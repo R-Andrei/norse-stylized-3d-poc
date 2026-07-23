@@ -59,6 +59,7 @@
                 float4 _GroundRiverbedLayerDetailA;
                 float4 _GroundRiverbedLayerDetailB;
                 float4 _GroundRiverbedLayerDetailC;
+                float _GroundBankRiverbedSameDrySurface;
                 float _GroundRiverbedMaterialStrength;
                 float4 _GroundRiverbedMaterialTransition;
                 float _GroundRiverbedHydrologyEnabled;

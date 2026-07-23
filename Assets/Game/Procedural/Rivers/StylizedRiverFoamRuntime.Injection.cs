@@ -262,11 +262,10 @@ namespace ProgrammaticStylized3D.Rivers
 
                     FoamSourceEventGpuData gpuData =
                         automaticFoamSourceEventGpuData[index];
-                    bool persistentObjectEmitter =
-                        IsPersistentAutomaticSourceEmitter(sourceEvent.Type);
-                    bool hasNewDeposition = persistentObjectEmitter ||
+                    bool hasNewDeposition =
                         gpuData.Deposit.z < 0.5f ||
-                        gpuData.Header.z > gpuData.Deposit.y + 0.000001f;
+                        gpuData.Header.z >
+                            gpuData.Deposit.y + 0.000001f;
                     if (hasNewDeposition)
                     {
                         DispatchAutomaticFoamSourceEvent(
@@ -279,7 +278,7 @@ namespace ProgrammaticStylized3D.Rivers
 
                     if (sourceEvent.Elapsed >= sourceEvent.Duration - 0.00001f)
                     {
-                        CompleteAutomaticObjectContactCycle(sourceEvent);
+                        CompleteAutomaticObjectSourceEvent(sourceEvent);
                         automaticFoamSourceEvents[index] = default;
                         automaticFoamSourceEventGpuData[index] = default;
                         activeAutomaticFoamSourceEventCount = Mathf.Max(
@@ -301,7 +300,7 @@ namespace ProgrammaticStylized3D.Rivers
                 gridDescriptor);
         }
 
-        private static bool IsPersistentAutomaticSourceEmitter(
+        private static bool IsAutomaticObjectContactCycle(
             AutomaticFoamSourceEventType sourceType)
         {
             return sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
@@ -314,42 +313,9 @@ namespace ProgrammaticStylized3D.Rivers
             out float phaseOrSide,
             out float progress)
         {
-            if (IsPersistentAutomaticSourceEmitter(sourceEvent.Type))
-            {
-                float buildEnd = Mathf.Max(
-                    0.0001f,
-                    sourceEvent.ObjectBuildDuration);
-                float holdEnd = buildEnd + Mathf.Max(
-                    0f,
-                    sourceEvent.ObjectHoldDuration);
-                if (elapsed < buildEnd)
-                {
-                    phaseOrSide = 0f;
-                    progress = Mathf.Clamp01(elapsed / buildEnd);
-                }
-                else if (elapsed < holdEnd)
-                {
-                    phaseOrSide = 1f;
-                    progress = sourceEvent.ObjectHoldDuration > 0.0001f
-                        ? Mathf.Clamp01(
-                            (elapsed - buildEnd) /
-                            sourceEvent.ObjectHoldDuration)
-                        : 1f;
-                }
-                else
-                {
-                    phaseOrSide = 2f;
-                    progress = Mathf.Clamp01(
-                        (elapsed - holdEnd) /
-                        Mathf.Max(
-                            0.0001f,
-                            sourceEvent.ObjectReleaseDuration));
-                }
-
-                return;
-            }
-
-            phaseOrSide = sourceEvent.SideSign;
+            phaseOrSide = IsAutomaticObjectContactCycle(sourceEvent.Type)
+                ? 0f
+                : sourceEvent.SideSign;
             progress = Mathf.Clamp01(
                 elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
         }
@@ -384,11 +350,7 @@ namespace ProgrammaticStylized3D.Rivers
                 out float previousProgress);
             float materialStepProgress = Mathf.Clamp01(
                 (1f / Mathf.Max(1f, ResolveUpdateRate())) /
-                Mathf.Max(
-                    0.0001f,
-                    objectContactCycle
-                        ? sourceEvent.ObjectBuildDuration
-                        : sourceEvent.Duration));
+                Mathf.Max(0.0001f, sourceEvent.Duration));
 
             Vector4 distanceData;
             Vector4 shoreData;
@@ -442,8 +404,8 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.FeatherMetres);
                 variationData = new Vector4(
                     sourceEvent.SourceFillSeed,
-                    sourceEvent.BreakupScaleMetres,
-                    sourceEvent.BreakupStrength,
+                    0f,
+                    0f,
                     sourceEvent.Curvature);
                 kinematicsData = new Vector4(
                     sourceEvent.FormationSpeedMetresPerSecond,

@@ -55,6 +55,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public float Softness { get; }
         public float FeatureEdgeClearance { get; }
         public float FeatureReturnFade { get; }
+        public float FeatureSafetyMargin => FeatureEdgeClearance;
+        public float WholeFeatureReturnFade => FeatureReturnFade;
     }
 
 [Serializable]
@@ -143,14 +145,14 @@ public sealed class GroundMaterialControls
     private float bankMaterialBlendSoftness = 0.75f;
 
 
-    [InspectorName("Discrete Feature Edge Clearance")]
-    [Tooltip("Inward feature-free distance in metres from the Bank application boundary. Feature-aware payloads retain only their substrate response inside this band. Zero disables feature suppression.")]
+    [InspectorName("Feature Safety Margin")]
+    [Tooltip("Additional inward clearance in metres between the complete conservative rock support and the Bank application boundary. Whole rocks are retained, removed, or faded as one feature. Zero disables whole-rock boundary handling.")]
     [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
     [SerializeField]
     private float bankFeatureEdgeClearance = 0.50f;
 
-    [InspectorName("Discrete Feature Return Fade")]
-    [Tooltip("Distance in metres after the feature-free Bank edge band over which discrete features return. Zero performs a hard return after the clearance band.")]
+    [InspectorName("Whole Feature Return Fade")]
+    [Tooltip("Distance in metres over which a complete Bank-layer rock returns after its conservative support clears the safety margin. Zero performs a hard whole-rock return.")]
     [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumFeatureReturnFade)]
     [SerializeField]
     private float bankFeatureReturnFade = 0.15f;
@@ -266,14 +268,14 @@ public sealed class GroundMaterialControls
     private float riverbedMaterialBlendSoftness = 0.75f;
 
 
-    [InspectorName("Discrete Feature Edge Clearance")]
-    [Tooltip("Inward feature-free distance in metres from the Riverbed application boundary. Feature-aware payloads retain only their substrate response inside this band. Zero disables feature suppression.")]
+    [InspectorName("Feature Safety Margin")]
+    [Tooltip("Additional inward clearance in metres between the complete conservative rock support and the Riverbed application boundary. Whole rocks are retained, removed, or faded as one feature. Zero disables whole-rock boundary handling.")]
     [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumDistance)]
     [SerializeField]
     private float riverbedFeatureEdgeClearance = 0.50f;
 
-    [InspectorName("Discrete Feature Return Fade")]
-    [Tooltip("Distance in metres after the feature-free Riverbed edge band over which discrete features return. Zero performs a hard return after the clearance band.")]
+    [InspectorName("Whole Feature Return Fade")]
+    [Tooltip("Distance in metres over which a complete Riverbed-layer rock returns after its conservative support clears the safety margin. Zero performs a hard whole-rock return.")]
     [Range(0f, GroundSurfaceApplicationBlendSettings.MaximumFeatureReturnFade)]
     [SerializeField]
     private float riverbedFeatureReturnFade = 0.15f;
@@ -709,6 +711,10 @@ public sealed class GroundMaterialControls
         BankSurfaceApplicationBlend.FeatureEdgeClearance;
     public float BankFeatureReturnFade =>
         BankSurfaceApplicationBlend.FeatureReturnFade;
+    public float BankFeatureSafetyMargin =>
+        BankSurfaceApplicationBlend.FeatureSafetyMargin;
+    public float BankWholeFeatureReturnFade =>
+        BankSurfaceApplicationBlend.WholeFeatureReturnFade;
     public float BankMaterialReach => Mathf.Clamp01(bankMaterialReach);
     public float ImmediateBankExposure => Mathf.Clamp01(immediateBankExposure);
     public float WaterlineMaterialStrength => Mathf.Clamp01(waterlineMaterialStrength);
@@ -755,6 +761,10 @@ public sealed class GroundMaterialControls
         RiverbedSurfaceApplicationBlend.FeatureEdgeClearance;
     public float RiverbedFeatureReturnFade =>
         RiverbedSurfaceApplicationBlend.FeatureReturnFade;
+    public float RiverbedFeatureSafetyMargin =>
+        RiverbedSurfaceApplicationBlend.FeatureSafetyMargin;
+    public float RiverbedWholeFeatureReturnFade =>
+        RiverbedSurfaceApplicationBlend.WholeFeatureReturnFade;
     public float RiverbedDetailScaleMultiplier =>
         Mathf.Clamp(riverbedDetailScaleMultiplier, 0.25f, 4f);
     public float RiverbedTextureFormStrengthMultiplier =>

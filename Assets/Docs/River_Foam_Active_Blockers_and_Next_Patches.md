@@ -26,7 +26,9 @@
 
 `RG-METRIC-P12u — Unified Automatic Birth Reveal-Speed Contract` is user-validated as working as expected and is frozen and closed. Its live report output and performance profile remain optional evidence work rather than open correctness blockers.
 
-`RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport` is the active approved patch. It separates geometric Coverage from intrinsic Presence and Remaining Life, makes birth controls literal, preserves negative topology, and consolidates the three global transport/visibility selectors in one documented Inspector contract.
+`RG-METRIC-P13A — Authoritative Birth Material and Coverage-Separated Transport` and `RG-METRIC-P13A.1 — D3D11 Struct-Selection Compile Hotfix` are implemented and Unity-imported. P13A remains the current Coverage/Presence/Life baseline; P13A.1 removed the D3D11 struct-valued conditional without changing its calculations.
+
+`RG-METRIC-P13B — Packet-Rearmed Birth and Object Contact Retention` is implemented in source and awaiting Unity validation. It stops repeated automatic-source accumulation, restricts Object Arc/Semi-Arc refresh to the immediate contact profile, adds distance-derived per-slot rearming, reuses the existing obstacle-routing texture for a narrow contact slowdown halo, and removes automatic-source Breakup Strength authoring and hidden breakup/gap masks.
 
 ### P12g reviewed evidence
 
@@ -1208,4 +1210,312 @@ The replacement performs no new arithmetic. It selects the same already-decoded 
 - Applying the two-entry hotfix ZIP over the immutable P13A tree reproduces the completed P13A.1 tree byte-for-byte with zero unsafe, added, deleted, or differing paths.
 - Compute kernels, resources, dispatches, mode calculations, persistent packing, lifecycle, birth, render, diagnostics, and accepted P12t/P12u source remain unchanged.
 - Unity 6000.5 D3D11 compilation is pending and is the required next validation action.
+
+
+
+## RG-METRIC-P13B — Packet-Rearmed Birth and Object Contact Retention
+
+**Status:** Source implemented; offline validation passed; Unity validation pending.
+
+### Objective
+
+Prevent automatic Foam sources from building giant persistent Layer C reservoirs through repeated emission while preserving finite thin source packets and long-lived object-contact Foam. Reuse current resources and reduce repeated work rather than adding a filament field, texture, buffer, kernel, pass, or draw call.
+
+### Read-only reviewed evidence
+
+- The supplied source archive and P13A/P13A.1 patch archives contain no `.git` metadata. `HEAD`, status, staged state, and history are unavailable. The immutable post-P13A.1 copy at patch start is the comparison authority.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::AutomaticShoreSourceProfile.SlotSpacingMetres` and `AutomaticFreeWaterSourceProfile.SlotSpacingMetres` interpolate slot spacing from Coverage, while `TryStartAutomaticShoreSourceEvent` and `TryStartAutomaticFreeWaterSourceEvent` also reject each deterministic slot through a Coverage probability. Coverage therefore changes both candidate density and participation.
+- `AutomaticShoreSourceProfile.EventsPerSecond`, `AutomaticObjectSourceProfile.EventsPerSecond`, and `AutomaticFreeWaterSourceProfile.EventsPerSecond` interpolate from nonzero family minimum rates once Activity is positive. Activity is therefore not a linear zero-to-maximum rate.
+- Shore and Free-Water sources have deterministic slot identities but no per-slot active/rearm record. `TryStartAutomaticShoreSourceEvent` and `TryStartAutomaticFreeWaterSourceEvent` may select the same logical slot again as soon as their global rate accumulator fires.
+- Nonpersistent automatic sources already use current-minus-previous deposition permission in `CS_RiverFoam.compute::EvaluateFoamAutomaticSourceRasterSample`. Shore Ribbon, Inward Wash, Lace, Cross-Lace, and Torn Fragment therefore do not need a new deposition architecture. Contact Fleck is the exception because `FoamEvaluateObjectContactFleckSource` multiplies the whole completed shape by one global reveal amplitude, so every tick increases the complete footprint and passes current-minus-previous permission.
+- `StylizedRiverFoamRuntime.Injection.cs::IsPersistentAutomaticSourceEmitter` classifies Object Arc and Semi-Arc as persistent. `DispatchAutomaticFoamSourceEvents` dispatches them every material tick, while `FoamResolveObjectRibbonPhaseMask` returns the complete front and wake geometry throughout Hold. Wake arms are therefore replenished for the full Hold interval.
+- `CS_RiverFoam.compute::FoamEvaluateObjectContactArcSource` and `FoamEvaluateObjectContactSemiArcSource` already compute front-profile and downstream wake-arm shapes separately before combining them. The immediate contact profile can remain refreshable while wake arms use one-shot Build deposition without a new event lane or resource.
+- `StylizedRiverFoamRuntime.Obstacles.cs::StampObstacleRoutingComponent` writes one RGHalf routing texture. Its current G channel is a one-sided upstream collision influence and `ResolveFixedMetricObstacleRoutingPolicy` has zero downstream release cells. Side/rear contact Foam therefore receives no retention slowdown.
+- `RiverWaterFoamVelocity.hlsl::RiverWaterResolveFoamVelocityContract` currently treats R as direction and G as the shared routing/slowdown influence. The same RG texture can instead encode R as signed routing influence and G as independent slowdown influence. This permits a narrow all-around contact slowdown halo without lateral redirection and without a new texture sample.
+- Automatic-source Breakup Strength is exposed for Shore Ribbon, Inward Wash, Contact Fleck, Lace, Cross-Lace, and Torn Fragment. `CS_RiverFoam.compute::FoamSourceEventBreakup` is then mixed with different hidden strengths, while Lace/Cross-Lace also apply separate gap masks and Torn Fragment applies a separate bite mask. The controls do not own one predictable operation. Arc/Semi-Arc breakup fields are serialized legacy state and already absent from the active Inspector.
+- P13A Coverage/Presence/Life packing, P12u Reveal Speed, P12t Chipping, negative topology, material transport, Final Visibility modes, and Presence Footprint modes are direct consumers or adjacent contracts but do not require semantic changes in P13B.
+
+### Acceptance criteria
+
+1. Coverage selects a stable fraction of a fixed deterministic slot population. It does not also change slot spacing.
+2. Activity is linear from zero to each family maximum start rate. Activity zero emits nothing; Activity one attempts at the documented maximum rate.
+3. Shore and Free-Water logical slots cannot start another event until the prior event duration plus a distance-derived packet-clearance interval has elapsed. The clearance interval uses authored Minimum Packet Gap and current Foam downstream speed.
+4. Contact Flecks are rearmed per object, cannot overlap another active Fleck from the same object, and use a spatial reveal sweep so only newly revealed geometry is deposited.
+5. Object Arc/Semi-Arc front and wake geometry are deposited once during Build. During Hold, only the immediate object-contact front profile is refreshed. Release progressively withdraws that front-only refresh and never refreshes wake arms. Existing deposited material remains governed by transport, support, and lifecycle.
+6. The current obstacle-routing RGHalf texture becomes `R = signed routing influence`, `G = slowdown influence`. Existing upstream routing remains one-sided. A narrow contact slowdown halo covers front, shoulders, sides, and rear without adding lateral routing.
+7. When slowdown is enabled, full contact influence reaches the exact authored Minimum Downstream Factor. The former Slowdown Strength field becomes an Inspector-facing Slowdown Falloff/Reach authority; zero disables slowdown and higher values broaden the influence response.
+8. Remove every visible automatic-source Breakup Strength Min/Max control and remove generic breakup, Lace/Cross-Lace gap masks, and Torn Fragment bite masks from automatic-source geometry. Preserve source dimensions, curvature, end taper, deterministic width variation, and explicit recipe silhouettes.
+9. Do not change P13A persistent packing/merge/transport, Final Visibility modes, Presence Footprint modes, P12u timing, P12t Chipping, negative topology, source Initial Presence/Life, or scene tuning values.
+10. Runtime resource, kernel, dispatch-structure, texture-sample, pass, and draw-call counts must not increase. Accepted-event and repeated-raster work should decrease.
+
+### Approved project file scope
+
+Modify exactly:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+13. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+14. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+15. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl`
+16. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl`
+17. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Create/delete/move/rename: none inside the Unity project. Patch ZIP, validation report, and checksum are generated outside the project.
+
+### Implementation sequence
+
+1. Record this complete plan before source edits.
+2. Add authoritative Shore, Object Fleck, and Free-Water Minimum Packet Gap controls; move Activity/Coverage tooltips to their corrected contracts; relabel obstacle slowdown ownership; remove visible and serialized automatic-source Breakup Strength controls.
+3. Make Shore/Free-Water deterministic slot spacing fixed and Coverage participation stable; make all Activity rates linear from zero; add bounded per-slot/per-object rearm state and clear it with automatic-source state.
+4. Convert Contact Fleck reveal to a spatial accumulated sweep and add per-object active/rearm checks.
+5. Split Object Arc/Semi-Arc current/previous front and wake contributions in the rasterizer: one-shot Build deposition for all geometry, Hold refresh for contact front only, and progressive Release withdrawal for that front only. Wake arms are never refreshed after Build.
+6. Remove automatic-source generic breakup and hidden gap/bite masks while preserving explicit width noise, end taper, curvature, and silhouettes.
+7. Repack obstacle routing writes as signed routing plus independent slowdown; stamp the all-around contact slowdown halo at obstacle dirty-time; update compute and render velocity decoding without adding calls or samples.
+8. Synchronize the remaining four canonical documents.
+9. Run exact-scope reconciliation, all-reference scans, HLSL/C# delimiter and preprocessor checks, event ABI/kernel/resource/pass/property invariants, deterministic rearm and deposition model tests, obstacle-channel model tests, D3D11 conditional scan, and package reproduction.
+
+### Invariants and non-goals
+
+- No filament field or procedural ribbon renderer.
+- No new persistent texture, buffer, event vector, compute kernel, full-field pass, shader sample, material pass, or draw call.
+- Preserve the 32-event pool and existing source-event GPU byte layout.
+- Preserve fixed spacing `0.15 m`, material cadence, transport substeps, state formats, and cache ownership.
+- Preserve P13A Coverage/Presence/Life authority and overlap policy unchanged.
+- Preserve negative topology, support topology, lifecycle rates, and object-contact positive support unchanged.
+- Preserve source Reveal Speed and geometric min/max dimensions except removal of breakup/gap/bite shaping.
+- Do not edit scenes, prefabs, materials, metadata, layers, tags, or components.
+- Do not tune Final Visibility or Presence Footprint in this patch.
+
+### Performance and risks
+
+- Per-slot rearm state is CPU-only and bounded by the deterministic Shore/Free-Water slot counts plus registered object count. It allocates no per-frame collection.
+- Source start arithmetic adds dictionary lookups only on bounded event-attempt scans. Fewer accepted overlapping events and removal of hidden source noise are expected to reduce aggregate source-raster work; this is unmeasured until Unity profiling.
+- Object Arc/Semi-Arc still use the existing event dispatch range during Hold and progressive front-only Release, but only the contact profile writes material. Wake-arm refresh work is removed. A later dispatch-range optimization is possible but outside this patch.
+- Contact slowdown stamping runs only when the obstacle-routing texture is rebuilt. It reuses existing CPU scratch/state, texture memory, upload, shader sample, and velocity call count.
+- Risk: removing breakup/gap masks makes individual source strokes more continuous. Packet spacing, finite lengths, curvature, explicit widths, end taper, Chipping, and Strands remain available to prevent featureless shapes.
+- Risk: very low Foam downstream speed or Minimum Downstream Factor can produce long rearm intervals. This is intentional: a source must not stack packets that have not cleared.
+- Risk: object Hold refresh can still build a dense immediate contact band. Its width remains the fixed contact-profile ribbon and cannot refresh downstream arms.
+
+### Validation status
+
+- Read-only review and exact scope declaration: complete.
+- Plan recorded before implementation edits: complete.
+- Implementation: complete in the declared source scope.
+- Offline source/model validation: complete; exact results recorded in the P13B implementation record below.
+- Unity 6000.5 C# compilation, D3D11 shader import, Play Mode source-population review, and profiler evidence: pending user validation.
+
+
+### P13B implementation record
+
+Implemented source contract:
+
+1. Shore and Free-Water use fixed deterministic slot spacing. Coverage is a stable slot-participation threshold and no longer changes slot density. Activity is linear from zero to the existing family maximum attempt rate.
+2. Every accepted Shore and Free-Water slot records a next-start time equal to event duration plus `Minimum Packet Gap / resolved downstream speed`. Contact Flecks use equivalent per-object state, reject concurrent Flecks from the same object, and also wait while that object's Arc/Semi-Arc cycle is active.
+3. Finite event rasterization uses current-minus-previous only as a per-cell reveal permission. A newly reached cell receives the complete current geometric Coverage target, avoiding cadence-dependent derivative Coverage while preventing writes behind the reveal head.
+4. Contact Fleck reveal is spatial along its tangent instead of globally increasing the complete Fleck mask.
+5. Arc/Semi-Arc Build deposits contact and finite wake geometry once. Hold refreshes only the immediate contact front. Release progressively withdraws only that front refresh. Wake arms are not repainted after Build.
+6. Object Flecks are removed from the normalized Arc/Semi-Arc mix. Mixed mode enables Flecks directly through Fleck Coverage, Fleck Activity, and Minimum Fleck Packet Gap; Arc/Semi-Arc weights normalize only those two cycle recipes.
+7. The existing obstacle-routing RGHalf texture now means `R = signed lateral-routing influence`, `G = independent slowdown influence`. Existing one-sided upstream routing is preserved. A dirty-time `0.45 m` all-side contact halo reaches full slowdown inside `0.10 m` without another resource, upload, sample, or dispatch.
+8. The serialized slowdown-strength scalar is Inspector-labelled `Obstacle Slowdown Falloff`. Zero disables slowdown. Any positive setting reaches the exact authored Minimum Downstream Factor at full contact; the setting changes how quickly influence approaches that minimum.
+9. Generic automatic-source Breakup Strength controls and evaluation are removed, together with Lace/Cross-Lace gap masks and Torn Fragment bite masks. The reserved source-event ABI lanes remain zeroed/ignored so the GPU record layout and P7 diagnostics remain compatible.
+10. Confirmed unused Arc/Semi-Arc arm-reach and Semi-Arc lopsidedness serialized/accessor/sanitizer controls are removed. Existing scene YAML may retain unknown historical keys; no scene or prefab is edited.
+
+Preserved contracts:
+
+- P13A Coverage/Presence/Life packing, birth merge, Donor/TVD transport, Final Visibility and Presence Footprint;
+- P12u reveal-speed resolver and source-event pool capacity;
+- P12t Candidate/Eligibility/soft-reconstruction Chipping;
+- topology support, negative aging, lifecycle rates, fixed metric `0.15 m`, kernels, buffers, textures, passes, and draw calls.
+
+Performance disposition:
+
+- Active-gameplay source writes are expected to decrease because finite sources stop writing behind their reveal head, same-slot/object packet rearming prevents rapid restarts, and Object wake arms are no longer refreshed during Hold/Release.
+- Added cost is bounded dictionary lookup/arithmetic during source-attempt scans and dirty-time CPU contact-halo stamping. There is no per-frame allocation, GPU resource, shader sample, kernel, pass, or draw-call increase.
+- Velocity evaluation replaces one shared influence with signed routing plus slowdown. Falloff uses a bounded quartic-to-linear blend with scalar multiplies and one lerp; no transcendental operation is added. Measured CPU/GPU impact remains pending Unity profiling.
+
+Offline validation proves source-level invariants and package reproduction only. Unity compilation, D3D11 import, Play Mode visual acceptance, and performance remain pending.
+
+### Post-implementation consistency and compliance reconciliation
+
+- Final project diff is exactly the 17 approved files. Added/deleted/moved/renamed project files: none.
+- The complete source/model suite is `28/28 PASS`: exact scope, C#/HLSL/shader lexical and preprocessor balance, serialized-property/property-reference resolution, removed-control scans, packet-rearm and deposition ownership, Fleck spatial reveal, Object Build/Hold/Release ownership, obstacle RG separation, exact-minimum slowdown mathematics, event ABI, kernel/property/pass invariants, P13A/P12t byte identity, P12u resolver byte identity, and D3D11 struct-conditional regression scan.
+- Randomized model evidence includes 100,000 packet-clearance cases, 1,001 × 1,001 Fleck reveal samples, 10,000 one-shot reveal cells, 100,000 slowdown cases, and 100,000 signed-routing/slowdown combinations.
+- Applying the 17-entry patch archive over the immutable post-P13A.1 baseline reproduces the completed P13B tree byte-for-byte with zero unsafe, added, deleted, or differing paths.
+- Final reread confirms no new texture, buffer, event vector, kernel, full-field pass, shader sample, material pass, draw call, layer, tag, component, scene, prefab, material, or metadata edit.
+- Unity 6000.5 C# compilation, D3D11 shader import, Play Mode source spacing/contact retention review, and CPU/GPU profiling remain pending and are the required next validation actions.
+
+## RG-METRIC-P13B.1 — Reveal-Speed Diagnostic Object-Cycle Compile Hotfix
+
+**Status:** Implemented; offline validation passed; Unity compilation pending.
+
+### Objective
+
+Restore Unity C# compilation after P13B removed `IsPersistentAutomaticSourceEmitter` from `StylizedRiverFoamRuntime.Injection.cs` while `StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs` retained two stale calls. Preserve all P13B runtime, spawning, retention, timing, transport, rendering, and diagnostic calculations.
+
+### Read-only reviewed evidence
+
+- Unity reports `CS0103` at `StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs:121` and `:138`: `IsPersistentAutomaticSourceEmitter` does not exist in the current context.
+- Source-wide search finds exactly those two executable references. The only other occurrence is historical P13B planning text.
+- `StylizedRiverFoamRuntime.Injection.cs::IsAutomaticObjectContactCycle` is the current shared classifier for `ObjectContactArc` and `ObjectContactSemiArc`.
+- The diagnostic uses the missing helper only to select `ObjectBuildDuration` as reveal duration and to print Hold/Release/Rest timing for Arc/Semi-Arc events. `IsAutomaticObjectContactCycle` has the exact required event set.
+
+### Approved project file scope
+
+Modify exactly:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+
+Create/delete/move/rename: none inside the Unity project. Patch ZIP, validation report, and checksum are generated outside the project.
+
+### Implementation sequence
+
+1. Record this hotfix before changing C# source.
+2. Replace both stale `IsPersistentAutomaticSourceEmitter` calls with `IsAutomaticObjectContactCycle`.
+3. Confirm no executable reference to the removed helper remains.
+4. Confirm the current classifier still resolves exactly Arc and Semi-Arc.
+5. Run exact-scope, replacement-count, delimiter/preprocessor, source-reference, and package-reproduction checks.
+
+### Invariants and non-goals
+
+- No event timing, event type, source scheduling, packet rearm, object retention, transport, lifecycle, rendering, Chipping, Inspector, serialization, resource, kernel, pass, scene, prefab, material, layer, tag, or component change.
+- P13A/P13A.1 and P13B runtime behaviour remains unchanged.
+- No new helper is introduced; the current authoritative object-cycle classifier is reused.
+
+### Performance
+
+No runtime cost change. The diagnostic is editor-only, and the replacement calls the existing constant-time event-type classifier.
+
+### Validation status
+
+- Offline exact-scope and semantic validation: passed.
+- Unity 6000.5 C# compilation: pending user validation.
+
+### Post-implementation reconciliation
+
+- Actual project diff is exactly the two declared files.
+- Both stale calls were replaced with `IsAutomaticObjectContactCycle`; no executable `IsPersistentAutomaticSourceEmitter` reference remains.
+- `IsAutomaticObjectContactCycle` still classifies exactly `ObjectContactArc` and `ObjectContactSemiArc`, preserving reveal-duration and Hold/Release/Rest diagnostic behaviour.
+- No runtime source file was modified. P13B spawning and object-retention calculations remain byte-identical.
+- Unity compilation is pending and is the required next validation action.
+
+
+## RG-METRIC-P13C — One-Shot Object Packets and Full-Vector Contact Retention
+
+**Status:** Source implementation complete; `35/35` offline validation gates pass; package reproduction complete; Unity validation pending.
+
+### Objective
+
+Remove the remaining persistent Object Arc/Semi-Arc emitters and make object-contact slowdown reduce the complete routed Foam velocity vector. Arc, Semi-Arc, and Fleck become finite one-shot packets behind one shared per-object rearm gate. Preserve P13A material authority, P12u reveal-speed progression, P12t Chipping, Shore/Free-Water source ownership, topology aging, and all existing GPU resources.
+
+### Read-only reviewed evidence
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::DispatchAutomaticFoamSourceEvents` treats Object Arc/Semi-Arc Hold as unconditional new deposition and continues dispatching until `Build + Hold + Release` completes.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute::FoamEvaluateObjectContactArcSource`, `FoamEvaluateObjectContactSemiArcSource`, and the `refreshObjectContact` branch retain/rewrite the immediate contact front through Hold/Release.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs::CompleteAutomaticObjectContactCycle` rearms Arc/Semi-Arc from `ObjectRestDuration`, while Flecks use a separate `automaticObjectFleckNextStartTimes` dictionary. The two source classes therefore do not share one clearance authority.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs::StampObstacleContactSlowdownComponent` already writes an all-side slowdown halo into the existing obstacle-routing texture, but its `0.10 m` full reach and `0.45 m` outer reach are hidden constants and are absent from the routing-field signature.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl::RiverWaterResolveFoamVelocityContract` applies slowdown only to downstream velocity. Lateral velocity remains unscaled, so full contact influence does not reduce total speed to the authored minimum factor.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs` and `StylizedRiverFoamRuntime.P7Diagnostics.cs` still assume Arc/Semi-Arc Build/Hold/Release/Rest state and must be reconciled when those phases are removed.
+- The source archive has no `.git` metadata. The immutable post-P13B.1 tree at `/mnt/data/p13c_base` is the comparison authority.
+
+### Approved project file scope
+
+Modify exactly:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+4. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+5. `Assets/Docs/River_Rendering_Roadmap.md`
+6. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Obstacles.cs`
+13. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+14. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+15. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+16. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+17. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+18. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl`
+
+Create/delete/move/rename: none inside the Unity project. Patch archive, validation report, and checksum are generated outside the project.
+
+### Implementation sequence
+
+1. Replace serialized Object Hold, Release, Rest, and Fleck-specific packet-gap controls with one `Object Contact Minimum Packet Gap (m)` control. Add authored `Object Contact Full Slowdown Reach (m)` and `Object Contact Slowdown Outer Reach (m)` controls; preserve existing serialized slowdown falloff/minimum-factor backing names.
+2. Replace `AutomaticObjectContactCycleState` plus `automaticObjectFleckNextStartTimes` with one per-object source state containing cycle index, next eligible time, and last successful object event type. Arc/Semi-Arc/Fleck share this state and one clearance gate. A completed Fleck must not immediately chain into another Fleck when contact cycles are enabled; the next eligible object event is a cycle. Flecks remain supplemental rather than starving Arc/Semi-Arc at high Activity.
+3. Make Arc/Semi-Arc event duration equal Build duration only. Remove Hold/Release/Rest from event state, creation, phase progression, completion, and diagnostics. Arc/Semi-Arc use the ordinary current-minus-previous one-shot deposition path.
+4. Schedule every completed Arc/Semi-Arc/Fleck through one clearance resolver: slowdown-halo clearance at the authored minimum full-vector speed plus the authored downstream packet gap at base Foam speed. Slowdown disabled resolves factor `1`. Positive slowdown with minimum factor `0` yields no automatic rearm.
+5. Reduce object source evaluation to Build-only geometry and remove the Hold/Release refresh bypass. Preserve Arc/Semi-Arc build order, dimensions, contact profile, and one-shot wake geometry.
+6. Stamp the authored contact-halo reaches into the existing RGHalf obstacle field and include both reaches in the dirty-time routing signature.
+7. Apply the resolved contact speed factor to both downstream and lateral velocity components. Preserve routing direction and the exact minimum-factor contract.
+8. Reconcile Inspector help, public diagnostic properties, the Object source status row, P7 diagnostics, reveal-speed diagnostics, and all five canonical documents. The post-implementation audit found `StylizedRiverFoamRuntime.PublicSurface.cs` and `StylizedRiverEditor.DebugViews.cs` still exposed obsolete Hold/Release/Rest counters; scope was amended before either file was edited. Run exact-scope, stale-reference, serialized-property, event-state, source-deposition, rearm, velocity, resource/kernel/pass, delimiter/preprocessor, and package-reproduction checks.
+
+### Invariants and non-goals
+
+- No Arc/Semi-Arc source rasterization occurs after Build completes.
+- Arc/Semi-Arc/Fleck cannot bypass the shared object clearance gate or run concurrently for the same object.
+- Flecks remain supplemental: when both Flecks and contact cycles are enabled, a successful Fleck is followed by a contact-cycle opportunity before another Fleck from that object.
+- Full contact slowdown scales both velocity components by the exact authored minimum speed factor; outside the halo velocity is unchanged.
+- Preserve P13A Coverage/Presence/Life/Pattern packing, merge, Donor/TVD transport, Final Visibility, and Presence Footprint unchanged.
+- Preserve P12u reveal-speed resolver, source geometry and dimensions, fixed `0.15 m` metric, topology support/negative aging, P12t Chipping/Strands, source Initial Presence/Life, and the 32-event pool.
+- Do not edit Shore or Free-Water spawning, scenes, prefabs, materials, metadata, layers, tags, components, textures, buffers, kernels, passes, draw calls, or shader sample count.
+- Do not add debug views.
+
+### Performance and risks
+
+- Removing Hold/Release dispatches and shortening Arc/Semi-Arc event occupancy reduces active-gameplay source-raster work.
+- Shared object state replaces one dictionary and does not allocate per frame.
+- Contact reach changes rebuild only the existing dirty-time obstacle-routing texture. Two scalar settings are added to its signature; no new field or upload exists.
+- Full-vector slowdown adds one scalar multiply to the lateral component and reuses the existing slowdown calculation.
+- Conservative halo-clearance timing uses the full outer reach at the authored minimum speed. It may delay rearm longer than actual material takes to leave the halo; this is intentional to prevent stacking.
+- A positive slowdown with minimum speed factor zero disables automatic object rearm by contract. Inspector text must state this explicitly.
+
+### Acceptance criteria
+
+1. `Automatic Birth Sources` shows Arc/Semi-Arc cyan only while Build advances.
+2. Arc/Semi-Arc event duration and source dispatch stop at Build completion; Hold/Release/Rest state and controls are absent.
+3. Arc, Semi-Arc, and Fleck share one per-object next-eligible time and cannot overlap or bypass it.
+4. A successful Fleck cannot starve contact cycles by repeatedly winning every shared rearm interval.
+5. Object packet rearm equals conservative halo clearance plus authored packet-gap clearance; minimum speed zero with slowdown enabled yields no automatic rearm.
+6. Full slowdown influence scales downstream, lateral, and total velocity magnitude by the exact minimum speed factor.
+7. Authored full/outer halo reach changes rebuild the existing obstacle field and obey `outer >= full >= 0`.
+8. No new runtime resource, kernel, pass, sample, draw call, scene, prefab, material, layer, tag, or component exists.
+
+### Validation status
+
+- Read-only review and exact scope declaration: complete.
+- Plan recorded before implementation edits: complete.
+- Implementation: complete.
+- Post-change consistency/compliance audit: complete; `35/35 PASS`.
+- Patch reproduction over the immutable post-P13B.1 source: complete; final archive extraction reproduces all 323 project files byte-for-byte with no added, deleted, or differing path.
+- Unity 6000.5 C# compilation, D3D11 shader import, Play Mode source/retention review, and profiling: pending user validation.
+
+### Implementation record
+
+- Arc/Semi-Arc `Duration` now equals resolved Build duration. Injection dispatch uses only generic progress advancement; completion immediately returns the object to shared clearance ownership.
+- Arc/Semi-Arc compute evaluation contains Build geometry only. The persistent contact bypass and all Hold/Release source masks are absent.
+- Arc, Semi-Arc, and Fleck use one `AutomaticObjectSourceState` dictionary. The separate Fleck next-start dictionary is removed. Active ownership is checked against all three recipes.
+- Shared completion resolves conservative halo-clearance plus packet-gap time. Slowdown disabled uses factor one; positive slowdown with minimum factor zero returns infinite clearance until authoring authority changes.
+- Object-contact reach controls replace hidden `0.10 m` / `0.45 m` constants and participate in obstacle-field dirty signatures.
+- Canonical velocity resolves normal routing first, then scales the complete routed `float2` by one contact speed factor. At full influence total velocity reaches the exact authored minimum factor.
+- Obsolete Hold/Release/Rest/Fleck-gap properties and Inspector controls are removed. The old Fleck-only gap is not migrated into the new shared object gap; existing components receive the approved new `1.0 m` default. The discovered public/debug counter consumers were added to scope before edit; the Inspector now reports Arc/Semi-Arc building, Fleck building, and waiting-for-clearance counts.
+- No texture, buffer, event GPU lane, kernel, resource declaration, shader sample, pass, draw call, scene, prefab, material, metadata, layer, tag, or component was added.
+
+### Offline validation evidence
+
+`35/35 PASS`, including exact 18-file reconciliation, no additions/deletions, stale-state scans, serialized-property resolution, shared-owner checks, Build-only dispatch/evaluation checks, 200,000 one-shot permission cases, 200,000 packet-clearance cases, 200,000 full-vector slowdown cases, C#/HLSL/preprocessor/Markdown structure, unchanged 23-kernel manifest, unchanged eight-`float4` source GPU ABI, byte-identical P12u reveal resolver, byte-identical P13A simulation contract, and byte-identical P12t/P13A rendering include.
 

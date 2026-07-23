@@ -4441,10 +4441,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
-                "Discrete Feature Handling",
+                "Whole Feature Handling",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Feature-aware payloads can retain their substrate-only form and finish near this application boundary while suppressing discrete features such as rocks. This adds no texture sample. Set Edge Clearance to zero to disable the feature-aware transition for visual or GPU timing comparison.",
+                "Feature-aware payloads reconstruct each rock's conservative support without IDs or searches. A rock is retained, removed, or faded uniformly from its substrate-only response according to its complete support. Set Feature Safety Margin to zero to disable whole-feature boundary handling for visual or GPU timing comparison.",
                 MessageType.None);
             EditorGUILayout.PropertyField(featureEdgeClearance);
             using (new EditorGUI.DisabledScope(

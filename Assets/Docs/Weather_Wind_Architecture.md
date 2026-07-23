@@ -2,7 +2,7 @@
 
 ## Status
 
-**Active implementation plan — WEATHER-WIND-V0**
+**Implemented baseline — WEATHER-WIND-V0 + WEATHER-WIND-TRAILS-V0.9A (provisionally frozen)**
 
 ```text
 Engine: Unity 6000.5.0f1
@@ -16,11 +16,11 @@ Initial covered area: 64 × 64 m
 Initial update cadence: 10 Hz
 ```
 
-This document is the canonical architecture and implementation ledger for shared Weather-owned wind. Wind is not owned by vegetation. Vegetation, future stylized wind lines, and gameplay systems consume the Weather wind contract according to their own response rules.
+This document is the canonical architecture and implementation ledger for shared Weather-owned wind. Wind is not owned by vegetation. Vegetation and the implemented stylized wind trails consume the Weather wind contract according to their own response rules; future gameplay systems may consume the same authoritative contract.
 
 The provisional parent Weather-system record is `Assets/Docs/Weather_System_Architecture_Provisional.md`. This document remains authoritative for the implemented wind subsystem.
 
-The current patch implements only the minimum reusable wind domain and vegetation response integration. It does not implement the complete Weather system, stylized wind-line rendering, player movement resistance, or authored regional weather logic.
+The current implemented baseline includes the reusable Weather wind domain, vegetation response integration, and the Weather-owned stylized wind-trail renderer frozen at V0.9A. It does not implement the complete Weather system, player movement resistance, authored regional weather logic, or the deferred full Weather testing sprint.
 
 ---
 
@@ -42,10 +42,10 @@ The current patch implements only the minimum reusable wind domain and vegetatio
 - small blade-detail flutter;
 - composition with later interaction and trail fields.
 
-### Future consumers
+### Current and future consumers
 
-- Stylized wind lines sample or advect through the Weather target-wind field.
-- Gameplay samples the CPU Weather wind function in Weather strength units; it must not read back the GPU response texture or interpret grass-bend metres as wind strength.
+- Implemented stylized wind trails use the authoritative Weather target-wind contract for spawn selection, birth direction, path validation, and upwind camera entry.
+- Gameplay may sample the CPU Weather wind function in Weather strength units; it must not read back the GPU response texture or interpret grass-bend metres as wind strength.
 - Other visual systems may sample the target field or define their own response cache.
 
 ---
@@ -246,7 +246,7 @@ No Ground, River, vegetation mesh, instance-layout, vegetation shader pass, scen
 - Gameplay-anchor movement preserves overlapping field state through toroidal scrolling.
 - A 5 m² and 500 m² vegetation area receive the same metres-per-cell wind quality when inside the visual domain.
 - CPU `SampleWindXZ` exists for later gameplay integration.
-- Target texture and shared HLSL contract expose authoritative Weather strength vectors for later stylized wind-line advection; the separate response texture stores visual bend in metres.
+- Target texture and shared HLSL contract expose authoritative Weather strength vectors used by the implemented stylized wind trails and available to later consumers; the separate response texture stores visual bend in metres.
 - Existing `VegetationBenchmarkWindProvider` scene component does not become a missing script and contains no old wind implementation.
 - Vegetation draw count, placement hash, instance stride, mesh, Ground integration, and candidate controls remain unchanged.
 - Inspector provides one Weather report-copy button.
@@ -327,7 +327,7 @@ Both active modes render the same Scene-view frame of reference:
 - arrow direction from the sampled XZ vector;
 - arrow length and colour jointly encoding magnitude.
 
-`Wind Field` displays the authoritative Weather target vector. It is the field used by CPU gameplay sampling and intended future visual consumers such as stylized wind-line advection.
+`Wind Field` displays the authoritative Weather target vector. It is the field used by CPU gameplay sampling, the implemented wind-trail consumer, and any later visual consumers that require the target field.
 
 `Response Error` displays:
 
@@ -2169,3 +2169,695 @@ Source-level checks confirm:
 - LF-only content and no trailing whitespace.
 
 Unity compilation, shader import, baseline migration, the absence of the vertex-layout warning, actual resolved report values, guaranteed full phase sequencing, front/tail pointedness throughout spawn and despawn, absence of mid-air disappearance, occupancy behavior under longer total lifetimes, Frame Debugger draw count, steady-state GC, CPU/GPU timing, depth behavior, transparency sorting, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.7 — Wind-directed zero-mean wobble and camera-focused spawning
+
+**Status:** Runtime, editor, migration, and source-level audit complete on 2026-07-22. Unity compilation and live visual validation remain pending.
+
+### Objective and user-approved distinction
+
+The user clarified that trail **direction** and trail **waving** are separate concerns:
+
+- the authoritative Weather field owns the average route and travel direction;
+- every visible trail must wobble repeatedly from side to side around that route;
+- the wobble must not accumulate a permanent lateral turn or turn one trail into a long curve;
+- an occasional larger wave means one normal wobble loop receives extra amplitude, then returns to the same Weather-directed backbone;
+- spawn candidates should, on average, begin inside or immediately beside the target-camera viewport and should prefer useful downwind runway through the frame.
+
+The intended shape is therefore:
+
+```text
+Weather backbone: ------------------------------>
+Visible trail:    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~>
+```
+
+and explicitly not one long heading change:
+
+```text
+------
+      \
+       \
+```
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Create, delete, move, rename, metadata, shader, scene, prefab, material asset, Weather producer/editor/compute/shared-HLSL, vegetation, Ground, River, URP, renderer-feature, layer, tag, package, and hierarchy changes: none.
+
+### Trajectory model
+
+The existing captured-time midpoint/RK2 integration remains the authoritative backbone:
+
+```text
+sample target wind at current point
+sample target wind at projected midpoint
+advance one integration step in the midpoint direction
+repeat
+```
+
+After the backbone is complete, V0.7 applies a mandatory lateral presentation displacement. The displacement is measured against cumulative **backbone distance in metres**, not normalized only once across the full path.
+
+For backbone distance `s`, amplitude `A`, resolved wavelength `W`, and local XZ perpendicular `P(s)`:
+
+```text
+finalPoint(s) = backbone(s) + P(s) * A * sin(2πs/W)
+```
+
+The runtime resolves an integer number of complete cycles over the usable backbone. This gives exact zero displacement at both path endpoints, complete positive/negative loops, and no accumulated lateral offset. The Weather field therefore remains the average route even when a local segment temporarily points slightly sideways to form the wobble.
+
+Default editable controls:
+
+```text
+Minimum Lateral Wobble Strength:   0.18 m
+Maximum Lateral Wobble Strength:   0.30 m
+Minimum Lateral Wobble Wavelength: 3.5 m
+Maximum Lateral Wobble Wavelength: 5.0 m
+```
+
+For the default visible-body range of `5.5–8.5 m`, this normally leaves approximately one to two complete visible oscillations in the body rather than one fraction of a path-wide curve.
+
+### Mandatory validation and fallback
+
+Every accepted trail must retain at least its configured minimum wobble strength unless the user explicitly sets that minimum to zero. Runtime construction:
+
+1. copies the authoritative backbone into fixed scratch storage;
+2. chooses deterministic strength, wavelength, and side sign;
+3. applies the repeated zero-endpoint wobble;
+4. validates field bounds, self-approach, path wind floor, and existing minimum segment-to-wind alignment;
+5. reduces amplitude toward the configured minimum when required;
+6. rejects the candidate rather than silently spawning a straight path when the configured minimum wobble cannot pass.
+
+The wobble does not modify Weather state, does not feed vegetation, and is not rebuilt per frame.
+
+### Localized occasional larger loop
+
+The former whole-path broad wave is superseded. `FormerlySerializedAs` preserves the installed component's serialized chance and strength fields under the new names:
+
+```text
+Occasional Larger Loop Chance:          0.22
+Occasional Larger Loop Extra Strength:  0.28 m
+```
+
+When selected, one complete baseline wobble cycle receives a smooth localized amplitude envelope. Its offset is still the same sine cycle around the same backbone; only that loop becomes larger. The envelope is zero at the cycle boundaries, so the trail immediately returns to its normal wobble and gains no persistent sideways heading.
+
+If the extra loop violates bounds, self-approach, or alignment, its strength is reduced. If no extra strength passes, the already-valid mandatory baseline wobble is restored. Failure of the optional larger loop can never restore the old straight backbone.
+
+### Camera-focused candidate placement
+
+The old sequence generated an XZ lattice across the entire 64 m Weather field and discarded most points after camera testing. V0.7 reverses ownership:
+
+```text
+generate jittered lattice in target-camera viewport space
+project each point onto its selected anchor-relative altitude plane
+reject projections outside the Weather field
+sample authoritative target wind
+score strength, spacing, and downwind camera runway
+```
+
+Default controls:
+
+```text
+Candidate Viewport Margin: 0.05
+Camera Spawn Preference:   0.75
+```
+
+The viewport margin allows a narrow near-screen band so a trail can enter shortly after birth. `Camera Spawn Preference = 0` removes camera-runway weighting; `1` strongly prefers candidates whose first visible-body-length distance remains in or near the viewport. Wind strength and spacing remain mandatory placement terms, and camera relevance is a weighted preference rather than a second simulation rule.
+
+Forward visibility is estimated from five fixed samples along the selected candidate's current target-wind direction. No physics, depth readback, managed collection, or per-frame camera scan is introduced.
+
+### Diagnostics and Inspector
+
+`Visual Calibration > Wind-Directed Wobble` exposes:
+
+- minimum and maximum wobble strength;
+- minimum and maximum wobble wavelength;
+- occasional larger-loop chance;
+- occasional larger-loop extra strength.
+
+`Advanced Generation > Camera Relevance` exposes:
+
+- candidate viewport margin;
+- camera spawn preference.
+
+The report title advances to `V0.7 Wobble and Camera Placement Report` and records:
+
+- configured mandatory wobble ranges;
+- larger-loop chance and extra strength;
+- camera spawn preference and viewport margin;
+- active and total larger-loop counts;
+- last accepted wobble strength and resolved wavelength;
+- last accepted larger-loop extra strength;
+- last accepted forward-visibility score.
+
+Scene candidate diagnostics identify camera projection or Weather-field rejection with the existing grey diagnostic colour. No Scene-view text overlay is reintroduced.
+
+### Migration
+
+Serialized baseline version advances from `2` to `3`.
+
+Exact previous defaults migrate once:
+
+```text
+Candidate Viewport Margin:          0.12 -> 0.05
+Old Broad-Wave Extra Strength:      0.45 -> 0.28 m
+```
+
+`FormerlySerializedAs` maps the old broad-wave fields to the new localized larger-loop fields. Existing values changed away from the exact former defaults remain untouched. Newly added mandatory wobble and camera-preference controls use their declared first defaults. The existing Inspector Undo and dirty-state workflow persists the migration through normal Unity serialization.
+
+### Performance and invariants
+
+- Candidate count remains `8 × 8 = 64` by default.
+- Camera-runway scoring performs five projection checks per wind-eligible, separation-eligible candidate at bounded spawn cadence.
+- Mandatory wobble and the optional larger loop are `O(S)` spawn-time operations over at most 80 fixed points.
+- One additional fixed `Vector2[S]` baseline backup and one fixed `float[P]` camera-score array are allocated only with existing runtime resources.
+- No per-frame path rebuild, new draw, new material, new compute dispatch, GPU readback, or managed spawn-path allocation is introduced.
+- The V0.6 spawn/alive/despawn lifecycle, pointed endpoints, mesh layout, shader contract, hidden runtime material, one combined draw, and Play Mode-only ownership remain unchanged.
+
+Hard invariants:
+
+- Weather target wind remains the average route and direction source.
+- Baseline wobble is zero-endpoint and composed of complete cycles.
+- A larger loop is localized to one cycle and cannot create a long one-way bend.
+- Optional-loop failure restores mandatory wobble, not a straight trail.
+- A configured non-zero minimum wobble either survives validation or rejects the candidate.
+- Camera relevance influences spawn selection only; it does not alter target wind or trajectory direction.
+
+### Source-level validation and pending Unity evidence
+
+Source-level checks confirm:
+
+- exact three-file scope;
+- balanced C# structure and no shader modification;
+- current C# 9-compatible render invocation retained;
+- standard vertex order and V0.6 lifecycle attributes untouched;
+- viewport-space candidate generation and horizontal-plane projection;
+- deterministic camera-runway scoring without target-wind duplication;
+- mandatory metre-based repeated wobble with integer complete cycles and exact zero endpoint displacement;
+- optional localized larger-loop envelope confined to one complete cycle;
+- amplitude reduction and fallback/rejection ownership;
+- fixed arrays allocated/released with existing resources;
+- exact-once Inspector exposure and versioned migration;
+- report coverage, LF-only content, and no trailing whitespace.
+
+Unity compilation, migration persistence, Game-view camera placement, repeated visible oscillation on every accepted trail, average Weather-direction retention, forced/default larger-loop behavior, candidate rejection balance, occupancy, complete V0.6 lifecycle behavior, vertex-layout warning absence, Frame Debugger draw count, steady-state GC, CPU/GPU timing, depth behavior, transparency sorting, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed.
+
+Post-change static validation passed **73/73** checks. A straight-backbone analytical replay at `12 m`, `20 m`, and `39.5 m` produced `3`, `5`, and `9` complete cycles respectively, exact zero endpoint displacement within floating-point tolerance, resolved wavelengths of approximately `4.0–4.39 m`, and worst segment alignment of `0.7808` under the default `0.30 m` wobble plus `0.28 m` localized extra loop. This exceeds the configured `0.35` segment-alignment floor. The replay is source-level mathematical evidence only; it does not replace Unity Game-view validation.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.8 — Smooth dense presentation curve and five-trail baseline
+
+**Status:** Runtime, editor, migration, and source-level audit complete on 2026-07-22. Unity compilation and Game-view continuity validation remain pending.
+
+### Objective and approved scope
+
+The V0.7 mandatory wobble exposed the fact that one rendered ribbon pair was still emitted only for each `0.5 m` authoritative Weather-integration point. A typical `3.5–5.0 m` wobble therefore contained only approximately seven to ten straight chords, producing visible angle transitions and a segmented polyline appearance.
+
+V0.8 separates trajectory ownership from render tessellation:
+
+```text
+captured-time RK2 Weather backbone at the existing integration step
+-> tangent-continuous open quadratic midpoint spline
+-> dense presentation sampling
+-> mandatory zero-mean lateral wobble and optional localized larger loop
+-> one fixed combined ribbon mesh
+```
+
+The user also confirmed that five simultaneous trails are preferable. Five becomes the new exact baseline default and remains within the fixed one-draw budget.
+
+Approved affected files:
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Shader, scene, material asset, Weather producer/editor/compute/shared HLSL, vegetation, Ground, River, URP, renderer feature, layer, tag, package, prefab, and hierarchy changes: none.
+
+### Separate Weather and render resolutions
+
+`Maximum Centreline Points` and `Integration Step Metres` continue to control only the authoritative Weather backbone. Their V0.7 defaults remain:
+
+```text
+Maximum Weather-backbone points: 80
+Weather RK2 integration step:     0.5 m
+```
+
+New advanced presentation control:
+
+```text
+Render Curve Subdivisions Per Backbone Section
+Range:   2–12
+Default: 8
+```
+
+The runtime constructs an open quadratic midpoint spline from the coarse backbone. Each interior section runs from the midpoint of the preceding edge to the midpoint of the following edge, using the original Weather point as its quadratic control point. Start and end sections are clamped to the original path endpoints. Adjacent sections share both position and first derivative, so the presentation backbone has no hard tangent transition at Weather-sample boundaries and remains inside local control-point convex regions rather than overshooting into unrelated space.
+
+At `80` backbone points and `8` subdivisions, fixed render capacity per trail is:
+
+```text
+80 × 8 + 1 = 641 render points
+```
+
+The mandatory metre-based wobble and localized larger loop are evaluated on this dense smooth backbone, not on the coarse Weather samples. Cumulative distances and central-difference ribbon tangents are rebuilt from the final dense path before lifecycle fitting and mesh upload.
+
+### Validation ownership
+
+The coarse RK2 backbone retains authoritative target-wind validation at its original cadence. Dense presentation samples are validated against the tangent-continuous smooth backbone rather than performing hundreds of redundant target-wind samples. The final recorded minimum alignment is the more conservative of:
+
+- coarse Weather-backbone-to-target-wind alignment;
+- dense wobbled-segment-to-smooth-backbone alignment.
+
+Field bounds, minimum completed length, and self-approach validation still operate on the final dense presentation path. The self-approach test excludes a local dense-neighbour window equivalent to more than one render subdivision group so ordinary adjacent samples on the same smooth curve cannot falsely reject one another.
+
+### Five-trail fixed budget
+
+New exact baseline:
+
+```text
+Maximum active trails: 5
+```
+
+At the V0.8 baseline `5 × 641` capacity:
+
+```text
+Vertices:  5 × 641 × 2 = 6,410
+Indices:   5 × 640 × 6 = 19,200
+Triangles: 5 × 640 × 2 = 6,400
+Vertex payload: 6,410 × 68 bytes = 435,880 bytes
+Index payload:  19,200 × 2 bytes = 38,400 bytes
+Combined raw payload: approximately 463 KiB
+```
+
+This remains one material and one bounded draw submission. Dense spline construction, wobble, validation, and slot upload run only when a trail is successfully spawned or cleared. No per-frame curve rebuild, added Weather dispatch, GPU readback, material instance per trail, or managed spawn-path collection is introduced.
+
+The Inspector's allowed maxima remain safe for 16-bit vertex indices: `16 trails × (96 × 12 + 1) × 2 = 36,896` vertices, below the `65,535` addressable vertex limit.
+
+### Inspector and diagnostics
+
+`Advanced Generation > Streamline Construction > Render Curve` exposes `Render Curve Subdivisions Per Backbone Section` with a note that it changes presentation tessellation without changing Weather-field integration frequency.
+
+The report advances to `V0.8 Smooth Presentation Curve Report` and distinguishes:
+
+- Weather-backbone point capacity;
+- render subdivisions and per-trail render-point capacity;
+- last generated backbone and render-point counts;
+- average and maximum final render-segment lengths;
+- maximum angle between adjacent final render segments;
+- resulting fixed mesh vertex and index capacities.
+
+Scene diagnostics continue to draw `TryGetTrailPoint`, which now returns the actual dense rendered centreline rather than the coarse Weather backbone.
+
+### Migration
+
+Serialized baseline version advances from `3` to `4`.
+
+Exact old default migration:
+
+```text
+Maximum Active Trails: 3 -> 5
+```
+
+The user's already-authored value of `5` remains untouched because it no longer equals the old exact default. Any other non-default trail count is also preserved. The new subdivision field receives its declared default of `8`; an invalid legacy value below the supported range is corrected to `8`. Inspector Undo and dirty-state persistence remain unchanged.
+
+### Hard invariants
+
+- The Weather field still owns the average route and direction.
+- Weather RK2 resolution is not raised merely to hide render tessellation.
+- The smooth presentation curve has continuous tangent direction at section joins.
+- Wobble remains zero-mean around the smooth Weather backbone.
+- The optional larger loop remains localized to one wobble cycle.
+- Lifecycle distances and pointed endpoints operate on the final dense arc length.
+- Draw count remains one and material ownership remains runtime-only.
+- No shader change is required for curve smoothness.
+
+### Source-level audit and pending Unity evidence
+
+Source-level checks confirm:
+
+- exact three-file scope;
+- default and exact-default migration to five active trails;
+- separate fixed backbone and render capacities;
+- open quadratic midpoint sections with endpoint clamping and matching section tangents;
+- default dense spacing of approximately `0.0625 m` for ordinary `0.5 m` backbone sections;
+- mandatory wobble evaluated on dense presentation points;
+- no additional target-wind sample per render subdivision;
+- final dense-path bounds, self-approach, lifecycle, tangent, and mesh ownership;
+- 16-bit vertex-index safety at the complete allowed Inspector range;
+- report and Inspector exposure;
+- no shader or frozen dependency modification;
+- LF-only content and no trailing whitespace.
+
+Unity compilation, baseline migration persistence, actual report capacities, absence of visible chord transitions at normal and close camera distances, maximum adjacent-angle evidence, complete lifecycle behavior, five-trail occupancy, mesh warning absence, Frame Debugger draw count, steady-state GC, spawn-time CPU, transparent GPU cost, depth behavior, sorting, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed.
+
+## WEATHER-WIND-TRAILS-V0.8A — Dense-curve self-approach regression correction
+
+**Status:** Runtime correction and source-level audit complete on 2026-07-22. Unity compilation and runtime spawning validation remain pending.
+
+### Reported failure and evidence
+
+The user ran V0.8 for 46.3 seconds and reported zero successful trails across 92 spawn attempts. The complete report showed 52 visible candidates, 27 eligible candidates in the latest sweep, only 2 no-eligible failures, and 90 path rejections. Candidate generation, camera projection, wind filtering, and spacing therefore remained active; rejection occurred after candidate selection during path construction or lifecycle resolution.
+
+The V0.8 dense path uses an endpoint-clamped quadratic section. Its first and last render samples are intentionally non-uniform: the clamped endpoint section begins with very short intervals before approaching the nominal `integrationStep / subdivisions` spacing. `PathSelfApproaches` currently estimates a fixed local-neighbour exclusion from the nominal spacing and then compares dense samples by index. At the default `0.5 m / 8` settings, it begins comparing point 6 against point 0 even though those endpoint-clamped samples are only about `0.14 m` apart along the same ordinary curve. The configured self-approach distance is `0.3 m`, so every valid dense path can be falsely classified as self-approaching near its endpoint.
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+
+The complete delivered V0.8A archive may also include the unchanged V0.8 custom editor so the user can apply one full replacement patch. Shader, scene, material, Weather producer/editor/compute/shared HLSL, vegetation, Ground, River, URP, renderer feature, layer, tag, package, prefab, and hierarchy changes: none.
+
+### Correction plan
+
+1. Validate each deformed dense path first so its actual cumulative arc-distance array is current.
+2. Replace index-estimated local-neighbour exclusion with an actual along-path-distance exclusion.
+3. Preserve the original coarse-path semantic by excluding pairs separated by less than `max(2 × Integration Step, 2 × Self Approach Distance)` along the curve before testing Euclidean proximity.
+4. Apply the same corrected validation order to mandatory wobble and optional larger-loop attempts.
+5. Keep all candidate scoring, RK2 Weather integration, spline construction, wobble equations, lifecycle resolution, five-trail capacity, render subdivision default, mesh layout, shader, and draw submission unchanged.
+6. Run structural, exact-scope, formula, and synthetic endpoint regression checks. Unity compilation and runtime spawning remain pending for user validation.
+
+### Acceptance criteria
+
+- Dense samples on the same local curve are never rejected merely because endpoint parameterization produces non-uniform spacing.
+- Genuine non-local path returns closer than `Self Approach Distance` remain rejected.
+- At default settings, the endpoint-clamped synthetic first section no longer reports self-approach.
+- The fix adds no managed allocation and no per-frame work; it remains spawn-time bounded validation.
+- The report should resume recording successful paths and nonzero active trails under the same scene and Weather settings that produced the failure.
+
+
+### Implemented correction and audit
+
+`TryEvaluatePresentationPath` now runs before the self-approach check for both mandatory-wobble and optional-larger-loop attempts. Its actual cumulative dense-path distances are passed into `PathSelfApproaches`.
+
+`PathSelfApproaches` no longer derives a neighbour count from nominal render spacing. It excludes local comparisons using actual arc distance:
+
+```text
+local arc exclusion = max(2 × Integration Step, 2 × Self Approach Distance)
+```
+
+At the default values this is `max(1.0 m, 0.6 m) = 1.0 m`, matching the original coarse-path intent of not comparing immediately local curve samples. Once two points are at least that far apart along the path, their Euclidean distance is compared with the configured `0.3 m` self-approach threshold. Genuine non-local returns remain rejected.
+
+A synthetic replay of the V0.8 endpoint-clamped first quadratic section reproduced the defect: the old nominal-index logic compared dense point 6 with point 0 even though their true along-curve and Euclidean separation was only `0.140625 m`, then rejected it against the `0.3 m` threshold. The corrected actual-arc logic excludes that local pair and does not reject the ordinary endpoint section. A separate synthetic non-local return separated by more than `3.5 m` of arc distance but only `0.2 m` in Euclidean space remained correctly detected.
+
+Source-level validation passed **23/23** checks. Checks covered the two corrected validation sites, actual cumulative-distance ownership, preserved coarse semantic exclusion, removal of nominal-index estimation, five-trail and eight-subdivision defaults, retained spline/wobble/lifecycle contracts, unchanged editor bytes, exact approved source scope, balanced C# structure, LF/trailing-whitespace hygiene, canonical-plan coverage, false-positive reproduction, corrected endpoint acceptance, and retained genuine-return detection.
+
+V0.8 candidate generation, camera relevance, target-wind sampling, RK2 integration, smooth presentation construction, mandatory wobble, larger-loop deformation, lifecycle fitting, mesh capacities, shader, scene state, and draw submission are otherwise unchanged. Unity compilation and confirmation of nonzero spawn success under the user's reported scene remain pending and are not represented as passed.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.9 — Direction-locked backbone and upwind camera entry
+
+**Status:** Runtime, editor, migration, and source-level audit complete on 2026-07-22. Unity compilation and Game-view validation remain pending.
+
+### Reported failure and objective
+
+V0.8A restored successful spawning and retained the smooth dense presentation curve, but user evidence showed two remaining presentation failures:
+
+- some trails still followed a materially turning route because the authoritative RK2 backbone continuously adopted each newly sampled local wind direction;
+- trails could spawn outside or at the downwind edge of the camera, travel farther away with the wind, remain invisible, and occupy active-trail capacity.
+
+The approved correction separates current wind ownership from trail steering:
+
+```text
+resolve one dominant visible Weather direction at trail birth
+-> lock a straight average backbone to that direction
+-> validate local wind strength and direction without allowing local steering
+-> apply the existing smooth zero-mean wobble around that backbone
+```
+
+Camera placement becomes explicitly entry-side based:
+
+```text
+resolve wind direction in screen space
+-> accept seeds only in the first upwind portion of the viewport
+-> permit a small off-screen margin only beyond an upwind-facing edge
+-> require useful visible downwind runway
+-> release a trail slot once its complete visible body has passed the downwind edge
+```
+
+### Approved affected files
+
+Modify:
+
+- `Assets/Docs/Weather_Wind_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
+
+Shader, scene, material asset, Weather producer/editor/compute/shared HLSL, vegetation, Ground, River, URP, renderer feature, layer, tag, package, prefab, and hierarchy changes: none.
+
+### Dominant birth direction
+
+Each spawn sweep samples a fixed `3 × 3` set of visible viewport points on the trail-height plane. Valid authoritative target-wind samples inside the Weather field are strength-squared weighted into one dominant XZ direction. The same world direction is projected through the target camera to obtain the downwind screen-space direction.
+
+The resolved direction is captured for the entire trail. The backbone advances by the existing `Integration Step Metres` in that fixed direction. Local target wind is still sampled at every backbone midpoint and must:
+
+- remain above `Minimum Path Wind Strength`;
+- remain within `Maximum Local Wind Direction Mismatch` of the captured direction.
+
+Local samples can stop or reject a path, but they cannot rotate it. The default mismatch limit is `35 degrees`. The coarse backbone records maximum local mismatch and lateral drift from the birth axis; a valid direction-locked backbone should report negligible pre-wobble drift.
+
+The smooth V0.8 presentation spline, mandatory repeated zero-mean wobble, optional localized larger loop, V0.6 lifecycle, pointed endpoints, and dense mesh remain unchanged. All visible curvature therefore comes from the oscillation layer rather than cumulative backbone steering.
+
+### Upwind entry placement
+
+New exact baseline controls:
+
+```text
+Upwind Spawn Band Depth:             0.30
+Upwind Entry Margin:                 0.03 viewport units
+Camera Entry Preference:             0.90
+Preferred Visible Runway:            12 m
+Minimum Accepted Visible Runway:      7 m
+Maximum Local Wind Direction Mismatch: 35 degrees
+```
+
+Candidates are still generated from the bounded jittered camera-space lattice. Their viewport projection onto the resolved screen-wind axis defines a normalized downwind coordinate:
+
+- `0` is the upwind support edge;
+- `1` is the downwind support edge.
+
+On-screen seeds are accepted only within the first `Upwind Spawn Band Depth` of that range. Off-screen seeds are accepted only when their outside vector points substantially against the resolved screen wind and remains inside the small `Upwind Entry Margin`. Downwind and unrelated side-edge off-screen seeds are hard rejected.
+
+A short deterministic world-space probe measures the contiguous distance that the direction-locked route remains inside the target viewport. Candidates below `Minimum Accepted Visible Runway` are hard rejected. Remaining candidates combine:
+
+- authoritative wind strength;
+- active/cooldown separation;
+- upwind position;
+- visible runway.
+
+Off-screen upwind seeds receive a slight score penalty relative to equally suitable on-screen entry seeds, so normal occupancy prefers immediate visibility while still allowing a line to enter shortly after spawning.
+
+### Downwind capacity release
+
+The shader-owned lifecycle interval is mirrored in fixed CPU scalar arrays per trail. Each Play Mode frame, at most three distances are sampled from each active dense path: visible tail, midpoint, and head. If all three have passed the downwind viewport support line, the trail is released immediately and its normal separation cooldown is recorded.
+
+This does not visibly truncate a trail: release occurs only after the complete visible body is already beyond the downwind edge. It prevents off-screen completed traversals from occupying one of the five active slots for the remainder of a long configured lifetime.
+
+The added per-frame cost at five active trails is bounded to at most:
+
+```text
+15 dense-path distance lookups
+15 camera projections
+5 world-to-screen direction projections
+```
+
+No managed allocation, mesh rebuild, new draw, material, compute dispatch, GPU readback, or Weather sample is added by the release check.
+
+### Inspector and diagnostics
+
+`Placement & Density > Camera Entry Placement` exposes:
+
+- `Upwind Spawn Band Depth`
+- `Upwind Entry Margin Viewport`
+- `Preferred Visible Runway Metres`
+- `Minimum Accepted Visible Runway Metres`
+- `Camera Entry Preference`
+
+`Advanced Generation > Streamline Construction > Direction-Locked Backbone` exposes:
+
+- `Maximum Local Wind Direction Mismatch Degrees`
+
+The report advances to `V0.9 Direction-Locked Upwind Entry Report` and adds:
+
+- resolved dominant world and screen wind directions;
+- accepted viewport position and upwind score;
+- accepted visible runway and normalized runway score;
+- maximum local wind mismatch;
+- pre-wobble backbone lateral drift;
+- camera-entry, direction-mismatch, and runway rejection counts;
+- downwind off-screen early release count.
+
+Scene diagnostics add distinct candidate colours for camera-entry rejection, incompatible local wind, and insufficient visible runway.
+
+### Migration
+
+Serialized baseline version advances from `4` to `5`.
+
+Exact prior defaults migrate once:
+
+```text
+Candidate Viewport Margin / Upwind Entry Margin: 0.05 -> 0.03
+Camera Spawn Preference / Camera Entry Preference: 0.75 -> 0.90
+```
+
+The obsolete maximum-turn field is not mapped into the new direction-mismatch field because the controls have different semantics. The new field uses its declared `35 degree` default. New runway and band controls use their declared defaults. Existing five-trail capacity and all unrelated user tuning are preserved.
+
+### Hard invariants
+
+- Weather remains the source of current average direction and path validity.
+- One direction is captured at birth; local wind cannot steer the backbone afterward.
+- The pre-wobble backbone cannot accumulate lateral drift.
+- Mandatory wobble remains repeated, zero-mean, and endpoint-returning.
+- Off-screen candidates are permitted only on an upwind-facing entry edge.
+- No candidate below the configured minimum visible runway can consume a slot.
+- A complete trail that has passed the downwind edge cannot retain capacity invisibly.
+- Five active trails, one combined mesh, one hidden material, and one draw remain the baseline.
+
+### Source-level validation and pending Unity evidence
+
+Source-level checks confirm:
+
+- exact three-file scope;
+- removal of local-wind steering from backbone construction;
+- fixed birth-direction advancement and local strength/mismatch validation;
+- no obsolete maximum-turn Inspector control;
+- viewport-axis upwind-band filtering and asymmetric off-screen entry acceptance;
+- hard minimum and preferred visible-runway ownership;
+- fixed-array lifecycle data for downwind capacity release;
+- no per-frame managed allocation or Weather sampling in the release path;
+- preserved V0.8A self-approach correction, dense presentation curve, wobble, lifecycle, mesh, shader, and draw contracts;
+- versioned exact-default migration and report coverage;
+- balanced C# structure, LF-only files, and no trailing whitespace.
+
+Unity compilation, Inspector migration persistence, dominant-direction agreement with the Weather debug field, absence of large backbone turns, repeated fluid wobble, on-screen/upwind spawn distribution, minimum visible runway, off-screen entry delay, downwind release behavior, five-trail occupancy, full lifecycle behavior, mesh warning absence, Frame Debugger draw count, steady-state GC, CPU/GPU timing, transparency sorting, depth behavior, bloom response, and desktop/Mobile compatibility remain pending and are not represented as passed.
+
+Post-change static validation passed **77/77** checks. The audit covered exact three-file scope, fixed birth-direction advancement, removal of local steering, hard upwind-entry and runway filters, fixed-array resource ownership, lifecycle-mirrored downwind release, exact-once Inspector exposure, candidate diagnostic statuses, report coverage, migration, balanced C# structure, LF-only content, and whitespace hygiene. A synthetic viewport test sampled 24 screen-wind directions and randomized points around the expanded viewport; every accepted on-screen point remained inside the configured first 30% upwind band, and every accepted off-screen point lay against rather than with the screen-wind direction. This is source-level evidence only and does not replace Unity validation.
+
+## WEATHER-WIND-TRAILS-V0.9A — direction-mismatch compile correction
+
+**Status:** Compiles successfully in Unity; user reports the V0.9A behavior is working substantially as expected. Provisionally frozen pending the later Weather testing sprint.
+
+### Scope
+
+Modify:
+
+- `Assets/Game/Procedural/Weather/WeatherWindTrailRenderer.cs`
+- `Assets/Docs/Weather_Wind_Architecture.md`
+
+The custom Inspector is included unchanged in the complete replacement archive. No shader, scene, material, Weather simulation, vegetation, Ground, URP, layer, tag, or hierarchy change is included.
+
+### Fault and correction
+
+`TryBuildPath` declared its output accumulator as `pathMaximumLocalWindMismatchDegrees`, but one `TryEvaluateWeatherBackbonePath` call passed an undeclared identifier named `maximumLocalWindMismatchDegrees`. Unity therefore failed compilation with `CS0103`.
+
+The call now passes the declared method output variable:
+
+```csharp
+out pathMaximumLocalWindMismatchDegrees
+```
+
+No trajectory, upwind placement, runway, lifecycle, smoothing, wobble, mesh, shader, rendering, migration, or default behavior changed.
+
+### Source-level validation
+
+Checks confirm:
+
+- the undefined identifier no longer exists;
+- the declared `pathMaximumLocalWindMismatchDegrees` output is assigned by the Weather-backbone evaluator and forwarded unchanged to trail activation diagnostics;
+- the serialized control remains `maximumLocalWindDirectionMismatchDegrees`;
+- the Inspector, report, configuration hash, validation clamp, and path evaluator all reference that serialized control consistently;
+- the complete replacement archive differs from V0.9 only in the runtime source and this ledger entry.
+
+Unity compilation was subsequently confirmed successful by the user. Comprehensive soak, profiling, Frame Debugger, cross-quality, and broader Weather integration testing remain deferred to the later Weather testing sprint.
+
+---
+
+## WEATHER-WIND-TRAILS-V0.10 — implementation freeze
+
+**Status:** Implemented and provisionally frozen on 2026-07-22. No runtime, shader, scene, material, Weather simulation, vegetation, Ground, URP, layer, tag, or hierarchy change is part of this freeze.
+
+### Acceptance basis
+
+The user confirmed that the V0.9A correction compiles successfully and that the wind trails are now working substantially as expected in the current Game view. This is sufficient to freeze the feature for the present development phase.
+
+This freeze does **not** claim completion of the deferred Weather testing sprint. Extended soak testing, profiler allocation evidence, Frame Debugger evidence, desktop/Mobile comparison, transparency sorting stress, depth/bloom review, and full Weather-system interaction testing remain intentionally deferred.
+
+### Frozen implementation
+
+The accepted wind-trail baseline is:
+
+- Weather-owned and co-located with the published `WeatherWindDomain`;
+- Play Mode-only runtime ownership;
+- automatic domain, anchor, and target-camera resolution;
+- one hidden runtime material created from the serialized trail shader;
+- one fixed-capacity combined ribbon mesh and one render submission;
+- five active-trail slots as the accepted baseline;
+- authoritative Weather strength used for candidate selection and path validity;
+- one dominant visible Weather direction captured at trail birth;
+- direction-locked average backbone that local wind cannot cumulatively steer;
+- local Weather samples retained as strength and direction-compatibility validation;
+- camera-space upwind entry band, asymmetric upwind margin, and minimum visible-runway rejection;
+- early capacity release only after the complete visible body has passed the downwind edge;
+- smooth dense presentation curve separated from the coarse Weather backbone;
+- mandatory repeated zero-mean lateral wobble around the backbone;
+- one optional localized larger loop that returns to the same backbone;
+- pointed physical endpoints with uniform body opacity available as an exposed control;
+- resolved `Spawn -> Alive -> Despawn` lifecycle with no mid-air lifetime removal;
+- length-dependent spawn/despawn timing and directly authored alive duration;
+- fixed-array runtime state, no intended steady-state managed allocation, and no second wind simulation.
+
+### Frozen baseline values
+
+```text
+Maximum active trails:                  5
+Spawn attempts per second:              1
+Minimum separation / cooldown:          8 m / 3 s
+Weather backbone capacity:              80 points
+Integration step:                       0.5 m
+Render subdivisions:                    8 per backbone section
+Render point capacity per trail:        641
+Alive duration:                         7–11 s
+Travel speed:                           1.0–1.5 m/s
+Visible body length:                    5.5–8.5 m
+Lifecycle tip-speed allowance:          0.75 m/s
+Pointed-end length:                     0.75 m
+Uniform body opacity:                   enabled
+Trail colour / opacity:                 white / 0.95
+Mandatory wobble strength:              0.18–0.30 m
+Mandatory wobble wavelength:            3.5–5.0 m
+Larger-loop chance / extra strength:    22% / 0.28 m
+Upwind spawn-band depth:                0.30
+Upwind entry margin:                    0.03 viewport units
+Camera entry preference:                0.90
+Preferred / minimum visible runway:     12 m / 7 m
+Maximum local wind-direction mismatch:  35 degrees
+Default mesh capacity:                  6,410 vertices / 19,200 indices
+Trail vertex stride:                    68 bytes
+```
+
+Serialized scene values that the user deliberately tuned away from these code defaults remain valid and are not overwritten by this documentation freeze.
+
+### Deferred validation
+
+The future Weather testing sprint should cover, at minimum:
+
+- long-running spawn/lifecycle/teleport/reset behavior;
+- zero steady-state `GC.Alloc` verification after warm-up;
+- CPU and GPU timing at the five-trail maximum;
+- one-pass/one-draw confirmation in Frame Debugger;
+- desktop and Mobile renderer compatibility;
+- transparency sorting, opaque-depth occlusion, and bloom/readability under varied lighting;
+- interaction with later Weather states, authored regions, and other Weather consumers.
+
+Until that sprint, V0.9A is the frozen implementation baseline and further wind-trail changes should be fault-driven rather than speculative visual redesign.
+

@@ -16,7 +16,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
     /// </summary>
     internal static class GeneratedMassSparseRiverbedTileAssembler
     {
-        internal const int AlgorithmVersion = 7;
+        internal const int AlgorithmVersion = 10;
         internal const int FinalResolution = 1024;
         internal const int WorkResolution = 2048;
         internal const int CandidateCount = 3;
@@ -69,6 +69,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float SilhouetteCoverageLower = 0.30f;
         private const float SilhouetteCoverageUpper = 0.98f;
         private const int SilhouetteFilterRadius = 3;
+        private const float AnchorProofCoverageThreshold = 0.05f;
+        private const float AnchorProofMaximumDistance = 0.92f;
+        private const float AnchorSupportPaddingTexels = 1f;
+        private const int AnchorProofMaximumMip = 5;
+        private const float FeatureSlopeEvidenceThreshold = 0.008f;
+        private const float FeatureCavityEvidenceThreshold = 0.001f;
+        private const float FeatureFormEvidenceThreshold = 0.001f;
+        private const float FeatureRoughnessEvidenceThreshold = 0.008f;
 
         private static readonly CandidateDefinition[] CandidateDefinitions =
         {
@@ -291,6 +299,20 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal float FeatureMaskMaximum;
             internal float SubstrateOnlyFormMean;
             internal float SubstrateOnlyRoughnessMean;
+            internal float FeatureSubstrateRoughness;
+            internal float FeatureSubstrateRoughnessMaximumDeviation;
+            internal float FeatureMaximumSupportRadiusUv;
+            internal float FeatureAnchorDistanceMinimum;
+            internal float FeatureAnchorDistanceMaximum;
+            internal float FeatureAnchorDistanceMean;
+            internal int FeatureAnchorOwnerMismatchCount;
+            internal int FeatureAnchorInvalidSampleCount;
+            internal float FeatureAnchorMaximumCenterErrorUv;
+            internal float FeatureAnchorMaximumRetentionSpread;
+            internal int FeatureAnchorInconsistentRockCount;
+            internal int FeatureResponseUngatedPixelCount;
+            internal int FeatureNeutralGeometricMaskPixelCount;
+            internal int FeatureAnchorLastAcceptedMip;
             internal string PalettePayloadFingerprint;
             internal string PalettePreviewNeutralFingerprint;
             internal string PalettePreviewHigherContrastFingerprint;
@@ -2406,6 +2428,16 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             result.RuntimePackedDetail = new Color32[count];
             float[] silhouetteCoverage =
                 BuildPayloadSilhouetteCoverage(final.Mask);
+            float[] featureCenterOffsetX = new float[count];
+            float[] featureCenterOffsetY = new float[count];
+            int[] featureAnchorOwner = new int[count];
+            MeasureFeaturePayloadMetadata(result, placements, substrate);
+            BuildFeatureAnchorPayload(
+                placements,
+                result.FeatureMaximumSupportRadiusUv,
+                featureCenterOffsetX,
+                featureCenterOffsetY,
+                featureAnchorOwner);
             for (int index = 0; index < count; index++)
             {
                 float rockCoverage = silhouetteCoverage[index];
@@ -2460,13 +2492,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         placements[final.Owner[index]].SourceIndex)
                     : substrate.Color[index];
                 result.Moderate[index] = (Color32)moderateColor;
-                float substrateRoughness = ResolveSubstrateRoughness(
-                    substrate.Variation[index]);
+                if (rockCoverage > 0.001f &&
+                    final.Owner[index] >= 0 &&
+                    featureAnchorOwner[index] != final.Owner[index])
+                {
+                    result.FeatureAnchorOwnerMismatchCount++;
+                }
                 result.PaletteForm[index] = EncodePalettePayload(
                     paletteForm,
                     substrateForm,
-                    substrateRoughness,
-                    rockCoverage);
+                    featureCenterOffsetX[index],
+                    featureCenterOffsetY[index]);
                 result.RuntimePackedDetail[index] =
                     BuildRuntimePackedDetailPixel(
                         final,
@@ -2494,6 +2530,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 result.PalettePreviewAlternate,
                 result.PaletteForm);
             MeasurePalettePayload(result, final);
+            MeasureFeatureAnchorReconstruction(
+                result,
+                placements,
+                DecodeFeatureAnchorXPayload(result.PaletteForm),
+                DecodeFeatureAnchorYPayload(result.PaletteForm));
             result.PalettePayloadFingerprint =
                 CalculatePairedPayloadFingerprint(result);
             result.PalettePreviewNeutralFingerprint =
@@ -2612,14 +2653,15 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private static Color32 EncodePalettePayload(
             float combinedForm,
             float substrateForm,
-            float substrateRoughness,
-            float featureCoverage)
+            float featureCenterOffsetX,
+            float featureCenterOffsetY)
         {
             return new Color32(
                 EncodeLinearSrgbByte(combinedForm),
                 EncodeLinearSrgbByte(substrateForm),
-                EncodeLinearSrgbByte(substrateRoughness),
-                ToByte(featureCoverage));
+                EncodeLinearSrgbByte(
+                    featureCenterOffsetX * 0.5f + 0.5f),
+                ToByte(featureCenterOffsetY * 0.5f + 0.5f));
         }
 
         private static byte EncodeLinearSrgbByte(float value)
@@ -2793,7 +2835,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             int fractionalCoverageCount = 0;
             double featureMask = 0.0;
             double substrateOnlyForm = 0.0;
-            double substrateOnlyRoughness = 0.0;
+            double featureAnchorDistance = 0.0;
+            int featureAnchorCount = 0;
+            int featureResponseUngatedPixelCount = 0;
+            int featureNeutralGeometricMaskPixelCount = 0;
+            float minimumFeatureAnchorDistance = 1f;
+            float maximumFeatureAnchorDistance = 0f;
             float maximumFeatureMask = 0f;
             float minimumForm = 1f;
             float maximumForm = 0f;
@@ -2804,28 +2851,83 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 float form = DecodePaletteForm(palettePayload);
                 float substrateFormValue = Mathf.Clamp01(
                     Mathf.GammaToLinearSpace(palettePayload.g / 255f));
-                float substrateRoughnessValue = Mathf.Clamp01(
-                    Mathf.GammaToLinearSpace(palettePayload.b / 255f));
-                float featureMaskValue = palettePayload.a / 255f;
-                substrateOnlyForm += substrateFormValue;
-                substrateOnlyRoughness += substrateRoughnessValue;
-                featureMask += featureMaskValue;
-                maximumFeatureMask = Mathf.Max(
-                    maximumFeatureMask,
-                    featureMaskValue);
-                float maskCoverage = Mathf.Clamp01(final.Mask[index]);
-                if (maskCoverage > 0.0001f && maskCoverage < 0.9999f)
-                {
-                    fractionalCoverageCount++;
-                }
-                minimumForm = Mathf.Min(minimumForm, form);
-                maximumForm = Mathf.Max(maximumForm, form);
+                float featureOffsetX =
+                    Mathf.Clamp01(
+                        Mathf.GammaToLinearSpace(
+                            palettePayload.b / 255f)) * 2f - 1f;
+                float featureOffsetY =
+                    palettePayload.a / 255f * 2f - 1f;
+                float featureAnchorDistanceValue = Mathf.Sqrt(
+                    featureOffsetX * featureOffsetX +
+                    featureOffsetY * featureOffsetY);
                 Color32 packed = result.RuntimePackedDetail[index];
                 float slopeX = packed.r / 255f * 2f - 1f;
                 float slopeY = packed.g / 255f * 2f - 1f;
                 float slopeMagnitude = Mathf.Sqrt(
                     slopeX * slopeX + slopeY * slopeY);
                 float cavity = packed.b / 255f;
+                float roughness = packed.a / 255f;
+                float formEvidence = Mathf.Abs(
+                    form - substrateFormValue);
+                float roughnessEvidence = Mathf.Abs(
+                    roughness - result.FeatureSubstrateRoughness);
+                bool hasSlopeResponse =
+                    slopeMagnitude >= FeatureSlopeEvidenceThreshold;
+                bool hasCavityResponse =
+                    cavity >= FeatureCavityEvidenceThreshold;
+                bool hasFormResponse =
+                    formEvidence >= FeatureFormEvidenceThreshold;
+                bool hasRoughnessResponse =
+                    roughnessEvidence >= FeatureRoughnessEvidenceThreshold;
+                bool hasEmittedFeatureResponse =
+                    hasSlopeResponse ||
+                    hasCavityResponse ||
+                    hasFormResponse ||
+                    hasRoughnessResponse;
+                float decodedFeatureMaskValue =
+                    hasSlopeResponse ||
+                    hasCavityResponse ||
+                    hasRoughnessResponse
+                        ? 1f
+                        : 0f;
+                float formFeatureMaskValue = hasFormResponse ? 1f : 0f;
+                float featureMaskValue = Mathf.Max(
+                    decodedFeatureMaskValue,
+                    formFeatureMaskValue);
+                substrateOnlyForm += substrateFormValue;
+                if (featureMaskValue > AnchorProofCoverageThreshold)
+                {
+                    featureAnchorDistance += featureAnchorDistanceValue;
+                    featureAnchorCount++;
+                    minimumFeatureAnchorDistance = Mathf.Min(
+                        minimumFeatureAnchorDistance,
+                        featureAnchorDistanceValue);
+                    maximumFeatureAnchorDistance = Mathf.Max(
+                        maximumFeatureAnchorDistance,
+                        featureAnchorDistanceValue);
+                }
+                featureMask += featureMaskValue;
+                maximumFeatureMask = Mathf.Max(
+                    maximumFeatureMask,
+                    featureMaskValue);
+                float maskCoverage = Mathf.Clamp01(final.Mask[index]);
+                if (hasEmittedFeatureResponse && featureMaskValue < 0.5f)
+                {
+                    featureResponseUngatedPixelCount++;
+                }
+
+                if (maskCoverage > AnchorProofCoverageThreshold &&
+                    !hasEmittedFeatureResponse)
+                {
+                    featureNeutralGeometricMaskPixelCount++;
+                }
+
+                if (maskCoverage > 0.0001f && maskCoverage < 0.9999f)
+                {
+                    fractionalCoverageCount++;
+                }
+                minimumForm = Mathf.Min(minimumForm, form);
+                maximumForm = Mathf.Max(maximumForm, form);
                 if (final.Mask[index] > 0.5f)
                 {
                     rockForm += form;
@@ -2883,10 +2985,532 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             float payloadCount = Mathf.Max(1, result.PaletteForm.Length);
             result.FeatureMaskMean = (float)(featureMask / payloadCount);
             result.FeatureMaskMaximum = maximumFeatureMask;
+            result.FeatureResponseUngatedPixelCount =
+                featureResponseUngatedPixelCount;
+            result.FeatureNeutralGeometricMaskPixelCount =
+                featureNeutralGeometricMaskPixelCount;
             result.SubstrateOnlyFormMean =
                 (float)(substrateOnlyForm / payloadCount);
             result.SubstrateOnlyRoughnessMean =
-                (float)(substrateOnlyRoughness / payloadCount);
+                result.FeatureSubstrateRoughness;
+            result.FeatureAnchorDistanceMinimum = featureAnchorCount > 0
+                ? minimumFeatureAnchorDistance
+                : 0f;
+            result.FeatureAnchorDistanceMaximum = featureAnchorCount > 0
+                ? maximumFeatureAnchorDistance
+                : 0f;
+            result.FeatureAnchorDistanceMean = featureAnchorCount > 0
+                ? (float)(featureAnchorDistance / featureAnchorCount)
+                : 0f;
+        }
+
+        private static void BuildFeatureAnchorPayload(
+            IReadOnlyList<PlacementEvidence> placements,
+            float maximumSupportRadiusUv,
+            float[] centerOffsetX,
+            float[] centerOffsetY,
+            int[] anchorOwner)
+        {
+            float maximumSupportRadiusWork = Mathf.Max(
+                0.0001f,
+                maximumSupportRadiusUv * WorkResolution);
+            for (int y = 0; y < FinalResolution; y++)
+            {
+                for (int x = 0; x < FinalResolution; x++)
+                {
+                    int index = y * FinalResolution + x;
+                    Vector2 point = new Vector2(
+                        (x + 0.5f) * WorkScale,
+                        (y + 0.5f) * WorkScale);
+                    float bestDistance = float.PositiveInfinity;
+                    int bestOwner = -1;
+                    for (int placementIndex = 0;
+                         placementIndex < placements.Count;
+                         placementIndex++)
+                    {
+                        PlacementEvidence placement = placements[placementIndex];
+                        float distance = ToroidalDistance(
+                            point,
+                            new Vector2(
+                                placement.CenterX,
+                                placement.CenterY));
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            bestOwner = placementIndex;
+                        }
+                    }
+
+                    if (bestOwner < 0)
+                    {
+                        centerOffsetX[index] = 1f;
+                        centerOffsetY[index] = 1f;
+                        anchorOwner[index] = -1;
+                        continue;
+                    }
+
+                    PlacementEvidence owner = placements[bestOwner];
+                    centerOffsetX[index] = Mathf.Clamp(
+                        ToroidalDelta(
+                            point.x,
+                            owner.CenterX,
+                            WorkResolution) /
+                        maximumSupportRadiusWork,
+                        -1f,
+                        1f);
+                    centerOffsetY[index] = Mathf.Clamp(
+                        ToroidalDelta(
+                            point.y,
+                            owner.CenterY,
+                            WorkResolution) /
+                        maximumSupportRadiusWork,
+                        -1f,
+                        1f);
+                    anchorOwner[index] = bestOwner;
+                }
+            }
+        }
+
+        private static void MeasureFeaturePayloadMetadata(
+            CandidateResult result,
+            IReadOnlyList<PlacementEvidence> placements,
+            SubstrateResult substrate)
+        {
+            double roughnessSum = 0.0;
+            for (int index = 0; index < substrate.Variation.Length; index++)
+            {
+                roughnessSum += ResolveSubstrateRoughness(
+                    substrate.Variation[index]);
+            }
+
+            result.FeatureSubstrateRoughness =
+                (float)(roughnessSum /
+                    Mathf.Max(1, substrate.Variation.Length));
+            float maximumDeviation = 0f;
+            for (int index = 0; index < substrate.Variation.Length; index++)
+            {
+                maximumDeviation = Mathf.Max(
+                    maximumDeviation,
+                    Mathf.Abs(
+                        ResolveSubstrateRoughness(
+                            substrate.Variation[index]) -
+                        result.FeatureSubstrateRoughness));
+            }
+
+            result.FeatureSubstrateRoughnessMaximumDeviation =
+                maximumDeviation;
+            float maximumRadius = 0f;
+            for (int index = 0; index < placements.Count; index++)
+            {
+                maximumRadius = Mathf.Max(
+                    maximumRadius,
+                    placements[index].Radius);
+            }
+
+            result.FeatureMaximumSupportRadiusUv =
+                maximumRadius / WorkResolution +
+                AnchorSupportPaddingTexels / FinalResolution;
+        }
+
+        private static float[] DecodeFeatureAnchorXPayload(
+            IReadOnlyList<Color32> paletteForm)
+        {
+            float[] offset = new float[paletteForm.Count];
+            for (int index = 0; index < paletteForm.Count; index++)
+            {
+                offset[index] =
+                    Mathf.Clamp01(
+                        Mathf.GammaToLinearSpace(
+                            paletteForm[index].b / 255f)) *
+                    2f - 1f;
+            }
+
+            return offset;
+        }
+
+        private static float[] DecodeFeatureAnchorYPayload(
+            IReadOnlyList<Color32> paletteForm)
+        {
+            float[] offset = new float[paletteForm.Count];
+            for (int index = 0; index < paletteForm.Count; index++)
+            {
+                offset[index] = paletteForm[index].a / 255f * 2f - 1f;
+            }
+
+            return offset;
+        }
+
+        private static void MeasureFeatureAnchorReconstruction(
+            CandidateResult result,
+            IReadOnlyList<PlacementEvidence> placements,
+            float[] baseCenterOffsetX,
+            float[] baseCenterOffsetY)
+        {
+            float[] centerOffsetX = baseCenterOffsetX;
+            float[] centerOffsetY = baseCenterOffsetY;
+            int resolution = FinalResolution;
+            int lastAcceptedMip = -1;
+            float maximumCenterErrorAcrossMips = 0f;
+            float maximumSpreadAcrossMips = 0f;
+            int invalidSamplesAcrossMips = 0;
+            int inconsistentRocksAcrossMips = 0;
+            float supportRadiusUv = result.FeatureMaximumSupportRadiusUv;
+
+            for (int mip = 0;
+                 mip <= AnchorProofMaximumMip && resolution >= 8;
+                 mip++)
+            {
+                float minimumRadiusPixels = float.PositiveInfinity;
+                for (int index = 0; index < placements.Count; index++)
+                {
+                    minimumRadiusPixels = Mathf.Min(
+                        minimumRadiusPixels,
+                        placements[index].Radius /
+                            WorkResolution * resolution);
+                }
+
+                // Once the smallest visible rock falls below this footprint,
+                // centre-anchor reconstruction is no longer a meaningful
+                // whole-rock contract. Do not count the first unsupported mip
+                // as a proof failure; the validator requires the last accepted
+                // mip to reach the production-relevant threshold.
+                if (minimumRadiusPixels < 1.25f)
+                {
+                    break;
+                }
+
+                float maximumCenterError = 0f;
+                int invalidSamples = 0;
+                int acceptedSamples = 0;
+                float[] rockMinimum = new float[placements.Count];
+                float[] rockMaximum = new float[placements.Count];
+                for (int index = 0; index < placements.Count; index++)
+                {
+                    rockMinimum[index] = float.PositiveInfinity;
+                    rockMaximum[index] = float.NegativeInfinity;
+                }
+
+                float cellGuard = 0.75f * 1.41421356237f / resolution;
+                for (int y = 0; y < resolution; y++)
+                {
+                    for (int x = 0; x < resolution; x++)
+                    {
+                        float cellCenterX = (x + 0.5f) / resolution;
+                        float cellCenterY = (y + 0.5f) / resolution;
+                        int cellOwner = FindNearestPlacementUv(
+                            placements,
+                            cellCenterX,
+                            cellCenterY);
+                        if (cellOwner < 0)
+                        {
+                            continue;
+                        }
+
+                        PlacementEvidence cellPlacement =
+                            placements[cellOwner];
+                        float cellRadiusUv =
+                            cellPlacement.Radius / WorkResolution;
+                        float cellDistanceUv = ToroidalDistanceUv(
+                            cellCenterX,
+                            cellCenterY,
+                            cellPlacement.CenterX / WorkResolution,
+                            cellPlacement.CenterY / WorkResolution);
+                        if (cellDistanceUv >
+                            cellRadiusUv * AnchorProofMaximumDistance +
+                            cellGuard)
+                        {
+                            continue;
+                        }
+
+                        for (int subY = 0; subY < 2; subY++)
+                        {
+                            for (int subX = 0; subX < 2; subX++)
+                            {
+                                float pointX = (
+                                    x + (subX == 0 ? 0.25f : 0.75f)) /
+                                    resolution;
+                                float pointY = (
+                                    y + (subY == 0 ? 0.25f : 0.75f)) /
+                                    resolution;
+                                int expectedOwner = FindNearestPlacementUv(
+                                    placements,
+                                    pointX,
+                                    pointY);
+                                if (expectedOwner < 0)
+                                {
+                                    invalidSamples++;
+                                    continue;
+                                }
+
+                                PlacementEvidence placement =
+                                    placements[expectedOwner];
+                                float expectedCenterX =
+                                    placement.CenterX / WorkResolution;
+                                float expectedCenterY =
+                                    placement.CenterY / WorkResolution;
+                                float expectedRadiusUv =
+                                    placement.Radius / WorkResolution;
+                                float sampleDistanceUv = ToroidalDistanceUv(
+                                    pointX,
+                                    pointY,
+                                    expectedCenterX,
+                                    expectedCenterY);
+                                if (sampleDistanceUv >
+                                    expectedRadiusUv *
+                                    AnchorProofMaximumDistance)
+                                {
+                                    continue;
+                                }
+
+                                float offsetX = SampleToroidalBilinearField(
+                                    centerOffsetX,
+                                    resolution,
+                                    pointX,
+                                    pointY);
+                                float offsetY = SampleToroidalBilinearField(
+                                    centerOffsetY,
+                                    resolution,
+                                    pointX,
+                                    pointY);
+                                if (float.IsNaN(offsetX) ||
+                                    float.IsInfinity(offsetX) ||
+                                    float.IsNaN(offsetY) ||
+                                    float.IsInfinity(offsetY))
+                                {
+                                    invalidSamples++;
+                                    continue;
+                                }
+
+                                float centerX = Repeat01(
+                                    pointX - offsetX * supportRadiusUv);
+                                float centerY = Repeat01(
+                                    pointY - offsetY * supportRadiusUv);
+                                int reconstructedOwner = FindNearestPlacementUv(
+                                    placements,
+                                    centerX,
+                                    centerY);
+                                if (reconstructedOwner != expectedOwner)
+                                {
+                                    invalidSamples++;
+                                    continue;
+                                }
+
+                                int owner = expectedOwner;
+                                float centerError = ToroidalDistanceUv(
+                                    centerX,
+                                    centerY,
+                                    expectedCenterX,
+                                    expectedCenterY);
+                                maximumCenterError = Mathf.Max(
+                                    maximumCenterError,
+                                    centerError);
+
+                                float errorX = ToroidalDeltaUv(
+                                    centerX,
+                                    expectedCenterX);
+                                float errorY = ToroidalDeltaUv(
+                                    centerY,
+                                    expectedCenterY);
+                                float angle =
+                                    (owner * 0.61803398875f + 0.173f) *
+                                    Mathf.PI * 2f;
+                                float edgeProxy =
+                                    errorX * Mathf.Cos(angle) +
+                                    errorY * Mathf.Sin(angle) -
+                                    supportRadiusUv;
+                                rockMinimum[owner] = Mathf.Min(
+                                    rockMinimum[owner],
+                                    edgeProxy);
+                                rockMaximum[owner] = Mathf.Max(
+                                    rockMaximum[owner],
+                                    edgeProxy);
+                                acceptedSamples++;
+                            }
+                        }
+                    }
+                }
+
+                float maximumSpread = 0f;
+                int inconsistentRocks = 0;
+                for (int index = 0; index < placements.Count; index++)
+                {
+                    if (float.IsPositiveInfinity(rockMinimum[index]))
+                    {
+                        continue;
+                    }
+
+                    float spread = rockMaximum[index] - rockMinimum[index];
+                    maximumSpread = Mathf.Max(maximumSpread, spread);
+                    if (spread > 0.01f)
+                    {
+                        inconsistentRocks++;
+                    }
+                }
+
+                maximumCenterErrorAcrossMips = Mathf.Max(
+                    maximumCenterErrorAcrossMips,
+                    maximumCenterError);
+                maximumSpreadAcrossMips = Mathf.Max(
+                    maximumSpreadAcrossMips,
+                    maximumSpread);
+                invalidSamplesAcrossMips += invalidSamples;
+                inconsistentRocksAcrossMips = Mathf.Max(
+                    inconsistentRocksAcrossMips,
+                    inconsistentRocks);
+
+                if (acceptedSamples > 0 &&
+                    invalidSamples == 0 &&
+                    maximumCenterError <= 0.01f &&
+                    maximumSpread <= 0.01f &&
+                    inconsistentRocks == 0)
+                {
+                    lastAcceptedMip = mip;
+                }
+                else
+                {
+                    break;
+                }
+
+                if (mip < AnchorProofMaximumMip)
+                {
+                    centerOffsetX = DownsampleLinearField(
+                        centerOffsetX,
+                        resolution);
+                    centerOffsetY = DownsampleLinearField(
+                        centerOffsetY,
+                        resolution);
+                    resolution /= 2;
+                }
+            }
+
+            result.FeatureAnchorInvalidSampleCount =
+                invalidSamplesAcrossMips;
+            result.FeatureAnchorMaximumCenterErrorUv =
+                maximumCenterErrorAcrossMips;
+            result.FeatureAnchorMaximumRetentionSpread =
+                maximumSpreadAcrossMips;
+            result.FeatureAnchorInconsistentRockCount =
+                inconsistentRocksAcrossMips;
+            result.FeatureAnchorLastAcceptedMip = lastAcceptedMip;
+        }
+
+        private static float SampleToroidalBilinearField(
+            IReadOnlyList<float> field,
+            int resolution,
+            float u,
+            float v)
+        {
+            float sampleX = Repeat01(u) * resolution - 0.5f;
+            float sampleY = Repeat01(v) * resolution - 0.5f;
+            int x0 = Mathf.FloorToInt(sampleX);
+            int y0 = Mathf.FloorToInt(sampleY);
+            int x1 = x0 + 1;
+            int y1 = y0 + 1;
+            float tX = sampleX - Mathf.Floor(sampleX);
+            float tY = sampleY - Mathf.Floor(sampleY);
+            x0 = Wrap(x0, resolution);
+            x1 = Wrap(x1, resolution);
+            y0 = Wrap(y0, resolution);
+            y1 = Wrap(y1, resolution);
+            float row0 = Mathf.LerpUnclamped(
+                field[y0 * resolution + x0],
+                field[y0 * resolution + x1],
+                tX);
+            float row1 = Mathf.LerpUnclamped(
+                field[y1 * resolution + x0],
+                field[y1 * resolution + x1],
+                tX);
+            return Mathf.LerpUnclamped(row0, row1, tY);
+        }
+
+        private static float[] DownsampleLinearField(
+            IReadOnlyList<float> source,
+            int sourceResolution)
+        {
+            int destinationResolution = sourceResolution / 2;
+            float[] destination = new float[
+                destinationResolution * destinationResolution];
+            for (int y = 0; y < destinationResolution; y++)
+            {
+                for (int x = 0; x < destinationResolution; x++)
+                {
+                    float sum = 0f;
+                    for (int offsetY = 0; offsetY < 2; offsetY++)
+                    {
+                        for (int offsetX = 0; offsetX < 2; offsetX++)
+                        {
+                            sum += source[
+                                (y * 2 + offsetY) * sourceResolution +
+                                x * 2 + offsetX];
+                        }
+                    }
+
+                    destination[y * destinationResolution + x] =
+                        sum * 0.25f;
+                }
+            }
+
+            return destination;
+        }
+
+        private static int FindNearestPlacementUv(
+            IReadOnlyList<PlacementEvidence> placements,
+            float x,
+            float y)
+        {
+            if (placements == null || placements.Count == 0)
+            {
+                return -1;
+            }
+
+            float bestDistance = float.PositiveInfinity;
+            int bestIndex = -1;
+            for (int index = 0; index < placements.Count; index++)
+            {
+                float distance = ToroidalDistanceUv(
+                    x,
+                    y,
+                    placements[index].CenterX / WorkResolution,
+                    placements[index].CenterY / WorkResolution);
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    bestIndex = index;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private static float ToroidalDistanceUv(
+            float xA,
+            float yA,
+            float xB,
+            float yB)
+        {
+            float deltaX = Mathf.Abs(ToroidalDeltaUv(xA, xB));
+            float deltaY = Mathf.Abs(ToroidalDeltaUv(yA, yB));
+            return Mathf.Sqrt(deltaX * deltaX + deltaY * deltaY);
+        }
+
+        private static float ToroidalDeltaUv(float value, float center)
+        {
+            float delta = value - center;
+            if (delta > 0.5f)
+            {
+                delta -= 1f;
+            }
+            else if (delta < -0.5f)
+            {
+                delta += 1f;
+            }
+
+            return delta;
+        }
+
+        private static float Repeat01(float value)
+        {
+            return value - Mathf.Floor(value);
         }
 
         private static float MeasureMaximumAdjacentPaletteFormDifference(
@@ -2939,6 +3563,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 writer.Write(AlgorithmVersion);
                 writer.Write(result.Definition.StableId);
+                writer.Write(result.FeatureSubstrateRoughness);
+                writer.Write(result.FeatureMaximumSupportRadiusUv);
                 WritePixels(writer, result.PaletteForm);
                 WritePixels(writer, result.RuntimePackedDetail);
                 writer.Flush();
@@ -3388,6 +4014,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 writer.Write(result.MinimumNormalizedNeighbourSeparation);
                 writer.Write(result.MaximumNearNeighbourCount);
                 writer.Write(result.MaximumBroadCenterCount);
+                writer.Write(result.FeatureSubstrateRoughness);
+                writer.Write(result.FeatureMaximumSupportRadiusUv);
+                writer.Write(result.FeatureAnchorMaximumCenterErrorUv);
+                writer.Write(result.FeatureAnchorMaximumRetentionSpread);
                 WritePixels(writer, result.Moderate);
                 WritePixels(writer, result.PlacementDebug);
                 WritePixels(writer, result.StableIdDebug);

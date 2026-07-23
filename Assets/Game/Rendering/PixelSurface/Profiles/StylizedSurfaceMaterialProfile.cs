@@ -156,6 +156,28 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
         public bool UsesFeatureTextureForm =>
             UsesTextureForm &&
             detailLibrary.EntryUsesFeatureTextureForm(DetailEntryId);
+        public float FeatureSubstrateRoughness
+        {
+            get
+            {
+                return TryResolveFeaturePayloadMetadata(
+                    out float substrateRoughness,
+                    out _)
+                    ? substrateRoughness
+                    : 0.5f;
+            }
+        }
+        public float FeatureMaximumSupportRadiusUv
+        {
+            get
+            {
+                return TryResolveFeaturePayloadMetadata(
+                    out _,
+                    out float maximumSupportRadiusUv)
+                    ? maximumSupportRadiusUv
+                    : 0f;
+            }
+        }
 
         // Compatibility aliases retained for existing callers and serialized
         // terminology. Payload selection is automatic from the library entry.
@@ -209,6 +231,20 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             UsesTextureForm
                 ? 0f
                 : Mathf.Clamp(finishVariationStrength, 0f, 0.5f);
+
+        public bool TryResolveFeaturePayloadMetadata(
+            out float substrateRoughness,
+            out float maximumSupportRadiusUv)
+        {
+            substrateRoughness = 0.5f;
+            maximumSupportRadiusUv = 0f;
+            return detailEnabled &&
+                   detailLibrary != null &&
+                   detailLibrary.TryResolveFeaturePayloadMetadata(
+                       DetailEntryId,
+                       out substrateRoughness,
+                       out maximumSupportRadiusUv);
+        }
 
         public bool TryResolveDetail(
             out Texture2DArray textureArray,

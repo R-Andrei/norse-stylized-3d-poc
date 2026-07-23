@@ -487,12 +487,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             DrawReadOnlyRow(
                 new GUIContent(
-                    "Object Contact Cycles",
-                    "Per-object Arc/Semi-Arc emission phases. Build grows one contiguous open-C source path, Hold replenishes that complete path, Release clears it contiguously, and Rest submits no source. The downstream rear remains unsourced in every phase."),
-                $"{runtime.AutomaticObjectContactBuildCount} build | " +
-                $"{runtime.AutomaticObjectContactHoldCount} hold | " +
-                $"{runtime.AutomaticObjectContactReleaseCount} release | " +
-                $"{runtime.AutomaticObjectContactRestCount} rest");
+                    "Object Source Packets",
+                    "Per-object one-shot source ownership. Arc/Semi-Arc exist only while Build advances, Flecks are finite packets, and all recipes wait behind one shared packet-clearance gate after completion."),
+                $"{runtime.AutomaticObjectContactBuildCount} Arc/Semi-Arc building | " +
+                $"{runtime.AutomaticObjectContactFleckCount} Fleck building | " +
+                $"{runtime.AutomaticObjectWaitingClearanceCount} waiting for clearance");
         }
 
         private int DrawDebugViewSelector(

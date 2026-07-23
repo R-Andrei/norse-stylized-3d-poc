@@ -40,9 +40,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool runCornerDamageIntegrationPreview =
                 evaluationMode ==
                     EdgeWearEvaluationMode.CornerDamageIntegrationPreview;
+            bool runCornerDamageIntegrationPreflight =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageIntegrationPreflight;
             bool runCornerDamagePreview =
                 runCornerDamageGeometryPreview ||
                 runCornerDamageIntegrationPreview;
+            bool useCornerDamageCandidatePolicy =
+                runCornerDamagePreview ||
+                runCornerDamageIntegrationPreflight;
+            bool runCornerDamageTransactionMode =
+                runCornerDamagePreview ||
+                runCornerDamageIntegrationPreflight;
             bool applyUnifiedBoundedPreview =
                 evaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBoundedPreview;
@@ -75,7 +84,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float amount01 = Mathf.Clamp01(settings.EdgeWearAmount * 0.5f);
             if (amount01 <= 0.0001f &&
                 !runCornerDamageTransactionAudit &&
-                !runCornerDamagePreview)
+                !runCornerDamageTransactionMode)
             {
                 return null;
             }
@@ -106,7 +115,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float capRingDepthLimit = 0f;
             float capRingEdgeLimit = 0f;
             string capRingWinningLimit = "none";
-            if (runCornerDamageTransactionAudit || runCornerDamagePreview)
+            if (runCornerDamageTransactionAudit ||
+                runCornerDamageTransactionMode)
             {
                 cornerDamageTransaction = EvaluateCornerDamageTransaction(
                     edgeWearFaces,
@@ -122,7 +132,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return null;
                 }
 
-                if (runCornerDamageIntegrationPreview)
+                if (runCornerDamageIntegrationPreview ||
+                    runCornerDamageIntegrationPreflight)
                 {
                     capRingRequestedWidth =
                         ResolveCornerDamageCapRingRequestedWidth(
@@ -134,27 +145,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             out capRingEdgeLimit,
                             out capRingWinningLimit);
                 }
-                BeginCornerDamagePreviewCapture(
-                    runCornerDamageGeometryPreview
-                        ? CornerDamagePreviewKind.GeometryOnly
-                        : CornerDamagePreviewKind.WithEdgeWear,
-                    cornerDamageTransaction,
-                    settings,
-                    requestedWidth,
-                    capRingOrdinaryLimit,
-                    capRingDepthLimit,
-                    capRingEdgeLimit,
-                    capRingWinningLimit,
-                    capRingRequestedWidth);
+                if (runCornerDamagePreview)
+                {
+                    BeginCornerDamagePreviewCapture(
+                        runCornerDamageGeometryPreview
+                            ? CornerDamagePreviewKind.GeometryOnly
+                            : CornerDamagePreviewKind.WithEdgeWear,
+                        cornerDamageTransaction,
+                        settings,
+                        requestedWidth,
+                        capRingOrdinaryLimit,
+                        capRingDepthLimit,
+                        capRingEdgeLimit,
+                        capRingWinningLimit,
+                        capRingRequestedWidth);
+                }
                 if (cornerDamageTransaction == null ||
                     !cornerDamageTransaction.Succeeded ||
                     cornerDamageTransaction.AcceptedFaces == null ||
                     cornerDamageTransaction.AcceptedCapFace == null)
                 {
-                    CaptureCornerDamagePreviewBlocker(
-                        cornerDamageTransaction == null
-                            ? "corner-damage transaction capture was unavailable"
-                            : cornerDamageTransaction.Diagnostic);
+                    if (runCornerDamageIntegrationPreflight)
+                    {
+                        CaptureCornerDamageIntegrationPreflight(
+                            BuildCornerDamageIntegrationPreflightRecord(
+                                cornerDamageTransaction,
+                                null,
+                                capRingRequestedWidth,
+                                minimumStyleWidth,
+                                0,
+                                0,
+                                null,
+                                null,
+                                false,
+                                false,
+                                0f,
+                                cornerDamageTransaction == null
+                                    ? "corner transaction was unavailable"
+                                    : cornerDamageTransaction.Diagnostic));
+                    }
+                    else
+                    {
+                        CaptureCornerDamagePreviewBlocker(
+                            cornerDamageTransaction == null
+                                ? "corner-damage transaction capture was unavailable"
+                                : cornerDamageTransaction.Diagnostic);
+                    }
                     return null;
                 }
                 if (runCornerDamageGeometryPreview)
@@ -202,15 +238,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     cornerDamageTransaction.
                         ConstructionSourceFaceCountExpected)
                 {
-                    CaptureCornerDamagePreviewBlocker(
-                        "corner-damage construction source-face attribution is incomplete");
+                    if (runCornerDamageIntegrationPreflight)
+                    {
+                        CaptureCornerDamageIntegrationPreflight(
+                            BuildCornerDamageIntegrationPreflightRecord(
+                                cornerDamageTransaction,
+                                null,
+                                capRingRequestedWidth,
+                                minimumStyleWidth,
+                                0,
+                                0,
+                                null,
+                                null,
+                                false,
+                                false,
+                                0f,
+                                cornerDamageTransaction == null
+                                    ? "corner transaction was unavailable"
+                                    : cornerDamageTransaction.Diagnostic));
+                    }
+                    else
+                    {
+                        CaptureCornerDamagePreviewBlocker(
+                            "corner-damage construction source-face attribution is incomplete");
+                    }
                     return null;
                 }
                 if (capRingRequestedWidth + PointMergeDistance <
                     minimumStyleWidth)
                 {
-                    CaptureCornerDamagePreviewBlocker(
-                        "cap-ring requested width is below the minimum stable style width");
+                    if (runCornerDamageIntegrationPreflight)
+                    {
+                        CaptureCornerDamageIntegrationPreflight(
+                            BuildCornerDamageIntegrationPreflightRecord(
+                                cornerDamageTransaction,
+                                null,
+                                capRingRequestedWidth,
+                                minimumStyleWidth,
+                                0,
+                                0,
+                                null,
+                                null,
+                                false,
+                                false,
+                                0f,
+                                cornerDamageTransaction == null
+                                    ? "corner transaction was unavailable"
+                                    : cornerDamageTransaction.Diagnostic));
+                    }
+                    else
+                    {
+                        CaptureCornerDamagePreviewBlocker(
+                            "cap-ring requested width is below the minimum stable style width");
+                    }
                     return null;
                 }
 
@@ -232,11 +312,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     microTopologyNormalization,
                     cornerDamageTransaction,
                     capRingRequestedWidth,
+                    false,
                     out EdgeWearCoverageAudit coverageAudit);
             if (candidates.Count == 0)
             {
                 const string noViableCandidateReason =
                     "no geometrically viable edge-wear candidates";
+                if (runCornerDamageIntegrationPreflight)
+                {
+                    CaptureCornerDamageIntegrationPreflight(
+                        BuildCornerDamageIntegrationPreflightRecord(
+                            cornerDamageTransaction,
+                            coverageAudit,
+                            capRingRequestedWidth,
+                            minimumStyleWidth,
+                            0,
+                            0,
+                            null,
+                            null,
+                            false,
+                            false,
+                            0f,
+                            noViableCandidateReason));
+                    return null;
+                }
                 LogChamferReadiness(
                     new ChamferReadinessStats(0, 0),
                     false,
@@ -277,7 +376,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return null;
             }
 
-            if (runCornerDamagePreview)
+            if (useCornerDamageCandidatePolicy)
             {
                 candidates.Sort(CompareCornerDamagePreviewCandidates);
             }
@@ -288,7 +387,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             int mandatoryCandidateCount = 0;
-            if (runCornerDamagePreview)
+            if (useCornerDamageCandidatePolicy)
             {
                 for (int candidateIndex = 0;
                      candidateIndex < candidates.Count;
@@ -303,7 +402,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float coverage01 = Mathf.Clamp01(settings.EdgeWearCoverage * 0.5f);
             int ordinaryCandidateCount =
                 candidates.Count - mandatoryCandidateCount;
-            int selectedCount = runCornerDamagePreview
+            int selectedCount = useCornerDamageCandidatePolicy
                 ? mandatoryCandidateCount + Mathf.Clamp(
                     Mathf.CeilToInt(ordinaryCandidateCount * coverage01),
                     0,
@@ -321,13 +420,58 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     mandatoryCandidateCount,
                     Mathf.Min(mandatoryCandidateCount, selectedCount));
             }
+            float integrationPreflightScale = 1f;
+            if (runCornerDamageIntegrationPreflight)
+            {
+                integrationPreflightScale =
+                    ResolveAndApplyCornerDamageIntegrationPreflightScale(
+                        coverageAudit,
+                        cornerDamageTransaction,
+                        capRingRequestedWidth,
+                        minimumStyleWidth);
+                if (integrationPreflightScale <= 0f)
+                {
+                    CaptureCornerDamageIntegrationPreflight(
+                        BuildCornerDamageIntegrationPreflightRecord(
+                            cornerDamageTransaction,
+                            coverageAudit,
+                            capRingRequestedWidth,
+                            minimumStyleWidth,
+                            candidates.Count,
+                            selectedCount,
+                            null,
+                            null,
+                            false,
+                            false,
+                            0f,
+                            "cap-ring-preflight"));
+                    return null;
+                }
+            }
             CaptureEdgeWearArtisticSelectionAudit(
                 coverageAudit,
                 candidates,
                 selectedCount);
             if (selectedCount <= 0)
             {
-                if (runCornerDamagePreview)
+                if (runCornerDamageIntegrationPreflight)
+                {
+                    CaptureCornerDamageIntegrationPreflight(
+                        BuildCornerDamageIntegrationPreflightRecord(
+                            cornerDamageTransaction,
+                            coverageAudit,
+                            capRingRequestedWidth,
+                            minimumStyleWidth,
+                            candidates.Count,
+                            selectedCount,
+                            null,
+                            null,
+                            false,
+                            false,
+                            integrationPreflightScale,
+                            "candidate-selection"));
+                }
+                else if (runCornerDamagePreview)
                 {
                     CaptureCornerDamagePreviewBlocker(
                         "corner preview selected no bevel candidates");
@@ -363,6 +507,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 
             LogChamferReadiness(stats, ready, blocker);
+            if (!ready && runCornerDamageIntegrationPreflight)
+            {
+                CaptureCornerDamageIntegrationPreflight(
+                    BuildCornerDamageIntegrationPreflightRecord(
+                        cornerDamageTransaction,
+                        coverageAudit,
+                        capRingRequestedWidth,
+                        minimumStyleWidth,
+                        candidates.Count,
+                        selectedCount,
+                        null,
+                        null,
+                        false,
+                        false,
+                        integrationPreflightScale,
+                        string.IsNullOrEmpty(blocker)
+                            ? "topology-context"
+                            : blocker));
+                return null;
+            }
             if (!ready && runUnifiedEvaluation)
             {
                 PlaneCutBevelAuditResult readinessAudit = default;
@@ -405,6 +569,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 float minimumStableFaceArea =
                     maximumDimension * maximumDimension * 0.000001f;
+
+                if (runCornerDamageIntegrationPreflight)
+                {
+                    ChamferCornerStats preflightCornerStats =
+                        new ChamferCornerStats();
+                    bool widthSolutionReady =
+                        AuditExplicitChamferCornerSolution(
+                            edgeWearFaces,
+                            context,
+                            requestedWidth,
+                            minimumStableEdgeLength,
+                            minimumStableFaceArea,
+                            coverageAudit,
+                            null,
+                            ref preflightCornerStats,
+                            out ChamferCornerSolution preflightSolution,
+                            out string preflightBlocker);
+                    if (widthSolutionReady)
+                    {
+                        ApplyEdgeWearCoverageCornerSolution(
+                            coverageAudit,
+                            context,
+                            preflightSolution);
+                    }
+                    CaptureCornerDamageIntegrationPreflight(
+                        BuildCornerDamageIntegrationPreflightRecord(
+                            cornerDamageTransaction,
+                            coverageAudit,
+                            capRingRequestedWidth,
+                            minimumStyleWidth,
+                            candidates.Count,
+                            selectedCount,
+                            context,
+                            preflightSolution,
+                            true,
+                            widthSolutionReady,
+                            integrationPreflightScale,
+                            preflightBlocker));
+                    return null;
+                }
 
                 if (runUnifiedEvaluation)
                 {

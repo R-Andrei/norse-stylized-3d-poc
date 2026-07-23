@@ -549,11 +549,38 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     $"Texture-form source: pre-normalized paired payload, algorithm {StylizedSurfaceDetailLibraryBuilder.PrepackedTextureFormAlgorithmVersion}");
                 if (entry.UsesFeatureTextureForm)
                 {
+                    builder.AppendLine(
+                        $"Feature substrate roughness scalar: {entry.FeatureSubstrateRoughness:F5}");
+                    builder.AppendLine(
+                        $"Feature maximum support radius UV: {entry.FeatureMaximumSupportRadiusUv:F6}");
+                    if (entry.FeatureSubstrateRoughness <
+                            StylizedSurfaceDetailLibraryBuilder
+                                .MinimumFeatureSubstrateRoughnessMean ||
+                        entry.FeatureSubstrateRoughness >
+                            StylizedSurfaceDetailLibraryBuilder
+                                .MaximumFeatureSubstrateRoughnessMean ||
+                        entry.FeatureMaximumSupportRadiusUv <
+                            StylizedSurfaceDetailLibraryBuilder
+                                .MinimumFeatureMaximumSupportRadiusUv ||
+                        entry.FeatureMaximumSupportRadiusUv >
+                            StylizedSurfaceDetailLibraryBuilder
+                                .MaximumFeatureMaximumSupportRadiusUv)
+                    {
+                        failures.Add(
+                            $"{label}: feature scalar roughness/radius metadata " +
+                            $"is {entry.FeatureSubstrateRoughness:F5}/" +
+                            $"{entry.FeatureMaximumSupportRadiusUv:F6}; " +
+                            "run the passing algorithm-10 proof and fixed-path installer.");
+                    }
+                    Texture2D packedSource = entry.SourceTexture;
                     AppendFeatureTextureFormPayloadReport(
                         builder,
                         failures,
                         label,
-                        pairedSource.GetPixels32(0));
+                        pairedSource.GetPixels32(0),
+                        packedSource != null && packedSource.isReadable
+                            ? packedSource.GetPixels32(0)
+                            : null);
                 }
                 else
                 {
@@ -672,12 +699,16 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             StringBuilder builder,
             ICollection<string> failures,
             string label,
-            IReadOnlyList<Color32> pixels)
+            IReadOnlyList<Color32> pixels,
+            IReadOnlyList<Color32> packedPixels)
         {
-            if (pixels == null || pixels.Count == 0)
+            if (pixels == null ||
+                pixels.Count == 0 ||
+                packedPixels == null ||
+                packedPixels.Count != pixels.Count)
             {
                 failures.Add(
-                    $"{label}: feature-aware Palette Form has no pixels.");
+                    $"{label}: feature-aware paired payload has missing or mismatched pixels.");
                 return;
             }
 
@@ -686,7 +717,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             int light = 0;
             double featureSum = 0.0;
             double substrateFormSum = 0.0;
-            double substrateRoughnessSum = 0.0;
+            double anchorDistanceSum = 0.0;
+            int anchorCount = 0;
+            float anchorDistanceMinimum = 1f;
+            float anchorDistanceMaximum = 0f;
             float featureMaximum = 0f;
             float combinedMinimum = 1f;
             float combinedMaximum = 0f;
@@ -699,10 +733,26 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 float substrateForm =
                     StylizedSurfaceDetailLibraryBuilder.DecodeSrgbByte(
                         pixel.g);
-                float substrateRoughness =
+                float anchorX =
                     StylizedSurfaceDetailLibraryBuilder.DecodeSrgbByte(
-                        pixel.b);
-                float feature = pixel.a / 255f;
+                        pixel.b) * 2f - 1f;
+                float anchorY = pixel.a / 255f * 2f - 1f;
+                float anchorDistance = Mathf.Sqrt(
+                    anchorX * anchorX + anchorY * anchorY);
+                Color32 packedPixel = packedPixels[index];
+                float slopeX = packedPixel.r / 255f * 2f - 1f;
+                float slopeY = packedPixel.g / 255f * 2f - 1f;
+                float slopeEvidence = Mathf.Sqrt(
+                    slopeX * slopeX + slopeY * slopeY);
+                float cavityEvidence = packedPixel.b / 255f;
+                float formEvidence = Mathf.Abs(
+                    combinedForm - substrateForm);
+                float feature =
+                    slopeEvidence >= 0.008f ||
+                    cavityEvidence >= 0.001f ||
+                    formEvidence >= 0.001f
+                        ? 1f
+                        : 0f;
                 combinedMinimum = Mathf.Min(
                     combinedMinimum,
                     combinedForm);
@@ -710,7 +760,17 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     combinedMaximum,
                     combinedForm);
                 substrateFormSum += substrateForm;
-                substrateRoughnessSum += substrateRoughness;
+                if (feature > 0.05f)
+                {
+                    anchorDistanceSum += anchorDistance;
+                    anchorCount++;
+                    anchorDistanceMinimum = Mathf.Min(
+                        anchorDistanceMinimum,
+                        anchorDistance);
+                    anchorDistanceMaximum = Mathf.Max(
+                        anchorDistanceMaximum,
+                        anchorDistance);
+                }
                 featureSum += feature;
                 featureMaximum = Mathf.Max(featureMaximum, feature);
                 if (combinedForm < 0.45f)
@@ -731,8 +791,9 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             float featureMean = (float)(featureSum * inverseCount);
             float substrateFormMean =
                 (float)(substrateFormSum * inverseCount);
-            float substrateRoughnessMean =
-                (float)(substrateRoughnessSum * inverseCount);
+            float anchorDistanceMean = anchorCount > 0
+                ? (float)(anchorDistanceSum / anchorCount)
+                : 0f;
             float count = pixels.Count;
             builder.AppendLine(
                 $"Feature-aware combined form min/max: " +
@@ -746,8 +807,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 $"Feature mask mean/max: " +
                 $"{featureMean:F5}/{featureMaximum:F5}");
             builder.AppendLine(
-                $"Substrate-only form/roughness means (linear): " +
-                $"{substrateFormMean:F5}/{substrateRoughnessMean:F5}");
+                $"Substrate-only form mean (linear): " +
+                $"{substrateFormMean:F5}");
+            builder.AppendLine(
+                $"Feature anchor distance min/mean/max (linear): " +
+                $"{anchorDistanceMinimum:F5}/{anchorDistanceMean:F5}/{anchorDistanceMaximum:F5}");
 
             if (featureMaximum <
                     StylizedSurfaceDetailLibraryBuilder
@@ -773,21 +837,21 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 substrateFormMean >
                     StylizedSurfaceDetailLibraryBuilder
                         .MaximumFeatureSubstrateFormMean ||
-                substrateRoughnessMean <
+                anchorCount <= 0 ||
+                anchorDistanceMean <
                     StylizedSurfaceDetailLibraryBuilder
-                        .MinimumFeatureSubstrateRoughnessMean ||
-                substrateRoughnessMean >
+                        .MinimumFeatureAnchorDistanceMean ||
+                anchorDistanceMean >
                     StylizedSurfaceDetailLibraryBuilder
-                        .MaximumFeatureSubstrateRoughnessMean)
+                        .MaximumFeatureAnchorDistanceMean ||
+                anchorDistanceMinimum < 0f ||
+                anchorDistanceMaximum > 1.01f)
             {
                 failures.Add(
-                    $"{label}: substrate-only form/roughness means are " +
-                    $"{substrateFormMean:F5}/{substrateRoughnessMean:F5}; " +
-                    $"expected form " +
-                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureSubstrateFormMean:F2}–" +
-                    $"{StylizedSurfaceDetailLibraryBuilder.MaximumFeatureSubstrateFormMean:F2} and roughness " +
-                    $"{StylizedSurfaceDetailLibraryBuilder.MinimumFeatureSubstrateRoughnessMean:F2}–" +
-                    $"{StylizedSurfaceDetailLibraryBuilder.MaximumFeatureSubstrateRoughnessMean:F2}.");
+                    $"{label}: substrate form/anchor payload is " +
+                    $"{substrateFormMean:F5} / " +
+                    $"{anchorDistanceMinimum:F5}–{anchorDistanceMaximum:F5} mean {anchorDistanceMean:F5}; " +
+                    $"expected valid algorithm-10 substrate G and centre-offset B/A.");
             }
         }
 

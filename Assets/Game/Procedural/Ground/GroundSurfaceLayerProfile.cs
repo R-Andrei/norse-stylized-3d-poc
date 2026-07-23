@@ -132,6 +132,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
         public bool UsesFeatureTextureForm =>
             surfaceMaterial != null &&
             surfaceMaterial.UsesFeatureTextureForm;
+        public float FeatureSubstrateRoughness =>
+            surfaceMaterial != null
+                ? surfaceMaterial.FeatureSubstrateRoughness
+                : 0.5f;
+        public float FeatureMaximumSupportRadiusUv =>
+            surfaceMaterial != null
+                ? surfaceMaterial.FeatureMaximumSupportRadiusUv
+                : 0f;
         public float TextureFormStrength =>
             surfaceMaterial != null
                 ? surfaceMaterial.TextureFormStrength

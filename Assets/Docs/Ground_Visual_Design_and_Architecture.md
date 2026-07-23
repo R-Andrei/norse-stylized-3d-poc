@@ -1,3 +1,12 @@
+## 2026-07-22 — Sparse-rock boundary silhouette rule
+
+A discrete riverbed rock is a recognizable object, not opacity noise. Application transitions may blend the noisy substrate spatially, but they must never cut through a rock silhouette. Each rock therefore remains, disappears, or fades uniformly according to whether one candidate-wide conservative support circle around its reconstructed centre has cleared the Bank or Riverbed boundary and configured safety margin.
+
+Palette Form B/A carry a non-ID signed centre-offset vector. The support radius is scalar metadata shared by the candidate and is deliberately based on its largest rock. Smaller rocks may disappear earlier than their exact silhouette requires; that is accepted and preferable to a crescent or half-rock. Suppressed rocks reveal substrate-only form and scalar roughness, never Primary Ground.
+
+Feature IDs, nearest-feature searches, centre/radius arrays, metadata textures, and derivatives of sampled feature data are rejected. Close-camera, production-camera, tiled, and mip evidence must show zero inconsistent visible-rock decisions before installation.
+
+
 ## 2026-07-22 — GSU-M2.7C.5E.2.2: Feature-aware surface-application transition architecture
 
 M2.7C.5E.2.2 preserves the accepted E2.1 sequential material composition:

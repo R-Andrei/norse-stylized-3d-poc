@@ -825,14 +825,10 @@ namespace ProgrammaticStylized3D.Rivers
             public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamShorePattern Pattern { get; }
 
-            public float SlotSpacingMetres => Mathf.Lerp(
-                AutomaticShoreSourceMaximumSlotSpacingMetres,
-                AutomaticShoreSourceMinimumSlotSpacingMetres,
-                Mathf.Sqrt(Coverage));
-            public float EventsPerSecond => Mathf.Lerp(
-                AutomaticShoreSourceMinimumEventsPerSecond,
-                AutomaticShoreSourceMaximumEventsPerSecond,
-                Activity);
+            public float SlotSpacingMetres =>
+                AutomaticShoreSourceSlotSpacingMetres;
+            public float EventsPerSecond =>
+                AutomaticShoreSourceMaximumEventsPerSecond * Activity;
         }
 
 
@@ -866,10 +862,8 @@ namespace ProgrammaticStylized3D.Rivers
             public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamObjectPattern Pattern { get; }
 
-            public float EventsPerSecond => Mathf.Lerp(
-                AutomaticObjectSourceMinimumEventsPerSecond,
-                AutomaticObjectSourceMaximumEventsPerSecond,
-                Activity);
+            public float EventsPerSecond =>
+                AutomaticObjectSourceMaximumEventsPerSecond * Activity;
         }
 
         private readonly struct ResolvedAutomaticObjectContactProfile
@@ -969,15 +963,11 @@ namespace ProgrammaticStylized3D.Rivers
             public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamFreeWaterPattern Pattern { get; }
 
-            public float SlotSpacingMetres => Mathf.Lerp(
-                AutomaticFreeWaterSourceMaximumSlotSpacingMetres,
-                AutomaticFreeWaterSourceMinimumSlotSpacingMetres,
-                Mathf.Sqrt(Coverage));
+            public float SlotSpacingMetres =>
+                AutomaticFreeWaterSourceSlotSpacingMetres;
 
-            public float EventsPerSecond => Mathf.Lerp(
-                AutomaticFreeWaterSourceMinimumEventsPerSecond,
-                AutomaticFreeWaterSourceMaximumEventsPerSecond,
-                Activity);
+            public float EventsPerSecond =>
+                AutomaticFreeWaterSourceMaximumEventsPerSecond * Activity;
         }
         private bool IsAutomaticSourcePopulationActive =>
             river != null && river.FoamEnabled &&
@@ -1001,7 +991,7 @@ namespace ProgrammaticStylized3D.Rivers
         {
             bool startedAny = false;
             startedAny |= AdvanceAutomaticShoreBirthSources(deltaTime, now);
-            startedAny |= AdvanceAutomaticObjectBirthSources(deltaTime, now);
+            startedAny |= AdvanceAutomaticObjectBirthSources(deltaTime);
             startedAny |= AdvanceAutomaticFreeWaterBirthSources(deltaTime, now);
             return startedAny;
         }
@@ -1143,14 +1133,14 @@ namespace ProgrammaticStylized3D.Rivers
 
 
         private bool AdvanceAutomaticObjectBirthSources(
-            float deltaTime,
-            float now)
+            float deltaTime)
         {
             automaticObjectBirthSubmittedLastUpdate = 0;
             automaticObjectBirthRejectedLastUpdate = 0;
             automaticObjectBirthAnchorCountLastUpdate = 0;
             automaticObjectContactCycleTime += Mathf.Max(0f, deltaTime);
             RefreshAutomaticObjectPatternAuthority();
+            RefreshAutomaticObjectClearanceAuthority();
 
             if (!ResolveAutomaticObjectSourceProfile(
                     out AutomaticObjectSourceProfile objectProfile,
@@ -1158,7 +1148,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus = inactiveStatus;
-                RefreshAutomaticObjectContactCycleDiagnostics();
+                RefreshAutomaticObjectSourcePacketDiagnostics();
                 return false;
             }
 
@@ -1167,7 +1157,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus = "Waiting for disturbance runtime";
-                RefreshAutomaticObjectContactCycleDiagnostics();
+                RefreshAutomaticObjectSourcePacketDiagnostics();
                 return false;
             }
 
@@ -1175,14 +1165,28 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticObjectFoamSources);
             automaticObjectBirthAnchorCountLastUpdate =
                 automaticObjectFoamSources.Count;
-            SynchronizeAutomaticObjectContactCycleStates();
+            SynchronizeAutomaticObjectSourceStates();
             if (automaticObjectFoamSources.Count <= 0)
             {
                 automaticObjectBirthAccumulator = 0f;
                 automaticObjectBirthStatus =
                     "No registered static object source anchors";
-                RefreshAutomaticObjectContactCycleDiagnostics();
+                RefreshAutomaticObjectSourcePacketDiagnostics();
                 return false;
+            }
+
+            float fleckRateScale = ResolveAutomaticObjectFleckRateScale(
+                objectProfile.Pattern);
+            float fleckEventsPerSecond = objectProfile.EventsPerSecond *
+                fleckRateScale;
+            if (fleckEventsPerSecond > 0.0001f)
+            {
+                automaticObjectBirthAccumulator += Mathf.Max(0f, deltaTime) *
+                    fleckEventsPerSecond;
+            }
+            else
+            {
+                automaticObjectBirthAccumulator = 0f;
             }
 
             int cycleStarts = 0;
@@ -1200,14 +1204,8 @@ namespace ProgrammaticStylized3D.Rivers
                 }
             }
 
-            float fleckRateScale = ResolveAutomaticObjectFleckRateScale(
-                objectProfile.Pattern);
-            float fleckEventsPerSecond = objectProfile.EventsPerSecond *
-                fleckRateScale;
             if (fleckEventsPerSecond > 0.0001f)
             {
-                automaticObjectBirthAccumulator += Mathf.Max(0f, deltaTime) *
-                    fleckEventsPerSecond;
                 while (automaticObjectBirthAccumulator >= 1f &&
                        cycleStarts + fleckStarts <
                            AutomaticObjectSourceMaximumStartsPerUpdate)
@@ -1229,22 +1227,16 @@ namespace ProgrammaticStylized3D.Rivers
                     break;
                 }
             }
-            else
-            {
-                automaticObjectBirthAccumulator = 0f;
-            }
 
             int startsThisUpdate = cycleStarts + fleckStarts;
             automaticObjectBirthSubmittedLastUpdate = startsThisUpdate;
             automaticObjectBirthRejectedLastUpdate = skippedThisUpdate;
             automaticObjectBirthSubmittedTotal += startsThisUpdate;
-            RefreshAutomaticObjectContactCycleDiagnostics();
+            RefreshAutomaticObjectSourcePacketDiagnostics();
             automaticObjectBirthStatus =
-                $"Contact cycles {automaticObjectContactBuildCount} build / " +
-                $"{automaticObjectContactHoldCount} hold / " +
-                $"{automaticObjectContactReleaseCount} release / " +
-                $"{automaticObjectContactRestCount} rest; " +
-                $"started {cycleStarts} cycle(s) + {fleckStarts} fleck(s), " +
+                $"Object packets {automaticObjectContactBuildCount} building / " +
+                $"{automaticObjectWaitingClearanceCount} waiting for clearance; " +
+                $"started {cycleStarts} Arc/Semi-Arc + {fleckStarts} Fleck, " +
                 $"skipped {skippedThisUpdate}";
             return startsThisUpdate > 0;
         }
@@ -1266,8 +1258,6 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamObjectContactArcPatternWeight * 10000f);
                 signature = signature * 31 + Mathf.RoundToInt(
                     river.FoamObjectContactSemiArcPatternWeight * 10000f);
-                signature = signature * 31 + Mathf.RoundToInt(
-                    river.FoamObjectContactFleckPatternWeight * 10000f);
             }
 
             if (automaticObjectPatternAuthoritySignature == int.MinValue)
@@ -1287,9 +1277,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 AutomaticFoamSourceEvent sourceEvent =
                     automaticFoamSourceEvents[index];
-                if (!sourceEvent.Active ||
-                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
-                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                if (!sourceEvent.Active || !IsAutomaticObjectSourceType(sourceEvent.Type))
                 {
                     continue;
                 }
@@ -1302,7 +1290,7 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             automaticObjectContactStaleSourceIds.Clear();
-            foreach (EntityId sourceId in automaticObjectContactCycleStates.Keys)
+            foreach (EntityId sourceId in automaticObjectSourceStates.Keys)
             {
                 automaticObjectContactStaleSourceIds.Add(sourceId);
             }
@@ -1311,12 +1299,69 @@ namespace ProgrammaticStylized3D.Rivers
                  index < automaticObjectContactStaleSourceIds.Count;
                  index++)
             {
-                EntityId sourceId =
-                    automaticObjectContactStaleSourceIds[index];
-                AutomaticObjectContactCycleState state =
-                    automaticObjectContactCycleStates[sourceId];
+                EntityId sourceId = automaticObjectContactStaleSourceIds[index];
+                AutomaticObjectSourceState state =
+                    automaticObjectSourceStates[sourceId];
                 state.NextStartTime = automaticObjectContactCycleTime;
-                automaticObjectContactCycleStates[sourceId] = state;
+                state.LastEventType = AutomaticFoamSourceEventType.None;
+                automaticObjectSourceStates[sourceId] = state;
+            }
+            automaticObjectContactStaleSourceIds.Clear();
+        }
+
+        private void RefreshAutomaticObjectClearanceAuthority()
+        {
+            if (river == null)
+            {
+                return;
+            }
+
+            int signature;
+            unchecked
+            {
+                signature = 29;
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactMinimumPacketGapMetres * 1000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObstacleSlowdownStrength * 10000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObstacleMinimumDownstreamFactor * 10000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    river.FoamObjectContactSlowdownOuterReachMetres * 1000f);
+                signature = signature * 31 + Mathf.RoundToInt(
+                    ResolveBaseFoamDownstreamSpeedMetresPerSecond() * 1000f);
+            }
+
+            if (automaticObjectClearanceAuthoritySignature == int.MinValue)
+            {
+                automaticObjectClearanceAuthoritySignature = signature;
+                return;
+            }
+
+            if (automaticObjectClearanceAuthoritySignature == signature)
+            {
+                return;
+            }
+
+            automaticObjectClearanceAuthoritySignature = signature;
+            automaticObjectContactStaleSourceIds.Clear();
+            foreach (EntityId sourceId in automaticObjectSourceStates.Keys)
+            {
+                if (!HasActiveAutomaticObjectSource(sourceId))
+                {
+                    automaticObjectContactStaleSourceIds.Add(sourceId);
+                }
+            }
+
+            for (int index = 0;
+                 index < automaticObjectContactStaleSourceIds.Count;
+                 index++)
+            {
+                EntityId sourceId = automaticObjectContactStaleSourceIds[index];
+                AutomaticObjectSourceState state =
+                    automaticObjectSourceStates[sourceId];
+                state.NextStartTime = automaticObjectContactCycleTime;
+                automaticObjectSourceStates[sourceId] = state;
             }
             automaticObjectContactStaleSourceIds.Clear();
         }
@@ -1418,24 +1463,33 @@ namespace ProgrammaticStylized3D.Rivers
                     continue;
                 }
 
-                if (!automaticObjectContactCycleStates.TryGetValue(
+                if (!automaticObjectSourceStates.TryGetValue(
                         source.SourceId,
-                        out AutomaticObjectContactCycleState state))
+                        out AutomaticObjectSourceState state))
                 {
-                    state = new AutomaticObjectContactCycleState
-                    {
-                        CycleIndex = 0,
-                        NextStartTime = automaticObjectContactCycleTime +
-                            Hash01(identitySeed + 2.9f) *
-                            river.FoamObjectContactRestDurationMaxSeconds
-                    };
-                    automaticObjectContactCycleStates[source.SourceId] = state;
+                    state = CreateInitialAutomaticObjectSourceState();
+                    automaticObjectSourceStates[source.SourceId] = state;
                 }
 
-                if (HasActiveAutomaticObjectContactCycle(source.SourceId) ||
+                if (HasActiveAutomaticObjectSource(source.SourceId) ||
                     automaticObjectContactCycleTime + 0.0001f <
                         state.NextStartTime)
                 {
+                    skippedObjects++;
+                    continue;
+                }
+
+                bool fleckDue = automaticObjectBirthAccumulator >= 1f &&
+                    ResolveAutomaticObjectFleckRateScale(profile.Pattern) > 0.0001f &&
+                    Hash01(identitySeed + 1.7f) <= profile.Coverage &&
+                    state.LastEventType !=
+                        AutomaticFoamSourceEventType.ObjectContactFleck;
+                if (fleckDue)
+                {
+                    // A pending supplemental Fleck may take this eligible slot,
+                    // but a completed Fleck always yields the next opportunity
+                    // back to Arc/Semi-Arc so high Activity cannot starve cycles.
+                    skippedObjects++;
                     continue;
                 }
 
@@ -1452,7 +1506,7 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     state.CycleIndex++;
                     state.NextStartTime = float.PositiveInfinity;
-                    automaticObjectContactCycleStates[source.SourceId] = state;
+                    automaticObjectSourceStates[source.SourceId] = state;
                     idleSince = 0.0;
                     return true;
                 }
@@ -1488,20 +1542,46 @@ namespace ProgrammaticStylized3D.Rivers
                     cycleIndex);
                 RiverFoamStaticObjectSource source =
                     automaticObjectFoamSources[sourceIndex];
-                float sourceSeed = ResolveAutomaticObjectIdentitySeed(source) +
-                    cycleIndex * 53.137f;
-                if (Hash01(sourceSeed + 1.7f) > profile.Coverage)
+                float identitySeed = ResolveAutomaticObjectIdentitySeed(source);
+                if (Hash01(identitySeed + 1.7f) > profile.Coverage)
                 {
                     skippedObjects++;
                     continue;
                 }
 
+                if (!automaticObjectSourceStates.TryGetValue(
+                        source.SourceId,
+                        out AutomaticObjectSourceState state))
+                {
+                    state = CreateInitialAutomaticObjectSourceState();
+                    automaticObjectSourceStates[source.SourceId] = state;
+                }
+
+                bool contactCycleEligible =
+                    river.FoamObjectContactCyclesEnabled &&
+                    Hash01(identitySeed + 1.7f) <=
+                        river.FoamObjectContactCycleCoverage;
+                if (HasActiveAutomaticObjectSource(source.SourceId) ||
+                    automaticObjectContactCycleTime + 0.0001f <
+                        state.NextStartTime ||
+                    (contactCycleEligible &&
+                     state.LastEventType ==
+                        AutomaticFoamSourceEventType.ObjectContactFleck))
+                {
+                    skippedObjects++;
+                    continue;
+                }
+
+                float sourceSeed = identitySeed + state.CycleIndex * 53.137f;
                 if (TryBeginAutomaticObjectSourceEvent(
                         profile,
                         AutomaticObjectSourceRecipe.ContactFleck,
                         source,
                         sourceSeed))
                 {
+                    state.CycleIndex++;
+                    state.NextStartTime = float.PositiveInfinity;
+                    automaticObjectSourceStates[source.SourceId] = state;
                     idleSince = 0.0;
                     return true;
                 }
@@ -1546,17 +1626,10 @@ namespace ProgrammaticStylized3D.Rivers
         private float ResolveAutomaticObjectFleckRateScale(
             StylizedRiverFoamObjectPattern pattern)
         {
-            if (pattern == StylizedRiverFoamObjectPattern.ContactFlecks)
-            {
-                return 1f;
-            }
-
-            if (pattern != StylizedRiverFoamObjectPattern.Mixed || river == null)
-            {
-                return 0f;
-            }
-
-            return Mathf.Clamp01(river.FoamObjectContactFleckPatternWeight);
+            return pattern == StylizedRiverFoamObjectPattern.Mixed ||
+                pattern == StylizedRiverFoamObjectPattern.ContactFlecks
+                    ? 1f
+                    : 0f;
         }
 
         private float ResolveAutomaticObjectIdentitySeed(
@@ -1567,20 +1640,33 @@ namespace ProgrammaticStylized3D.Rivers
                 source.Phase * 11.0f;
         }
 
-        private bool HasActiveAutomaticObjectContactCycle(EntityId sourceId)
+        private AutomaticObjectSourceState CreateInitialAutomaticObjectSourceState()
+        {
+            return new AutomaticObjectSourceState
+            {
+                CycleIndex = 0,
+                NextStartTime = automaticObjectContactCycleTime,
+                LastEventType = AutomaticFoamSourceEventType.None
+            };
+        }
+
+        private static bool IsAutomaticObjectSourceType(
+            AutomaticFoamSourceEventType sourceType)
+        {
+            return sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
+                sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc ||
+                sourceType == AutomaticFoamSourceEventType.ObjectContactFleck;
+        }
+
+        private bool HasActiveAutomaticObjectSource(EntityId sourceId)
         {
             for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
             {
                 AutomaticFoamSourceEvent sourceEvent =
                     automaticFoamSourceEvents[index];
-                if (!sourceEvent.Active ||
-                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
-                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
-                {
-                    continue;
-                }
-
-                if (sourceEvent.ObjectSourceId.Equals(sourceId))
+                if (sourceEvent.Active &&
+                    IsAutomaticObjectSourceType(sourceEvent.Type) &&
+                    sourceEvent.ObjectSourceId.Equals(sourceId))
                 {
                     return true;
                 }
@@ -1589,30 +1675,38 @@ namespace ProgrammaticStylized3D.Rivers
             return false;
         }
 
-        private void CompleteAutomaticObjectContactCycle(
+        private void CompleteAutomaticObjectSourceEvent(
             AutomaticFoamSourceEvent sourceEvent)
         {
-            if (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
-                sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc)
+            if (!IsAutomaticObjectSourceType(sourceEvent.Type))
             {
                 return;
             }
 
-            automaticObjectContactCycleStates.TryGetValue(
+            automaticObjectSourceStates.TryGetValue(
                 sourceEvent.ObjectSourceId,
-                out AutomaticObjectContactCycleState state);
-            state.NextStartTime = automaticObjectContactCycleTime +
-                Mathf.Max(0f, sourceEvent.ObjectRestDuration);
-            automaticObjectContactCycleStates[sourceEvent.ObjectSourceId] = state;
+                out AutomaticObjectSourceState state);
+            state.LastEventType = sourceEvent.Type;
+            float clearanceSeconds = ResolveAutomaticObjectPacketClearanceSeconds();
+            state.NextStartTime = float.IsPositiveInfinity(clearanceSeconds)
+                ? float.PositiveInfinity
+                : automaticObjectContactCycleTime + clearanceSeconds;
+            automaticObjectSourceStates[sourceEvent.ObjectSourceId] = state;
         }
 
-        private void SynchronizeAutomaticObjectContactCycleStates()
+        private void SynchronizeAutomaticObjectSourceStates()
         {
             automaticObjectContactLiveSourceIds.Clear();
             for (int index = 0; index < automaticObjectFoamSources.Count; index++)
             {
-                automaticObjectContactLiveSourceIds.Add(
-                    automaticObjectFoamSources[index].SourceId);
+                EntityId sourceId = automaticObjectFoamSources[index].SourceId;
+                automaticObjectContactLiveSourceIds.Add(sourceId);
+                if (!automaticObjectSourceStates.ContainsKey(sourceId))
+                {
+                    automaticObjectSourceStates.Add(
+                        sourceId,
+                        CreateInitialAutomaticObjectSourceState());
+                }
             }
 
             for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
@@ -1620,8 +1714,7 @@ namespace ProgrammaticStylized3D.Rivers
                 AutomaticFoamSourceEvent sourceEvent =
                     automaticFoamSourceEvents[index];
                 if (sourceEvent.Active &&
-                    (sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactArc ||
-                     sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                    IsAutomaticObjectSourceType(sourceEvent.Type))
                 {
                     automaticObjectContactLiveSourceIds.Add(
                         sourceEvent.ObjectSourceId);
@@ -1629,8 +1722,8 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             automaticObjectContactStaleSourceIds.Clear();
-            foreach (KeyValuePair<EntityId, AutomaticObjectContactCycleState> pair
-                     in automaticObjectContactCycleStates)
+            foreach (KeyValuePair<EntityId, AutomaticObjectSourceState> pair
+                     in automaticObjectSourceStates)
             {
                 if (!automaticObjectContactLiveSourceIds.Contains(pair.Key))
                 {
@@ -1642,51 +1735,47 @@ namespace ProgrammaticStylized3D.Rivers
                  index < automaticObjectContactStaleSourceIds.Count;
                  index++)
             {
-                automaticObjectContactCycleStates.Remove(
+                automaticObjectSourceStates.Remove(
                     automaticObjectContactStaleSourceIds[index]);
             }
+            automaticObjectContactStaleSourceIds.Clear();
         }
 
-        private void RefreshAutomaticObjectContactCycleDiagnostics()
+        private void RefreshAutomaticObjectSourcePacketDiagnostics()
         {
             automaticObjectContactBuildCount = 0;
-            automaticObjectContactHoldCount = 0;
-            automaticObjectContactReleaseCount = 0;
+            automaticObjectContactFleckCount = 0;
             for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
             {
                 AutomaticFoamSourceEvent sourceEvent =
                     automaticFoamSourceEvents[index];
-                if (!sourceEvent.Active ||
-                    (sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactArc &&
-                     sourceEvent.Type != AutomaticFoamSourceEventType.ObjectContactSemiArc))
+                if (!sourceEvent.Active)
                 {
                     continue;
                 }
 
-                if (sourceEvent.Elapsed < sourceEvent.ObjectBuildDuration)
+                if (sourceEvent.Type ==
+                        AutomaticFoamSourceEventType.ObjectContactArc ||
+                    sourceEvent.Type ==
+                        AutomaticFoamSourceEventType.ObjectContactSemiArc)
                 {
                     automaticObjectContactBuildCount++;
                 }
-                else if (sourceEvent.Elapsed <
-                         sourceEvent.ObjectBuildDuration +
-                         sourceEvent.ObjectHoldDuration)
+                else if (sourceEvent.Type ==
+                    AutomaticFoamSourceEventType.ObjectContactFleck)
                 {
-                    automaticObjectContactHoldCount++;
-                }
-                else
-                {
-                    automaticObjectContactReleaseCount++;
+                    automaticObjectContactFleckCount++;
                 }
             }
 
-            automaticObjectContactRestCount = 0;
-            foreach (KeyValuePair<EntityId, AutomaticObjectContactCycleState> pair
-                     in automaticObjectContactCycleStates)
+            automaticObjectWaitingClearanceCount = 0;
+            foreach (KeyValuePair<EntityId, AutomaticObjectSourceState> pair
+                     in automaticObjectSourceStates)
             {
-                if (!HasActiveAutomaticObjectContactCycle(pair.Key) &&
+                if (!HasActiveAutomaticObjectSource(pair.Key) &&
                     pair.Value.NextStartTime > automaticObjectContactCycleTime)
                 {
-                    automaticObjectContactRestCount++;
+                    automaticObjectWaitingClearanceCount++;
                 }
             }
         }
@@ -1836,11 +1925,8 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamObjectContactFleckInitialLifeMin,
                     river.FoamObjectContactFleckInitialLifeMax,
                     eventScale);
-                breakupScale = Mathf.Lerp(0.08f, 0.22f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamObjectContactFleckBreakupStrengthMin,
-                    river.FoamObjectContactFleckBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
+                breakupScale = 0f;
+                breakupStrength = 0f;
                 patternFormationSpeedMultiplier =
                     river.FoamObjectContactFleckFormationSpeedMultiplier;
                 amount = Mathf.Lerp(
@@ -2057,24 +2143,6 @@ namespace ProgrammaticStylized3D.Rivers
             float formationSpeed =
                 revealTiming.RequestedSpeedMetresPerSecond;
             bool contactCycle = recipe != AutomaticObjectSourceRecipe.ContactFleck;
-            float holdDuration = contactCycle
-                ? Mathf.Lerp(
-                    river.FoamObjectContactHoldDurationMinSeconds,
-                    river.FoamObjectContactHoldDurationMaxSeconds,
-                    Hash01(seed + 15.7f))
-                : 0f;
-            float releaseDuration = contactCycle
-                ? Mathf.Lerp(
-                    river.FoamObjectContactReleaseDurationMinSeconds,
-                    river.FoamObjectContactReleaseDurationMaxSeconds,
-                    Hash01(seed + 16.9f))
-                : 0f;
-            float restDuration = contactCycle
-                ? Mathf.Lerp(
-                    river.FoamObjectContactRestDurationMinSeconds,
-                    river.FoamObjectContactRestDurationMaxSeconds,
-                    Hash01(seed + 18.1f))
-                : 0f;
             float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
             float feather = contactCycle
                 ? 0f
@@ -2098,9 +2166,6 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 source.GlobalDistance,
                 revealTiming,
-                holdDuration,
-                releaseDuration,
-                restDuration,
                 headTrailMetres,
                 offset,
                 width,
@@ -2126,9 +2191,6 @@ namespace ProgrammaticStylized3D.Rivers
             float endGlobalDistance,
             float objectCentreGlobalDistance,
             ResolvedAutomaticRevealTiming revealTiming,
-            float holdDuration,
-            float releaseDuration,
-            float restDuration,
             float headTrailMetres,
             float contactOffsetMetres,
             float widthMetres,
@@ -2180,12 +2242,6 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
             float resolvedBuildDuration =
                 revealTiming.ResolvedDurationSeconds;
-            float resolvedHoldDuration = contactCycle
-                ? Mathf.Max(0f, holdDuration)
-                : 0f;
-            float resolvedReleaseDuration = contactCycle
-                ? Mathf.Max(0.05f, releaseDuration)
-                : 0f;
 
             automaticFoamSourceEvents[slotIndex] = new AutomaticFoamSourceEvent
             {
@@ -2197,15 +2253,9 @@ namespace ProgrammaticStylized3D.Rivers
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
                 ObjectCentreGlobalDistance = objectCentreGlobalDistance,
-                Duration = resolvedBuildDuration +
-                    resolvedHoldDuration + resolvedReleaseDuration,
+                Duration = resolvedBuildDuration,
                 Elapsed = 0f,
                 ObjectBuildDuration = resolvedBuildDuration,
-                ObjectHoldDuration = resolvedHoldDuration,
-                ObjectReleaseDuration = resolvedReleaseDuration,
-                ObjectRestDuration = contactCycle
-                    ? Mathf.Max(0f, restDuration)
-                    : 0f,
                 FormationSpeedMetresPerSecond =
                     revealTiming.RequestedSpeedMetresPerSecond,
                 RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
@@ -2235,12 +2285,8 @@ namespace ProgrammaticStylized3D.Rivers
                         SourceFillMinimumFeatureSizeMetres * 0.55f,
                         Mathf.Max(widthMetres * 1.5f, featherMetres * 1.25f)),
                 ShapeSeed = sourceKey + AutomaticObjectBirthShapeSeedSalt,
-                BreakupScaleMetres = contactCycle
-                    ? 0f
-                    : Mathf.Max(0.05f, breakupScaleMetres),
-                BreakupStrength = contactCycle
-                    ? 0f
-                    : Mathf.Clamp01(breakupStrength),
+                BreakupScaleMetres = 0f,
+                BreakupStrength = 0f,
                 Curvature = Mathf.Clamp(lopsidedness, -1f, 1f),
                 // Arc/Semi-Arc contact cycles must never receive breakup or patterned
                 // source-fill holes inside their upstream bridge or straight wake arms. Flecks
@@ -2335,6 +2381,78 @@ namespace ProgrammaticStylized3D.Rivers
             return true;
         }
 
+        private float ResolveLatestAutomaticSourceEventDurationSeconds()
+        {
+            int eventId = latestFoamCompositionEventId;
+            for (int index = 0; index < automaticFoamSourceEvents.Length; index++)
+            {
+                AutomaticFoamSourceEvent sourceEvent =
+                    automaticFoamSourceEvents[index];
+                if (sourceEvent.Active && sourceEvent.EventId == eventId)
+                {
+                    return Mathf.Max(0f, sourceEvent.Duration);
+                }
+            }
+
+            return 0f;
+        }
+
+        private float ResolveAutomaticObjectPacketClearanceSeconds()
+        {
+            if (river == null)
+            {
+                return float.PositiveInfinity;
+            }
+
+            float baseSpeed = ResolveBaseFoamDownstreamSpeedMetresPerSecond();
+            if (baseSpeed <= 0.0001f)
+            {
+                return float.PositiveInfinity;
+            }
+
+            float contactSpeedFactor = ResolveObjectContactPacketSpeedFactor();
+            if (contactSpeedFactor <= 0.0001f)
+            {
+                return float.PositiveInfinity;
+            }
+
+            float haloClearanceSeconds =
+                river.FoamObjectContactSlowdownOuterReachMetres /
+                Mathf.Max(0.0001f, baseSpeed * contactSpeedFactor);
+            float gapClearanceSeconds =
+                river.FoamObjectContactMinimumPacketGapMetres /
+                Mathf.Max(0.0001f, baseSpeed);
+            return Mathf.Max(0f, haloClearanceSeconds) +
+                Mathf.Max(0f, gapClearanceSeconds);
+        }
+
+        private float ResolveAutomaticPacketClearanceSeconds(
+            float packetGapMetres,
+            float localSpeedFactor = 1f)
+        {
+            float downstreamSpeed = river != null
+                ? Mathf.Abs(river.FlowSpeedMetresPerSecond) *
+                    Mathf.Max(0f, river.FoamDownstreamSpeedRatio) *
+                    Mathf.Max(0f, localSpeedFactor)
+                : 0f;
+            return Mathf.Max(0f, packetGapMetres) /
+                Mathf.Max(
+                    AutomaticPacketClearanceMinimumSpeedMetresPerSecond,
+                    downstreamSpeed);
+        }
+
+        private float ResolveObjectContactPacketSpeedFactor()
+        {
+            if (river == null || river.FoamObstacleSlowdownStrength <= 0.0001f)
+            {
+                return 1f;
+            }
+
+            return Mathf.Clamp01(river.FoamObstacleMinimumDownstreamFactor);
+        }
+
+
+
         private int ResolvePermutedAutomaticObjectSourceIndex(
             int scanIndex,
             int sourceCount,
@@ -2391,6 +2509,7 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 if (TryStartAutomaticFreeWaterSourceEvent(
                         freeWaterProfile,
+                        now,
                         out int skippedSlots))
                 {
                     automaticFreeWaterBirthAccumulator -= 1f;
@@ -2484,6 +2603,7 @@ namespace ProgrammaticStylized3D.Rivers
 
         private bool TryStartAutomaticFreeWaterSourceEvent(
             AutomaticFreeWaterSourceProfile profile,
+            float now,
             out int skippedSlots)
         {
             skippedSlots = 0;
@@ -2524,11 +2644,15 @@ namespace ProgrammaticStylized3D.Rivers
                     wrappedSlot / AutomaticFreeWaterSourceLateralLaneCount;
                 int lateralIndex =
                     wrappedSlot % AutomaticFreeWaterSourceLateralLaneCount;
-                float slotSeed = river.VisualSeed * 0.257f +
-                    wrappedSlot * 23.719f +
-                    cycleIndex * 41.137f;
+                float identitySeed = river.VisualSeed * 0.257f +
+                    wrappedSlot * 23.719f;
+                float slotSeed = identitySeed + cycleIndex * 41.137f;
 
-                if (Hash01(slotSeed + 1.7f) > profile.Coverage)
+                if (Hash01(identitySeed + 1.7f) > profile.Coverage ||
+                    (automaticFreeWaterSlotNextStartTimes.TryGetValue(
+                         wrappedSlot,
+                         out float nextStartTime) &&
+                     now + 0.0001f < nextStartTime))
                 {
                     skippedSlots++;
                     continue;
@@ -2572,6 +2696,10 @@ namespace ProgrammaticStylized3D.Rivers
                         centreAcrossMetres,
                         visibleHalfWidth))
                 {
+                    automaticFreeWaterSlotNextStartTimes[wrappedSlot] =
+                        now + ResolveLatestAutomaticSourceEventDurationSeconds() +
+                        ResolveAutomaticPacketClearanceSeconds(
+                            river.FoamFreeWaterMinimumPacketGapMetres);
                     idleSince = 0.0;
                     return true;
                 }
@@ -2669,11 +2797,8 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamFreeWaterFragmentInitialLifeMin,
                     river.FoamFreeWaterFragmentInitialLifeMax,
                     eventScale);
-                breakupScale = Mathf.Lerp(0.10f, 0.42f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamFreeWaterFragmentBreakupStrengthMin,
-                    river.FoamFreeWaterFragmentBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
+                breakupScale = 0f;
+                breakupStrength = 0f;
                 patternFormationSpeedMultiplier =
                     river.FoamFreeWaterFragmentFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
@@ -2696,11 +2821,8 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamFreeWaterCrossLaceInitialLifeMin,
                     river.FoamFreeWaterCrossLaceInitialLifeMax,
                     eventScale);
-                breakupScale = Mathf.Lerp(0.20f, 0.68f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamFreeWaterCrossLaceBreakupStrengthMin,
-                    river.FoamFreeWaterCrossLaceBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
+                breakupScale = 0f;
+                breakupStrength = 0f;
                 patternFormationSpeedMultiplier =
                     river.FoamFreeWaterCrossLaceFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
@@ -2723,11 +2845,8 @@ namespace ProgrammaticStylized3D.Rivers
                     river.FoamFreeWaterLaceInitialLifeMin,
                     river.FoamFreeWaterLaceInitialLifeMax,
                     eventScale);
-                breakupScale = Mathf.Lerp(0.20f, 0.70f, Hash01(seed + 9.5f));
-                breakupStrength = Mathf.Lerp(
-                    river.FoamFreeWaterLaceBreakupStrengthMin,
-                    river.FoamFreeWaterLaceBreakupStrengthMax,
-                    Hash01(seed + 10.1f));
+                breakupScale = 0f;
+                breakupStrength = 0f;
                 patternFormationSpeedMultiplier =
                     river.FoamFreeWaterLaceFormationSpeedMultiplier;
                 float side = Hash01(seed + 11.7f) < 0.5f ? -1f : 1f;
@@ -2962,8 +3081,8 @@ namespace ProgrammaticStylized3D.Rivers
                     SourceFillMinimumFeatureSizeMetres * 0.50f,
                     Mathf.Max(widthMetres * 2.0f, featherMetres * 1.25f)),
                 ShapeSeed = sourceKey + AutomaticFreeWaterBirthShapeSeedSalt,
-                BreakupScaleMetres = Mathf.Max(0.05f, breakupScaleMetres),
-                BreakupStrength = Mathf.Clamp01(breakupStrength),
+                BreakupScaleMetres = 0f,
+                BreakupStrength = 0f,
                 Curvature = Mathf.Clamp(curvature, -1f, 1f),
                 SourceFillBlend = sourceType == AutomaticFoamSourceEventType.FreeWaterLaceConnector
                     ? 0.18f
@@ -3056,11 +3175,15 @@ namespace ProgrammaticStylized3D.Rivers
                 int longitudinalIndex = wrappedSlot / 2;
                 int sideIndex = wrappedSlot & 1;
                 float sideSign = sideIndex == 0 ? -1f : 1f;
-                float slotSeed = river.VisualSeed * 0.137f +
-                    wrappedSlot * 17.317f +
-                    cycleIndex * 31.619f;
+                float identitySeed = river.VisualSeed * 0.137f +
+                    wrappedSlot * 17.317f;
+                float slotSeed = identitySeed + cycleIndex * 31.619f;
 
-                if (Hash01(slotSeed + 1.7f) > profile.Coverage)
+                if (Hash01(identitySeed + 1.7f) > profile.Coverage ||
+                    (automaticShoreSlotNextStartTimes.TryGetValue(
+                         wrappedSlot,
+                         out float nextStartTime) &&
+                     now + 0.0001f < nextStartTime))
                 {
                     skippedSlots++;
                     continue;
@@ -3093,6 +3216,10 @@ namespace ProgrammaticStylized3D.Rivers
                         sideSign,
                         visibleHalfWidth))
                 {
+                    automaticShoreSlotNextStartTimes[wrappedSlot] =
+                        now + ResolveLatestAutomaticSourceEventDurationSeconds() +
+                        ResolveAutomaticPacketClearanceSeconds(
+                            river.FoamShoreMinimumPacketGapMetres);
                     idleSince = 0.0;
                     return true;
                 }
@@ -3206,11 +3333,8 @@ namespace ProgrammaticStylized3D.Rivers
                         river.FoamInwardWashInitialLifeMin,
                         river.FoamInwardWashInitialLifeMax,
                         eventScale);
-                    breakupScale = Mathf.Lerp(0.14f, 0.34f, Hash01(seed + 9.5f));
-                    breakupStrength = Mathf.Lerp(
-                        river.FoamInwardWashBreakupStrengthMin,
-                        river.FoamInwardWashBreakupStrengthMax,
-                        Hash01(seed + 10.1f));
+                    breakupScale = 0f;
+                    breakupStrength = 0f;
                     curvature = flowDirection * Mathf.Lerp(
                         0.18f,
                         0.56f,
@@ -3247,11 +3371,8 @@ namespace ProgrammaticStylized3D.Rivers
                         river.FoamShoreRibbonInitialLifeMin,
                         river.FoamShoreRibbonInitialLifeMax,
                         eventScale);
-                    breakupScale = Mathf.Lerp(0.42f, 1.05f, Hash01(seed + 9.5f));
-                    breakupStrength = Mathf.Lerp(
-                        river.FoamShoreRibbonBreakupStrengthMin,
-                        river.FoamShoreRibbonBreakupStrengthMax,
-                        Hash01(seed + 10.1f));
+                    breakupScale = 0f;
+                    breakupStrength = 0f;
                     curvature = Mathf.Lerp(
                         -0.10f,
                         0.10f,
@@ -3460,8 +3581,8 @@ namespace ProgrammaticStylized3D.Rivers
                         ? Mathf.Max(widthMetres * 1.35f, featherMetres * 1.25f)
                         : Mathf.Max(widthMetres, featherMetres * 1.25f)),
                 ShapeSeed = sourceKey + AutomaticShoreBirthShapeSeedSalt,
-                BreakupScaleMetres = Mathf.Max(0.10f, breakupScaleMetres),
-                BreakupStrength = Mathf.Clamp01(breakupStrength),
+                BreakupScaleMetres = 0f,
+                BreakupStrength = 0f,
                 Curvature = curvature,
                 SourceFillBlend = sourceType == AutomaticFoamSourceEventType.InwardWash ? 0.08f : 0.35f
             };
@@ -3522,15 +3643,17 @@ namespace ProgrammaticStylized3D.Rivers
                 automaticRevealTimingByType.Length);
             activeAutomaticFoamSourceEventCount = 0;
             automaticSourceEventsRasterizedLastUpdate = 0;
-            automaticObjectContactCycleStates.Clear();
+            automaticObjectSourceStates.Clear();
+            automaticShoreSlotNextStartTimes.Clear();
+            automaticFreeWaterSlotNextStartTimes.Clear();
             automaticObjectContactLiveSourceIds.Clear();
             automaticObjectContactStaleSourceIds.Clear();
             automaticObjectContactCycleTime = 0f;
             automaticObjectPatternAuthoritySignature = int.MinValue;
+            automaticObjectClearanceAuthoritySignature = int.MinValue;
             automaticObjectContactBuildCount = 0;
-            automaticObjectContactHoldCount = 0;
-            automaticObjectContactReleaseCount = 0;
-            automaticObjectContactRestCount = 0;
+            automaticObjectContactFleckCount = 0;
+            automaticObjectWaitingClearanceCount = 0;
         }
 
         private int ResolvePermutedAutomaticShoreSlot(

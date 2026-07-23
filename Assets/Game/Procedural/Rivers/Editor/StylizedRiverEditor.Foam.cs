@@ -186,7 +186,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
                 "Coverage — geometric cell occupancy transported by Donor Cell " +
-                "or TVD Superbee. Source shape, subcell width, breakup, reveal, " +
+                "or TVD Superbee. Source shape, subcell width, progressive reveal, " +
                 "and valid-fluid clipping may change Coverage.\n\n" +
                 "Presence — intrinsic authored material strength. New material " +
                 "writes Initial Presence exactly; transport must not reinterpret " +
@@ -459,13 +459,23 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUILayout.PropertyField(
                 Find("foamObstacleSlowdownStrength"),
                 new GUIContent(
-                    "Obstacle Slowdown Strength",
-                    "How strongly obstacle-routing influence reduces local downstream foam speed."));
+                    "Object Contact Slowdown Falloff",
+                    "Controls how quickly the object-contact slowdown halo reaches full authority. Zero disables contact slowdown; any positive value reaches the exact Minimum Speed Factor at full contact influence."));
             EditorGUILayout.PropertyField(
                 Find("foamObstacleMinimumDownstreamFactor"),
                 new GUIContent(
-                    "Obstacle Minimum Downstream Factor",
-                    "Minimum downstream-speed factor at maximum obstacle influence. Zero permits temporary stagnation without upstream motion."));
+                    "Object Contact Minimum Speed Factor",
+                    "Exact factor applied to the complete routed Foam velocity vector at full contact influence. Zero permits local stagnation and prevents automatic object-source rearm while slowdown is enabled."));
+            EditorGUILayout.PropertyField(
+                Find("foamObjectContactFullSlowdownReachMetres"),
+                new GUIContent(
+                    "Object Contact Full Slowdown Reach (m)",
+                    "Distance from the obstacle surface over which the contact slowdown remains at full influence."));
+            EditorGUILayout.PropertyField(
+                Find("foamObjectContactSlowdownOuterReachMetres"),
+                new GUIContent(
+                    "Object Contact Slowdown Outer Reach (m)",
+                    "Outer distance from the obstacle surface where contact slowdown reaches zero. This value is clamped to at least Full Slowdown Reach."));
         }
 
         private void DrawFoamLayerC()
@@ -1170,7 +1180,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawFoamAutomaticSourcePopulationSection()
         {
             EditorGUILayout.HelpBox(
-                "Automatic birth creates real persistent FoamState material. Off disables automatic birth; otherwise each source category is controlled by its own Enabled toggle. Shore, Object, and Free Water Foam are Layer C source classes.",
+                "Automatic birth creates finite Layer C material packets. Coverage selects a stable share of deterministic source slots, Activity controls how promptly a cleared slot fires, and Minimum Packet Gap prevents repeated emission from painting one continuous reservoir.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -1204,7 +1214,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamShoreFoamActivity"),
                     new GUIContent(
                         "Activity",
-                        "How often new shore source events start. Higher values start more full-strength source events per second."));
+                        "How promptly an eligible Shore slot starts a finite packet. Zero disables starts; one fires immediately after clearance. Activity cannot bypass the packet gap."));
+                EditorGUILayout.PropertyField(
+                    Find("foamShoreMinimumPacketGapMetres"),
+                    new GUIContent(
+                        "Minimum Packet Gap (m)",
+                        "Minimum downstream clearance after a Shore packet completes before the same deterministic source slot may emit again."));
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamPatchSize"),
                     new GUIContent(
@@ -1272,17 +1287,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamShoreRibbonInitialPresenceMin"),
                         Find("foamShoreRibbonInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamShoreRibbonInitialLifeMin"),
                         Find("foamShoreRibbonInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamShoreRibbonBreakupStrengthMin"),
-                        Find("foamShoreRibbonBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1316,17 +1326,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamInwardWashInitialPresenceMin"),
                         Find("foamInwardWashInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamInwardWashInitialLifeMin"),
                         Find("foamInwardWashInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamInwardWashBreakupStrengthMin"),
-                        Find("foamInwardWashBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1353,46 +1358,36 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamObjectFoamActivity"),
                     new GUIContent(
                         "Fleck Activity",
-                        "How often supplemental Contact Fleck events start. Arc and Semi-Arc contact persistence is owned by the per-object emission cycle below."));
+                        "How promptly an eligible object attempts to start a finite Contact Fleck. Activity cannot bypass the shared per-object packet-clearance gate, and one Fleck cannot chain directly into another when contact cycles are enabled."));
+                EditorGUILayout.PropertyField(
+                    Find("foamObjectContactMinimumPacketGapMetres"),
+                    new GUIContent(
+                        "Object Contact Minimum Packet Gap (m)",
+                        "Minimum downstream clearance after any Object Arc, Semi-Arc, or Fleck finishes before the same object may emit another packet. Rearm also includes conservative clearance through the object-contact slowdown halo."));
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
                         "Base Reveal Speed",
-                        "Base reveal speed used for Arc/Semi-Arc Build and the complete Contact Fleck reveal. Hold, Release, Rest, Activity, and later Foam transport remain independent."));
+                        "Base reveal speed used for one-shot Arc, Semi-Arc, and Fleck Build. Activity, packet clearance, and later Layer C transport remain independent."));
 
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
-                    "Contact Emission Cycle",
+                    "One-Shot Contact Packets",
                     EditorStyles.boldLabel);
                 EditorGUILayout.PropertyField(
                     Find("foamObjectContactCycleCoverage"),
                     new GUIContent(
                         "Anchor Coverage",
-                        "Stable share of registered object anchors that receive the per-object Arc/Semi-Arc cycle. One includes every eligible object."));
+                        "Stable share of registered object anchors that can emit one-shot Arc/Semi-Arc packets. One includes every eligible object."));
                 EditorGUILayout.HelpBox(
-                    "Each eligible object grows one contiguous thin open-C ribbon through the immediate upstream/shoulder contact ring, replenishes that open C during Hold, then releases it contiguously before Rest. Arcs release in Build order; Semi-Arcs retract the dominant arm first and clear the path in reverse order. The downstream rear is never sourced.",
+                    "Arc, Semi-Arc, and Fleck are finite one-shot packets. Arc/Semi-Arc deposit only while Build advances; no Hold, Release, or persistent contact refresh exists. All three recipes share one per-object clearance gate. If contact slowdown is enabled with Minimum Speed Factor zero, automatic object rearm remains disabled because the previous packet is authored as stationary.",
                     MessageType.None);
-                DrawMinMaxUnitControls(
-                    "Hold Duration (s)",
-                    Find("foamObjectContactHoldDurationMinSeconds"),
-                    Find("foamObjectContactHoldDurationMaxSeconds"),
-                    "How long the complete one-cell open-C contact ribbon remains actively replenished after Build finishes.");
-                DrawMinMaxUnitControls(
-                    "Release Duration (s)",
-                    Find("foamObjectContactReleaseDurationMinSeconds"),
-                    Find("foamObjectContactReleaseDurationMaxSeconds"),
-                    "How long the contiguous emitter takes to turn off. Arcs release in Build order; Semi-Arcs retract the one-sided extension first and then release the face in reverse order. This changes source release, not stored Foam lifetime.");
-                DrawMinMaxUnitControls(
-                    "Rest Duration (s)",
-                    Find("foamObjectContactRestDurationMinSeconds"),
-                    Find("foamObjectContactRestDurationMaxSeconds"),
-                    "How long the same object remains source-off after Release before its next contact cycle may begin.");
 
                 EditorGUILayout.PropertyField(
                     Find("foamObjectFoamPattern"),
                     new GUIContent(
                         "Debug Pattern Mode",
-                        "Mixed uses Arc and Semi-Arc weights for per-object contact cycles and the Fleck weight for supplemental stochastic flecks. The pure modes force one pattern for validation."));
+                        "Mixed uses Arc and Semi-Arc weights for per-object contact cycles and enables supplemental Flecks through their independent Coverage and Activity controls. Pure modes force one pattern for validation."));
                 EditorGUILayout.HelpBox(
                     "Contact Arcs and Semi-Arcs use a one-cell upstream contact bridge plus thin straight downstream wake arms from the two side shoulders. They never follow the obstacle behind the shoulders, use no breakup or source-fill holes, and expose only real path controls. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
                     MessageType.None);
@@ -1401,28 +1396,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 EditorGUILayout.LabelField("Pattern Mix", EditorStyles.boldLabel);
                 SerializedProperty arcWeight = Find("foamObjectContactArcPatternWeight");
                 SerializedProperty semiArcWeight = Find("foamObjectContactSemiArcPatternWeight");
-                SerializedProperty fleckWeight = Find("foamObjectContactFleckPatternWeight");
-                DrawNormalizedPatternWeight3(
+                DrawNormalizedPatternWeight(
                     arcWeight,
                     semiArcWeight,
-                    fleckWeight,
                     new GUIContent(
                         "Contact Arcs",
-                        "Relative share of Mixed per-object contact cycles assigned to full Contact Arcs. Editing this preserves the normalized three-pattern authoring mix."));
-                DrawNormalizedPatternWeight3(
+                        "Relative share of Mixed per-object contact cycles assigned to full Contact Arcs. Flecks are independent and are not part of this normalized cycle mix."));
+                DrawNormalizedPatternWeight(
                     semiArcWeight,
                     arcWeight,
-                    fleckWeight,
                     new GUIContent(
                         "Contact Semi-Arcs",
-                        "Relative share of Mixed per-object contact cycles assigned to lopsided Contact Semi-Arcs. Editing this preserves the normalized three-pattern authoring mix."));
-                DrawNormalizedPatternWeight3(
-                    fleckWeight,
-                    arcWeight,
-                    semiArcWeight,
-                    new GUIContent(
-                        "Contact Flecks",
-                        "Relative strength of supplemental stochastic Contact Flecks in Mixed mode. Fleck Activity owns their global start rate; editing this preserves the normalized three-pattern authoring mix."));
+                        "Relative share of Mixed per-object contact cycles assigned to single-arm Contact Semi-Arcs. Flecks are independent and are not part of this normalized cycle mix."));
+                EditorGUILayout.HelpBox(
+                    "Contact Flecks are an independent packet population. Their Coverage, Activity, and Minimum Fleck Packet Gap control them directly; Arc/Semi-Arc weights do not scale Fleck rate.",
+                    MessageType.None);
 
                 EditorGUILayout.Space(4f);
                 if (DrawInlineFoldout(
@@ -1528,17 +1516,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamObjectContactFleckInitialPresenceMin"),
                         Find("foamObjectContactFleckInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamObjectContactFleckInitialLifeMin"),
                         Find("foamObjectContactFleckInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamObjectContactFleckBreakupStrengthMin"),
-                        Find("foamObjectContactFleckBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this Fleck pattern.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1567,7 +1550,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamFreeWaterFoamActivity"),
                     new GUIContent(
                         "Activity",
-                        "How often new open-water source events start."));
+                        "How promptly an eligible Free Water slot starts a finite packet. Zero disables starts; one fires immediately after clearance."));
+                EditorGUILayout.PropertyField(
+                    Find("foamFreeWaterMinimumPacketGapMetres"),
+                    new GUIContent(
+                        "Minimum Packet Gap (m)",
+                        "Minimum downstream clearance after a Free Water packet completes before the same deterministic source slot may emit again."));
                 EditorGUILayout.PropertyField(
                     Find("foamFreeWaterFoamFormationSpeedMetresPerSecond"),
                     new GUIContent(
@@ -1632,17 +1620,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamFreeWaterLaceInitialPresenceMin"),
                         Find("foamFreeWaterLaceInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterLaceInitialLifeMin"),
                         Find("foamFreeWaterLaceInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamFreeWaterLaceBreakupStrengthMin"),
-                        Find("foamFreeWaterLaceBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     DrawMinMaxUnitControls(
                         "Curvature",
                         Find("foamFreeWaterLaceCurvatureMin"),
@@ -1673,17 +1656,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamFreeWaterCrossLaceInitialPresenceMin"),
                         Find("foamFreeWaterCrossLaceInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterCrossLaceInitialLifeMin"),
                         Find("foamFreeWaterCrossLaceInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamFreeWaterCrossLaceBreakupStrengthMin"),
-                        Find("foamFreeWaterCrossLaceBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1709,22 +1687,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Initial Presence",
                         Find("foamFreeWaterFragmentInitialPresenceMin"),
                         Find("foamFreeWaterFragmentInitialPresenceMax"),
-                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only.");
+                        "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
                     DrawMinMaxUnitControls(
                         "Initial Life",
                         Find("foamFreeWaterFragmentInitialLifeMin"),
                         Find("foamFreeWaterFragmentInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Breakup Strength",
-                        Find("foamFreeWaterFragmentBreakupStrengthMin"),
-                        Find("foamFreeWaterFragmentBreakupStrengthMax"),
-                        "Deterministic edge/source breakup strength for this pattern.");
                     EditorGUI.indentLevel--;
                 }
 
                 EditorGUILayout.HelpBox(
-                    "Free Water Foam is Layer C birth only: Lace Connectors use a moving head+stroke along flow, Cross-Lace Connectors use a moving head+stroke across the river, and Torn Fragments use a progressive swept patch. Bright specular glints are intentionally not spawned as persistent material.",
+                    "Free Water Foam emits finite one-shot packets. Lace, Cross-Lace, and Torn Fragment slots must clear their configured downstream packet gap before rearming. Bright specular glints are intentionally not spawned as persistent material.",
                     MessageType.Info);
                 EditorGUI.indentLevel--;
             }

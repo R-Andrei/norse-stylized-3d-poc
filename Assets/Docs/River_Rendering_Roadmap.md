@@ -1387,3 +1387,44 @@ Foam > Transport & Visibility Contract
 Donor Cell is deliberately more diffuse; TVD Superbee reconstructs bounded Coverage and preserves one coherent donor material state. Convergent capacity and valid-fluid clipping reduce Coverage coherently without independently changing intrinsic material ratios. Concentration + Lifetime allows Coverage dilution and Life to reduce visibility; Lifecycle-Faithful leaves ordinary survival to explicit Layer C aging. Coverage-Only ignores Presence amplitude; Presence-Amplitude carries exact intrinsic Presence through identical Presence-independent shape-coupling weights so uniform Presence remains exactly proportional in the completed resolved mask.
 
 Negative topology remains unchanged and may still kill selected Foam rapidly. P12t Candidate/Eligibility/soft reconstruction and P12u reveal scheduling remain frozen. No scene tuning, allocation, kernel, dispatch, pass, or draw-call change is included. Offline mathematical/static validation passes 25/25 checks; Unity import, live lifetime validation, and measured performance remain pending.
+
+
+## RG-METRIC-P13B — Packet-rearmed birth and object-contact retention
+
+P13B changes automatic Layer C source ownership and the existing obstacle velocity field; it does not change the P13A material packing, transport schemes, Final Visibility modes, Presence Footprint modes, lifecycle, or P12t Chipping.
+
+Automatic-source contract:
+
+- Shore and Free-Water have fixed deterministic slot spacing. Coverage selects a stable share of those slots. Activity is linear from zero to the existing maximum attempt rate.
+- Each accepted slot is rearmed only after its event duration plus a distance-derived Minimum Packet Gap. Contact Flecks use per-object active/rearm ownership and cannot start while the same object owns an active contact cycle.
+- Current-minus-previous reveal is a permission test; newly reached cells receive the complete current Coverage target. This prevents repainting behind the head without making Coverage depend on reveal cadence.
+- Fleck reveal is spatial. Arc/Semi-Arc wakes are one-shot Build products. Only the immediate contact front is refreshed during Hold and progressively withdrawn during Release.
+- Flecks are independent of the normalized Arc/Semi-Arc cycle mix and are controlled directly by Fleck Coverage, Activity, and packet gap.
+
+Obstacle velocity contract:
+
+```text
+existing RGHalf obstacle texture
+R = signed lateral-routing influence
+G = independent slowdown influence
+```
+
+The existing one-sided collision route remains. A narrow dirty-time all-side contact halo writes slowdown only, allowing front/side/rear Foam to approach the exact authored Minimum Downstream Factor without lateral redirection. No texture, buffer, upload class, compute kernel, shader sample, pass, or draw call is added.
+
+Control cleanup removes automatic-source Breakup Strength authoring and shader evaluation, Lace/Cross-Lace gap masks, Torn Fragment bite masks, Fleck mix weight, and confirmed unused Arc/Semi-Arc arm-reach/lopsidedness controls. Reserved event-record lanes remain structurally present for ABI compatibility.
+
+Expected aggregate runtime work is lower because slots cannot immediately restart, finite packets stop writing behind their heads, and object wake arms are not refreshed after Build. Added CPU work is bounded rearm lookup and obstacle-dirty contact stamping; velocity adds a bounded multiply-and-lerp falloff calculation without a transcendental operation. Measured performance remains pending Unity profiling. P13B offline validation is `28/28 PASS`; Unity compilation, D3D11 import, Play Mode visual acceptance, and profiling remain pending.
+
+
+Status: source implementation complete; offline validation/package reproduction complete; Unity import, visual acceptance, and profiler evidence pending. P13B is the active post-P13A source-population correction. Visibility retuning and any filament representation remain deferred until the corrected packet population is observed in Unity.
+
+## RG-METRIC-P13C — One-shot Object packets and full-vector contact retention
+
+P13C removes the final persistent Object emitter path left by P13B. Object Arc and Semi-Arc now exist only during progressive Build; Hold, Release, Rest, persistent contact-front refresh, and separate Fleck rearm state are removed. Arc, Semi-Arc, and Fleck share one per-object active owner and one distance-derived packet-clearance gate.
+
+The existing object-contact slowdown halo now scales the complete routed Foam velocity vector. At full influence, downstream, lateral, and total speed reach the exact authored minimum speed factor. The existing RGHalf routing texture, field build, shader sample, kernels, resources, passes, and draw calls are unchanged. Full and outer halo reaches become explicit Inspector controls with the existing hidden values as defaults.
+
+Expected runtime source cost is lower because Arc/Semi-Arc leave the event pool at Build completion and no longer dispatch during Hold/Release. P13A material/transport/visibility, Shore and Free-Water packet ownership, P12u reveal speed, topology aging, and P12t Chipping remain unchanged.
+
+Status: source implementation complete; `35/35` offline validation passes; package reproduction complete. Unity import, Play Mode proof that cyan Object source geometry disappears after Build, contact-retention review, and profiler evidence remain pending.
+

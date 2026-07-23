@@ -117,10 +117,7 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 anyActive = true;
-                float revealDuration =
-                    IsPersistentAutomaticSourceEmitter(sourceEvent.Type)
-                        ? sourceEvent.ObjectBuildDuration
-                        : sourceEvent.Duration;
+                float revealDuration = sourceEvent.Duration;
                 float actualSpeed = sourceEvent.RevealPathDistanceMetres /
                     Mathf.Max(0.0001f, revealDuration);
                 report.AppendLine(
@@ -135,13 +132,6 @@ namespace ProgrammaticStylized3D.Rivers
                     $"raw={sourceEvent.RawRevealDurationSeconds:0.###} s; " +
                     $"actual={actualSpeed:0.###} m/s; " +
                     $"cadenceLimited={sourceEvent.RevealCadenceLimited}");
-                if (IsPersistentAutomaticSourceEmitter(sourceEvent.Type))
-                {
-                    report.AppendLine(
-                        $"  hold={sourceEvent.ObjectHoldDuration:0.###} s; " +
-                        $"release={sourceEvent.ObjectReleaseDuration:0.###} s; " +
-                        $"rest={sourceEvent.ObjectRestDuration:0.###} s");
-                }
             }
 
             if (!anyActive)

@@ -191,17 +191,28 @@
                     }
                 }
 
+                // The material-uniform branch keeps the inward-distance
+                // derivative coherent. The sampled B/A payload directly carries
+                // the centre offset; feature-mask gating occurs afterwards.
                 [branch]
                 if (_GroundBankMaterialTransition.z > 0.0001 &&
-                    result.featureTextureFormPayload > 0.5 &&
-                    result.featureMask > 0.001)
+                    _GroundBankLayerDetailC.z > 1.5)
                 {
-                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
-                        result,
-                        ResolveGroundSurfaceFeatureRetention(
+                    float wholeFeatureRetention =
+                        ResolveGroundWholeFeatureRetention(
                             ResolveGroundRiverBankDomain(input),
                             ResolveGroundRiverBankInwardDistance(input),
-                            _GroundBankMaterialTransition));
+                            input.positionWS,
+                            result.featureCenterOffsetNormalized,
+                            result.featureMaximumSupportRadiusUv,
+                            _GroundBankLayerDetailA.z,
+                            _GroundBankMaterialTransition);
+                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
+                        result,
+                        lerp(
+                            1.0,
+                            wholeFeatureRetention,
+                            step(0.001, result.featureMask)));
                 }
 
                 return result;
@@ -245,17 +256,27 @@
                     }
                 }
 
+                // See the Bank path: the only derivative is taken from the
+                // coherent corridor distance field, not from sampled feature data.
                 [branch]
                 if (_GroundRiverbedMaterialTransition.z > 0.0001 &&
-                    result.featureTextureFormPayload > 0.5 &&
-                    result.featureMask > 0.001)
+                    _GroundRiverbedLayerDetailC.z > 1.5)
                 {
-                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
-                        result,
-                        ResolveGroundSurfaceFeatureRetention(
+                    float wholeFeatureRetention =
+                        ResolveGroundWholeFeatureRetention(
                             ResolveGroundRiverbedSupportMask(input),
                             ResolveGroundRiverbedInwardDistance(input),
-                            _GroundRiverbedMaterialTransition));
+                            input.positionWS,
+                            result.featureCenterOffsetNormalized,
+                            result.featureMaximumSupportRadiusUv,
+                            _GroundRiverbedLayerDetailA.z,
+                            _GroundRiverbedMaterialTransition);
+                    result = PS3D_ApplyStylizedSurfaceFeatureRetention(
+                        result,
+                        lerp(
+                            1.0,
+                            wholeFeatureRetention,
+                            step(0.001, result.featureMask)));
                 }
 
                 return result;
@@ -979,30 +1000,49 @@
                     ResolveGroundRiverbedSupportMask(input);
                 float riverbedMaterialApplicationEnabled =
                     ResolveGroundRiverbedMaterialApplicationEnabled();
+                float riverbedApplicationDomain =
+                    ResolveGroundRiverbedApplicationDomain(input);
                 float bankUnderRiverbedBlend =
                     ResolveGroundBankEdgeMaterialBlend(input) *
-                    saturate(riverbedSupport) *
+                    riverbedApplicationDomain *
                     riverbedMaterialApplicationEnabled;
-                float resolvedBankMaterialBlend = saturate(
-                    bankMaterialBlend + bankUnderRiverbedBlend);
+                float resolvedBankMaterialBlend = max(
+                    saturate(bankMaterialBlend),
+                    saturate(bankUnderRiverbedBlend));
                 float riverbedMaterialBlend =
                     ResolveGroundRiverbedMaterialBlend(
                         input,
                         riverbedSupport);
                 float riverbedWetness =
                     ResolveGroundRiverbedWetness(input);
+                float sameDrySurface =
+                    ResolveGroundBankRiverbedSameDrySurface();
+                float3 sequentialSubstrateWeights =
+                    ResolveGroundSubstrateCompositionWeights(
+                        resolvedBankMaterialBlend,
+                        riverbedMaterialBlend);
+                float sharedDrySurfaceBlend =
+                    1.0 - sequentialSubstrateWeights.x;
+                float bankDetailApplication = lerp(
+                    resolvedBankMaterialBlend,
+                    sharedDrySurfaceBlend,
+                    sameDrySurface);
                 PS3D_StylizedSurfaceDetail bankLayerDetail =
                     ResolveGroundBankLayerDetail(
                         input,
-                        resolvedBankMaterialBlend);
+                        bankDetailApplication);
                 PS3D_StylizedSurfaceDetail riverbedLayerDetail =
                     ResolveGroundRiverbedLayerDetail(
                         input,
                         riverbedMaterialBlend);
-                float3 substrateWeights =
-                    ResolveGroundSubstrateCompositionWeights(
-                        resolvedBankMaterialBlend,
-                        riverbedMaterialBlend);
+                float3 sharedSubstrateWeights = float3(
+                    1.0 - sharedDrySurfaceBlend,
+                    sharedDrySurfaceBlend,
+                    0.0);
+                float3 substrateWeights = lerp(
+                    sequentialSubstrateWeights,
+                    sharedSubstrateWeights,
+                    sameDrySurface);
                 float4 surfaceCoverRetention =
                     ResolveGroundBankCoverRetention(bankMaterialBlend) *
                     (1.0 - saturate(riverbedSupport));

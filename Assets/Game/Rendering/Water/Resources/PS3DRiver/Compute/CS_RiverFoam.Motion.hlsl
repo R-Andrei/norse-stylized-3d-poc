@@ -52,6 +52,7 @@ float2 FoamLoadObstacleRoutingCell(float2 coordinate)
         return 0.0.xx;
     }
 
+    // R = signed routing influence, G = independent contact slowdown.
     float2 routing = _FoamObstacleRoutingRead.Load(int3(texel, 0));
     routing.x = clamp(routing.x, -1.0, 1.0);
     routing.y = saturate(routing.y);

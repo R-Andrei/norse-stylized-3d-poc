@@ -4349,3 +4349,89 @@ The three policies are co-located under `Foam > Transport & Visibility Contract`
 ### Preserved ownership
 
 Negative topology and all aging rates remain unchanged. The original analytical Candidate, soft Eligibility, accepted soft-mask Chipping reconstruction, and structural Strand order remain Layer E authorities. P13A adds no resource, cadence, pass, or draw-call dependency.
+
+
+## RG-METRIC-P13B — Packet-rearmed birth and object-contact retention
+
+P13B changes automatic Layer C source ownership and the existing obstacle velocity field; it does not change the P13A material packing, transport schemes, Final Visibility modes, Presence Footprint modes, lifecycle, or P12t Chipping.
+
+Automatic-source contract:
+
+- Shore and Free-Water have fixed deterministic slot spacing. Coverage selects a stable share of those slots. Activity is linear from zero to the existing maximum attempt rate.
+- Each accepted slot is rearmed only after its event duration plus a distance-derived Minimum Packet Gap. Contact Flecks use per-object active/rearm ownership and cannot start while the same object owns an active contact cycle.
+- Current-minus-previous reveal is a permission test; newly reached cells receive the complete current Coverage target. This prevents repainting behind the head without making Coverage depend on reveal cadence.
+- Fleck reveal is spatial. Arc/Semi-Arc wakes are one-shot Build products. Only the immediate contact front is refreshed during Hold and progressively withdrawn during Release.
+- Flecks are independent of the normalized Arc/Semi-Arc cycle mix and are controlled directly by Fleck Coverage, Activity, and packet gap.
+
+Obstacle velocity contract:
+
+```text
+existing RGHalf obstacle texture
+R = signed lateral-routing influence
+G = independent slowdown influence
+```
+
+The existing one-sided collision route remains. A narrow dirty-time all-side contact halo writes slowdown only, allowing front/side/rear Foam to approach the exact authored Minimum Downstream Factor without lateral redirection. No texture, buffer, upload class, compute kernel, shader sample, pass, or draw call is added.
+
+Control cleanup removes automatic-source Breakup Strength authoring and shader evaluation, Lace/Cross-Lace gap masks, Torn Fragment bite masks, Fleck mix weight, and confirmed unused Arc/Semi-Arc arm-reach/lopsidedness controls. Reserved event-record lanes remain structurally present for ABI compatibility.
+
+Expected aggregate runtime work is lower because slots cannot immediately restart, finite packets stop writing behind their heads, and object wake arms are not refreshed after Build. Added CPU work is bounded rearm lookup and obstacle-dirty contact stamping; velocity adds a bounded multiply-and-lerp falloff calculation without a transcendental operation. Measured performance remains pending Unity profiling. P13B offline validation is `28/28 PASS`; Unity compilation, D3D11 import, Play Mode visual acceptance, and profiling remain pending.
+
+
+### Layer ownership after P13B
+
+```text
+Activity attempt accumulator
+    -> stable eligible deterministic slot/object
+    -> packet-clearance gate
+    -> finite reveal event
+    -> current-minus-previous permission
+    -> full current Coverage target on newly reached cells
+    -> P13A Layer C merge/transport/lifecycle
+```
+
+Object contact is split explicitly:
+
+```text
+Build:   contact front + finite wake arm(s), born once
+Hold:    immediate contact front refresh only
+Release: progressively withdraw contact-front refresh only
+Rest:    source off
+Wake:    ordinary transported Layer C material after Build
+```
+
+Velocity ownership remains canonical across compute transport and render interpolation. Signed routing influence cannot create slowdown by itself; slowdown influence cannot create lateral routing by itself. This prevents the new contact retention halo from bending Foam around the rear of the object.
+
+## P13C addendum — one-shot Object source ownership and contact retention
+
+Object source ownership is now finite and packet-based:
+
+```text
+Arc / Semi-Arc / Fleck Build
+    -> newly reached source interval only
+    -> authored Coverage + intrinsic material birth
+    -> source event completes
+    -> no persistent source ownership remains
+```
+
+Arc and Semi-Arc no longer have Hold, Release, or Rest phases. Their immediate contact front and finite wake geometry are born during Build and become ordinary transported Layer C material. Apparent persistence must come from explicit topology/lifecycle support and canonical velocity retention, never repeated source writes.
+
+All three Object recipes use one per-object source state and one clearance gate. Completion schedules conservative halo clearance plus authored downstream packet spacing. A Fleck is supplemental in Mixed mode: after one Fleck, an eligible Arc/Semi-Arc opportunity takes precedence before another Fleck may start.
+
+Object-contact velocity uses the existing obstacle texture with independent meanings:
+
+```text
+R: signed routing intent
+G: contact slowdown influence
+```
+
+The canonical resolver computes normal routed downstream/lateral velocity first and scales the complete vector by the contact speed factor. Full influence therefore applies the exact authored minimum speed factor to total motion while retaining routing direction. Full and outer contact reaches are authored dirty-time obstacle-field parameters; no new field or sample exists.
+
+Layer boundaries remain:
+
+- Layer A topology may extend or accelerate Remaining Life but does not emit material.
+- Layer B owns both routing direction and complete-vector object-contact speed retention.
+- Layer C sources own finite birth only; material transport/lifecycle continue after source completion.
+- Layers D/E remain unchanged by P13C.
+
+P13C offline validation: `35/35 PASS`. Unity compilation, Play Mode source/retention acceptance, and profiling remain pending.

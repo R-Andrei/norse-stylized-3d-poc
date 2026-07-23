@@ -172,6 +172,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 microTopologyNormalization,
             CornerDamageTransactionAuditResult cornerDamageTransaction,
             float capRingRequestedWidth,
+            bool mandatoryOnlyPreflight,
             out EdgeWearCoverageAudit coverageAudit)
         {
             bool maximumCoverageMode =
@@ -272,6 +273,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 bool cornerDamageCapRing =
                     cornerDamageTransaction != null &&
                     cornerDamageTransaction.CapRingKeys.Contains(edgeKey);
+                if (mandatoryOnlyPreflight && !cornerDamageCapRing)
+                {
+                    continue;
+                }
+
                 int originalSourceEdgeIndex;
                 if (cornerDamageTransaction != null &&
                     cornerDamageTransaction.StableIdentityByOutputKey.
@@ -743,6 +749,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         }
                     }
                 }
+            }
+
+            if (mandatoryOnlyPreflight)
+            {
+                viabilityStopwatch.Stop();
+                coverageAudit.ViabilityPreflightMilliseconds =
+                    viabilityStopwatch.Elapsed.TotalMilliseconds;
+                return provisionalCandidates;
             }
 
             PopulateEdgeWearArtisticContextMetrics(
@@ -4405,8 +4419,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     TopFacingPreference =
                         settings.CornerChipTopFacingPreference
                 };
-            result.SourceVolume =
-                CalculatePlaneCutPolyhedronVolume(normalizedFaces);
+            System.Diagnostics.Stopwatch transactionStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                result.SourceVolume =
+                    CalculatePlaneCutPolyhedronVolume(normalizedFaces);
 
             if (normalizedFaces == null || normalizedFaces.Count < 4 ||
                 recipe == null ||
@@ -4435,6 +4453,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 PointMergeDistance * 8f,
                 maximumDimension * 0.00001f);
 
+            System.Diagnostics.Stopwatch rankingStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
             List<CornerDamageCandidateRecord> eligibleCandidates =
                 new List<CornerDamageCandidateRecord>();
             for (int vertexIndex = 0;
@@ -4464,6 +4484,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             eligibleCandidates = RankCornerDamageCandidates(
                 eligibleCandidates);
+            rankingStopwatch.Stop();
+            result.CandidateRankingMilliseconds =
+                rankingStopwatch.Elapsed.TotalMilliseconds;
             result.EligibleCandidateCount = eligibleCandidates.Count;
             if (eligibleCandidates.Count == 0)
             {
@@ -4601,7 +4624,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 result.Diagnostic =
                     "all four bounded corner-damage depth trials were rejected";
             }
-            return result;
+                return result;
+            }
+            finally
+            {
+                transactionStopwatch.Stop();
+                result.TransactionMilliseconds =
+                    transactionStopwatch.Elapsed.TotalMilliseconds;
+            }
         }
 
         private static List<CornerDamageCandidateRecord>
@@ -5488,6 +5518,275 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             return limitingWidth *
                 ResolveCornerDamageCapRingScaleOverride();
+        }
+
+        private static float
+            ResolveAndApplyCornerDamageIntegrationPreflightScale(
+                EdgeWearCoverageAudit coverageAudit,
+                CornerDamageTransactionAuditResult transaction,
+                float requestedRingWidth,
+                float minimumStyleWidth)
+        {
+            if (coverageAudit == null || transaction == null ||
+                !transaction.Succeeded || requestedRingWidth <= 0f)
+            {
+                return 0f;
+            }
+
+            int expectedMandatoryCount = transaction.CapRingKeys.Count;
+            int mandatoryCount = 0;
+            int certifiedCount = 0;
+            float minimumCertifiedWidth = float.PositiveInfinity;
+            for (int recordIndex = 0;
+                 recordIndex < coverageAudit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    coverageAudit.Records[recordIndex];
+                if (lifecycle == null || !lifecycle.Mandatory)
+                {
+                    continue;
+                }
+
+                mandatoryCount++;
+                EdgeWearEdgeViabilityRecord viability = lifecycle.Viability;
+                if (viability == null || !viability.IsolatedSucceeded ||
+                    viability.IsolatedMaximumCertifiedWidth <= 0f)
+                {
+                    continue;
+                }
+
+                certifiedCount++;
+                minimumCertifiedWidth = Mathf.Min(
+                    minimumCertifiedWidth,
+                    viability.IsolatedMaximumCertifiedWidth);
+            }
+
+            if (expectedMandatoryCount <= 0 ||
+                mandatoryCount != expectedMandatoryCount ||
+                certifiedCount != expectedMandatoryCount ||
+                float.IsPositiveInfinity(minimumCertifiedWidth))
+            {
+                return 0f;
+            }
+
+            float certifiedRatio = Mathf.Clamp01(
+                minimumCertifiedWidth / requestedRingWidth);
+            float resolvedScale = 0f;
+            for (int scaleIndex = 0;
+                 scaleIndex < CornerDamageCapRingSearchScales.Length;
+                 scaleIndex++)
+            {
+                float scale = CornerDamageCapRingSearchScales[scaleIndex];
+                if (scale <= certifiedRatio + 0.0001f &&
+                    requestedRingWidth * scale + PointMergeDistance >=
+                        minimumStyleWidth)
+                {
+                    resolvedScale = scale;
+                    break;
+                }
+            }
+            if (resolvedScale <= 0f)
+            {
+                return 0f;
+            }
+
+            float resolvedWidth = requestedRingWidth * resolvedScale;
+            for (int recordIndex = 0;
+                 recordIndex < coverageAudit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord lifecycle =
+                    coverageAudit.Records[recordIndex];
+                if (lifecycle == null || !lifecycle.Mandatory ||
+                    lifecycle.Viability == null)
+                {
+                    continue;
+                }
+
+                EdgeWearEdgeViabilityRecord viability = lifecycle.Viability;
+                viability.RequestedWidth = resolvedWidth;
+                viability.RequiredFootprintLength =
+                    resolvedWidth * EdgeWearMinimumFootprintLengthMultiplier;
+                viability.LengthToWidthRatio = resolvedWidth > 0f
+                    ? lifecycle.Length / resolvedWidth
+                    : 0f;
+                viability.IsolatedMaximumCertifiedWidthFraction =
+                    resolvedWidth > 0f
+                        ? viability.IsolatedMaximumCertifiedWidth /
+                            resolvedWidth
+                        : 0f;
+            }
+            return resolvedScale;
+        }
+
+        private static CornerDamageIntegrationPreflightRecord
+            BuildCornerDamageIntegrationPreflightRecord(
+                CornerDamageTransactionAuditResult transaction,
+                EdgeWearCoverageAudit coverageAudit,
+                float requestedRingWidth,
+                float minimumStyleWidth,
+                int candidateCount,
+                int selectedCount,
+                ChamferTopologyContext context,
+                ChamferCornerSolution solution,
+                bool topologyReady,
+                bool widthSolutionReady,
+                float resolvedUniformScale,
+                string blocker)
+        {
+            CornerDamageIntegrationPreflightRecord result =
+                new CornerDamageIntegrationPreflightRecord
+                {
+                    Transaction = transaction,
+                    Completed = true,
+                    RequestedRingWidth = requestedRingWidth,
+                    MinimumStyleWidth = minimumStyleWidth,
+                    ExpectedMandatoryCount = transaction == null
+                        ? 0
+                        : transaction.CapRingKeys.Count,
+                    MinimumCertifiedWidth = float.PositiveInfinity,
+                    ResolvedUniformScale = resolvedUniformScale,
+                    CandidateCount = Mathf.Max(0, candidateCount),
+                    SelectedCount = Mathf.Max(0, selectedCount),
+                    SelectedGraphEdgeCount = context == null
+                        ? 0
+                        : context.SelectedEdges.Count,
+                    TopologyReady = topologyReady,
+                    WidthSolutionReady = widthSolutionReady
+                };
+            result.CandidateConservationValid = topologyReady &&
+                result.SelectedGraphEdgeCount == result.SelectedCount;
+
+            if (coverageAudit != null)
+            {
+                List<int> ordinaryIdentities = new List<int>();
+                List<int> mandatoryIdentities = new List<int>();
+                for (int recordIndex = 0;
+                     recordIndex < coverageAudit.Records.Count;
+                     recordIndex++)
+                {
+                    EdgeWearEdgeLifecycleRecord lifecycle =
+                        coverageAudit.Records[recordIndex];
+                    if (lifecycle == null)
+                    {
+                        continue;
+                    }
+                    if (lifecycle.Mandatory)
+                    {
+                        result.MandatoryRecordCount++;
+                        EdgeWearEdgeViabilityRecord viability =
+                            lifecycle.Viability;
+                        if (viability != null &&
+                            viability.IsolatedSucceeded &&
+                            viability.IsolatedMaximumCertifiedWidth > 0f)
+                        {
+                            result.MandatoryIsolatedCertifiedCount++;
+                            result.MinimumCertifiedWidth = Mathf.Min(
+                                result.MinimumCertifiedWidth,
+                                viability.IsolatedMaximumCertifiedWidth);
+                        }
+                        if (lifecycle.Selected)
+                        {
+                            result.MandatorySelectedCount++;
+                        }
+                        if (lifecycle.Active &&
+                            lifecycle.OriginalSourceEdgeIndex >= 0)
+                        {
+                            result.MandatorySolvedCount++;
+                            mandatoryIdentities.Add(
+                                lifecycle.OriginalSourceEdgeIndex);
+                        }
+                        continue;
+                    }
+
+                    if (lifecycle.Active &&
+                        lifecycle.OriginalSourceEdgeIndex >= 0)
+                    {
+                        ordinaryIdentities.Add(
+                            lifecycle.OriginalSourceEdgeIndex);
+                    }
+                }
+                ordinaryIdentities.Sort();
+                mandatoryIdentities.Sort();
+                result.PredictedOrdinaryIdentities =
+                    ordinaryIdentities.ToArray();
+                result.PredictedMandatoryIdentities =
+                    mandatoryIdentities.ToArray();
+                result.PredictedOrdinaryCount = ordinaryIdentities.Count;
+            }
+
+            if (float.IsPositiveInfinity(result.MinimumCertifiedWidth))
+            {
+                result.MinimumCertifiedWidth = 0f;
+            }
+            result.MinimumCertifiedRatio = requestedRingWidth > 0f
+                ? result.MinimumCertifiedWidth / requestedRingWidth
+                : 0f;
+
+            string explicitBlocker = blocker ?? string.Empty;
+            if (transaction == null || !transaction.Succeeded)
+            {
+                result.FailureStage = "transaction-certification";
+                result.Diagnostic = transaction == null
+                    ? "corner transaction was unavailable"
+                    : transaction.Diagnostic;
+            }
+            else if (requestedRingWidth + PointMergeDistance <
+                minimumStyleWidth || resolvedUniformScale <= 0f)
+            {
+                result.FailureStage = "cap-ring-preflight";
+                result.Diagnostic = string.IsNullOrEmpty(explicitBlocker)
+                    ? "mandatory cap ring has no common stable width"
+                    : explicitBlocker;
+            }
+            else if (result.CandidateCount <= 0 ||
+                result.SelectedCount <= 0 ||
+                result.MandatoryRecordCount !=
+                    result.ExpectedMandatoryCount ||
+                result.MandatorySelectedCount !=
+                    result.ExpectedMandatoryCount)
+            {
+                result.FailureStage = "candidate-selection";
+                result.Diagnostic = string.IsNullOrEmpty(explicitBlocker)
+                    ? "mandatory candidate selection is incomplete"
+                    : explicitBlocker;
+            }
+            else if (!topologyReady)
+            {
+                result.FailureStage = "topology-context";
+                result.Diagnostic = string.IsNullOrEmpty(explicitBlocker)
+                    ? "post-chip topology context is not ready"
+                    : explicitBlocker;
+            }
+            else if (!result.CandidateConservationValid)
+            {
+                result.FailureStage = "candidate-conservation";
+                result.Diagnostic = string.IsNullOrEmpty(explicitBlocker)
+                    ? "selected candidate conservation failed"
+                    : explicitBlocker;
+            }
+            else if (!widthSolutionReady || solution == null)
+            {
+                result.FailureStage = "width-solution";
+                result.Diagnostic = string.IsNullOrEmpty(explicitBlocker)
+                    ? "post-chip corner-width solution failed"
+                    : explicitBlocker;
+            }
+            else if (result.MandatorySolvedCount !=
+                result.ExpectedMandatoryCount)
+            {
+                result.FailureStage = "cap-ring-completion";
+                result.Diagnostic =
+                    "mandatory cap ring is incomplete after width solving";
+            }
+            else
+            {
+                result.FailureStage = "none";
+                result.Diagnostic =
+                    "complete non-emitting integration preflight passed";
+            }
+            return result;
         }
 
         private static int CompareCornerDamagePreviewCandidates(

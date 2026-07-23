@@ -1,11 +1,12 @@
 #ifndef PS3D_RIVER_WATER_FOAM_VELOCITY_INCLUDED
 #define PS3D_RIVER_WATER_FOAM_VELOCITY_INCLUDED
 
-// Patch 4.11C.5.16A canonical Foam velocity contract. Raw lane intent and
-// obstacle routing remain separate inputs because the lane sample scrolls while
-// obstacle routing stays fixed in river space. Every consumer resolves those
-// inputs through this pure function so Layer C transport, Layer D advection,
-// diagnostics, and future strain calculations share one physical velocity.
+// Canonical Foam velocity contract. The obstacle texture now carries signed
+// lateral-routing influence in R and independent contact-slowdown influence in
+// G. This keeps the one-sided collision route separate from the narrow all-side
+// contact retention halo without adding a resource or sample. The resolved
+// slowdown factor scales the complete routed velocity vector so full contact
+// influence reduces downstream, lateral, and total speed consistently.
 struct RiverWaterFoamResolvedVelocity
 {
     // x = nonnegative downstream speed magnitude in metres/second.
@@ -43,27 +44,38 @@ RiverWaterFoamResolvedVelocity RiverWaterResolveFoamVelocityContract(
     }
 
     float lane = clamp(laneIntent, -1.0, 1.0);
-    float obstacle = clamp(obstacleIntent, -1.0, 1.0);
-    float influence = saturate(obstacleInfluence);
-    float lateral = clamp(lerp(lane, obstacle, influence), -1.0, 1.0);
+    float signedRoutingInfluence = clamp(obstacleIntent, -1.0, 1.0);
+    float routingInfluence = abs(signedRoutingInfluence);
+    float routingDirection = signedRoutingInfluence >= 0.0 ? 1.0 : -1.0;
+    float lateral = clamp(
+        lerp(lane, routingDirection, routingInfluence),
+        -1.0,
+        1.0);
 
     float speed = max(0.0, baseDownstreamSpeed);
     float lateralRatio = max(0.0, maximumLateralSpeedRatio);
-    float slowdown = saturate(
-        influence * saturate(obstacleSlowdownStrength));
+    float slowdownField = saturate(obstacleInfluence);
+    float slowdownFalloff = saturate(obstacleSlowdownStrength);
+    float slowdownFieldSquared = slowdownField * slowdownField;
+    float narrowSlowdown = slowdownFieldSquared * slowdownFieldSquared;
+    float slowdown = slowdownFalloff > 0.0001
+        ? lerp(narrowSlowdown, slowdownField, slowdownFalloff)
+        : 0.0;
     float minimumFactor = saturate(obstacleMinimumDownstreamFactor);
-    float downstreamFactor = lerp(1.0, minimumFactor, slowdown);
+    float contactSpeedFactor = lerp(1.0, minimumFactor, slowdown);
     float speedActive = speed > 0.0001 ? 1.0 : 0.0;
+    float2 routedVelocity = float2(
+        speed,
+        lateral * speed * lateralRatio);
 
-    resolved.velocityMetresPerSecond = float2(
-        max(0.0, speed * downstreamFactor),
-        lateral * speed * lateralRatio) * validity;
+    resolved.velocityMetresPerSecond =
+        routedVelocity * contactSpeedFactor * validity;
     resolved.lateralIntent = lateral * validity;
     resolved.downstreamSpeedFactor =
-        downstreamFactor * speedActive * validity;
-    resolved.obstacleInfluence = influence * validity;
+        contactSpeedFactor * speedActive * validity;
+    resolved.obstacleInfluence = slowdownField * validity;
     resolved.laneIntent = lane * validity;
-    resolved.obstacleIntent = obstacle * validity;
+    resolved.obstacleIntent = signedRoutingInfluence * validity;
     return resolved;
 }
 

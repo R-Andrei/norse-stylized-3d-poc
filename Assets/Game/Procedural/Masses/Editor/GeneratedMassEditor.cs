@@ -62,6 +62,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             5727
         };
 
+        private static readonly int[]
+            EdgeWearSuiteArtisticSentinelSeeds =
+        {
+            1,
+            2223,
+            8889,
+            5727
+        };
+
         private static readonly string[] EdgeWearBatchWidthNames =
         {
             "minimum",
@@ -983,7 +992,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             EditorGUILayout.HelpBox(
                 "One-click validation rebuilds the current preview, runs " +
-                "both canonical " + matrixCaseCount + "-case edge-wear matrices and the 33-case corner-chipping matrix, then writes one combined report. The focused edge-wear matrix buttons remain available when only one audit is needed.",
+                "the exhaustive " + matrixCaseCount +
+                "-case topology matrix, derives " + matrixCaseCount +
+                " artistic-selection fingerprints, runs the 33-case " +
+                "corner-chipping matrix, and materializes 12 difficult " +
+                "artistic sentinels before writing one combined report. " +
+                "The focused matrix buttons remain exhaustive.",
                 MessageType.None);
 
             using (new EditorGUI.DisabledScope(
@@ -1145,9 +1159,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 if (string.IsNullOrEmpty(report))
                 {
                     report =
-                        "GeneratedMass EW-C1A.3a corner-chip preview" +
+                        "GeneratedMass EW-C1A.3c corner-chip preview" +
                         Environment.NewLine +
-                        "contract=EW-C1A.3a-corner-chip-preview" +
+                        "contract=EW-C1A.3c-corner-chip-preview" +
                         Environment.NewLine +
                         "status=failed" + Environment.NewLine +
                         "diagnostic=preview report was unavailable";
@@ -1156,9 +1170,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             catch (Exception exception)
             {
                 report =
-                    "GeneratedMass EW-C1A.3a corner-chip preview" +
+                    "GeneratedMass EW-C1A.3c corner-chip preview" +
                     Environment.NewLine +
-                    "contract=EW-C1A.3a-corner-chip-preview" +
+                    "contract=EW-C1A.3c-corner-chip-preview" +
                     Environment.NewLine +
                     "status=failed" + Environment.NewLine +
                     "diagnostic=exception: " + exception;
@@ -1283,6 +1297,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 suite.MacroVariationContractMilliseconds =
                     macroStopwatch.Elapsed.TotalMilliseconds;
 
+                if (suite.Stopwatch.Elapsed.TotalMilliseconds >=
+                    EdgeWearValidationSuiteHardBudgetMilliseconds)
+                {
+                    suite.TotalBudgetExceeded = true;
+                    suite.FailFastTriggered = true;
+                    FinishEdgeWearValidationSuite(
+                        suite,
+                        false,
+                        "performance-budget: complete suite exceeded the 90 s hard stop");
+                    return;
+                }
+
                 if (!suite.CurrentPreviewPassed ||
                     !suite.CurrentPreviewTelemetryAvailable ||
                     !suite.MacroVariationContractPassed)
@@ -1297,6 +1323,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
                 suite.Stage =
                     EdgeWearValidationSuiteStage.TopologyViability;
+                suite.RemainingBudgetBeforeTopologyMilliseconds =
+                    Math.Max(
+                        0d,
+                        EdgeWearValidationSuiteHardBudgetMilliseconds -
+                        suite.Stopwatch.Elapsed.TotalMilliseconds);
                 StartEdgeWearViabilityMatrix(
                     mass,
                     EdgeWearMatrixKind.TopologyViability,
@@ -1351,6 +1382,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
 
+            EdgeWearValidationSuiteJob suiteBudget =
+                job.SuiteOwned ? activeEdgeWearValidationSuiteJob : null;
+            if (suiteBudget != null &&
+                suiteBudget.Stopwatch.Elapsed.TotalMilliseconds >=
+                    EdgeWearValidationSuiteHardBudgetMilliseconds)
+            {
+                suiteBudget.TotalBudgetExceeded = true;
+                suiteBudget.FailFastTriggered = true;
+                FinishEdgeWearValidationSuite(
+                    suiteBudget,
+                    false,
+                    "performance-budget: complete suite exceeded the 90 s hard stop");
+                return;
+            }
+
             if (job.CancelRequested || job.Target == null)
             {
                 FinishEdgeWearViabilityMatrix(
@@ -1369,9 +1415,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
 
-            int seedIndex = caseIndex / EdgeWearBatchWidths.Length;
-            int widthIndex = caseIndex % EdgeWearBatchWidths.Length;
-            int shapeSeed = EdgeWearBatchShapeSeeds[seedIndex];
+            EdgeWearMatrixCaseCoordinate coordinate =
+                job.ResolveCaseCoordinate(caseIndex);
+            int widthIndex = coordinate.WidthIndex;
+            int shapeSeed = coordinate.ShapeSeed;
             float width = EdgeWearBatchWidths[widthIndex];
             string widthName = EdgeWearBatchWidthNames[widthIndex];
             float progress = (float)caseIndex / job.TotalCaseCount;
@@ -1513,6 +1560,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     : terminalReason + "; " + stateDiagnostic;
             }
 
+            job.Stopwatch.Stop();
             EdgeWearViabilityMatrixAggregate aggregate =
                 BuildEdgeWearViabilityMatrixAggregate(
                     job,
@@ -1560,17 +1608,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         return;
                     }
 
-                    suite.Stage = EdgeWearValidationSuiteStage
-                        .ArtisticPreviewParity;
-                    StartEdgeWearViabilityMatrix(
-                        suite.Target,
-                        EdgeWearMatrixKind.ArtisticPreviewParity,
-                        true);
+                    System.Diagnostics.Stopwatch fingerprintStopwatch =
+                        System.Diagnostics.Stopwatch.StartNew();
+                    suite.EvaluateArtisticFingerprintContract();
+                    fingerprintStopwatch.Stop();
+                    suite.ArtisticFingerprintMilliseconds =
+                        fingerprintStopwatch.Elapsed.TotalMilliseconds;
+                    if (!suite.ArtisticFingerprintContractPassed)
+                    {
+                        suite.FailFastTriggered = true;
+                        FinishEdgeWearValidationSuite(
+                            suite,
+                            false,
+                            "fail-fast: artistic fingerprint contract failed: " +
+                            suite.ArtisticFingerprintDiagnostic);
+                        return;
+                    }
+
+                    suite.Stage = EdgeWearValidationSuiteStage.CornerChipping;
+                    suite.RemainingBudgetBeforeCornerMilliseconds =
+                        Math.Max(
+                            0d,
+                            EdgeWearValidationSuiteHardBudgetMilliseconds -
+                            suite.Stopwatch.Elapsed.TotalMilliseconds);
+                    StartCornerChippingMatrix(suite);
                     return;
                 }
 
-                suite.Stage = EdgeWearValidationSuiteStage.CornerChipping;
-                StartCornerChippingMatrix(suite);
+                if (aggregate.Status != "passed" ||
+                    !suite.ArtisticMaterializationContractPassed)
+                {
+                    suite.FailFastTriggered = true;
+                    string artisticReason = aggregate.Status != "passed"
+                        ? "artistic sentinel materialization matrix failed"
+                        : "artistic sentinel fingerprint contract failed: " +
+                            suite.ArtisticMaterializedFingerprintDiagnostic;
+                    FinishEdgeWearValidationSuite(
+                        suite,
+                        false,
+                        "fail-fast: " + artisticReason);
+                    return;
+                }
+
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    string.Empty);
                 return;
             }
 
@@ -1636,6 +1719,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 message);
         }
 
+        private const double CornerChippingCaseHardBudgetMilliseconds = 4000d;
+        private const double CornerChippingMatrixHardBudgetMilliseconds =
+            35000d;
+        private const double EdgeWearValidationSuiteHardBudgetMilliseconds =
+            90000d;
+
         private static void StartCornerChippingMatrix(
             EdgeWearValidationSuiteJob suite)
         {
@@ -1675,6 +1764,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return;
             }
 
+            if (suite.Stopwatch.Elapsed.TotalMilliseconds >=
+                EdgeWearValidationSuiteHardBudgetMilliseconds)
+            {
+                suite.TotalBudgetExceeded = true;
+                suite.FailFastTriggered = true;
+                FinishCornerChippingMatrix(
+                    job,
+                    false,
+                    "performance-budget: complete suite exceeded the 90 s hard stop");
+                return;
+            }
+
             if (job.CancelRequested || suite.CancelRequested ||
                 job.Target == null)
             {
@@ -1684,6 +1785,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.Target == null
                         ? "target mass was destroyed"
                         : "cancelled by user");
+                return;
+            }
+
+            if (job.Stopwatch.Elapsed.TotalMilliseconds >=
+                CornerChippingMatrixHardBudgetMilliseconds)
+            {
+                FinishCornerChippingMatrix(
+                    job,
+                    false,
+                    "performance-budget: corner matrix exceeded the 35 s hard stop");
                 return;
             }
 
@@ -1735,6 +1846,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
             job.Cases.Add(matrixCase);
             job.CompletedCaseCount++;
+
+            if (job.Stopwatch.Elapsed.TotalMilliseconds >=
+                CornerChippingMatrixHardBudgetMilliseconds)
+            {
+                FinishCornerChippingMatrix(
+                    job,
+                    false,
+                    "performance-budget: corner matrix exceeded the 35 s hard stop");
+                return;
+            }
 
             if (job.CompletedCaseCount >= job.TotalCaseCount)
             {
@@ -1795,64 +1916,73 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
-            MeshData finalMesh;
-            if (!enabled)
-            {
-                MeshData baselineMesh =
-                    MassGenerator.GenerateUnifiedEdgeWearPreviewBaseline(
-                        recipe,
-                        settings,
-                        out MassGenerator.UnifiedEdgeWearPreviewStatus
-                            baselineStatus);
-                finalMesh = MassGenerator.GenerateUnifiedEdgeWearPreview(
+            CornerChippingMatrixJob.BaselineCacheEntry baseline =
+                GetOrBuildCornerChippingBaseline(
+                    job,
                     recipe,
                     settings,
+                    out bool baselineBuiltNow);
+            if (baseline == null || baseline.Mesh == null)
+            {
+                stopwatch.Stop();
+                result.ElapsedMilliseconds =
+                    stopwatch.Elapsed.TotalMilliseconds;
+                result.Diagnostic =
+                    "ordinary baseline cache could not be built";
+                return result;
+            }
+
+            MeshData finalMesh =
+                MassGenerator.GenerateUnifiedEdgeWearPreviewWithBaseline(
+                    recipe,
+                    settings,
+                    baseline.Mesh,
+                    baseline.Status,
+                    baseline.BuildMilliseconds,
+                    baseline.MaximumObservedIntegrationMilliseconds,
                     out MassGenerator.UnifiedEdgeWearPreviewStatus
                         routedStatus,
-                    out MassGenerator.CornerDamagePreviewStatus
-                        cornerStatus);
+                    out MassGenerator.CornerDamagePreviewStatus cornerStatus);
+            if (!enabled)
+            {
                 result.ZeroParityValid = cornerStatus == null &&
-                    MeshDataExactlyEqual(baselineMesh, finalMesh) &&
+                    MeshDataExactlyEqual(baseline.Mesh, finalMesh) &&
                     UnifiedPreviewStatusExactlyEqual(
-                        baselineStatus,
+                        baseline.Status,
                         routedStatus);
                 result.SelectionDeterministic = cornerStatus == null;
                 result.TransactionValid = cornerStatus == null;
                 result.CapRingValid = cornerStatus == null;
                 result.RetentionValid = cornerStatus == null;
+                result.BaselineBuildCount = baselineBuiltNow ? 1 : 0;
+                result.BaselineCacheUseCount = 1;
             }
             else
             {
-                MassGenerator.GenerateCornerDamageGeometryPreview(
-                    recipe,
-                    settings,
-                    out MassGenerator.CornerDamagePreviewStatus
-                        geometryStatus);
-                finalMesh = MassGenerator.GenerateUnifiedEdgeWearPreview(
-                    recipe,
-                    settings,
-                    out MassGenerator.UnifiedEdgeWearPreviewStatus
-                        unifiedStatus,
-                    out MassGenerator.CornerDamagePreviewStatus
-                        integratedStatus);
+                MassGenerator.CornerDamagePreviewStatus integratedStatus =
+                    cornerStatus;
+                int acceptedRank = integratedStatus == null
+                    ? -1
+                    : integratedStatus.AcceptedCornerRank;
+                MassGenerator.CornerDamageSelectionFingerprint fingerprint =
+                    acceptedRank < 0
+                        ? default
+                        : MassGenerator.GenerateCornerDamageSelectionFingerprint(
+                            recipe,
+                            settings,
+                            acceptedRank);
 
                 result.ZeroParityValid = true;
                 result.SelectionDeterministic =
-                    CornerSelectionsExactlyEqual(
-                        geometryStatus,
+                    CornerSelectionFingerprintMatches(
+                        fingerprint,
                         integratedStatus);
                 result.TransactionValid =
-                    geometryStatus != null &&
                     integratedStatus != null &&
-                    geometryStatus.TransactionCertified &&
                     integratedStatus.TransactionCertified &&
-                    geometryStatus.AcceptedCornerRank >= 0 &&
                     integratedStatus.AcceptedCornerRank >= 0 &&
-                    geometryStatus.SelectedGraphVertexIndex >= 0 &&
                     integratedStatus.SelectedGraphVertexIndex >= 0 &&
-                    geometryStatus.CapFaceCount == 1 &&
                     integratedStatus.CapFaceCount == 1 &&
-                    geometryStatus.SemanticCapFaceCount == 1 &&
                     integratedStatus.SemanticCapFaceCount == 1 &&
                     integratedStatus.ConstructionSourceFaceCountExpected > 0 &&
                     integratedStatus.ConstructionSourceFaceCountAttributed ==
@@ -1860,7 +1990,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 result.CapRingValid =
                     integratedStatus != null &&
                     integratedStatus.PreviewApplied &&
-                    unifiedStatus.PreviewApplied &&
+                    routedStatus.PreviewApplied &&
                     integratedStatus.ExpectedCapRingEdgeCount > 0 &&
                     integratedStatus.CapRingCommittedScale > 0f &&
                     integratedStatus.MandatoryCandidateCount ==
@@ -1914,9 +2044,66 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 result.UnrelatedBaselineCount = integratedStatus == null
                     ? 0
                     : integratedStatus.UnrelatedBaselineBuiltCount;
+                if (integratedStatus != null)
+                {
+                    result.BaselineBuildCount =
+                        integratedStatus.BaselineBuildCount;
+                    result.BaselineCacheUseCount =
+                        integratedStatus.BaselineCacheUseCount;
+                    result.TransactionAttemptCount =
+                        integratedStatus.TransactionAttemptCount;
+                    result.IntegrationPreflightAttemptCount =
+                        integratedStatus.IntegrationPreflightAttemptCount;
+                    result.FullIntegrationBuildCount =
+                        integratedStatus.FullIntegrationBuildCount;
+                    result.FullFallbackBuildCount =
+                        integratedStatus.FullFallbackBuildCount;
+                    result.GeometrySearchReuseCount =
+                        integratedStatus.GeometrySearchReuseCount;
+                    result.IntegrationPreflightMismatchCount =
+                        integratedStatus.IntegrationPreflightMismatchCount;
+                    result.PreflightCandidateCount =
+                        integratedStatus.PreflightCandidateCount;
+                    result.PreflightSelectedCount =
+                        integratedStatus.PreflightSelectedCount;
+                    result.PreflightMandatorySolvedCount =
+                        integratedStatus.PreflightMandatorySolvedCount;
+                    result.PreflightCollateralLostCount =
+                        integratedStatus.PreflightCollateralLostCount;
+                    result.CandidateRankingMilliseconds =
+                        integratedStatus.CandidateRankingMilliseconds;
+                    result.TransactionMilliseconds =
+                        integratedStatus.TransactionMilliseconds;
+                    result.IntegrationPreflightMilliseconds =
+                        integratedStatus.IntegrationPreflightMilliseconds;
+                    result.IntegrationMilliseconds =
+                        integratedStatus.IntegrationMilliseconds;
+                    result.CaseBudgetExceeded =
+                        integratedStatus.CaseBudgetExceeded;
+                    baseline.MaximumObservedIntegrationMilliseconds =
+                        Math.Max(
+                            baseline.MaximumObservedIntegrationMilliseconds,
+                            integratedStatus.IntegrationMilliseconds);
+                    if (integratedStatus.FullIntegrationBuildCount > 1 ||
+                        integratedStatus.FullFallbackBuildCount != 0)
+                    {
+                        result.SearchFailureStage =
+                            "integration-build-count";
+                        result.SearchFailureReason =
+                            "enabled case performed more than one final build or any fallback build";
+                    }
+                }
             }
             stopwatch.Stop();
             result.ElapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+            if (enabled && result.ElapsedMilliseconds >
+                CornerChippingCaseHardBudgetMilliseconds)
+            {
+                result.CaseBudgetExceeded = true;
+                result.SearchFailureStage = "performance-budget";
+                result.SearchFailureReason =
+                    "corner matrix case exceeded the 4 s hard stop";
+            }
             result.ChannelValid = ValidateCornerMatrixMeshChannels(
                 finalMesh,
                 out string channelDiagnostic);
@@ -1929,25 +2116,64 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             return result;
         }
 
-        private static bool CornerSelectionsExactlyEqual(
-            MassGenerator.CornerDamagePreviewStatus left,
-            MassGenerator.CornerDamagePreviewStatus right)
+        private static CornerChippingMatrixJob.BaselineCacheEntry
+            GetOrBuildCornerChippingBaseline(
+                CornerChippingMatrixJob job,
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings settings,
+                out bool builtNow)
         {
-            if (left == null || right == null)
+            builtNow = false;
+            if (job == null || recipe == null)
+            {
+                return null;
+            }
+            if (job.BaselineBySeed.TryGetValue(
+                    recipe.ShapeSeed,
+                    out CornerChippingMatrixJob.BaselineCacheEntry cached))
+            {
+                return cached;
+            }
+
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            MeshData mesh = MassGenerator.GenerateUnifiedEdgeWearPreviewBaseline(
+                recipe,
+                settings,
+                out MassGenerator.UnifiedEdgeWearPreviewStatus status);
+            stopwatch.Stop();
+            CornerChippingMatrixJob.BaselineCacheEntry created =
+                new CornerChippingMatrixJob.BaselineCacheEntry
+                {
+                    Mesh = mesh,
+                    Status = status,
+                    BuildMilliseconds = stopwatch.Elapsed.TotalMilliseconds
+                };
+            job.BaselineBySeed[recipe.ShapeSeed] = created;
+            builtNow = true;
+            return created;
+        }
+
+        private static bool CornerSelectionFingerprintMatches(
+            MassGenerator.CornerDamageSelectionFingerprint fingerprint,
+            MassGenerator.CornerDamagePreviewStatus status)
+        {
+            if (!fingerprint.Valid || status == null)
             {
                 return false;
             }
-            return left.AcceptedCornerRank ==
-                       right.AcceptedCornerRank &&
-                   left.SelectedGraphVertexIndex ==
-                       right.SelectedGraphVertexIndex &&
-                   left.AcceptedTrialIndex == right.AcceptedTrialIndex &&
-                   left.AcceptedDepth.Equals(right.AcceptedDepth) &&
-                   left.CapRingCommittedScale.Equals(
-                       right.CapRingCommittedScale) &&
+            return fingerprint.CandidateCornerCount ==
+                       status.CandidateCornerCount &&
+                   fingerprint.SelectedCornerRank ==
+                       status.AcceptedCornerRank &&
+                   fingerprint.SelectedGraphVertexIndex ==
+                       status.SelectedGraphVertexIndex &&
+                   fingerprint.AcceptedTrialIndex ==
+                       status.AcceptedTrialIndex &&
+                   fingerprint.AcceptedDepth.Equals(status.AcceptedDepth) &&
                    IntArraysExactlyEqual(
-                       left.MandatoryCapRingIdentities,
-                       right.MandatoryCapRingIdentities);
+                       fingerprint.MandatoryCapRingIdentities,
+                       status.MandatoryCapRingIdentities);
         }
 
         private static bool IntArraysExactlyEqual(int[] left, int[] right)
@@ -1965,6 +2191,169 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     return false;
                 }
             }
+            return true;
+        }
+
+        private static string BuildEdgeWearMatrixCaseKey(
+            int shapeSeed,
+            string widthName)
+        {
+            return shapeSeed.ToString(CultureInfo.InvariantCulture) + "/" +
+                (widthName ?? string.Empty);
+        }
+
+        private static MassGenerator.EdgeWearBatchAuditCaseResult
+            CloneEdgeWearBatchAuditResultForArtisticProjection(
+                MassGenerator.EdgeWearBatchAuditCaseResult source)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            MassGenerator.EdgeWearBatchAuditCaseResult clone =
+                new MassGenerator.EdgeWearBatchAuditCaseResult();
+            System.Reflection.FieldInfo[] resultFields =
+                typeof(MassGenerator.EdgeWearBatchAuditCaseResult)
+                    .GetFields(
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.Public);
+            for (int fieldIndex = 0;
+                 fieldIndex < resultFields.Length;
+                 fieldIndex++)
+            {
+                System.Reflection.FieldInfo field =
+                    resultFields[fieldIndex];
+                field.SetValue(clone, field.GetValue(source));
+            }
+
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord[] sourceRecords =
+                source.ArtisticEdges;
+            if (sourceRecords == null)
+            {
+                clone.ArtisticEdges = null;
+                return clone;
+            }
+
+            System.Reflection.FieldInfo[] recordFields =
+                typeof(MassGenerator.EdgeWearArtisticEdgeAuditRecord)
+                    .GetFields(
+                        System.Reflection.BindingFlags.Instance |
+                        System.Reflection.BindingFlags.Public);
+            MassGenerator.EdgeWearArtisticEdgeAuditRecord[] clonedRecords =
+                new MassGenerator.EdgeWearArtisticEdgeAuditRecord[
+                    sourceRecords.Length];
+            for (int recordIndex = 0;
+                 recordIndex < sourceRecords.Length;
+                 recordIndex++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord sourceRecord =
+                    sourceRecords[recordIndex];
+                if (sourceRecord == null)
+                {
+                    continue;
+                }
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord clonedRecord =
+                    new MassGenerator.EdgeWearArtisticEdgeAuditRecord();
+                for (int fieldIndex = 0;
+                     fieldIndex < recordFields.Length;
+                     fieldIndex++)
+                {
+                    System.Reflection.FieldInfo field =
+                        recordFields[fieldIndex];
+                    field.SetValue(
+                        clonedRecord,
+                        field.GetValue(sourceRecord));
+                }
+                clonedRecords[recordIndex] = clonedRecord;
+            }
+            clone.ArtisticEdges = clonedRecords;
+            return clone;
+        }
+
+        private static bool TryBuildEdgeWearArtisticFingerprint(
+            MassGenerator.EdgeWearBatchAuditCaseResult result,
+            out string fingerprint,
+            out string diagnostic)
+        {
+            fingerprint = string.Empty;
+            diagnostic = string.Empty;
+            if (result == null || result.ArtisticEdges == null ||
+                result.ArtisticEdges.Length == 0)
+            {
+                diagnostic = "artistic edge records were unavailable";
+                return false;
+            }
+
+            List<MassGenerator.EdgeWearArtisticEdgeAuditRecord> ranked =
+                new List<MassGenerator.EdgeWearArtisticEdgeAuditRecord>();
+            HashSet<int> identities = new HashSet<int>();
+            for (int index = 0;
+                 index < result.ArtisticEdges.Length;
+                 index++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord record =
+                    result.ArtisticEdges[index];
+                if (record == null || record.GeometricEligible == 0 ||
+                    record.ArtisticEligible == 0)
+                {
+                    continue;
+                }
+                if (float.IsNaN(record.Score) ||
+                    float.IsInfinity(record.Score))
+                {
+                    diagnostic = "artistic score was non-finite for edge " +
+                        record.SourceEdgeIndex;
+                    return false;
+                }
+                if (!identities.Add(record.SourceEdgeIndex))
+                {
+                    diagnostic = "duplicate artistic source identity " +
+                        record.SourceEdgeIndex;
+                    return false;
+                }
+                ranked.Add(record);
+            }
+
+            if (ranked.Count != result.ArtisticEligibleCount)
+            {
+                diagnostic = "artistic eligible count mismatch: records=" +
+                    ranked.Count + ",reported=" +
+                    result.ArtisticEligibleCount;
+                return false;
+            }
+
+            ranked.Sort((left, right) =>
+            {
+                int scoreOrder = right.Score.CompareTo(left.Score);
+                return scoreOrder != 0
+                    ? scoreOrder
+                    : left.SourceEdgeIndex.CompareTo(
+                        right.SourceEdgeIndex);
+            });
+            StringBuilder builder = new StringBuilder(512);
+            builder.Append(ranked.Count);
+            for (int index = 0; index < ranked.Count; index++)
+            {
+                MassGenerator.EdgeWearArtisticEdgeAuditRecord record =
+                    ranked[index];
+                int expectedRank = index + 1;
+                if (record.ArtisticSelectionRank != expectedRank)
+                {
+                    diagnostic = "artistic rank mismatch for edge " +
+                        record.SourceEdgeIndex + ": recorded=" +
+                        record.ArtisticSelectionRank + ",expected=" +
+                        expectedRank;
+                    return false;
+                }
+                builder.Append('|');
+                builder.Append(record.SourceEdgeIndex);
+                builder.Append('@');
+                builder.Append(record.Score.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture));
+            }
+            fingerprint = builder.ToString();
             return true;
         }
 
@@ -2224,10 +2613,49 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             suite.RecordCornerChippingMatrix(
                 aggregate,
                 BuildCornerChippingMatrixReport(job, aggregate));
-            FinishEdgeWearValidationSuite(
-                suite,
-                cancelled,
-                terminalReason);
+            if (cancelled || suite.CancelRequested ||
+                !statePreserved || suite.Target == null)
+            {
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    cancelled || suite.CancelRequested,
+                    terminalReason);
+                return;
+            }
+            if (aggregate.Status != "passed")
+            {
+                suite.FailFastTriggered = true;
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    string.IsNullOrEmpty(terminalReason)
+                        ? "fail-fast: corner chipping matrix failed"
+                        : terminalReason);
+                return;
+            }
+            if (suite.Stopwatch.Elapsed.TotalMilliseconds >=
+                EdgeWearValidationSuiteHardBudgetMilliseconds)
+            {
+                suite.TotalBudgetExceeded = true;
+                suite.FailFastTriggered = true;
+                FinishEdgeWearValidationSuite(
+                    suite,
+                    false,
+                    "performance-budget: complete suite exceeded the 90 s hard stop");
+                return;
+            }
+
+            suite.Stage = EdgeWearValidationSuiteStage
+                .ArtisticPreviewParity;
+            suite.RemainingBudgetBeforeArtisticMaterializationMilliseconds =
+                Math.Max(
+                    0d,
+                    EdgeWearValidationSuiteHardBudgetMilliseconds -
+                    suite.Stopwatch.Elapsed.TotalMilliseconds);
+            StartEdgeWearViabilityMatrix(
+                suite.Target,
+                EdgeWearMatrixKind.ArtisticPreviewParity,
+                true);
         }
 
         private static CornerChippingMatrixAggregate
@@ -2243,7 +2671,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     CasesRun = job.Cases.Count,
                     Cancelled = cancelled,
                     StatePreserved = statePreserved,
-                    TerminalReason = terminalReason ?? string.Empty
+                    TerminalReason = terminalReason ?? string.Empty,
+                    ElapsedMilliseconds =
+                        job.Stopwatch.Elapsed.TotalMilliseconds,
+                    MatrixBudgetExceeded =
+                        (terminalReason ?? string.Empty).IndexOf(
+                            "corner matrix exceeded",
+                            StringComparison.Ordinal) >= 0
                 };
             for (int index = 0; index < job.Cases.Count; index++)
             {
@@ -2285,6 +2719,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     aggregate.ChannelsPassed++;
                 }
+                aggregate.BaselineBuildCount +=
+                    item.BaselineBuildCount;
+                aggregate.BaselineCacheUseCount +=
+                    item.BaselineCacheUseCount;
+                if (item.CaseBudgetExceeded)
+                {
+                    aggregate.CaseBudgetExceededCount++;
+                }
             }
             return aggregate;
         }
@@ -2294,13 +2736,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             CornerChippingMatrixAggregate aggregate)
         {
             StringBuilder builder = new StringBuilder(32768);
-            builder.AppendLine("GeneratedMass EW-C1A.3a corner chipping matrix");
-            builder.AppendLine("contract=EW-C1A.3a-33-case");
+            builder.AppendLine("GeneratedMass EW-C1A.3d corner chipping matrix");
+            builder.AppendLine("contract=EW-C1A.3d-33-case");
             builder.Append("status=");
             builder.AppendLine(aggregate.Status);
             builder.Append("seeds=");
             builder.AppendLine(string.Join("/", EdgeWearBatchShapeSeeds));
             builder.AppendLine("policies=disabled/default/maximum-depth");
+            builder.AppendLine("caseBudgetMilliseconds=4000");
+            builder.AppendLine("matrixBudgetMilliseconds=35000");
             builder.Append("cases=");
             builder.Append(aggregate.CasesPassed);
             builder.Append('/');
@@ -2333,13 +2777,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(aggregate.Cancelled ? "1" : "0");
             builder.Append("statePreserved=");
             builder.AppendLine(aggregate.StatePreserved ? "1" : "0");
+            builder.Append("caseBudgetExceeded=");
+            builder.AppendLine(aggregate.CaseBudgetExceededCount.ToString());
+            builder.Append("matrixBudgetExceeded=");
+            builder.AppendLine(aggregate.MatrixBudgetExceeded ? "1" : "0");
+            builder.Append("elapsedMilliseconds=");
+            builder.AppendLine(aggregate.ElapsedMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
             builder.Append("terminalReason=");
             builder.AppendLine(string.IsNullOrEmpty(aggregate.TerminalReason)
                 ? "none"
                 : aggregate.TerminalReason);
             builder.AppendLine();
             builder.AppendLine(
-                "seed,policy,status,acceptedRank,selectedCorner,acceptedTrial,acceptedDepthFraction,candidateCorners,attemptedCorners,attemptedConfigurations,ringScale,mandatoryBuilt,retained,baseline,failureStage,elapsedMs,diagnostic");
+                "seed,policy,status,acceptedRank,selectedCorner,acceptedTrial,acceptedDepthFraction,candidateCorners,attemptedCorners,attemptedConfigurations,ringScale,mandatoryBuilt,retained,baseline,baselineBuilds,baselineCacheUses,transactionAttempts,integrationPreflightAttempts,fullIntegrationBuilds,fullFallbackBuilds,geometrySearchReuses,integrationPreflightMismatches,preflightCandidates,preflightSelected,preflightMandatorySolved,preflightCollateralLost,candidateRankingMs,transactionMs,integrationPreflightMs,integrationMs,caseBudgetExceeded,failureStage,elapsedMs,diagnostic");
             for (int index = 0; index < job.Cases.Count; index++)
             {
                 CornerChippingMatrixCase item = job.Cases[index];
@@ -2373,6 +2824,44 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.Append(',');
                 builder.Append(item.UnrelatedBaselineCount);
                 builder.Append(',');
+                builder.Append(item.BaselineBuildCount);
+                builder.Append(',');
+                builder.Append(item.BaselineCacheUseCount);
+                builder.Append(',');
+                builder.Append(item.TransactionAttemptCount);
+                builder.Append(',');
+                builder.Append(item.IntegrationPreflightAttemptCount);
+                builder.Append(',');
+                builder.Append(item.FullIntegrationBuildCount);
+                builder.Append(',');
+                builder.Append(item.FullFallbackBuildCount);
+                builder.Append(',');
+                builder.Append(item.GeometrySearchReuseCount);
+                builder.Append(',');
+                builder.Append(item.IntegrationPreflightMismatchCount);
+                builder.Append(',');
+                builder.Append(item.PreflightCandidateCount);
+                builder.Append(',');
+                builder.Append(item.PreflightSelectedCount);
+                builder.Append(',');
+                builder.Append(item.PreflightMandatorySolvedCount);
+                builder.Append(',');
+                builder.Append(item.PreflightCollateralLostCount);
+                builder.Append(',');
+                builder.Append(item.CandidateRankingMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.TransactionMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.IntegrationPreflightMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.IntegrationMilliseconds.ToString(
+                    "F3", CultureInfo.InvariantCulture));
+                builder.Append(',');
+                builder.Append(item.CaseBudgetExceeded ? "1" : "0");
+                builder.Append(',');
                 builder.Append((item.SearchFailureStage ?? string.Empty).
                     Replace(',', ';'));
                 builder.Append(',');
@@ -2403,6 +2892,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             EditorUtility.ClearProgressBar();
             suite.Stage = EdgeWearValidationSuiteStage.Complete;
             suite.Cancelled = cancelled;
+            suite.TotalElapsedMilliseconds =
+                suite.Stopwatch.Elapsed.TotalMilliseconds;
+            if (suite.TotalElapsedMilliseconds >=
+                EdgeWearValidationSuiteHardBudgetMilliseconds)
+            {
+                suite.TotalBudgetExceeded = true;
+                suite.FailFastTriggered = true;
+                terminalReason = string.IsNullOrEmpty(terminalReason)
+                    ? "performance-budget: complete suite exceeded the 90 s hard stop"
+                    : terminalReason;
+            }
             suite.TerminalReason = terminalReason ?? string.Empty;
 
             if (suite.FailFastTriggered)
@@ -2443,6 +2943,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             : suite.ComprehensiveArtisticDiagnostic + "; " +
                                 comprehensiveWriteDiagnostic;
                 }
+            }
+
+            suite.Stopwatch.Stop();
+            suite.TotalElapsedMilliseconds =
+                suite.Stopwatch.Elapsed.TotalMilliseconds;
+            if (suite.TotalElapsedMilliseconds >=
+                EdgeWearValidationSuiteHardBudgetMilliseconds)
+            {
+                suite.TotalBudgetExceeded = true;
+                suite.TerminalReason = string.IsNullOrEmpty(
+                        suite.TerminalReason)
+                    ? "performance-budget: complete suite exceeded the 90 s hard stop"
+                    : suite.TerminalReason;
             }
 
             string status = suite.Status;
@@ -2500,6 +3013,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     suite.PreviewCollateralFailures +
                 ",artisticComprehensive:" +
                     (suite.ComprehensiveArtisticAvailable ? "1" : "0") +
+                ",totalElapsedMs:" +
+                    suite.TotalElapsedMilliseconds.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
                 ",report=Library/" +
                     EdgeWearValidationSuiteReportFileName;
             Debug.LogFormat(
@@ -2516,7 +3033,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine(
                 "GeneratedMass edge-wear one-click validation suite");
-            builder.AppendLine("contract=EW-C1A.3a-suite");
+            builder.AppendLine("contract=EW-C1A.3d-suite");
             builder.Append("object=");
             builder.AppendLine(suite.TargetName);
             builder.Append("entityId=");
@@ -2529,8 +3046,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine((
                 EdgeWearBatchShapeSeeds.Length *
                 EdgeWearBatchWidths.Length).ToString());
+            builder.AppendLine(
+                "stageOrder=current-preview/macro/topology/artistic-fingerprint/corner-chipping/artistic-sentinels/comprehensive-evidence");
             builder.Append("status=");
             builder.AppendLine(suite.Status);
+            builder.Append("totalElapsedMs=");
+            builder.AppendLine(suite.TotalElapsedMilliseconds.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
+            builder.Append("totalBudgetMilliseconds=");
+            builder.AppendLine(
+                EdgeWearValidationSuiteHardBudgetMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("totalBudgetExceeded=");
+            builder.AppendLine(suite.TotalBudgetExceeded ? "1" : "0");
+            builder.Append("cornerCaseBudgetMilliseconds=");
+            builder.AppendLine(
+                CornerChippingCaseHardBudgetMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("cornerMatrixBudgetMilliseconds=");
+            builder.AppendLine(
+                CornerChippingMatrixHardBudgetMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
             builder.Append("currentPreviewPassed=");
             builder.AppendLine(
                 suite.CurrentPreviewPassed ? "1" : "0");
@@ -2582,18 +3122,99 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append(suite.TopologyCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.TopologyCasesRun.ToString());
+            builder.Append("topologyElapsedMs=");
+            builder.AppendLine(
+                suite.TopologyElapsedMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("remainingBudgetBeforeTopologyMs=");
+            builder.AppendLine(
+                suite.RemainingBudgetBeforeTopologyMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("artisticFingerprintStatus=");
+            builder.AppendLine(
+                suite.ArtisticFingerprintContractPassed
+                    ? "passed"
+                    : suite.ArtisticFingerprintCasesRun == 0
+                        ? "not-run"
+                        : "failed");
+            builder.Append("artisticFingerprintCases=");
+            builder.Append(suite.ArtisticFingerprintCasesPassed);
+            builder.Append('/');
+            builder.AppendLine(
+                suite.ArtisticFingerprintCasesRun.ToString());
+            builder.Append("artisticFingerprintElapsedMs=");
+            builder.AppendLine(
+                suite.ArtisticFingerprintMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("preparedCaseCacheHits=");
+            builder.AppendLine(
+                suite.ArtisticFingerprintCasesPassed.ToString());
+            builder.Append("artisticSentinelSeeds=");
+            builder.AppendLine(string.Join(
+                "/",
+                EdgeWearSuiteArtisticSentinelSeeds));
             builder.Append("previewStatus=");
             builder.AppendLine(suite.PreviewStatus);
             builder.Append("previewCases=");
             builder.Append(suite.PreviewCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.PreviewCasesRun.ToString());
+            builder.Append("artisticMaterializedStatus=");
+            builder.AppendLine(
+                suite.ArtisticMaterializationContractPassed
+                    ? "passed"
+                    : suite.ArtisticMaterializedFingerprintCasesRun == 0
+                        ? "not-run"
+                        : "failed");
+            builder.Append("artisticMaterializedCases=");
+            builder.Append(
+                suite.ArtisticMaterializedFingerprintCasesPassed);
+            builder.Append('/');
+            builder.AppendLine(
+                suite.ArtisticMaterializedFingerprintCasesRun.ToString());
+            builder.Append("artisticMaterializedElapsedMs=");
+            builder.AppendLine(
+                suite.ArtisticMaterializedElapsedMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append(
+                "remainingBudgetBeforeArtisticMaterializationMs=");
+            builder.AppendLine(
+                suite.RemainingBudgetBeforeArtisticMaterializationMilliseconds
+                    .ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture));
             builder.Append("cornerChippingStatus=");
             builder.AppendLine(suite.CornerChippingStatus);
             builder.Append("cornerChippingCases=");
             builder.Append(suite.CornerChippingCasesPassed);
             builder.Append('/');
             builder.AppendLine(suite.CornerChippingCasesRun.ToString());
+            builder.Append("cornerChippingCaseBudgetExceeded=");
+            builder.AppendLine(
+                suite.CornerCaseBudgetExceededCount.ToString());
+            builder.Append("cornerChippingMatrixBudgetExceeded=");
+            builder.AppendLine(
+                suite.CornerMatrixBudgetExceeded ? "1" : "0");
+            builder.Append("cornerChippingElapsedMs=");
+            builder.AppendLine(
+                suite.CornerMatrixElapsedMilliseconds.ToString(
+                    "F3",
+                    CultureInfo.InvariantCulture));
+            builder.Append("remainingBudgetBeforeCornerMs=");
+            builder.AppendLine(
+                suite.RemainingBudgetBeforeCornerMilliseconds.ToString(
+                    "G9",
+                    CultureInfo.InvariantCulture));
+            builder.Append("cornerBaselineBuilds=");
+            builder.AppendLine(
+                suite.CornerBaselineBuildCount.ToString());
+            builder.Append("cornerBaselineCacheUses=");
+            builder.AppendLine(
+                suite.CornerBaselineCacheUseCount.ToString());
             builder.Append("cornerDisabledZeroParity=");
             builder.Append(suite.CornerDisabledZeroParityPassed);
             builder.Append('/');
@@ -2656,6 +3277,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(string.IsNullOrEmpty(suite.TerminalReason)
                 ? "none"
                 : suite.TerminalReason);
+            builder.Append("artisticFingerprintDiagnostic=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    suite.ArtisticFingerprintDiagnostic)
+                ? "none"
+                : suite.ArtisticFingerprintDiagnostic);
+            builder.Append("artisticMaterializedDiagnostic=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    suite.ArtisticMaterializedFingerprintDiagnostic)
+                ? "none"
+                : suite.ArtisticMaterializedFingerprintDiagnostic);
 
             builder.AppendLine();
             builder.AppendLine("[Current Preview Summary]");
@@ -2677,15 +3308,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? "not run"
                 : suite.TopologyReportText);
             builder.AppendLine();
-            builder.AppendLine("[Artistic Preview Parity Matrix]");
-            builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
-                ? "not run"
-                : suite.PreviewReportText);
-            builder.AppendLine();
             builder.AppendLine("[Corner Chipping Matrix]");
             builder.AppendLine(string.IsNullOrEmpty(suite.CornerChippingReportText)
                 ? "not run"
                 : suite.CornerChippingReportText);
+            builder.AppendLine();
+            builder.AppendLine(
+                "[Artistic Preview Sentinel Materialization Matrix]");
+            builder.AppendLine(string.IsNullOrEmpty(suite.PreviewReportText)
+                ? "not run"
+                : suite.PreviewReportText);
             builder.AppendLine();
             builder.AppendLine(
                 "[Outlier Resolution and Negative Exclusion Contract]");
@@ -2790,10 +3422,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             }
             int expectedCaseCount = EdgeWearBatchShapeSeeds.Length *
                 EdgeWearBatchWidths.Length;
-            if (suite.PreviewCases.Count != expectedCaseCount)
+            if (suite.ArtisticFingerprintMatrixCases.Count != expectedCaseCount)
             {
-                diagnostic = "artistic preview case set was incomplete: " +
-                    suite.PreviewCases.Count + "/" + expectedCaseCount;
+                diagnostic =
+                    "topology artistic-record case set was incomplete: " +
+                    suite.ArtisticFingerprintMatrixCases.Count + "/" +
+                    expectedCaseCount;
                 return;
             }
 
@@ -2834,11 +3468,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             int gateContradictions = 0;
 
             for (int caseIndex = 0;
-                 caseIndex < suite.PreviewCases.Count;
+                 caseIndex < suite.ArtisticFingerprintMatrixCases.Count;
                  caseIndex++)
             {
                 EdgeWearViabilityMatrixCase matrixCase =
-                    suite.PreviewCases[caseIndex];
+                    suite.ArtisticFingerprintMatrixCases[caseIndex];
                 MassGenerator.EdgeWearArtisticEdgeAuditRecord[] records =
                     matrixCase.Result.ArtisticEdges;
                 if (records == null || records.Length == 0)
@@ -2959,7 +3593,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "GeneratedMass comprehensive artistic selection evidence");
             reportBuilder.AppendLine(
-                "contract=EW-V1A.3b-comprehensive");
+                "contract=EW-C1A.3d-comprehensive-selection-projection");
             reportBuilder.Append("cases=");
             reportBuilder.AppendLine(expectedCaseCount.ToString());
             reportBuilder.Append("scenariosPerCase=");
@@ -2975,7 +3609,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             reportBuilder.AppendLine(
                 "cutoffUniverse=every fixed selected slot plus native coverage deciles 0.10-1.00");
             reportBuilder.AppendLine(
-                "rawEvidence=all edge geometry,normals,gates,score components,modifiers,context,viability,effect,lifecycle");
+                "evidenceSource=topology-captured records with non-emitting artistic rank/candidate projection;materializationCoverage=12 difficult sentinels");
+            reportBuilder.AppendLine(
+                "rawEvidence=topology edge geometry,normals,gates,score components,modifiers,context,viability,effect,lifecycle;projectedFields=artistic rank/candidate/selection");
             AppendEdgeWearArtisticGlobalEvidenceValues(
                 reportBuilder,
                 scenarioUniverse,
@@ -5799,6 +6435,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     Cancelled = cancelled,
                     StatePreserved = statePreserved,
                     TerminalReason = terminalReason ?? string.Empty,
+                    ElapsedMilliseconds =
+                        job.Stopwatch.Elapsed.TotalMilliseconds,
                     MinimumCertifiedRatio = job.Cases.Count > 0
                         ? 1f
                         : 0f
@@ -6019,6 +6657,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine(aggregate.CasesPassed.ToString());
             builder.Append("casesFailed=");
             builder.AppendLine(aggregate.CasesFailed.ToString());
+            builder.Append("elapsedMilliseconds=");
+            builder.AppendLine(aggregate.ElapsedMilliseconds.ToString(
+                "G9",
+                CultureInfo.InvariantCulture));
             builder.Append("coexistenceCoverageFailures=");
             builder.AppendLine(
                 aggregate.CoexistenceCoverageFailures.ToString());
@@ -6728,6 +7370,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int MandatoryBuiltCount;
             public int UnrelatedRetainedCount;
             public int UnrelatedBaselineCount;
+            public int BaselineBuildCount;
+            public int BaselineCacheUseCount;
+            public int TransactionAttemptCount;
+            public int IntegrationPreflightAttemptCount;
+            public int FullIntegrationBuildCount;
+            public int FullFallbackBuildCount;
+            public int GeometrySearchReuseCount;
+            public int IntegrationPreflightMismatchCount;
+            public int PreflightCandidateCount;
+            public int PreflightSelectedCount;
+            public int PreflightMandatorySolvedCount;
+            public int PreflightCollateralLostCount;
+            public double CandidateRankingMilliseconds;
+            public double TransactionMilliseconds;
+            public double IntegrationPreflightMilliseconds;
+            public double IntegrationMilliseconds;
+            public bool CaseBudgetExceeded;
             public double ElapsedMilliseconds;
             public string Diagnostic = string.Empty;
 
@@ -6738,6 +7397,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CapRingValid &&
                 RetentionValid &&
                 ChannelValid &&
+                FullIntegrationBuildCount <= 1 &&
+                FullFallbackBuildCount == 0 &&
+                IntegrationPreflightMismatchCount == 0 &&
+                !CaseBudgetExceeded &&
                 string.IsNullOrEmpty(Diagnostic);
         }
 
@@ -6757,6 +7420,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int RetentionPassed;
             public int ChannelsRun;
             public int ChannelsPassed;
+            public int CaseBudgetExceededCount;
+            public int BaselineBuildCount;
+            public int BaselineCacheUseCount;
+            public bool MatrixBudgetExceeded;
+            public double ElapsedMilliseconds;
             public bool Cancelled;
             public bool StatePreserved;
             public string TerminalReason = string.Empty;
@@ -6773,6 +7441,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CapRingPassed == CapRingRun &&
                 RetentionPassed == RetentionRun &&
                 ChannelsPassed == ChannelsRun &&
+                CaseBudgetExceededCount == 0 &&
+                !MatrixBudgetExceeded &&
                 string.IsNullOrEmpty(TerminalReason)
                     ? "passed"
                     : Cancelled ? "cancelled" : "failed";
@@ -6780,6 +7450,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         private sealed class CornerChippingMatrixJob
         {
+            public sealed class BaselineCacheEntry
+            {
+                public MeshData Mesh;
+                public MassGenerator.UnifiedEdgeWearPreviewStatus Status;
+                public double BuildMilliseconds;
+                public double MaximumObservedIntegrationMilliseconds;
+            }
+
             public readonly GeneratedMass Target;
             public readonly string RecipeJson;
             public readonly Mesh TargetMesh;
@@ -6801,6 +7479,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public readonly float CornerChipCapRingWearStrength;
             public readonly List<CornerChippingMatrixCase> Cases =
                 new List<CornerChippingMatrixCase>();
+            public readonly Dictionary<int, BaselineCacheEntry>
+                BaselineBySeed =
+                    new Dictionary<int, BaselineCacheEntry>();
+            public readonly System.Diagnostics.Stopwatch Stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
             public bool CancelRequested;
             public int CompletedCaseCount;
             public int TotalCaseCount => EdgeWearBatchShapeSeeds.Length * 3;
@@ -6870,6 +7553,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public bool CancelRequested;
             public bool Cancelled;
             public bool FailFastTriggered;
+            public bool TotalBudgetExceeded;
+            public double TotalElapsedMilliseconds;
+            public readonly System.Diagnostics.Stopwatch Stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
             public string TerminalReason = string.Empty;
             public double CurrentPreviewMilliseconds;
             public double MacroVariationContractMilliseconds;
@@ -6890,6 +7577,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public EdgeWearViabilityMatrixAggregate PreviewAggregate;
             public string TopologyReportText = string.Empty;
             public string PreviewReportText = string.Empty;
+            public int ArtisticFingerprintCasesRun;
+            public int ArtisticFingerprintCasesPassed;
+            public double ArtisticFingerprintMilliseconds;
+            public string ArtisticFingerprintDiagnostic = string.Empty;
+            public int ArtisticMaterializedFingerprintCasesRun;
+            public int ArtisticMaterializedFingerprintCasesPassed;
+            public string ArtisticMaterializedFingerprintDiagnostic =
+                string.Empty;
+            public readonly Dictionary<string, string>
+                ArtisticFingerprintByCase =
+                    new Dictionary<string, string>();
+            public readonly List<EdgeWearViabilityMatrixCase>
+                ArtisticFingerprintMatrixCases =
+                    new List<EdgeWearViabilityMatrixCase>();
+            public double RemainingBudgetBeforeTopologyMilliseconds;
+            public double RemainingBudgetBeforeCornerMilliseconds;
+            public double
+                RemainingBudgetBeforeArtisticMaterializationMilliseconds;
             public CornerChippingMatrixAggregate CornerChippingAggregate;
             public string CornerChippingReportText = string.Empty;
             public bool ComprehensiveArtisticAvailable;
@@ -6946,6 +7651,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? "not-run"
                 : PreviewAggregate.Status;
 
+            public double TopologyElapsedMilliseconds =>
+                TopologyAggregate == null
+                    ? 0d
+                    : TopologyAggregate.ElapsedMilliseconds;
+
+            public double ArtisticMaterializedElapsedMilliseconds =>
+                PreviewAggregate == null
+                    ? 0d
+                    : PreviewAggregate.ElapsedMilliseconds;
+
             public string CornerChippingStatus =>
                 CornerChippingAggregate == null
                     ? "not-run"
@@ -6960,6 +7675,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CornerChippingAggregate == null
                     ? 0
                     : CornerChippingAggregate.CasesPassed;
+
+            public int CornerBaselineBuildCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.BaselineBuildCount;
+
+            public int CornerBaselineCacheUseCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.BaselineCacheUseCount;
+
+            public int CornerCaseBudgetExceededCount =>
+                CornerChippingAggregate == null
+                    ? 0
+                    : CornerChippingAggregate.CaseBudgetExceededCount;
+
+            public bool CornerMatrixBudgetExceeded =>
+                CornerChippingAggregate != null &&
+                CornerChippingAggregate.MatrixBudgetExceeded;
+
+            public double CornerMatrixElapsedMilliseconds =>
+                CornerChippingAggregate == null
+                    ? 0d
+                    : CornerChippingAggregate.ElapsedMilliseconds;
 
             public int CornerDisabledZeroParityRun =>
                 CornerChippingAggregate == null
@@ -7083,6 +7822,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         TopologyAggregate.Status != "passed" ||
                         PreviewAggregate.Status != "passed" ||
                         CornerChippingAggregate.Status != "passed" ||
+                        !ArtisticFingerprintContractPassed ||
+                        !ArtisticMaterializationContractPassed ||
                         OutlierRecoveryChecksRun == 0 ||
                         OutlierRecoveryChecksPassed !=
                             OutlierRecoveryChecksRun ||
@@ -7091,6 +7832,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         NegativeExclusionChecksPassed !=
                             NegativeExclusionChecksRun ||
                         !ComprehensiveArtisticAvailable ||
+                        TotalBudgetExceeded ||
                         !string.IsNullOrEmpty(TerminalReason))
                     {
                         return "failed";
@@ -7702,6 +8444,215 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         settings);
             }
 
+            public bool ArtisticFingerprintContractPassed =>
+                ArtisticFingerprintCasesRun ==
+                    EdgeWearBatchShapeSeeds.Length *
+                    EdgeWearBatchWidths.Length &&
+                ArtisticFingerprintCasesPassed ==
+                    ArtisticFingerprintCasesRun &&
+                string.IsNullOrEmpty(ArtisticFingerprintDiagnostic);
+
+            public bool ArtisticMaterializationContractPassed =>
+                ArtisticMaterializedFingerprintCasesRun ==
+                    EdgeWearSuiteArtisticSentinelSeeds.Length *
+                    EdgeWearBatchWidths.Length &&
+                ArtisticMaterializedFingerprintCasesPassed ==
+                    ArtisticMaterializedFingerprintCasesRun &&
+                string.IsNullOrEmpty(
+                    ArtisticMaterializedFingerprintDiagnostic);
+
+            public void EvaluateArtisticFingerprintContract()
+            {
+                ArtisticFingerprintCasesRun = 0;
+                ArtisticFingerprintCasesPassed = 0;
+                ArtisticFingerprintDiagnostic = string.Empty;
+                ArtisticFingerprintByCase.Clear();
+                ArtisticFingerprintMatrixCases.Clear();
+
+                int expected = EdgeWearBatchShapeSeeds.Length *
+                    EdgeWearBatchWidths.Length;
+                if (TopologyCases.Count != expected)
+                {
+                    ArtisticFingerprintDiagnostic =
+                        "topology case set was incomplete: " +
+                        TopologyCases.Count + "/" + expected;
+                    return;
+                }
+
+                for (int index = 0;
+                     index < TopologyCases.Count;
+                     index++)
+                {
+                    EdgeWearViabilityMatrixCase topologyCase =
+                        TopologyCases[index];
+                    ArtisticFingerprintCasesRun++;
+                    MassGenerator.EdgeWearBatchAuditCaseResult projected =
+                        CloneEdgeWearBatchAuditResultForArtisticProjection(
+                            topologyCase.Result);
+                    if (projected == null ||
+                        projected.ArtisticEdges == null)
+                    {
+                        ArtisticFingerprintDiagnostic =
+                            "failed to project topology artistic records for " +
+                            BuildEdgeWearMatrixCaseKey(
+                                topologyCase.ShapeSeed,
+                                topologyCase.WidthName);
+                        return;
+                    }
+
+                    List<MassGenerator.EdgeWearArtisticEdgeAuditRecord>
+                        ranked =
+                            new List<
+                                MassGenerator.
+                                    EdgeWearArtisticEdgeAuditRecord>();
+                    for (int edgeIndex = 0;
+                         edgeIndex < projected.ArtisticEdges.Length;
+                         edgeIndex++)
+                    {
+                        MassGenerator.EdgeWearArtisticEdgeAuditRecord record =
+                            projected.ArtisticEdges[edgeIndex];
+                        if (record != null &&
+                            record.GeometricEligible != 0 &&
+                            record.ArtisticEligible != 0)
+                        {
+                            ranked.Add(record);
+                        }
+                        else if (record != null)
+                        {
+                            record.Candidate = 0;
+                            record.Selected = 0;
+                            record.CandidateIndex = -1;
+                            record.ArtisticSelectionRank = -1;
+                        }
+                    }
+                    ranked.Sort((left, right) =>
+                    {
+                        int scoreOrder =
+                            right.Score.CompareTo(left.Score);
+                        return scoreOrder != 0
+                            ? scoreOrder
+                            : left.SourceEdgeIndex.CompareTo(
+                                right.SourceEdgeIndex);
+                    });
+                    for (int rank = 0; rank < ranked.Count; rank++)
+                    {
+                        MassGenerator.EdgeWearArtisticEdgeAuditRecord record =
+                            ranked[rank];
+                        record.Candidate = 1;
+                        record.Selected = 1;
+                        record.CandidateIndex = rank;
+                        record.ArtisticSelectionRank = rank + 1;
+                        record.ArtisticSelectionThreshold = ranked.Count == 0
+                            ? 0f
+                            : ranked[ranked.Count - 1].Score;
+                        record.ArtisticSelectionDelta = record.Score -
+                            record.ArtisticSelectionThreshold;
+                    }
+                    projected.ArtisticEligibleCount = ranked.Count;
+                    projected.CandidateCount = ranked.Count;
+                    projected.SelectedCount = ranked.Count;
+                    projected.ArtisticSelectionThreshold = ranked.Count == 0
+                        ? 0f
+                        : ranked[ranked.Count - 1].Score;
+
+                    EdgeWearViabilityMatrixCase projectedCase =
+                        new EdgeWearViabilityMatrixCase(
+                            topologyCase.ShapeSeed,
+                            topologyCase.WidthName,
+                            topologyCase.Width,
+                            projected);
+                    if (!TryBuildEdgeWearArtisticFingerprint(
+                            projected,
+                            out string fingerprint,
+                            out string diagnostic))
+                    {
+                        ArtisticFingerprintDiagnostic =
+                            "seed=" + topologyCase.ShapeSeed +
+                            ",width=" + topologyCase.WidthName + ": " +
+                            diagnostic;
+                        return;
+                    }
+                    string key = BuildEdgeWearMatrixCaseKey(
+                        topologyCase.ShapeSeed,
+                        topologyCase.WidthName);
+                    if (ArtisticFingerprintByCase.ContainsKey(key))
+                    {
+                        ArtisticFingerprintDiagnostic =
+                            "duplicate topology artistic case " + key;
+                        return;
+                    }
+                    ArtisticFingerprintByCase.Add(key, fingerprint);
+                    ArtisticFingerprintMatrixCases.Add(projectedCase);
+                    ArtisticFingerprintCasesPassed++;
+                }
+            }
+
+            private void EvaluateArtisticMaterializationContract()
+            {
+                ArtisticMaterializedFingerprintCasesRun = 0;
+                ArtisticMaterializedFingerprintCasesPassed = 0;
+                ArtisticMaterializedFingerprintDiagnostic = string.Empty;
+
+                int expected = EdgeWearSuiteArtisticSentinelSeeds.Length *
+                    EdgeWearBatchWidths.Length;
+                if (PreviewCases.Count != expected)
+                {
+                    ArtisticMaterializedFingerprintDiagnostic =
+                        "artistic sentinel case set was incomplete: " +
+                        PreviewCases.Count + "/" + expected;
+                    return;
+                }
+
+                for (int index = 0;
+                     index < PreviewCases.Count;
+                     index++)
+                {
+                    EdgeWearViabilityMatrixCase matrixCase =
+                        PreviewCases[index];
+                    ArtisticMaterializedFingerprintCasesRun++;
+                    string key = BuildEdgeWearMatrixCaseKey(
+                        matrixCase.ShapeSeed,
+                        matrixCase.WidthName);
+                    if (!ArtisticFingerprintByCase.TryGetValue(
+                            key,
+                            out string expectedFingerprint))
+                    {
+                        ArtisticMaterializedFingerprintDiagnostic =
+                            "missing topology artistic fingerprint for " +
+                            key;
+                        return;
+                    }
+                    if (!TryBuildEdgeWearArtisticFingerprint(
+                            matrixCase.Result,
+                            out string materializedFingerprint,
+                            out string diagnostic))
+                    {
+                        ArtisticMaterializedFingerprintDiagnostic =
+                            key + ": " + diagnostic;
+                        return;
+                    }
+                    if (!string.Equals(
+                            expectedFingerprint,
+                            materializedFingerprint,
+                            StringComparison.Ordinal))
+                    {
+                        ArtisticMaterializedFingerprintDiagnostic =
+                            "artistic ranking fingerprint mismatch for " +
+                            key;
+                        return;
+                    }
+                    if (!matrixCase.Result.Passed)
+                    {
+                        ArtisticMaterializedFingerprintDiagnostic =
+                            "artistic sentinel materialization failed for " +
+                            key + ": " +
+                            matrixCase.Result.PrimaryFailure;
+                        return;
+                    }
+                    ArtisticMaterializedFingerprintCasesPassed++;
+                }
+            }
+
             public void RecordMatrix(
                 EdgeWearViabilityMatrixJob job,
                 EdgeWearViabilityMatrixAggregate aggregate,
@@ -7720,6 +8671,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     PreviewReportText = reportText ?? string.Empty;
                     PreviewCases.Clear();
                     PreviewCases.AddRange(job.Cases);
+                    EvaluateArtisticMaterializationContract();
                     EvaluateOutlierRecoveryContract();
                 }
             }
@@ -8049,6 +9001,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
         }
 
+        private readonly struct EdgeWearMatrixCaseCoordinate
+        {
+            public readonly int ShapeSeed;
+            public readonly int WidthIndex;
+
+            public EdgeWearMatrixCaseCoordinate(
+                int shapeSeed,
+                int widthIndex)
+            {
+                ShapeSeed = shapeSeed;
+                WidthIndex = widthIndex;
+            }
+        }
+
         private sealed class EdgeWearViabilityMatrixJob
         {
             public readonly EdgeWearMatrixKind Kind;
@@ -8073,6 +9039,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 new List<EdgeWearViabilityMatrixCase>(
                     EdgeWearBatchShapeSeeds.Length *
                     EdgeWearBatchWidths.Length);
+            public readonly List<EdgeWearMatrixCaseCoordinate>
+                CaseCoordinates =
+                    new List<EdgeWearMatrixCaseCoordinate>(
+                        EdgeWearBatchShapeSeeds.Length *
+                        EdgeWearBatchWidths.Length);
+            public readonly System.Diagnostics.Stopwatch Stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
             public int CompletedCaseCount;
             public bool CancelRequested;
 
@@ -8107,46 +9080,103 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 OriginalMesh = meshFilter != null
                     ? meshFilter.sharedMesh
                     : null;
+
+                if (suiteOwned &&
+                    kind == EdgeWearMatrixKind.ArtisticPreviewParity)
+                {
+                    for (int seedIndex = 0;
+                         seedIndex <
+                         EdgeWearSuiteArtisticSentinelSeeds.Length;
+                         seedIndex++)
+                    {
+                        for (int widthIndex = 0;
+                             widthIndex < EdgeWearBatchWidths.Length;
+                             widthIndex++)
+                        {
+                            CaseCoordinates.Add(
+                                new EdgeWearMatrixCaseCoordinate(
+                                    EdgeWearSuiteArtisticSentinelSeeds[
+                                        seedIndex],
+                                    widthIndex));
+                        }
+                    }
+                }
+                else
+                {
+                    for (int seedIndex = 0;
+                         seedIndex < EdgeWearBatchShapeSeeds.Length;
+                         seedIndex++)
+                    {
+                        for (int widthIndex = 0;
+                             widthIndex < EdgeWearBatchWidths.Length;
+                             widthIndex++)
+                        {
+                            CaseCoordinates.Add(
+                                new EdgeWearMatrixCaseCoordinate(
+                                    EdgeWearBatchShapeSeeds[seedIndex],
+                                    widthIndex));
+                        }
+                    }
+                }
             }
 
             public bool RequireAllGeometricCandidates =>
                 Kind == EdgeWearMatrixKind.TopologyViability;
 
+            public bool SuiteArtisticSentinelOnly =>
+                SuiteOwned &&
+                Kind == EdgeWearMatrixKind.ArtisticPreviewParity;
+
             public string DisplayName => RequireAllGeometricCandidates
                 ? "topology viability matrix"
-                : "artistic preview parity matrix";
+                : SuiteArtisticSentinelOnly
+                    ? "artistic preview sentinel matrix"
+                    : "artistic preview parity matrix";
 
-            public string ConsoleName => RequireAllGeometricCandidates
-                ? "topology viability matrix"
-                : "artistic preview parity matrix";
+            public string ConsoleName => DisplayName;
 
             public string ProgressTitle => RequireAllGeometricCandidates
                 ? "Generated Mass Topology Viability Matrix"
-                : "Generated Mass Artistic Preview Parity Matrix";
+                : SuiteArtisticSentinelOnly
+                    ? "Generated Mass Artistic Preview Sentinels"
+                    : "Generated Mass Artistic Preview Parity Matrix";
 
             public string ReportTextFileName =>
                 RequireAllGeometricCandidates
                     ? "GeneratedMassEdgeWearBatchAudit.txt"
-                    : "GeneratedMassEdgeWearPreviewParityAudit.txt";
+                    : SuiteArtisticSentinelOnly
+                        ? "GeneratedMassEdgeWearPreviewSentinelAudit.txt"
+                        : "GeneratedMassEdgeWearPreviewParityAudit.txt";
 
             public string ReportCsvFileName =>
                 RequireAllGeometricCandidates
                     ? "GeneratedMassEdgeWearBatchAudit.csv"
-                    : "GeneratedMassEdgeWearPreviewParityAudit.csv";
+                    : SuiteArtisticSentinelOnly
+                        ? "GeneratedMassEdgeWearPreviewSentinelAudit.csv"
+                        : "GeneratedMassEdgeWearPreviewParityAudit.csv";
 
             public string ReportTitle => RequireAllGeometricCandidates
                 ? "GeneratedMass edge-wear multi-seed topology " +
                     "viability matrix"
-                : "GeneratedMass edge-wear multi-seed artistic " +
-                    "preview parity matrix";
+                : SuiteArtisticSentinelOnly
+                    ? "GeneratedMass edge-wear artistic preview " +
+                        "sentinel materialization matrix"
+                    : "GeneratedMass edge-wear multi-seed artistic " +
+                        "preview parity matrix";
 
             public string Contract => RequireAllGeometricCandidates
                 ? "EW-V1A.3b-topology"
-                : "EW-V1A.3b-preview";
+                : SuiteArtisticSentinelOnly
+                    ? "EW-C1A.3d-preview-sentinel"
+                    : "EW-V1A.3b-preview";
 
-            public int TotalCaseCount =>
-                EdgeWearBatchShapeSeeds.Length *
-                EdgeWearBatchWidths.Length;
+            public int TotalCaseCount => CaseCoordinates.Count;
+
+            public EdgeWearMatrixCaseCoordinate ResolveCaseCoordinate(
+                int caseIndex)
+            {
+                return CaseCoordinates[caseIndex];
+            }
 
             public bool ValidateTargetStatePreserved(
                 out string diagnostic)
@@ -8232,6 +9262,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public float MinimumCertifiedRatio;
             public double MaximumPreflightMilliseconds;
             public double MaximumTotalMilliseconds;
+            public double ElapsedMilliseconds;
             public bool Cancelled;
             public bool StatePreserved;
             public string TerminalReason = string.Empty;

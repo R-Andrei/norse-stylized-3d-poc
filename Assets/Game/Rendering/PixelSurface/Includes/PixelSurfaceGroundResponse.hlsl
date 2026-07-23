@@ -125,6 +125,50 @@
 #endif
             }
 
+            float ResolveGroundRiverbedBoundaryBankInwardDistance(
+                Varyings input)
+            {
+#if defined(PS3D_GROUND_HAS_RIVERBED_SUPPORT)
+                float bankInwardDistance =
+                    ResolveGroundRiverBankInwardDistance(input);
+                float riverbedInwardDistance =
+                    ResolveGroundRiverbedInwardDistance(input);
+                float bankOutwardDistance =
+                    ResolveGroundRiverBankDistance(input);
+                return max(
+                    0.0,
+                    bankInwardDistance -
+                    riverbedInwardDistance +
+                    bankOutwardDistance);
+#else
+                return 0.0;
+#endif
+            }
+
+            float ResolveGroundRiverbedBoundaryShoreMask()
+            {
+                // StylizedRiverCorridorGeometry.ResolveCorridorShoreInfluence
+                // publishes pow(0.52, 1.32) at the exact BedSlope edge.
+                return 0.42181733;
+            }
+
+            float ResolveGroundRiverbedApplicationDomain(Varyings input)
+            {
+#if defined(PS3D_GROUND_HAS_RIVERBED_SUPPORT)
+                float riverbedSupport =
+                    ResolveGroundRiverbedSupportMask(input);
+                float riverbedInwardDistance =
+                    ResolveGroundRiverbedInwardDistance(input);
+                return
+                    ResolveGroundRiverCoupledEnabled() *
+                    step(
+                        0.0001,
+                        riverbedSupport + riverbedInwardDistance);
+#else
+                return 0.0;
+#endif
+            }
+
 #if defined(PS3D_PIXELSURFACEGROUND_MATERIAL_PROPERTIES)
             float ResolveGroundBoundedUnion(
                 float firstContribution,
@@ -133,6 +177,14 @@
                 float first = saturate(firstContribution);
                 float second = saturate(secondContribution);
                 return 1.0 - (1.0 - first) * (1.0 - second);
+            }
+
+            float ResolveGroundBankRiverbedSameDrySurface()
+            {
+                return
+                    step(0.5, _GroundBankLayerEnabled) *
+                    step(0.5, _GroundRiverbedLayerEnabled) *
+                    step(0.5, _GroundBankRiverbedSameDrySurface);
             }
 
             float ResolveGroundSurfaceApplicationTransition(
@@ -161,23 +213,92 @@
                 return region * saturate(transitionWeight);
             }
 
-            float ResolveGroundSurfaceFeatureRetention(
+            float2 ResolveGroundWorldXZScalarGradient(
+                float scalarValue,
+                float3 positionWS,
+                out float valid)
+            {
+                float2 positionDx = ddx(positionWS.xz);
+                float2 positionDy = ddy(positionWS.xz);
+                float scalarDx = ddx(scalarValue);
+                float scalarDy = ddy(scalarValue);
+                float determinant =
+                    positionDx.x * positionDy.y -
+                    positionDx.y * positionDy.x;
+                float determinantMagnitude = abs(determinant);
+                valid = step(1e-8, determinantMagnitude);
+                float safeDeterminant =
+                    determinant >= 0.0
+                        ? max(determinant, 1e-8)
+                        : min(determinant, -1e-8);
+                return float2(
+                    (scalarDx * positionDy.y -
+                        scalarDy * positionDx.y) /
+                        safeDeterminant,
+                    (positionDx.x * scalarDy -
+                        positionDy.x * scalarDx) /
+                        safeDeterminant);
+            }
+
+            float ResolveGroundWholeFeatureRetention(
                 float regionWeight,
                 float inwardDistance,
+                float3 positionWS,
+                float2 featureCenterOffsetNormalized,
+                float maximumSupportRadiusUv,
+                float detailUvScale,
                 float4 transitionSettings)
             {
-                float clearance = max(0.0, transitionSettings.z);
+                float safetyMargin = max(0.0, transitionSettings.z);
                 float fadeDistance = max(0.0, transitionSettings.w);
+                float safeUvScale = max(0.0001, detailUvScale);
+                float conservativeSupportRadius =
+                    max(0.0, maximumSupportRadiusUv) / safeUvScale;
+                float metadataEnabled = step(
+                    1e-5,
+                    conservativeSupportRadius);
                 float enabled =
-                    step(0.0001, clearance) *
-                    step(0.0001, regionWeight);
+                    step(0.0001, safetyMargin) *
+                    step(0.0001, regionWeight) *
+                    metadataEnabled;
+
+                float2 centreOffset =
+                    featureCenterOffsetNormalized *
+                    conservativeSupportRadius;
+
+                float inwardGradientValid;
+                float2 inwardGradient =
+                    ResolveGroundWorldXZScalarGradient(
+                        inwardDistance,
+                        positionWS,
+                        inwardGradientValid);
+                float centreInwardDistance =
+                    inwardDistance - dot(inwardGradient, centreOffset);
+
+                float anchorDistanceSquared = dot(
+                    featureCenterOffsetNormalized,
+                    featureCenterOffsetNormalized);
+                float payloadValid =
+                    inwardGradientValid *
+                    step(1e-5, conservativeSupportRadius) *
+                    step(anchorDistanceSquared, 1.0001);
+
+                float reconstructedEdgeDistance =
+                    centreInwardDistance - conservativeSupportRadius;
+                // Invalid payload/derivative reconstruction is rejected
+                // conservatively. The algorithm-10 proof requires zero invalid
+                // accepted feature samples before installation.
+                float featureEdgeDistance = lerp(
+                    -1000000.0,
+                    reconstructedEdgeDistance,
+                    payloadValid);
                 float hardRetention = step(
-                    clearance,
-                    max(0.0, inwardDistance));
+                    safetyMargin,
+                    featureEdgeDistance);
                 float softRetention = smoothstep(
-                    clearance,
-                    clearance + max(0.0001, fadeDistance),
-                    max(0.0, inwardDistance));
+                    safetyMargin,
+                    safetyMargin + max(0.0001, fadeDistance),
+                    featureEdgeDistance);
                 float retention = lerp(
                     hardRetention,
                     softRetention,
@@ -407,13 +528,18 @@
             {
                 float bankApplication = saturate(bankMaterialBlend);
                 float riverbedApplication = saturate(riverbedMaterialBlend);
-                float lowerLayerRetention = 1.0 - riverbedApplication;
+                float rawSecondaryTotal =
+                    bankApplication + riverbedApplication;
+                float secondaryCoverage = saturate(rawSecondaryTotal);
+                float secondaryNormalization =
+                    rawSecondaryTotal > 0.0
+                        ? secondaryCoverage / rawSecondaryTotal
+                        : 0.0;
 
-                return saturate(
-                    float3(
-                        (1.0 - bankApplication) * lowerLayerRetention,
-                        bankApplication * lowerLayerRetention,
-                        riverbedApplication));
+                return float3(
+                    1.0 - secondaryCoverage,
+                    bankApplication * secondaryNormalization,
+                    riverbedApplication * secondaryNormalization);
             }
 
             float3 ResolveGroundBankZoneWeights(
@@ -479,6 +605,15 @@
                     distanceWeight);
             }
 
+            float ResolveGroundOuterBankBoundaryContribution()
+            {
+                return
+                    step(
+                        0.0001,
+                        max(0.0, _GroundOuterBankExtension)) *
+                    saturate(_GroundOuterBankStrength);
+            }
+
             float ResolveGroundComposedBankMaterialBlend(
                 float3 zones,
                 float outerContribution)
@@ -520,13 +655,14 @@
             {
                 float rawBankBlend = ResolveGroundComposedBankMaterialBlend(
                     ResolveGroundBankZoneWeights(
-                        ResolveGroundShoreMask(input),
+                        ResolveGroundRiverbedBoundaryShoreMask(),
                         1.0),
-                    0.0);
+                    ResolveGroundOuterBankBoundaryContribution());
                 float applicationTransition =
                     ResolveGroundSurfaceApplicationTransition(
                         1.0,
-                        ResolveGroundRiverBankInwardDistance(input),
+                        ResolveGroundRiverbedBoundaryBankInwardDistance(
+                            input),
                         _GroundBankMaterialTransition);
                 return saturate(rawBankBlend * applicationTransition);
             }

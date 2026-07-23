@@ -36,12 +36,20 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
             private StylizedSurfaceDetailSourceMode sourceMode =
                 StylizedSurfaceDetailSourceMode.PrepackedDetail;
 
+            [HideInInspector]
+            [SerializeField]
+            private float featureSubstrateRoughness = 0.5f;
+
+            [HideInInspector]
+            [SerializeField]
+            private float featureMaximumSupportRadiusUv;
+
 #if UNITY_EDITOR
             [Header("Prepacked Detail Source")]
             [SerializeField]
             private Texture2D sourceTexture;
 
-            [Tooltip("Optional pre-normalized Palette Form paired with the prepacked detail source. Ordinary paired entries use grayscale R. Feature-aware paired entries use R=combined form, G=substrate form, B=substrate roughness, A=feature mask.")]
+            [Tooltip("Optional pre-normalized Palette Form paired with the prepacked detail source. Ordinary paired entries use grayscale R. Feature-aware paired entries use R=combined form, G=substrate form, B/A=the signed X/Y offset from the owning feature centre normalized by one candidate-wide conservative support radius and remapped to 0–1; substrate roughness and the support radius are stored as entry metadata.")]
             [SerializeField]
             private Texture2D prepackedTextureForm;
 
@@ -97,6 +105,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
                 UsesFeatureTextureForm;
             public bool UsesTextureForm =>
                 UsesAuthoredMaterialSet || UsesPrepackedTextureForm;
+            public float FeatureSubstrateRoughness =>
+                UsesFeatureTextureForm
+                    ? Mathf.Clamp01(featureSubstrateRoughness)
+                    : 0.5f;
+            public float FeatureMaximumSupportRadiusUv =>
+                UsesFeatureTextureForm
+                    ? Mathf.Max(0f, featureMaximumSupportRadiusUv)
+                    : 0f;
 #if UNITY_EDITOR
             public Texture2D SourceTexture => sourceTexture;
             public Texture2D PrepackedTextureForm => prepackedTextureForm;
@@ -184,6 +200,29 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface
                    entryIndex < entries.Count &&
                    entries[entryIndex] != null &&
                    entries[entryIndex].UsesFeatureTextureForm;
+        }
+
+        public bool TryResolveFeaturePayloadMetadata(
+            string stableId,
+            out float substrateRoughness,
+            out float maximumSupportRadiusUv)
+        {
+            substrateRoughness = 0.5f;
+            maximumSupportRadiusUv = 0f;
+            int entryIndex = FindEntryIndex(stableId);
+            if (entryIndex < 0 ||
+                entryIndex >= entries.Count ||
+                entries[entryIndex] == null ||
+                !entries[entryIndex].UsesFeatureTextureForm)
+            {
+                return false;
+            }
+
+            substrateRoughness =
+                entries[entryIndex].FeatureSubstrateRoughness;
+            maximumSupportRadiusUv =
+                entries[entryIndex].FeatureMaximumSupportRadiusUv;
+            return maximumSupportRadiusUv > 0f;
         }
 
         public bool TryResolve(

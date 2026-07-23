@@ -868,6 +868,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             Shader.PropertyToID("_GroundRiverbedLayerDetailB");
         private static readonly int GroundRiverbedLayerDetailCId =
             Shader.PropertyToID("_GroundRiverbedLayerDetailC");
+        private static readonly int GroundBankRiverbedSameDrySurfaceId =
+            Shader.PropertyToID("_GroundBankRiverbedSameDrySurface");
         private static readonly int GroundRiverbedMaterialStrengthId =
             Shader.PropertyToID("_GroundRiverbedMaterialStrength");
         private static readonly int GroundRiverbedMaterialTransitionId =
@@ -4588,6 +4590,56 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundSurfaceRenderRole.OrdinaryGround);
         }
 
+        private static bool ResolveBankRiverbedSameDrySurface(
+            GroundMaterialControls controls,
+            GroundSurfaceLayerProfile bankLayer,
+            GroundSurfaceLayerProfile riverbedLayer)
+        {
+            const float EquivalenceTolerance = 0.0001f;
+
+            if (controls == null ||
+                bankLayer == null ||
+                riverbedLayer == null ||
+                bankLayer != riverbedLayer)
+            {
+                return false;
+            }
+
+            return
+                Mathf.Abs(
+                    controls.BankDetailScaleMultiplier -
+                    controls.RiverbedDetailScaleMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankTextureFormStrengthMultiplier -
+                    controls.RiverbedTextureFormStrengthMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankSceneLightingResponseMultiplier -
+                    controls.RiverbedSceneLightingResponseMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankDetailNormalStrengthMultiplier -
+                    controls.RiverbedDetailNormalStrengthMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankDetailCavityStrengthMultiplier -
+                    controls.RiverbedDetailCavityStrengthMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankDetailValueFormMultiplier -
+                    controls.RiverbedDetailValueFormMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankRoughnessVariationMultiplier -
+                    controls.RiverbedRoughnessVariationMultiplier) <=
+                EquivalenceTolerance &&
+                Mathf.Abs(
+                    controls.BankLegacyPixelCellInfluenceMultiplier -
+                    controls.RiverbedLegacyPixelCellInfluenceMultiplier) <=
+                EquivalenceTolerance;
+        }
+
         public void ApplySurfaceProfileMaterialProperties(
             Renderer targetRenderer,
             GroundSurfaceRenderRole renderRole)
@@ -4817,6 +4869,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 GroundRiverbedLayerDetailAId,
                 GroundRiverbedLayerDetailBId,
                 GroundRiverbedLayerDetailCId);
+            materialProperties.SetFloat(
+                GroundBankRiverbedSameDrySurfaceId,
+                ResolveBankRiverbedSameDrySurface(
+                    resolvedMaterialControls,
+                    bankSurfaceLayer,
+                    riverbedSurfaceLayer)
+                    ? 1f
+                    : 0f);
             materialProperties.SetFloat(
                 GroundRiverbedMaterialStrengthId,
                 resolvedMaterialControls.RiverbedMaterialStrength);
@@ -5187,6 +5247,10 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             0f,
                             2f))
                     : Vector4.zero);
+            bool usesFeatureTextureForm =
+                hasTextureForm &&
+                layer != null &&
+                layer.UsesFeatureTextureForm;
             properties.SetVector(
                 detailBId,
                 hasDetail
@@ -5196,10 +5260,12 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                             0f,
                             2f),
                         layer.DetailCavityBias,
-                        layer.DetailValueStrength * Mathf.Clamp(
-                            detailValueFormMultiplier,
-                            0f,
-                            2f),
+                        usesFeatureTextureForm
+                            ? layer.FeatureSubstrateRoughness
+                            : layer.DetailValueStrength * Mathf.Clamp(
+                                detailValueFormMultiplier,
+                                0f,
+                                2f),
                         layer.DetailFormHighlightStrength * Mathf.Clamp(
                             detailValueFormMultiplier,
                             0f,
@@ -5208,12 +5274,14 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             properties.SetVector(
                 detailCId,
                 new Vector4(
-                    hasDetail
-                        ? layer.FinishVariationStrength * Mathf.Clamp(
-                            roughnessVariationMultiplier,
-                            0f,
-                            2f)
-                        : 0f,
+                    usesFeatureTextureForm
+                        ? layer.FeatureMaximumSupportRadiusUv
+                        : hasDetail
+                            ? layer.FinishVariationStrength * Mathf.Clamp(
+                                roughnessVariationMultiplier,
+                                0f,
+                                2f)
+                            : 0f,
                     layer != null
                         ? Mathf.Clamp01(
                             layer.LegacyPixelCellInfluence * Mathf.Clamp(
@@ -5222,7 +5290,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                                 2f))
                         : 1f,
                     hasTextureForm
-                        ? layer != null && layer.UsesFeatureTextureForm
+                        ? usesFeatureTextureForm
                             ? 2f
                             : 1f
                         : 0f,

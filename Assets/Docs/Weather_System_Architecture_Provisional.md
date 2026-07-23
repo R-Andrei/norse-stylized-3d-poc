@@ -21,7 +21,7 @@ Engine: Unity 6000.5.0f1
 Render pipeline: URP
 Gameplay camera: constrained top-down isometric
 Primary wind spatial domain: world-space XZ
-Current implemented Weather feature: shared wind domain and vegetation response field
+Current implemented Weather features: shared wind domain, vegetation response field, and stylized wind trails
 ```
 
 The current game does not require a general-purpose three-dimensional atmospheric simulation. The first Weather implementation is deliberately built around the XZ gameplay plane used by the top-down isometric game.
@@ -34,10 +34,10 @@ Weather owns authoritative environmental wind.
 
 Vegetation does not own wind. Vegetation consumes Weather wind and applies vegetation-specific response such as stiffness, bend weighting, and small blade-detail motion.
 
-The same ownership rule is intended to apply to future consumers:
+The same ownership rule applies to current and future consumers:
 
-- stylized drawn wind lines;
-- gameplay movement effects in severe wind;
+- implemented stylized wind trails;
+- future gameplay movement effects in severe wind;
 
 A consumer may apply its own response model, but it must not invent a separate authoritative wind state when the shared Weather wind is applicable.
 
@@ -64,7 +64,7 @@ This CPU-queryable contract is the future basis for deterministic gameplay effec
 
 The current vegetation system uses a separate dynamic response field that stores bend and bend velocity. This allows grass to exhibit inertia, overshoot, and settling without changing the authoritative wind value.
 
-Other consumers may require different response behavior. For example, a stylized wind line should follow the authoritative flow, while grass applies elastic bend behavior.
+Other consumers may require different response behavior. The implemented stylized wind trails use authoritative Weather strength and direction for placement, a direction-locked birth backbone, and consumer-owned visual wobble, while grass applies elastic bend behavior.
 
 Authoritative wind strength must not be expressed as grass-displacement metres.
 
@@ -99,13 +99,23 @@ The current wind generation is a baseline, not the final Weather authoring model
 
 ---
 
-## 6. Stylized wind-line compatibility
+## 6. Stylized wind trails — implemented and provisionally frozen
 
-A Weather-owned stylized wind-trail V0 architecture is now approved and recorded in `Assets/Docs/Weather_Wind_Architecture.md` under `WEATHER-WIND-TRAILS-V0.0`; runtime implementation and Unity validation remain pending.
+The Weather-owned stylized wind-trail system is implemented and provisionally frozen at `WEATHER-WIND-TRAILS-V0.9A`. The canonical implementation details, controls, migration history, diagnostics, and deferred validation scope are recorded in `Assets/Docs/Weather_Wind_Architecture.md`.
 
-The trails consume the shared authoritative target wind rather than an unrelated animation direction or the vegetation spring-response field. Candidate selection favours strong, separated locations, and centreline construction advances through repeated explicit-time XZ target-wind samples so trail direction agrees with Weather gameplay sampling and vegetation's target source.
+The frozen consumer:
 
-V0 uses the Weather field-anchor Y plus a configurable altitude range, one fixed-capacity combined camera-facing ribbon mesh, and one hidden runtime material created from a serialized Shader reference. It does not depend on `GeneratedGround`, create a material asset, add a renderer feature, or create a second wind simulation.
+- uses the shared authoritative Weather target-wind contract rather than vegetation spring response or an unrelated animation direction;
+- captures one dominant visible Weather direction at trail birth and prevents local samples from cumulatively steering the average backbone;
+- uses local target-wind samples for strength and direction-compatibility validation;
+- prefers the upwind portion of the target camera, requires useful visible runway, and releases capacity after the complete body exits downwind;
+- applies a smooth dense presentation curve with mandatory zero-mean lateral wobble and an optional localized larger loop;
+- uses a resolved `Spawn -> Alive -> Despawn` lifecycle with pointed physical endpoints;
+- uses the Weather field-anchor Y plus configurable altitude and has no `GeneratedGround` dependency;
+- uses one fixed-capacity combined ribbon mesh, one hidden runtime material from a serialized shader, and one target-camera render submission;
+- has an accepted baseline maximum of five active trails.
+
+The user confirmed successful Unity compilation after V0.9A and reported that the current behavior is working substantially as expected. Comprehensive soak, profiling, Frame Debugger, cross-quality, and complete Weather-system integration testing are deliberately deferred to a later Weather testing sprint. The feature is frozen for now; additional changes should be driven by concrete faults found during that sprint.
 
 ---
 

@@ -15,7 +15,7 @@ Docs/Generated_Mass_Feature_Implementation_Checklist.md
 - `EW-B4.2R13A.9a` remains the exact uniform basic-bevel/recovery fallback when Macro Variation Coverage or Strength is zero.
 - Ordinary production remains `EdgeWearEvaluationMode.None`; the accepted bevel remains explicit editor preview/audit geometry with `geometryCommit=disabled`.
 - `edgeWearMacroVariationCoverage` owns deterministic participation and the migration-stable `edgeWearMacroVariation` field owns normalized control Strength. The resolver maps control `0..1` to effective amplitude `0..0.55`, then applies a `15°..90°` smooth dihedral permission ending at `0.35`.
-- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A.1` proves the transaction. EW-C1A.1a.8 is accepted and frozen. `EW-C1A.2a` commits certified damaged faces, requires every dedicated cap-ring bevel, proves unrelated bevel retention, and leaves production geometry unchanged. EW-C1A.3 exposes one normal Corner Chipping authoring group, keeps one raw chip action, routes the existing edge-wear preview through the post-chip topology when enabled, and folds the 33-case single-chip gate into the existing one-click suite. EW-C1A.3a adds score-ordered fully certified corner fallback and uniform cap-ring width search after the first matrix passed only `14/33`, without adding controls or changing production generation.
+- Universal geometric within-edge profiling and EW-S1 object-space normal/material breakup are removed. Width remains constant along each edge. The uniform UV2.z visual response remains. `EW-C1A.1` proves the transaction. EW-C1A.1a.8 is accepted and frozen. `EW-C1A.2a` commits certified damaged faces, requires every dedicated cap-ring bevel, proves unrelated bevel retention, and leaves production geometry unchanged. EW-C1A.3 exposes one normal Corner Chipping authoring group, keeps one raw chip action, routes the existing edge-wear preview through the post-chip topology when enabled, and folds the 33-case single-chip gate into the existing one-click suite. EW-C1A.3a added score-ordered fully certified corner fallback and uniform cap-ring width search after the first matrix passed only `14/33`, but its brute-force matrix was cancelled after `2:38` at case `3/33`. EW-C1A.3b improved the brute-force sweep but its mandatory-ring-only preflight still admitted repeated complete integrations. EW-C1A.3c owns the complete non-emitting preflight replacement: per-seed baseline/timing caching, full selected-topology and retention prediction, exactly one final integration, no fallback, and lightweight determinism fingerprinting. EW-C1A.3d changes only `GeneratedMassEditor` validation scheduling: exhaustive topology `33/33`, topology-derived artistic fingerprints `33/33`, corner matrix next, and 12 difficult artistic materializations last. The suite research boundary is `90 s`; corner enabled-case and matrix boundaries remain `4 s` and `35 s`.
 
 ## Dependency boundary
 
@@ -2262,3 +2262,87 @@ Reviewed unchanged owners:
 - `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, and `MassGenerator.MeshOutput.cs` retain clipping, shell construction, triangulation, topology, and final-normal ownership.
 - `GeneratedMass.cs` and `MassSurfaceFeatureGenerator.cs` retain the existing six controls, defaults, preview actions, and settings transport.
 - shaders, materials, assets, mesh channels, and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+### EW-C1A.3d validator scheduling ownership
+
+`Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`:
+
+- keeps the focused topology and Artistic Preview Parity Matrix actions exhaustive at 33 cases each;
+- gives the one-click suite a 12-case artistic sentinel coordinate list over seeds `1`, `2223`, `8889`, and `5727` at all three widths;
+- stores topology matrix cases, derives 33 deterministic artistic rank/score fingerprints without mesh generation, and compares sentinel materializations against those fingerprints;
+- schedules corner chipping before artistic sentinel materialization so active feature evidence cannot be starved by duplicate regression work;
+- reports stage order, `not-run` state, elapsed/remaining budgets, prepared-case reuse, corner baseline build/cache totals, and sentinel coverage;
+- raises only the development suite hard stop to `90 s`; `4 s` enabled-case and `35 s` corner-matrix limits are unchanged;
+- advances combined, corner, and sentinel contracts to `EW-C1A.3d`.
+
+No MassGenerator owner, settings owner, inspector control layout, shader, material, scene, prefab, asset, metadata, production mode, or runtime callback changes in EW-C1A.3d.
+
+### EW-C1A.3c complete integration-preflight ownership
+
+Modified code owners:
+
+- `MassGenerator.cs`
+  - owns the preflight-only ranked search, cached-baseline timing admission, one-final-build rule, and final/preflight identity comparison;
+  - removes all fallback integration generation and reports `integration-preflight-mismatch` rather than searching another complete build;
+  - extends `CornerDamagePreviewStatus` with selected-topology, width-solution, mandatory, predicted-retention, mismatch, and timing evidence.
+- `MassGenerator.EdgeWear.Types.cs`
+  - replaces the ring-only record with `CornerDamageIntegrationPreflightRecord`, containing complete candidate/context/solution and stable-identity prediction evidence;
+  - retains bounded search telemetry with fallback count fixed at zero.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - routes `CornerDamageIntegrationPreflight` through full candidate discovery/selection and topology/width solving;
+  - captures the completed record and exits before shell construction, triangulation, final normals, or mesh emission.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - derives one common ring scale from existing isolated certification, applies it uniformly, and builds predicted ordinary/mandatory active identity sets from the non-emitting solved context.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - captures and reports complete preflight evidence, mismatch count, exact timing partitions, and budget ownership.
+- `Editor/GeneratedMassEditor.cs`
+  - passes cached baseline duration and observed seed integration duration into the search;
+  - requires `fullIntegrationBuilds <= 1`, `fullFallbackBuilds = 0`, and zero preflight mismatch;
+  - enforces `4 s` enabled-case, `35 s` corner-matrix, and `58 s` complete-suite boundaries and advances contracts to `EW-C1A.3c`.
+
+Reviewed unchanged owners:
+
+- `GeneratedMass.cs`, `MassSurfaceFeatureGenerator.cs`, and the Inspector retain the same six controls and existing actions.
+- clipping, cap creation, bounded shell construction, coexistence/recovery, polygon triangulation, final shared normals, shaders, assets, mesh channels, runtime callbacks, and `EdgeWearEvaluationMode.None` remain unchanged.
+
+### EW-C1A.3b bounded staged certification ownership
+
+Modified code owners:
+
+- `MassGenerator.cs`
+  - adds internal `CornerDamageRingPreflight` evaluation ownership and public baseline-aware unified-preview routing for the matrix;
+  - owns `GenerateCornerDamageFullCertificationSearch` as a staged search: one supplied or built ordinary baseline, one transaction/ring preflight per rank, one resolved common ring scale, one complete integration, and at most one next-lower fallback;
+  - owns `GenerateCornerDamageSelectionFingerprint`, which repeats only the accepted-rank transaction identity for matrix determinism instead of rebuilding the raw geometry endpoint;
+  - rejects otherwise valid attempts when the search crosses the `5 s` hard budget and returns production geometry on failure;
+  - exposes baseline/build/preflight/timing/budget evidence through `CornerDamagePreviewStatus`.
+- `MassGenerator.EdgeWear.Types.cs`
+  - adds `CornerDamageRingPreflightRecord` for the committed transaction, requested width, expected/captured/certified mandatory counts, minimum certified width/ratio, resolved/fallback scales, and diagnostic;
+  - adds `CornerDamageSearchTelemetry` for exact baseline, transaction, preflight, complete/fallback, geometry-reuse, timing, and budget ownership.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - routes `CornerDamageRingPreflight` through micro-topology normalization, ranked transaction, committed construction faces, identity mapping, and mandatory candidate viability;
+  - captures the preflight record and exits before coverage selection, coexistence, shell construction, triangulation, or final mesh emission.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - times candidate ranking and transaction work;
+  - extends `BuildEdgeWearBevelCandidates` with a preflight-only restriction that skips every non-mandatory edge and returns immediately after the three ring edges complete isolated viability;
+  - derives the ring record from the existing `IsolatedMaximumCertifiedWidth` evidence rather than running six complete outer mesh builds.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - owns thread-local preflight capture and transaction-result completion;
+  - appends exact staged build counts, timing partitions, and budget flags to the existing corner report.
+- `Editor/GeneratedMassEditor.cs`
+  - caches one ordinary baseline mesh/status per seed across disabled/default/maximum policies;
+  - evaluates one integrated staged search per enabled case and one lightweight selection fingerprint, with no per-case raw geometry search;
+  - enforces the `5 s` case and `55 s` matrix hard limits, reports `performance-budget`, preserves target state, and advances contracts to `EW-C1A.3b`.
+
+Reviewed unchanged owners:
+
+- `GeneratedMass.cs` and `MassSurfaceFeatureGenerator.cs` retain the existing six controls, Inspector layout/actions, preview-state ownership, and settings transport.
+- `MassGenerator.Polyhedron.cs` retains clipping, welding, cap creation, and semantic provenance.
+- `MassGenerator.EdgeWear.BoundedSingleEdge.cs`, `MassGenerator.EdgeWear.PlaneCutKernel.cs`, and coexistence/recovery owners retain complete shell geometry and certification.
+- `MassGenerator.MeshOutput.cs`, `MeshData.cs`, and `MeshBuilder.cs` retain final transformed shared normals, mesh channels, and tangent ownership.
+- shaders, materials, assets, serialized defaults, runtime callbacks, and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+Performance boundary:
+
+- Preflight candidate enumeration is restricted to the three mandatory ring edges. It uses existing isolated certification and adds no second solver.
+- One enabled matrix case owns at most one complete integration build plus one lower fallback per attempted corner; the old six-build outer scale sweep and duplicate raw endpoint search are removed.
+- The matrix cache is editor-job-local and stores eleven baseline mesh/status pairs at most; it is discarded with the suite job and is not a production or persistent cache.

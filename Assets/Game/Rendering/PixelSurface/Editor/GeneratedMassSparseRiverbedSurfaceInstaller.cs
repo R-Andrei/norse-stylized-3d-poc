@@ -92,6 +92,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             internal string LayerPath { get; }
             internal string PackedSourcePath { get; }
             internal string FormSourcePath { get; }
+            internal float FeatureSubstrateRoughness { get; set; } = 0.5f;
+            internal float FeatureMaximumSupportRadiusUv { get; set; }
         }
 
         private sealed class LibraryAssetSnapshot
@@ -556,7 +558,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (!File.Exists(reportPath))
             {
                 failures.Add(
-                    "The M2.7C.5E.2.2 proof report is missing. Run Tools > " +
+                    "The M2.7C.5E.2.4B proof report is missing. Run Tools > " +
                     "PS3D > Run Generated Mass Sparse Riverbed Assembly " +
                     "Proof before installing the surfaces.");
                 return;
@@ -564,10 +566,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             string report = File.ReadAllText(reportPath);
             if (report.IndexOf(
-                    "GSU-M2.7C.5E.2.2",
+                    "GSU-M2.7C.5E.2.4B",
                     StringComparison.Ordinal) < 0 ||
                 report.IndexOf(
-                    "Assembler algorithm version: 7",
+                    "Assembler algorithm version: 10",
                     StringComparison.Ordinal) < 0 ||
                 report.IndexOf(
                     "VERDICT: PASS",
@@ -575,13 +577,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             {
                 failures.Add(
                     "The local sparse-riverbed proof is not a passing " +
-                    "M2.7C.5E.2.2 algorithm-7 run.");
+                    "M2.7C.5E.2.4B algorithm-10 run.");
                 return;
             }
 
             for (int index = 0; index < Candidates.Length; index++)
             {
                 CandidateDefinition candidate = Candidates[index];
+                ParseProofFeatureMetadata(report, candidate, failures);
                 ValidateProofFile(
                     candidate.ProofPrefix + "_PaletteForm.png",
                     failures);
@@ -589,6 +592,105 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     candidate.ProofPrefix + "_RuntimePackedDetail.png",
                     failures);
             }
+        }
+
+        private static void ParseProofFeatureMetadata(
+            string report,
+            CandidateDefinition candidate,
+            ICollection<string> failures)
+        {
+            string sectionToken = "[" + candidate.ProofPrefix + "]";
+            int sectionStart = report.IndexOf(
+                sectionToken,
+                StringComparison.Ordinal);
+            if (sectionStart < 0)
+            {
+                failures.Add(
+                    "Proof report has no candidate section " +
+                    sectionToken + ".");
+                return;
+            }
+
+            int sectionEnd = report.IndexOf(
+                "\n[",
+                sectionStart + sectionToken.Length,
+                StringComparison.Ordinal);
+            if (sectionEnd < 0)
+            {
+                sectionEnd = report.Length;
+            }
+
+            string section = report.Substring(
+                sectionStart,
+                sectionEnd - sectionStart);
+            if (!TryParseProofFloat(
+                    section,
+                    "Feature substrate roughness scalar:",
+                    out float substrateRoughness) ||
+                !TryParseProofFloat(
+                    section,
+                    "Feature maximum support radius UV:",
+                    out float maximumSupportRadiusUv))
+            {
+                failures.Add(
+                    candidate.ProofPrefix +
+                    ": algorithm-10 proof metadata is missing or invalid.");
+                return;
+            }
+
+            if (substrateRoughness < 0.55f ||
+                substrateRoughness > 0.80f ||
+                maximumSupportRadiusUv <= 0f ||
+                maximumSupportRadiusUv > 0.25f)
+            {
+                failures.Add(
+                    candidate.ProofPrefix +
+                    ": proof metadata roughness/radius is out of range: " +
+                    substrateRoughness.ToString(
+                        "F5",
+                        CultureInfo.InvariantCulture) + " / " +
+                    maximumSupportRadiusUv.ToString(
+                        "F6",
+                        CultureInfo.InvariantCulture) + ".");
+                return;
+            }
+
+            candidate.FeatureSubstrateRoughness = substrateRoughness;
+            candidate.FeatureMaximumSupportRadiusUv =
+                maximumSupportRadiusUv;
+        }
+
+        private static bool TryParseProofFloat(
+            string section,
+            string label,
+            out float value)
+        {
+            value = 0f;
+            int labelIndex = section.IndexOf(
+                label,
+                StringComparison.Ordinal);
+            if (labelIndex < 0)
+            {
+                return false;
+            }
+
+            int valueStart = labelIndex + label.Length;
+            int lineEnd = section.IndexOf('\n', valueStart);
+            if (lineEnd < 0)
+            {
+                lineEnd = section.Length;
+            }
+
+            string text = section.Substring(
+                valueStart,
+                lineEnd - valueStart).Trim();
+            return float.TryParse(
+                text,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out value) &&
+                !float.IsNaN(value) &&
+                !float.IsInfinity(value);
         }
 
         private static void ValidateProofFile(
@@ -816,6 +918,10 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     .objectReferenceValue =
                     AssetDatabase.LoadAssetAtPath<Texture2D>(
                         candidate.FormSourcePath);
+                entry.FindPropertyRelative("featureSubstrateRoughness")
+                    .floatValue = candidate.FeatureSubstrateRoughness;
+                entry.FindPropertyRelative("featureMaximumSupportRadiusUv")
+                    .floatValue = candidate.FeatureMaximumSupportRadiusUv;
                 ClearAuthoredMaterialReferences(entry);
             }
 
@@ -861,7 +967,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                             candidate.PackedSourcePath) ||
                     entry.PrepackedTextureForm !=
                         AssetDatabase.LoadAssetAtPath<Texture2D>(
-                            candidate.FormSourcePath))
+                            candidate.FormSourcePath) ||
+                    Mathf.Abs(
+                        entry.FeatureSubstrateRoughness -
+                        candidate.FeatureSubstrateRoughness) > 0.00001f ||
+                    Mathf.Abs(
+                        entry.FeatureMaximumSupportRadiusUv -
+                        candidate.FeatureMaximumSupportRadiusUv) > 0.000001f)
                 {
                     return false;
                 }
@@ -1202,7 +1314,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             StringBuilder builder = new StringBuilder(16384);
             builder.AppendLine(
                 "GENERATED MASS SPARSE RIVERBED SURFACE REFRESH — " +
-                "GSU-M2.7C.5E.2.2.1");
+                "GSU-M2.7C.5E.2.4B.1");
             builder.AppendLine(
                 "Generated UTC: " +
                 DateTime.UtcNow.ToString(
@@ -1282,14 +1394,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (failures.Count > 0)
             {
                 Debug.LogError(
-                    "[GSU-M2.7C.5E.2.2.1] Sparse riverbed surface refresh " +
+                    "[GSU-M2.7C.5E.2.4B.1] Sparse riverbed surface refresh " +
                     "failed. Report written to " + InstallReportPath +
                     " and copied to the clipboard.");
             }
             else
             {
                 Debug.Log(
-                    "[GSU-M2.7C.5E.2.2.1] Refreshed all three sparse " +
+                    "[GSU-M2.7C.5E.2.4B.1] Refreshed all three sparse " +
                     "riverbed surface candidates. Report written to " +
                     InstallReportPath +
                     " and copied to the clipboard.");

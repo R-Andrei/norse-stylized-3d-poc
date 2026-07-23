@@ -954,12 +954,10 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectBirthAnchorCountLastUpdate;
         public int AutomaticObjectContactBuildCount =>
             automaticObjectContactBuildCount;
-        public int AutomaticObjectContactHoldCount =>
-            automaticObjectContactHoldCount;
-        public int AutomaticObjectContactReleaseCount =>
-            automaticObjectContactReleaseCount;
-        public int AutomaticObjectContactRestCount =>
-            automaticObjectContactRestCount;
+        public int AutomaticObjectContactFleckCount =>
+            automaticObjectContactFleckCount;
+        public int AutomaticObjectWaitingClearanceCount =>
+            automaticObjectWaitingClearanceCount;
         public int AutomaticObjectBirthBudgetPerTick =>
             AutomaticObjectSourceMaximumStartsPerUpdate;
 

@@ -1226,25 +1226,6 @@ void InjectFoam(uint3 dispatchId : SV_DispatchThreadID)
 static const float FoamSourceEventTypeShoreRibbon = 1.0;
 static const float FoamSourceEventTypeInwardWash = 2.0;
 
-float FoamSourceEventBreakup(
-    float2 sourceLocal,
-    float sourceFillSeed,
-    float scaleMetres,
-    float strength,
-    float2 physicalCellSpacing)
-{
-    float maximumCellSpacing = max(
-        max(0.01, physicalCellSpacing.x),
-        max(0.01, physicalCellSpacing.y));
-    float featureSize = max(max(0.08, scaleMetres), maximumCellSpacing * 2.0);
-    float value = EvaluateFoamSourceFillField(
-        sourceLocal,
-        sourceFillSeed,
-        featureSize);
-    float keep = smoothstep(0.18, 0.82, value);
-    return lerp(1.0, keep, saturate(strength));
-}
-
 float FoamSourceEventSoftRange(
     float value,
     float lower,
@@ -1307,18 +1288,7 @@ float FoamEvaluateShoreRibbonSource(
         halfWidth + feather,
         bandDistance);
 
-    float strandPhase = FoamHash11(sourceEvent.header.w + 17.0) * 6.2831853;
-    float strand = 0.72 + 0.28 * sin(
-        alongFromStart / max(0.12, sourceEvent.variation.y) * 2.9 +
-        strandPhase);
-    float breakup = FoamSourceEventBreakup(
-        float2(alongFromStart, inwardMetres),
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float irregularEdge = lerp(1.0, saturate(breakup * strand), 0.82);
-    float shape = saturate(max(core, softBand * irregularEdge) *
+    float shape = saturate(max(core, softBand) *
         endMask * revealMask);
 
     coverageMultiplier = 1.0;
@@ -1407,15 +1377,8 @@ float FoamEvaluateInwardWashSource(
             localInward));
     float startCap = smoothstep(0.0, 0.030, headS + trailFraction);
     float endTaper = 1.0 - smoothstep(0.84, 1.04, nearestS);
-    float breakup = FoamSourceEventBreakup(
-        float2(signedAlong, localInward),
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
     float shape = saturate(stroke * validInwardMask * startCap *
-        lerp(1.0, breakup, 0.32) * lerp(1.0, 0.78, nearestS) *
-        max(0.72, endTaper));
+        lerp(1.0, 0.78, nearestS) * max(0.72, endTaper));
 
     coverageMultiplier = lerp(1.0, 0.92, nearestS);
     return shape;
@@ -1721,68 +1684,23 @@ float FoamResolveAccumulatedSweepBuild(
         sweepCoordinate);
 }
 
-float FoamResolveSameOrderSweepRelease(
-    float sweepCoordinate,
-    float progress,
-    float feather01)
-{
-    float threshold =
-        saturate(progress) * (1.0 + feather01 * 2.0) - feather01;
-    return smoothstep(
-        threshold - feather01,
-        threshold + feather01,
-        sweepCoordinate);
-}
-
-float FoamResolveReverseOrderSweepRelease(
-    float sweepCoordinate,
-    float progress,
-    float feather01)
-{
-    float threshold =
-        (1.0 - saturate(progress)) * (1.0 + feather01 * 2.0) -
-        feather01;
-    return 1.0 - smoothstep(
-        threshold - feather01,
-        threshold + feather01,
-        sweepCoordinate);
-}
-
-float FoamResolveObjectRibbonPhaseMask(
+float FoamResolveObjectRibbonBuildMask(
     float pathT,
     float progress,
     float materialStepProgress,
     float pathLength,
-    float2 physicalCellSpacing,
-    float phase,
-    bool reverseRelease)
+    float2 physicalCellSpacing)
 {
     float phaseFeather01 = clamp(
         max(physicalCellSpacing.x, physicalCellSpacing.y) /
         max(0.001, pathLength),
         0.025,
         0.18);
-    float buildMask = FoamResolveAccumulatedSweepBuild(
+    return FoamResolveAccumulatedSweepBuild(
         pathT,
         progress,
         materialStepProgress,
         phaseFeather01);
-    float releaseMask = reverseRelease
-        ? FoamResolveReverseOrderSweepRelease(
-            pathT,
-            progress,
-            phaseFeather01)
-        : FoamResolveSameOrderSweepRelease(
-            pathT,
-            progress,
-            phaseFeather01);
-    float buildPhase = 1.0 - step(0.5, phase);
-    float holdPhase = step(0.5, phase) * (1.0 - step(1.5, phase));
-    float releasePhase = step(1.5, phase);
-    return saturate(
-        buildMask * buildPhase +
-        holdPhase +
-        releaseMask * releasePhase);
 }
 
 float FoamEvaluateObjectContactArcSource(
@@ -1869,31 +1787,24 @@ float FoamEvaluateObjectContactArcSource(
 
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
-    float phase = sourceEvent.header.y;
-    float negativePhase = FoamResolveObjectRibbonPhaseMask(
+    float negativePhase = FoamResolveObjectRibbonBuildMask(
         negativePathT,
         progress,
         materialStepProgress,
         totalPathLength,
-        physicalCellSpacing,
-        phase,
-        false);
-    float frontPhase = FoamResolveObjectRibbonPhaseMask(
+        physicalCellSpacing);
+    float frontPhase = FoamResolveObjectRibbonBuildMask(
         frontPathT,
         progress,
         materialStepProgress,
         totalPathLength,
-        physicalCellSpacing,
-        phase,
-        false);
-    float positivePhase = FoamResolveObjectRibbonPhaseMask(
+        physicalCellSpacing);
+    float positivePhase = FoamResolveObjectRibbonBuildMask(
         positivePathT,
         progress,
         materialStepProgress,
         totalPathLength,
-        physicalCellSpacing,
-        phase,
-        false);
+        physicalCellSpacing);
 
     float shape = max(
         frontShape * frontPhase,
@@ -1980,10 +1891,9 @@ float FoamEvaluateObjectContactSemiArcSource(
             frontHalfT);
     }
 
-    // Semi-Arcs must retain physical-front coverage throughout their active
-    // lifecycle. Build begins at the front point and advances through the
-    // selected face half toward the shoulder and downstream arm tip. Reverse
-    // release removes that arm tip first and preserves the front until last.
+    // Build begins at the front point and advances through the selected face
+    // half toward the shoulder and finite downstream arm tip. Every location is
+    // born once and becomes ordinary transported Layer C material afterward.
     float frontPathT = saturate(
         (1.0 - frontHalfT) * selectedFrontLength /
         totalPathLength);
@@ -1992,23 +1902,18 @@ float FoamEvaluateObjectContactSemiArcSource(
         totalPathLength);
     float progress = saturate(sourceEvent.header.z);
     float materialStepProgress = clamp(sourceEvent.shore.z, 0.0001, 1.0);
-    float phase = sourceEvent.header.y;
-    float armPhase = FoamResolveObjectRibbonPhaseMask(
+    float armPhase = FoamResolveObjectRibbonBuildMask(
         armPathT,
         progress,
         materialStepProgress,
         totalPathLength,
-        physicalCellSpacing,
-        phase,
-        true);
-    float frontPhase = FoamResolveObjectRibbonPhaseMask(
+        physicalCellSpacing);
+    float frontPhase = FoamResolveObjectRibbonBuildMask(
         frontPathT,
         progress,
         materialStepProgress,
         totalPathLength,
-        physicalCellSpacing,
-        phase,
-        true);
+        physicalCellSpacing);
 
     float shape = max(
         armShape * armPhase,
@@ -2074,7 +1979,18 @@ float FoamEvaluateObjectContactFleckSource(
         width + feather,
         distanceToFleck);
     float progress = saturate(sourceEvent.header.z);
-    float revealMask = smoothstep(0.0, 1.0, progress);
+    float tangentT = saturate(
+        (tangentDistance - tangentOffset + halfLength) /
+        max(0.001, halfLength * 2.0));
+    float revealFeather = clamp(
+        max(physicalCellSpacing.x, physicalCellSpacing.y) /
+        max(0.001, halfLength * 2.0),
+        0.04,
+        0.25);
+    float revealMask = 1.0 - smoothstep(
+        progress,
+        progress + revealFeather,
+        tangentT);
     float coarseAlongGate = 1.0 - smoothstep(
         alongHalf + contactOffset + totalLength,
         alongHalf + contactOffset + totalLength + feather * 2.0,
@@ -2083,15 +1999,8 @@ float FoamEvaluateObjectContactFleckSource(
         acrossHalf + contactOffset + width * 4.0 + feather,
         acrossHalf + contactOffset + width * 4.0 + feather * 3.0,
         abs(localAcross));
-    float breakup = FoamSourceEventBreakup(
-        float2(tangentDistance, normalDistance),
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
     float shape = saturate(stroke * revealMask * contactConfidence *
-        contact.a * coarseAlongGate * coarseAcrossGate *
-        lerp(1.0, breakup, 0.46));
+        contact.a * coarseAlongGate * coarseAcrossGate);
 
     coverageMultiplier = lerp(0.82, 1.0, saturate(contact.a));
     return shape;
@@ -2153,21 +2062,7 @@ float FoamEvaluateFreeWaterLaceConnectorSource(
 
     float endTaper = smoothstep(0.00, 0.12, nearestT) *
         (1.0 - smoothstep(0.88, 1.00, nearestT));
-    float breakup = FoamSourceEventBreakup(
-        p,
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float gapNoise = EvaluateFoamSourceFillField(
-        float2(nearestT * 6.0, p.y),
-        sourceEvent.variation.x + 173.0,
-        max(0.25, sourceEvent.variation.y * 1.4));
-    float gapMask = smoothstep(0.18, 0.68, gapNoise);
-
-    float shape = saturate(
-        stroke * max(0.25, endTaper) *
-        lerp(1.0, breakup * gapMask, 0.55));
+    float shape = saturate(stroke * max(0.25, endTaper));
     coverageMultiplier = 0.92;
     return shape;
 }
@@ -2189,7 +2084,8 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
     float requestedWidth = max(0.0015, sourceEvent.objectData.z);
     float cellSize = max(physicalCellSpacing.x, physicalCellSpacing.y);
     float rasterWidth = max(requestedWidth, cellSize * 0.18);
-    float subCellCoverage = saturate(requestedWidth / max(0.0001, rasterWidth));
+    float subCellCoverage = saturate(
+        requestedWidth / max(0.0001, rasterWidth));
     float feather = max(
         max(0.002, sourceEvent.shore.w * 0.20),
         cellSize * 0.16);
@@ -2211,16 +2107,23 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
         float sampleU = (float)sampleIndex / 4.0;
         float t = tailT + sampleSpan * sampleU;
 
-        float lateralPath = lerp(-halfLength, halfLength, t) * lateralDirectionSign;
+        float lateralPath = lerp(-halfLength, halfLength, t) *
+            lateralDirectionSign;
         float flowBend =
-            sourceEvent.variation.w * rasterWidth * 3.2 * sin(t * 3.14159265) +
-            rasterWidth * 1.2 * sin(t * 6.2831853 + sourceEvent.header.w);
+            sourceEvent.variation.w * rasterWidth * 3.2 *
+                sin(t * 3.14159265) +
+            rasterWidth * 1.2 *
+                sin(t * 6.2831853 + sourceEvent.header.w);
         float2 currentPoint = float2(flowBend, lateralPath);
 
         if (sampleIndex > 0)
         {
             float segmentT;
-            float d = FoamDistanceToSegment(p, previousPoint, currentPoint, segmentT);
+            float d = FoamDistanceToSegment(
+                p,
+                previousPoint,
+                currentPoint,
+                segmentT);
             if (d < minDistance)
             {
                 minDistance = d;
@@ -2244,21 +2147,8 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
 
     float endTaper = smoothstep(0.00, 0.12, nearestT) *
         (1.0 - smoothstep(0.88, 1.00, nearestT));
-    float breakup = FoamSourceEventBreakup(
-        p,
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float gapNoise = EvaluateFoamSourceFillField(
-        float2(nearestT * 6.0, p.x),
-        sourceEvent.variation.x + 389.0,
-        max(0.25, sourceEvent.variation.y * 1.4));
-    float gapMask = smoothstep(0.16, 0.66, gapNoise);
-
     float shape = saturate(
-        stroke * subCellCoverage * max(0.25, endTaper) *
-        lerp(1.0, breakup * gapMask, 0.48));
+        stroke * subCellCoverage * max(0.25, endTaper));
     coverageMultiplier = 0.94;
     return shape;
 }
@@ -2325,22 +2215,7 @@ float FoamEvaluateFreeWaterTornFragmentSource(
         head + trail,
         sweepCoord);
 
-    float breakup = FoamSourceEventBreakup(
-        q,
-        sourceEvent.variation.x,
-        sourceEvent.variation.y,
-        sourceEvent.variation.z,
-        physicalCellSpacing);
-    float bite = EvaluateFoamSourceFillField(
-        q,
-        sourceEvent.variation.x + 219.0,
-        max(0.12, sourceEvent.variation.y * 0.8));
-    float biteMask = lerp(
-        1.0,
-        smoothstep(0.18, 0.72, bite),
-        0.65);
-
-    float shape = saturate(fragmentBase * reveal * breakup * biteMask);
+    float shape = saturate(fragmentBase * reveal);
     coverageMultiplier = 0.88;
     return shape;
 }
@@ -2491,10 +2366,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
 
     float currentContribution = saturate(currentShape) *
         max(0.0, currentCoverageMultiplier);
-    bool persistentObjectEmitter =
-        (sourceType > 2.5 && sourceType < 3.5) ||
-        (sourceType > 4.5 && sourceType < 5.5);
-    if (!persistentObjectEmitter)
+    float birthContribution = currentContribution;
     {
         FoamSourceEventData previousSourceEvent = sourceEvent;
         previousSourceEvent.header.y = sourceEvent.deposit.x;
@@ -2524,6 +2396,15 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     physicalCellSpacing,
                     previousCoverageMultiplier);
             }
+            else if (sourceType < 3.5)
+            {
+                previousShape = FoamEvaluateObjectContactArcSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
+                    previousCoverageMultiplier);
+            }
             else if (sourceType < 4.5)
             {
                 previousShape = FoamEvaluateObjectContactFleckSource(
@@ -2532,6 +2413,15 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                     lateralMetres,
                     physicalCellSpacing,
                     coordinate,
+                    previousCoverageMultiplier);
+            }
+            else if (sourceType < 5.5)
+            {
+                previousShape = FoamEvaluateObjectContactSemiArcSource(
+                    previousSourceEvent,
+                    globalDistance,
+                    lateralMetres,
+                    physicalCellSpacing,
                     previousCoverageMultiplier);
             }
             else if (sourceType < 6.5)
@@ -2566,24 +2456,24 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
                 max(0.0, previousCoverageMultiplier);
         }
 
-        float newlyRevealedContribution = sourceEvent.deposit.z > 0.5
+        float newlyRevealedPermission = sourceEvent.deposit.z > 0.5
             ? max(0.0, currentContribution - previousContribution)
             : currentContribution;
-        if (newlyRevealedContribution <= FoamMaterialStateEpsilon)
+        if (newlyRevealedPermission <= FoamMaterialStateEpsilon)
         {
             return result;
         }
-    }
-    else if (currentContribution <= FoamMaterialStateEpsilon)
-    {
-        return result;
+
+        // Current-minus-previous is permission only. Once the moving reveal
+        // interval reaches a cell, write the complete current geometric target
+        // rather than a cadence-dependent derivative amount. This preserves
+        // authored Coverage while still preventing writes behind the head.
+        birthContribution = currentContribution;
     }
 
-    // Nonpersistent sources use current-minus-previous only as deposition
-    // permission. Persistent Object Arc/Semi-Arc sources rasterize their current
-    // phase-shaped emitter every material tick. Both paths preserve the current
-    // authored contribution as the absolute birth target expected by the merge.
-    float birthContribution = currentContribution;
+    // Every automatic source deposits only the newly revealed interval. Object
+    // Arc/Semi-Arc front and wake geometry are one-shot Build products and are
+    // never refreshed after the reveal head passes.
 
     // P13A makes Initial Presence and Initial Life authoritative material
     // properties. Source shape, family/subcell shaping, reveal progression and

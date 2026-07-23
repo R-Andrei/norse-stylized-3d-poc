@@ -2225,6 +2225,8 @@ private readonly struct EdgeWearTopologyStats
             public double SourceVolume;
             public int AcceptedTrialIndex = -1;
             public float AcceptedDepth;
+            public double CandidateRankingMilliseconds;
+            public double TransactionMilliseconds;
             public float ShortestCapEdgeLength;
             public readonly List<float> CapEdgeLengths =
                 new List<float>();
@@ -2247,6 +2249,55 @@ private readonly struct EdgeWearTopologyStats
                 new List<CornerDamageCandidateRecord>();
             public readonly List<CornerDamageTrialRecord> Trials =
                 new List<CornerDamageTrialRecord>();
+        }
+
+        private sealed class CornerDamageIntegrationPreflightRecord
+        {
+            public CornerDamageTransactionAuditResult Transaction;
+            public bool Completed;
+            public float RequestedRingWidth;
+            public float MinimumStyleWidth;
+            public int ExpectedMandatoryCount;
+            public int MandatoryRecordCount;
+            public int MandatoryIsolatedCertifiedCount;
+            public float MinimumCertifiedWidth;
+            public float MinimumCertifiedRatio;
+            public float ResolvedUniformScale;
+            public int CandidateCount;
+            public int SelectedCount;
+            public int SelectedGraphEdgeCount;
+            public bool CandidateConservationValid;
+            public bool TopologyReady;
+            public bool WidthSolutionReady;
+            public int MandatorySelectedCount;
+            public int MandatorySolvedCount;
+            public int PredictedOrdinaryCount;
+            public int PredictedUnrelatedBaselineCount;
+            public int PredictedUnrelatedRetainedCount;
+            public int PredictedCollateralLostCount;
+            public int[] PredictedOrdinaryIdentities = Array.Empty<int>();
+            public int[] PredictedMandatoryIdentities = Array.Empty<int>();
+            public int[] PredictedCollateralLostIdentities = Array.Empty<int>();
+            public string FailureStage = string.Empty;
+            public string Diagnostic = string.Empty;
+        }
+
+        private sealed class CornerDamageSearchTelemetry
+        {
+            public int BaselineBuildCount;
+            public int BaselineCacheUseCount;
+            public int TransactionAttemptCount;
+            public int IntegrationPreflightAttemptCount;
+            public int FullIntegrationBuildCount;
+            public int FullFallbackBuildCount;
+            public int GeometrySearchReuseCount;
+            public int IntegrationPreflightMismatchCount;
+            public double CandidateRankingMilliseconds;
+            public double TransactionMilliseconds;
+            public double IntegrationPreflightMilliseconds;
+            public double IntegrationMilliseconds;
+            public bool CaseBudgetExceeded;
+            public bool MatrixBudgetExceeded;
         }
 
         private sealed class CornerDamagePreviewConstructionRecord

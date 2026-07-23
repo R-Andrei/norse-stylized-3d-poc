@@ -9,7 +9,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
     {
         private const string DefaultTrailShaderAssetPath =
             "Assets/Game/Rendering/Weather/Shaders/SH_WeatherWindTrails.shader";
-        private static readonly Color OutsideViewportColor =
+        private static readonly Color OutsideWeatherFieldColor =
             new Color(0.55f, 0.58f, 0.62f, 0.55f);
         private static readonly Color BelowWindFloorColor =
             new Color(0.20f, 0.55f, 1.00f, 0.90f);
@@ -19,6 +19,12 @@ namespace ProgrammaticStylized3D.Weather.Editor
             new Color(0.25f, 1.00f, 0.45f, 0.95f);
         private static readonly Color SelectedColor =
             new Color(1.00f, 0.92f, 0.15f, 1.00f);
+        private static readonly Color CameraEntryRejectedColor =
+            new Color(0.45f, 0.45f, 0.45f, 0.55f);
+        private static readonly Color DirectionMismatchColor =
+            new Color(0.75f, 0.35f, 1.00f, 0.90f);
+        private static readonly Color InsufficientRunwayColor =
+            new Color(1.00f, 0.25f, 0.45f, 0.90f);
         private static readonly Color TrailPathColor =
             new Color(0.72f, 0.96f, 1.00f, 0.98f);
 
@@ -72,8 +78,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
             if (upgradedBaseline)
             {
                 EditorGUILayout.HelpBox(
-                    "Updated exact earlier baseline values to the V0.6 " +
-                    "length-resolved lifecycle. Existing non-default tuning " +
+                    "Updated exact earlier baseline values to the V0.9 " +
+                    "direction-locked upwind-entry baseline. Existing non-default tuning " +
                     "was preserved.",
                     MessageType.Info);
             }
@@ -171,12 +177,20 @@ namespace ProgrammaticStylized3D.Weather.Editor
 
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField(
-                    "Occasional Broad Waves",
+                    "Wind-Directed Wobble",
                     EditorStyles.miniBoldLabel);
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    DrawProperty("occasionalBroadWaveChance");
-                    DrawProperty("occasionalBroadWaveStrengthMetres");
+                    DrawMinMaxProperties(
+                        "Wobble Strength",
+                        "minimumLateralWobbleStrengthMetres",
+                        "maximumLateralWobbleStrengthMetres");
+                    DrawMinMaxProperties(
+                        "Wobble Wavelength",
+                        "minimumLateralWobbleWavelengthMetres",
+                        "maximumLateralWobbleWavelengthMetres");
+                    DrawProperty("occasionalLargerLoopChance");
+                    DrawProperty("occasionalLargerLoopExtraStrengthMetres");
                 }
 
                 DrawProperty("strengthOpacityInfluence");
@@ -236,6 +250,19 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 DrawProperty("minimumWindStrength");
                 DrawProperty("minimumTrailSeparationMetres");
                 DrawProperty("separationCooldownSeconds");
+
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField(
+                    "Camera Entry Placement",
+                    EditorStyles.miniBoldLabel);
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    DrawProperty("upwindSpawnBandDepth");
+                    DrawProperty("upwindEntryMarginViewport");
+                    DrawProperty("preferredVisibleRunwayMetres");
+                    DrawProperty("minimumAcceptedVisibleRunwayMetres");
+                    DrawProperty("cameraEntryPreference");
+                }
             }
         }
 
@@ -269,17 +296,35 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     EditorStyles.boldLabel);
                 DrawProperty("maximumCentrelinePoints");
                 DrawProperty("integrationStepMetres");
-                DrawProperty("minimumPathWindStrength");
-                DrawProperty("minimumCompletedPathLengthMetres");
-                DrawProperty("maximumTurnDegreesPerSegment");
-                DrawProperty("selfApproachDistanceMetres");
-                DrawProperty("minimumSegmentWindAlignment");
 
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField(
-                    "Camera Relevance",
-                    EditorStyles.boldLabel);
-                DrawProperty("candidateViewportMargin");
+                    "Render Curve",
+                    EditorStyles.miniBoldLabel);
+                DrawProperty("renderCurveSubdivisionsPerBackboneSection");
+                EditorGUILayout.HelpBox(
+                    "The Weather backbone keeps its existing integration step. " +
+                    "Render subdivisions create a dense tangent-continuous curve " +
+                    "without increasing Weather-field sampling frequency.",
+                    MessageType.None);
+
+                DrawProperty("minimumPathWindStrength");
+                DrawProperty("minimumCompletedPathLengthMetres");
+
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField(
+                    "Direction-Locked Backbone",
+                    EditorStyles.miniBoldLabel);
+                DrawProperty("maximumLocalWindDirectionMismatchDegrees");
+                EditorGUILayout.HelpBox(
+                    "The dominant visible Weather direction is locked when a trail " +
+                    "spawns. Local Weather samples validate strength and compatibility " +
+                    "but cannot steer the backbone into a large curve.",
+                    MessageType.None);
+
+                DrawProperty("selfApproachDistanceMetres");
+                DrawProperty("minimumSegmentWindAlignment");
+
             }
         }
 
@@ -465,7 +510,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
             {
                 EditorGUIUtility.systemCopyBuffer = report;
                 Debug.Log(
-                    "[Weather Wind Trails V0.6] Report copied to clipboard.",
+                    "[Weather Wind Trails V0.9] Report copied to clipboard.",
                     trailRenderer);
             }
         }
@@ -619,8 +664,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
         {
             switch (status)
             {
-                case WeatherWindTrailCandidateStatus.OutsideViewport:
-                    return OutsideViewportColor;
+                case WeatherWindTrailCandidateStatus.OutsideWeatherField:
+                    return OutsideWeatherFieldColor;
                 case WeatherWindTrailCandidateStatus.BelowWindFloor:
                     return BelowWindFloorColor;
                 case WeatherWindTrailCandidateStatus.TooClose:
@@ -629,6 +674,12 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     return EligibleColor;
                 case WeatherWindTrailCandidateStatus.Selected:
                     return SelectedColor;
+                case WeatherWindTrailCandidateStatus.OutsideCameraEntryRegion:
+                    return CameraEntryRejectedColor;
+                case WeatherWindTrailCandidateStatus.IncompatibleWindDirection:
+                    return DirectionMismatchColor;
+                case WeatherWindTrailCandidateStatus.InsufficientVisibleRunway:
+                    return InsufficientRunwayColor;
                 default:
                     return Color.clear;
             }

@@ -11,7 +11,7 @@ namespace ProgrammaticStylized3D.Rivers
     public sealed partial class StylizedRiverFoamRuntime
     {
         private const int FixedMetricMotionLaneAlgorithmContract = 1;
-        private const int FixedMetricObstacleRoutingContract = 1;
+        private const int FixedMetricObstacleRoutingContract = 2;
         private const float MotionLaneDownstreamBasisMetres = 32f;
         private const float MotionLaneLateralReferenceSpanMetres = 10f;
         private const float MotionLaneNearSmoothingOffsetMetres = 0.20f;
@@ -430,6 +430,16 @@ namespace ProgrammaticStylized3D.Rivers
             hash = AccumulateHash(
                 hash,
                 river != null && river.FlowDirection < 0f ? -1 : 1);
+            hash = AccumulateHash(
+                hash,
+                Mathf.RoundToInt((river != null
+                    ? river.FoamObjectContactFullSlowdownReachMetres
+                    : 0.10f) * 10000f));
+            hash = AccumulateHash(
+                hash,
+                Mathf.RoundToInt((river != null
+                    ? river.FoamObjectContactSlowdownOuterReachMetres
+                    : 0.45f) * 10000f));
             return hash;
         }
 
@@ -1070,7 +1080,104 @@ namespace ProgrammaticStylized3D.Rivers
                         lastObstacleRoutingMaximumApproachMetres,
                         Mathf.Max(0, minS - s) *
                         policy.LongitudinalSpacingMetres);
-                    WriteObstacleRoutingCell(x, y, direction, influence);
+                    WriteObstacleRoutingCell(x, y, direction * influence, influence);
+                }
+            }
+
+            StampObstacleContactSlowdownComponent(component, policy);
+        }
+
+        private void StampObstacleContactSlowdownComponent(
+            FoamObstacleRoutingComponent component,
+            FoamObstacleRoutingPolicy policy)
+        {
+            float fullReachMetres = river != null
+                ? river.FoamObjectContactFullSlowdownReachMetres
+                : 0.10f;
+            float outerReachMetres = river != null
+                ? river.FoamObjectContactSlowdownOuterReachMetres
+                : 0.45f;
+            float dx = Mathf.Max(0.0001f, policy.LongitudinalSpacingMetres);
+            float dy = Mathf.Max(0.0001f, policy.LateralSpacingMetres);
+            int radiusX = Mathf.Max(
+                1,
+                Mathf.CeilToInt(outerReachMetres / dx));
+            int radiusY = Mathf.Max(
+                1,
+                Mathf.CeilToInt(outerReachMetres / dy));
+
+            for (int sourceY = component.MinY;
+                 sourceY <= component.MaxY;
+                 sourceY++)
+            {
+                for (int sourceX = component.MinX;
+                     sourceX <= component.MaxX;
+                     sourceX++)
+                {
+                    int sourceIndex = sourceY * fieldWidth + sourceX;
+                    if (sourceIndex < 0 ||
+                        sourceIndex >= obstacleRoutingComponentIds.Length ||
+                        obstacleRoutingComponentIds[sourceIndex] != component.Id)
+                    {
+                        continue;
+                    }
+
+                    for (int offsetY = -radiusY; offsetY <= radiusY; offsetY++)
+                    {
+                        int targetY = sourceY + offsetY;
+                        if (targetY < 0 || targetY >= fieldHeight)
+                        {
+                            continue;
+                        }
+
+                        for (int offsetX = -radiusX;
+                             offsetX <= radiusX;
+                             offsetX++)
+                        {
+                            int targetX = sourceX + offsetX;
+                            if (targetX < 0 || targetX >= fieldWidth)
+                            {
+                                continue;
+                            }
+
+                            int targetIndex = targetY * fieldWidth + targetX;
+                            if (obstacleRoutingOccupied[targetIndex])
+                            {
+                                continue;
+                            }
+
+                            float surfaceDx = Mathf.Max(
+                                0f,
+                                (Mathf.Abs(offsetX) - 0.5f) * dx);
+                            float surfaceDy = Mathf.Max(
+                                0f,
+                                (Mathf.Abs(offsetY) - 0.5f) * dy);
+                            float distanceMetres = Mathf.Sqrt(
+                                surfaceDx * surfaceDx +
+                                surfaceDy * surfaceDy);
+                            if (distanceMetres > outerReachMetres)
+                            {
+                                continue;
+                            }
+
+                            float normalized = Mathf.InverseLerp(
+                                fullReachMetres,
+                                outerReachMetres,
+                                distanceMetres);
+                            float slowdownInfluence =
+                                1f - Smooth01(normalized);
+                            if (slowdownInfluence <= 0.001f)
+                            {
+                                continue;
+                            }
+
+                            WriteObstacleRoutingCell(
+                                targetX,
+                                targetY,
+                                0f,
+                                slowdownInfluence);
+                        }
+                    }
                 }
             }
         }
@@ -1409,21 +1516,27 @@ namespace ProgrammaticStylized3D.Rivers
         private void WriteObstacleRoutingCell(
             int x,
             int y,
-            float direction,
-            float influence)
+            float signedRoutingInfluence,
+            float slowdownInfluence)
         {
             int baseIndex = (y * fieldWidth + x) * 2;
-            float existingInfluence = Mathf.HalfToFloat(
+            float existingSignedRouting = Mathf.HalfToFloat(
+                obstacleRoutingHalfData[baseIndex]);
+            float resolvedSignedRouting =
+                Mathf.Abs(signedRoutingInfluence) >
+                Mathf.Abs(existingSignedRouting)
+                    ? Mathf.Clamp(signedRoutingInfluence, -1f, 1f)
+                    : existingSignedRouting;
+            float existingSlowdown = Mathf.HalfToFloat(
                 obstacleRoutingHalfData[baseIndex + 1]);
-            if (influence <= existingInfluence)
-            {
-                return;
-            }
+            float resolvedSlowdown = Mathf.Max(
+                existingSlowdown,
+                Mathf.Clamp01(slowdownInfluence));
 
             obstacleRoutingHalfData[baseIndex] = Mathf.FloatToHalf(
-                Mathf.Clamp(direction, -1f, 1f));
+                resolvedSignedRouting);
             obstacleRoutingHalfData[baseIndex + 1] = Mathf.FloatToHalf(
-                Mathf.Clamp01(influence));
+                resolvedSlowdown);
         }
 
         private static float ResolveNeutralThreshold(

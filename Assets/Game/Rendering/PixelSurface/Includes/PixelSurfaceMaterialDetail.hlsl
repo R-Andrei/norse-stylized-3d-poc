@@ -17,6 +17,8 @@ struct PS3D_StylizedSurfaceDetail
     float substrateFormSigned;
     float substrateRoughness;
     float featureMask;
+    float2 featureCenterOffsetNormalized;
+    float featureMaximumSupportRadiusUv;
 };
 
 PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
@@ -36,6 +38,8 @@ PS3D_StylizedSurfaceDetail PS3D_ZeroStylizedSurfaceDetail()
     result.substrateFormSigned = 0.0;
     result.substrateRoughness = 0.5;
     result.featureMask = 0.0;
+    result.featureCenterOffsetNormalized = float2(1.0, 1.0);
+    result.featureMaximumSupportRadiusUv = 0.0;
     return result;
 }
 
@@ -66,6 +70,23 @@ PS3D_StylizedSurfaceDetail PS3D_DecodeStylizedSurfaceDetail(
 
     result.textureFormPayload = step(0.5, detailC.z);
     result.featureTextureFormPayload = step(1.5, detailC.z);
+    result.substrateRoughness = lerp(
+        0.5,
+        saturate(detailB.z),
+        result.featureTextureFormPayload);
+    float rawSlopeEvidence = length(packedSample.rg * 2.0 - 1.0);
+    // Whole-feature suppression replaces packed roughness as well as form,
+    // slope, and cavity. The 0.008 gate exceeds the measured substrate-scalar
+    // deviation plus one 8-bit half-step.
+    float rawRoughnessEvidence = abs(
+        saturate(packedSample.a) - result.substrateRoughness);
+    float rawFeatureEvidence = max(
+        max(
+            step(0.008, rawSlopeEvidence),
+            step(0.001, packedSample.b)),
+        step(0.008, rawRoughnessEvidence));
+    result.featureMask =
+        rawFeatureEvidence * result.featureTextureFormPayload;
     float packedVariation = packedSample.a * 2.0 - 1.0;
     result.formSigned =
         packedVariation * max(0.0, detailB.z) *
@@ -76,6 +97,8 @@ PS3D_StylizedSurfaceDetail PS3D_DecodeStylizedSurfaceDetail(
     result.roughness = saturate(packedSample.a);
     result.roughnessVariationStrength =
         saturate(detailC.w) * result.textureFormPayload;
+    result.featureMaximumSupportRadiusUv =
+        max(0.0, detailC.x) * result.featureTextureFormPayload;
     return result;
 }
 
@@ -91,9 +114,14 @@ PS3D_StylizedSurfaceDetail PS3D_AssignStylizedSurfaceTextureForm(
         (normalizedForm * 2.0 - 1.0) * strength;
     detail.substrateFormSigned =
         (saturate(formSample.g) * 2.0 - 1.0) * strength;
-    detail.substrateRoughness = saturate(formSample.b);
-    detail.featureMask =
-        saturate(formSample.a) * detail.featureTextureFormPayload;
+    detail.featureCenterOffsetNormalized =
+        saturate(float2(formSample.b, formSample.a)) * 2.0 - 1.0;
+    float formFeatureEvidence = step(
+        0.001,
+        abs(saturate(formSample.r) - saturate(formSample.g)));
+    detail.featureMask = max(
+        detail.featureMask,
+        formFeatureEvidence * detail.featureTextureFormPayload);
     detail.textureFormStrength = strength;
     detail.sceneLightingResponse = saturate(formA.w);
     return detail;

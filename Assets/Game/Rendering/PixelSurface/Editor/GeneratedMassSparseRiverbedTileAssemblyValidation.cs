@@ -56,6 +56,14 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private const float MaximumSubstrateOnlyFormMean = 0.70f;
         private const float MinimumSubstrateOnlyRoughnessMean = 0.55f;
         private const float MaximumSubstrateOnlyRoughnessMean = 0.80f;
+        private const float MaximumFeatureSubstrateRoughnessDeviation = 0.025f;
+        private const float MinimumFeatureSupportRadiusUv = 0.001f;
+        private const float MaximumFeatureSupportRadiusUv = 0.25f;
+        private const float MinimumFeatureAnchorDistanceMaximum = 0.70f;
+        private const float MaximumFeatureAnchorDistanceMean = 0.95f;
+        private const float MaximumFeatureAnchorCenterErrorUv = 0.01f;
+        private const float MaximumFeatureAnchorRetentionSpread = 0.01f;
+        private const int MinimumFeatureAnchorAcceptedMip = 3;
 
         private sealed class AcceptedSourceContract
         {
@@ -177,7 +185,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             if (failures.Count > 0)
             {
                 Debug.LogError(
-                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
+                    "[GSU-M2.7C.5E.2.4B] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof failed " + failures.Count +
                     " check(s). Report written to " + ReportPath +
                     " and copied to the clipboard.");
@@ -185,7 +193,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             else if (warnings.Count > 0)
             {
                 Debug.LogWarning(
-                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
+                    "[GSU-M2.7C.5E.2.4B] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof passed with " +
                     warnings.Count + " source-drift warning(s). Report " +
                     "written to " + ReportPath +
@@ -194,7 +202,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             else
             {
                 Debug.Log(
-                    "[GSU-M2.7C.5E.2.2] Generated Mass feature-payload " +
+                    "[GSU-M2.7C.5E.2.4B] Generated Mass feature-payload " +
                     "ultra-sparse assembly proof passed mechanical " +
                     "validation. Report written to " + ReportPath +
                     " and copied to the clipboard. Visual substrate and " +
@@ -955,6 +963,64 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     FormatFloat(MaximumSubstrateOnlyRoughnessMean) + ".");
             }
 
+            if (candidate.FeatureSubstrateRoughnessMaximumDeviation >
+                    MaximumFeatureSubstrateRoughnessDeviation ||
+                candidate.FeatureMaximumSupportRadiusUv <
+                    MinimumFeatureSupportRadiusUv ||
+                candidate.FeatureMaximumSupportRadiusUv >
+                    MaximumFeatureSupportRadiusUv)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": feature scalar roughness/deviation/max-radius-UV is " +
+                    FormatFloat(candidate.FeatureSubstrateRoughness) + " / " +
+                    FormatFloat(
+                        candidate.FeatureSubstrateRoughnessMaximumDeviation) +
+                    " / " +
+                    FormatFloat(candidate.FeatureMaximumSupportRadiusUv) +
+                    "; accepted maximum roughness deviation is " +
+                    FormatFloat(
+                        MaximumFeatureSubstrateRoughnessDeviation) +
+                    " and radius range is " +
+                    FormatFloat(MinimumFeatureSupportRadiusUv) + "–" +
+                    FormatFloat(MaximumFeatureSupportRadiusUv) + ".");
+            }
+
+            if (candidate.FeatureAnchorOwnerMismatchCount != 0 ||
+                candidate.FeatureAnchorInvalidSampleCount != 0 ||
+                candidate.FeatureAnchorInconsistentRockCount != 0 ||
+                candidate.FeatureResponseUngatedPixelCount != 0 ||
+                candidate.FeatureAnchorDistanceMaximum <
+                    MinimumFeatureAnchorDistanceMaximum ||
+                candidate.FeatureAnchorDistanceMean > MaximumFeatureAnchorDistanceMean ||
+                candidate.FeatureAnchorMaximumCenterErrorUv >
+                    MaximumFeatureAnchorCenterErrorUv ||
+                candidate.FeatureAnchorMaximumRetentionSpread >
+                    MaximumFeatureAnchorRetentionSpread ||
+                candidate.FeatureAnchorLastAcceptedMip <
+                    MinimumFeatureAnchorAcceptedMip)
+            {
+                failures.Add(
+                    candidate.Definition.StableId +
+                    ": non-ID centre-anchor proof failed. owner mismatches / invalid / " +
+                    "inconsistent rocks / ungated emitted-response pixels = " +
+                    candidate.FeatureAnchorOwnerMismatchCount + " / " +
+                    candidate.FeatureAnchorInvalidSampleCount + " / " +
+                    candidate.FeatureAnchorInconsistentRockCount + " / " +
+                    candidate.FeatureResponseUngatedPixelCount +
+                    ", anchor-distance min/mean/max = " +
+                    FormatFloat(candidate.FeatureAnchorDistanceMinimum) + " / " +
+                    FormatFloat(candidate.FeatureAnchorDistanceMean) + " / " +
+                    FormatFloat(candidate.FeatureAnchorDistanceMaximum) +
+                    ", centre/spread = " +
+                    FormatFloat(
+                        candidate.FeatureAnchorMaximumCenterErrorUv) + " / " +
+                    FormatFloat(
+                        candidate.FeatureAnchorMaximumRetentionSpread) +
+                    ", last accepted mip = " +
+                    candidate.FeatureAnchorLastAcceptedMip + ".");
+            }
+
             if (string.IsNullOrEmpty(candidate.PalettePayloadFingerprint) ||
                 string.IsNullOrEmpty(
                     candidate.PalettePreviewNeutralFingerprint) ||
@@ -1115,8 +1181,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         {
             StringBuilder builder = new StringBuilder(32768);
             builder.AppendLine(
-                "GENERATED MASS FEATURE-AWARE PALETTE-NEUTRAL SPARSE RIVERBED " +
-                "RUNTIME PAYLOAD PROOF — GSU-M2.7C.5E.2.2");
+                "GENERATED MASS NON-ID WHOLE-ROCK SPARSE RIVERBED " +
+                "RUNTIME PAYLOAD PROOF — GSU-M2.7C.5E.2.4B");
             builder.AppendLine(
                 "Generated UTC: " +
                 DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
@@ -1135,8 +1201,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             builder.AppendLine(
                 "Source contract: frozen 18-rock algorithm-8 library, " +
                 "unified wear 0.52, fallback wear 0.56, frozen Moderate " +
-                "response; exact-count sparse composition plus paired " +
-                "palette-form and packed-detail proof payload.");
+                "response; exact-count sparse composition plus paired algorithm-10 " +
+                "centre-anchor Palette Form and packed-detail proof payload.");
             builder.AppendLine();
 
             builder.AppendLine("DETERMINISM");
@@ -1406,6 +1472,37 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 FormatFloat(candidate.FeatureMaskMaximum) + " — " +
                 FormatFloat(candidate.SubstrateOnlyFormMean) + " / " +
                 FormatFloat(candidate.SubstrateOnlyRoughnessMean));
+            builder.AppendLine(
+                "    Feature substrate roughness scalar: " +
+                FormatFloat(candidate.FeatureSubstrateRoughness));
+            builder.AppendLine(
+                "    Feature maximum support radius UV: " +
+                FormatFloat(candidate.FeatureMaximumSupportRadiusUv));
+            builder.AppendLine(
+                "    anchor distance min/mean/max: " +
+                FormatFloat(candidate.FeatureAnchorDistanceMinimum) + " / " +
+                FormatFloat(candidate.FeatureAnchorDistanceMean) + " / " +
+                FormatFloat(candidate.FeatureAnchorDistanceMaximum));
+            builder.AppendLine(
+                "    anchor owner mismatches / invalid samples / inconsistent rocks / ungated emitted-response pixels: " +
+                candidate.FeatureAnchorOwnerMismatchCount + " / " +
+                candidate.FeatureAnchorInvalidSampleCount + " / " +
+                candidate.FeatureAnchorInconsistentRockCount + " / " +
+                candidate.FeatureResponseUngatedPixelCount);
+            builder.AppendLine(
+                "    geometric-mask pixels with neutral emitted response: " +
+                candidate.FeatureNeutralGeometricMaskPixelCount);
+            builder.AppendLine(
+                "    anchor max centre error UV and retention spread: " +
+                FormatFloat(candidate.FeatureAnchorMaximumCenterErrorUv) + " / " +
+                FormatFloat(candidate.FeatureAnchorMaximumRetentionSpread));
+            builder.AppendLine(
+                "    anchor last accepted mip: " +
+                candidate.FeatureAnchorLastAcceptedMip);
+            builder.AppendLine(
+                "    retired roughness-field maximum scalar deviation: " +
+                FormatFloat(
+                    candidate.FeatureSubstrateRoughnessMaximumDeviation));
             builder.AppendLine(
                 "    palette payload fingerprint: " +
                 candidate.PalettePayloadFingerprint);

@@ -1,3 +1,217 @@
+## 2026-07-23 — Complete feature-response gating for algorithm-10 centre anchors
+
+The algorithm-10 centre-anchor contract remains unchanged. The correction is limited to reconstructing whether the emitted paired payload contains any discrete-rock response that must receive whole-feature retention.
+
+For feature texture-form entries, runtime feature evidence is the union of four independently emitted responses:
+
+```text
+slope evidence     = length(packed RG remapped to -1..1) >= 0.008
+cavity evidence    = packed B >= 0.001
+form evidence      = abs(Palette Form R - Palette Form G) >= 0.001
+roughness evidence = abs(packed A - substrate roughness scalar) >= 0.008
+feature mask       = max(slope, cavity, form, roughness evidence)
+```
+
+The roughness term is mandatory because whole-feature suppression replaces packed rock roughness with the substrate-only roughness scalar. Omitting it permits a roughness-only rock fragment to survive when slope, cavity, and combined/substrate form have already returned to neutral. The `0.008` threshold is above the measured candidate-wide substrate-field deviation plus 8-bit half-step bound: `0.00527 + 0.00196 = 0.00723`.
+
+The proof reconstructs the mask from the actual encoded Palette Form and Runtime Packed Detail bytes using the same thresholds. It distinguishes:
+
+- **ungated emitted-response pixels:** any pixel with meaningful slope, cavity, form, or roughness response for which the reconstructed runtime feature mask is zero; this is a hard failure and must be zero;
+- **geometric-mask pixels with neutral emitted response:** raw source-raster occupancy that emits no meaningful runtime rock response after silhouette filtering and payload encoding; this remains diagnostic and does not fail the proof.
+
+No payload channel, texture sample, algorithm version, centre-anchor reconstruction, support radius, installer identity, Ground property transport, Bank/Riverbed caller, or 2.4A.2 composition changes. Runtime cost is one absolute difference, one threshold comparison, and one maximum operation in feature-texture-form decode.
+
+---
+
+## 2026-07-22 — Non-ID whole-rock application-boundary retention
+
+Feature-aware sparse-riverbed payloads no longer treat one rock as unrelated fragments at a Bank or Riverbed application boundary. The current paired Palette Form contract is:
+
+- `R`: complete substrate-plus-rock form;
+- `G`: substrate-only form;
+- `B`: signed world-tile X offset from the owning placement centre, normalized by the candidate-wide conservative support radius and remapped to `0–1` through sRGB RGB encoding;
+- `A`: the matching signed Y offset, normalized/remapped identically but stored as linear alpha.
+
+The reusable detail-library entry owns two scalar companions: measured substrate-only roughness and the candidate-wide conservative support radius in tile UV. Ground transports them through vector components already inactive for feature texture-form response. No ShaderLab property, texture, sample, mesh stream, ID, search array, or runtime CPU lookup is added.
+
+ForwardLit decodes the centre-offset vector directly. It does not differentiate sampled feature data and does not infer radius from a quantized gradient. The conservative support radius is candidate-wide: it equals the largest placement's circumscribed radius plus one final-payload texel, so smaller rocks can be removed early but cannot be spatially cut.
+
+The shader solves one guarded screen-derivative Jacobian for the coherent interpolated application inward-distance field, translates that distance from the current fragment to the reconstructed rock centre, subtracts the conservative support radius, and applies one hard or faded retention value. Invalid Jacobians are conservatively suppressed; the algorithm-10 proof must report zero invalid accepted feature samples before installation.
+
+This contract is independent of the accepted 2.4A.2 direct Bank/Riverbed handoff. Dry composition, wetness, cover, Riverbed Support, and corridor UV3 remain unchanged. Canonical order is: compile ForwardLit, run algorithm-10 proof, then run the fixed-path installer.
+
+
+## 2026-07-22 — GSU-M2.7C.5E.2.4A.2 normalized direct Bank–Riverbed handoff contract
+
+This section supersedes the 2.4A/2.4A.1 use of product-based sequential coverage and bounded-union same-surface coverage. Those formulas preserve a positive Primary-Ground coefficient whenever Bank and Riverbed are both fractional and therefore cannot remove a Primary-Ground-coloured internal strip.
+
+### Proven dry-substrate ownership
+
+The Bank and Riverbed are two secondary applications over Primary Ground. Their raw authored participation values remain independently resolved, but substrate ownership is normalized from their combined participation:
+
+```hlsl
+bank = saturate(bankMaterialBlend);
+riverbed = saturate(riverbedMaterialBlend);
+rawTotal = bank + riverbed;
+secondaryCoverage = saturate(rawTotal);
+normalization = rawTotal > 0.0
+    ? secondaryCoverage / rawTotal
+    : 0.0;
+
+primaryWeight = 1.0 - secondaryCoverage;
+bankWeight = bank * normalization;
+riverbedWeight = riverbed * normalization;
+```
+
+The three weights are non-negative and sum to one. When `bank + riverbed >= 1`, `primaryWeight` is exactly zero. Different Bank and Riverbed materials therefore transition directly in their raw participation ratio instead of revealing an unrelated third substrate.
+
+The same weight triplet continues to own:
+
+- dry albedo and authored colour;
+- packed and Palette Form response;
+- normal slope;
+- cavity;
+- roughness and finish variation;
+- smoothness;
+- specular strength;
+- texture-form lighting response.
+
+Wetness, Shore highlight, cover retreat, submerged-cover exclusion, and hydrology remain separate and unchanged.
+
+### Equivalent dry surface
+
+When Bank and Riverbed resolve the same dry layer with equivalent dry-detail application multipliers, their shared application coverage is the same normalized total:
+
+```text
+sharedCoverage = saturate(bank + riverbed)
+```
+
+The Bank detail evaluator receives `sharedCoverage`. Both detail evaluators remain invoked unconditionally for FXC stability, but the final equivalent-surface weights are:
+
+```text
+Primary Ground = 1 - sharedCoverage
+Shared Bank detail = sharedCoverage
+Riverbed detail = 0
+```
+
+This preserves one continuous dry material across the internal boundary without a material-controlled branch around texture sampling.
+
+### Boundary Bank continuation
+
+Riverbed replaces a resolved lower Bank result. The boundary Bank application is held through the complete Riverbed application domain using existing corridor values only.
+
+At the exact Riverbed boundary:
+
+```text
+boundary Bank inward distance =
+    Bank inward distance
+    - Riverbed inward distance
+    + Bank outward distance
+```
+
+This identity follows directly from the frozen UV3 distances on both sides of exact Riverbed Support. It reconstructs the same terrain-handoff-to-waterline distance throughout the fractional-support strip and the Riverbed interior.
+
+The exact boundary Shore mask is the frozen corridor value produced by `StylizedRiverCorridorGeometry.ResolveCorridorShoreInfluence` at `acrossDistance == visibleHalfWidth`:
+
+```text
+pow(0.52, 1.32) = 0.4218173
+```
+
+The boundary outer-extension contribution is:
+
+```text
+enabled(extension) × Outer Bank Strength
+```
+
+because outward distance is zero at the Riverbed boundary. The continued Bank result therefore includes the authored outer-extension contribution and uses the boundary-relative Bank application transition rather than the current fragment's changing support-side distances.
+
+### Unchanged contracts
+
+- Corridor topology and UV3 production are unchanged.
+- `_CLUSTER_LIGHT_LOOP` remains unchanged.
+- No texture sample, property, CBUFFER member, varying, array, loop, ID, metadata texture, draw call, runtime allocation, generated asset, or per-frame CPU work is added.
+- The feature-aware Palette Form payload and per-fragment feature retention remain unchanged pending the separate non-ID whole-rock update.
+- Shore wetness, Riverbed wetness, waterline highlight, vegetation, snow, frost, Painted Accent exclusion, and cover-retention formulas are unchanged.
+
+---
+
+## 2026-07-22 — GSU-M2.7C.5E.2.4A Bank/Riverbed dry-surface continuity contract
+
+This section supersedes the E2.1 assumption that the ordinary Bank application weight is always a complete lower layer beneath Riverbed. The accepted corridor stream is unchanged:
+
+```text
+TEXCOORD3.x = exact Riverbed Support
+TEXCOORD3.y = outward Bank distance in metres from Riverbed Support
+TEXCOORD3.z = inward Bank distance in metres from the terrain handoff
+TEXCOORD3.w = inward Riverbed distance in metres from Riverbed Support
+```
+
+### Lower-layer continuity
+
+Riverbed continues to replace the already-resolved lower dry result. The Bank lower layer must therefore remain evaluable throughout the complete Riverbed application domain, including the inward Riverbed transition where exact support may still be fractional.
+
+```text
+riverbed application domain =
+    River-coupled renderer authorization
+    × step(epsilon, Riverbed Support + Riverbed inward distance)
+
+bank continuation =
+    Bank edge material application
+    × riverbed application domain
+    × Riverbed material application enabled
+
+resolved Bank application =
+    max(ordinary Bank application, bank continuation)
+```
+
+Continuation fills a missing lower-layer value. It is not a second Bank application and must not be added to the ordinary Bank weight.
+
+Different Bank and Riverbed dry layers retain the accepted sequential composition:
+
+```text
+Primary = (1 - Bank) × (1 - Riverbed)
+Bank = Bank × (1 - Riverbed)
+Riverbed = Riverbed
+```
+
+Primary Ground is therefore never introduced merely because Bank authorization was removed underneath an active Riverbed transition.
+
+### Equivalent dry-surface continuation
+
+One material-refresh-time scalar identifies the conservative exact case in which Bank and Riverbed use the same non-null `GroundSurfaceLayerProfile` and all eight Ground-owned dry-detail multipliers are equivalent. Hydrology, cover retention, material strengths, application transitions, and feature-edge controls remain independent and are excluded from this equivalence test.
+
+For this exact case, the two sequential applications represent the same dry response. Their combined application weight must preserve the existing sequential algebra:
+
+```text
+shared application = 1 - (1 - Bank) × (1 - Riverbed)
+```
+
+The shader evaluates Bank dry detail at the shared application weight and composes:
+
+```text
+Primary = 1 - shared application
+Shared dry surface = shared application
+Riverbed dry slot = 0
+```
+
+The shared path uses Bank feature retention relative to the outer Bank/Primary-Ground boundary. Riverbed detail remains evaluated in the branchless ForwardLit path for FXC stability but receives zero final dry weight, so its independent feature suppression does not contribute at the internal Bank/Riverbed boundary. Duplicate-sample removal is deferred until it can be implemented without restructuring the large detail-evaluation control flow.
+
+### Preserved independent response
+
+The following contracts remain unchanged and are not merged by dry-surface equivalence:
+
+- Shore hydrology and Riverbed hydrology;
+- exact Riverbed Support;
+- submerged vegetation, snow, frost, and Painted Accent exclusion;
+- Bank cover retreat;
+- Shore highlight response;
+- Riverbed submerged finish;
+- corridor geometry, UV streams, renderer authorization, and debug views.
+
+The update adds one scalar material property and constant-time material-refresh comparison. It adds no texture sample beyond the accepted rollback baseline, draw call, mesh stream, generated asset, runtime allocation, or per-frame CPU work. Both detail evaluators retain their baseline invocation shape; equivalent-surface selection occurs through scalar arguments and substrate weights rather than a material-controlled branch over texture-sampling structure assignments.
+
+---
+
 ## 2026-07-22 — GSU-M2.7C.5E.2.2 feature-aware application-boundary contract
 
 This section extends the accepted E2.1 generic Bank and Riverbed application transition without changing corridor-channel meanings or hydrology.

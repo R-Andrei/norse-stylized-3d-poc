@@ -4832,3 +4832,99 @@ A guarded zero-alpha fallback migrates transient pre-P13 RGB state without clear
 Nineteen existing files are modified: five canonical documents, six River authoring/editor/diagnostic C# files, two runtime state/diagnostic C# files, four compute contract/implementation files, and the shared River Foam include plus its sole production shader consumer. No file, metadata, scene, prefab, material, cache, texture, buffer, kernel, dispatch, pass, draw call, layer, tag, or component is created, removed, moved, or renamed.
 
 Persistent memory and dispatch counts are unchanged. TVD arithmetic changes but remains one bounded reconstruction per interior face; cost is unmeasured. More visible/live Foam is an intentional correctness consequence and requires later explicit tuning rather than hidden suppression. Offline model/static validation passes 25/25 checks; Unity compilation, live visual/lifetime evidence, and profiler measurements remain pending.
+
+
+## RG-METRIC-P13B — Packet-rearmed birth and object-contact retention
+
+P13B changes automatic Layer C source ownership and the existing obstacle velocity field; it does not change the P13A material packing, transport schemes, Final Visibility modes, Presence Footprint modes, lifecycle, or P12t Chipping.
+
+Automatic-source contract:
+
+- Shore and Free-Water have fixed deterministic slot spacing. Coverage selects a stable share of those slots. Activity is linear from zero to the existing maximum attempt rate.
+- Each accepted slot is rearmed only after its event duration plus a distance-derived Minimum Packet Gap. Contact Flecks use per-object active/rearm ownership and cannot start while the same object owns an active contact cycle.
+- Current-minus-previous reveal is a permission test; newly reached cells receive the complete current Coverage target. This prevents repainting behind the head without making Coverage depend on reveal cadence.
+- Fleck reveal is spatial. Arc/Semi-Arc wakes are one-shot Build products. Only the immediate contact front is refreshed during Hold and progressively withdrawn during Release.
+- Flecks are independent of the normalized Arc/Semi-Arc cycle mix and are controlled directly by Fleck Coverage, Activity, and packet gap.
+
+Obstacle velocity contract:
+
+```text
+existing RGHalf obstacle texture
+R = signed lateral-routing influence
+G = independent slowdown influence
+```
+
+The existing one-sided collision route remains. A narrow dirty-time all-side contact halo writes slowdown only, allowing front/side/rear Foam to approach the exact authored Minimum Downstream Factor without lateral redirection. No texture, buffer, upload class, compute kernel, shader sample, pass, or draw call is added.
+
+Control cleanup removes automatic-source Breakup Strength authoring and shader evaluation, Lace/Cross-Lace gap masks, Torn Fragment bite masks, Fleck mix weight, and confirmed unused Arc/Semi-Arc arm-reach/lopsidedness controls. Reserved event-record lanes remain structurally present for ABI compatibility.
+
+Expected aggregate runtime work is lower because slots cannot immediately restart, finite packets stop writing behind their heads, and object wake arms are not refreshed after Build. Added CPU work is bounded rearm lookup and obstacle-dirty contact stamping; velocity adds a bounded multiply-and-lerp falloff calculation without a transcendental operation. Measured performance remains pending Unity profiling. P13B offline validation is `28/28 PASS`; Unity compilation, D3D11 import, Play Mode visual acceptance, and profiling remain pending.
+
+
+### Implementation details
+
+- Fixed slot spacing: Shore `3.5 m`; Free Water `4.0 m`; neither scales with Coverage.
+- Existing maximum attempt rates remain Shore `5.0/s`, Free Water `1.10/s`, Fleck `3.0/s`; Activity multiplies these linearly.
+- Clearance uses the current River flow speed × Foam Downstream Speed Ratio, clamped to a `0.05 m/s` denominator floor. Object Flecks include the active obstacle minimum-speed factor when slowdown is enabled.
+- Contact slowdown reach is `0.45 m`, with full influence inside `0.10 m`, evaluated only when the obstacle field is rebuilt.
+- The source event GPU struct, seven float4 payload vectors, 32-event pool, dispatch range mechanism, kernels, and texture formats are unchanged.
+
+### Pending Unity acceptance
+
+1. Warning-free C# and D3D11 shader import.
+2. At maximum Activity/Coverage, each logical source produces separated finite packets rather than a continuously repainted reservoir.
+3. Arc/Semi-Arc wake arms move away and are not restored during Hold; immediate contact Foam remains replenished and slows near all object sides.
+4. Full slowdown influence reaches the Inspector Minimum Downstream Factor exactly.
+5. Removed controls do not appear in the Inspector and no missing-property editor errors occur.
+6. Profiler comparison confirms no new active-gameplay full-field work and records the actual dispatch reduction.
+
+## RG-METRIC-P13C — One-shot object packets and full-vector contact retention
+
+### Problem closed by this patch
+
+P13B left Object Arc/Semi-Arc contact-front material as a persistent Hold/Release emitter. That source continuously replaced material transported away from the obstacle, producing conveyor-belt wake trails. The P13B slowdown field also scaled only downstream velocity, allowing the lateral routing component to remain near full speed and carry material around the object instead of retaining it.
+
+### Object source contract
+
+1. Arc, Semi-Arc, and Fleck are finite one-shot events.
+2. Arc/Semi-Arc duration is resolved Build duration only. The accepted progressive source path and reveal-speed resolver remain unchanged.
+3. Every source location is written only when current-minus-previous Build permission reaches it. No source dispatch occurs after Build completion.
+4. Hold, Release, Rest, Fleck-specific gap state, and the persistent-contact bypass are removed rather than migrated into hidden mechanics.
+5. Every object anchor owns one shared source state: cycle index, next eligible time, and last successful recipe. Arc/Semi-Arc/Fleck cannot run concurrently for the same object.
+6. In Mixed mode a completed Fleck yields the next eligible opportunity to Arc/Semi-Arc before another Fleck can win, preserving supplemental Fleck ownership.
+
+### Rearm contract
+
+```text
+baseSpeed = abs(flow speed) × liquid factor × Foam downstream ratio
+contactFactor = slowdown disabled ? 1 : authored minimum speed factor
+haloTime = authored outer slowdown reach / (baseSpeed × contactFactor)
+gapTime = authored object packet gap / baseSpeed
+nextEligible = event completion + haloTime + gapTime
+```
+
+Zero base speed yields no automatic rearm. Positive contact slowdown with minimum factor zero also yields no automatic rearm; changing the relevant authority resets waiting inactive states so authoring can recover without regenerating the River.
+
+### Velocity contract
+
+The existing signed routing and slowdown channels remain:
+
+```text
+R = signed lateral-routing influence
+G = contact-slowdown influence
+```
+
+The shader first resolves normal downstream/lateral routing, then multiplies the complete `float2` by one contact speed factor. At full influence the entire vector reaches the exact authored minimum factor. The previously hidden `0.10 m` full reach and `0.45 m` outer reach become authored controls with the same defaults and `outer >= full >= 0` validation.
+
+### Inspector and diagnostics
+
+- Remove Object Hold, Release, Rest, and Fleck-specific packet-gap controls.
+- Add `Object Contact Minimum Packet Gap (m)` under Object Foam. The obsolete Fleck-only serialized value is not migrated because it had narrower ownership; existing components receive the new shared default `1.0 m`.
+- Add `Object Contact Full Slowdown Reach (m)` and `Object Contact Slowdown Outer Reach (m)` under Layer B.
+- Relabel the existing serialized slowdown fields as `Object Contact Slowdown Falloff` and `Object Contact Minimum Speed Factor` without renaming serialized backing fields.
+- Replace obsolete Build/Hold/Release/Rest diagnostic counters with Arc/Semi-Arc building, Fleck building, and waiting-for-clearance counts.
+
+### Scope and performance
+
+Eighteen existing project files are modified: five canonical documents; River authoring and two Editor files; eight runtime partials; the source compute file; and the shared velocity include. No project file is created, deleted, moved, or renamed. No runtime allocation/resource/pass/sample count is added. Build-only event occupancy and dispatch count are expected to decrease. Offline validation passes `35/35`; measured performance remains pending Unity profiling.
+

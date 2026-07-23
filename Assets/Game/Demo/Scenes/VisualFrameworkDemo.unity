@@ -8813,42 +8813,48 @@ MonoBehaviour:
   edgeSoftness: 0.15
   strengthOpacityInfluence: 0
   variationOpacityInfluence: 0
-  maximumActiveTrails: 5
-  spawnAttemptsPerSecond: 2
+  maximumActiveTrails: 4
+  spawnAttemptsPerSecond: 1
   candidateGridResolution: 8
   strongestCandidateSubset: 6
   candidateCellJitter: 0.7
   trailSeed: 6247
-  minimumWindStrength: 0.18
+  minimumWindStrength: 0.15
   strengthScoreExponent: 2
   spacingScoreExponent: 1
-  minimumTrailSeparationMetres: 8
+  minimumTrailSeparationMetres: 10
   separationCooldownSeconds: 3
   maximumCentrelinePoints: 80
   integrationStepMetres: 0.5
+  renderCurveSubdivisionsPerBackboneSection: 8
   minimumPathWindStrength: 0.12
   minimumCompletedPathLengthMetres: 4
   maximumTurnDegreesPerSegment: 55
   selfApproachDistanceMetres: 0.3
   minimumSegmentWindAlignment: 0.35
-  minimumAliveDurationSeconds: 7
-  maximumAliveDurationSeconds: 11
+  minimumAliveDurationSeconds: 6
+  maximumAliveDurationSeconds: 10
   minimumWidthMetres: 0.05
-  maximumWidthMetres: 0.1
+  maximumWidthMetres: 0.08
   minimumPresentationSpeed: 1.1
   maximumPresentationSpeed: 1.75
-  minimumVisibleBodyLengthMetres: 7
-  maximumVisibleBodyLengthMetres: 10
+  minimumVisibleBodyLengthMetres: 4
+  maximumVisibleBodyLengthMetres: 7
   lifecycleTipSpeedAllowance: 0.75
   pointedEndLengthMetres: 0.75
   minimumAltitudeMetres: 1.5
   maximumAltitudeMetres: 2.8
   maximumVerticalDeviationMetres: 0.2
-  occasionalBroadWaveChance: 0.2
-  occasionalBroadWaveStrengthMetres: 0.3
+  minimumLateralWobbleStrengthMetres: 0.18
+  maximumLateralWobbleStrengthMetres: 0.3
+  minimumLateralWobbleWavelengthMetres: 3.5
+  maximumLateralWobbleWavelengthMetres: 5
+  occasionalLargerLoopChance: 0.2
+  occasionalLargerLoopExtraStrengthMetres: 0.3
   trailOpacity: 0.96
-  serializedBaselineVersion: 2
-  candidateViewportMargin: 0.12
+  serializedBaselineVersion: 4
+  candidateViewportMargin: 0.05
+  cameraSpawnPreference: 0.75
 --- !u!1 &1356653794
 GameObject:
   m_ObjectHideFlags: 0

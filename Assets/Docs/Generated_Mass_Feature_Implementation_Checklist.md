@@ -22,10 +22,10 @@ Historical ledger rule: sections below preserve method history and old acceptanc
 ## Active feature
 
 ```text
-EW-C1A.3 — Single-chip generalization and Inspector cleanup
+EW-C1A.3d — Validation-suite de-duplication and research scheduling
 ```
 
-EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 removes the superseded duplicate corner-preview workflow, makes the existing edge-wear preview corner-aware, and adds the internal 33-case single-chip matrix to the existing one-click suite. Unity compilation and the complete matrix remain pending user validation.
+EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3c now owns the one-final-build corner search, but its first Unity suite never reached the corner stage: the already-passing current-preview, Macro, topology, and duplicate 33-case artistic-materialization work consumed `59,008.2899 ms` and exhausted the former `58 s` global boundary with `cornerChippingCases=0/0`. EW-C1A.3d de-duplicates validation scheduling without changing generation: topology remains exhaustive `33/33`, artistic ranking is fingerprinted over all 33 captured topology cases, the corner matrix runs next, and only 12 difficult artistic sentinels are deeply materialized afterward. The research-only whole-suite boundary is `90 s`; enabled corner generation remains hard-bounded at `4 s` per rock and the corner matrix at `35 s`. Unity compilation and runtime validation remain pending.
 
 ## Visual-development sequence
 
@@ -37,7 +37,10 @@ EW-C1A-RO2 pre-bevel ordering/ownership audit [complete]
 EW-C1A.1  transactional pre-bevel corner cut and provenance proof [implemented; transaction accepted]
 EW-C1A.1a one polygon, one render surface [accepted and frozen through EW-C1A.1a.8]
 EW-C1A.2  cap-ring bevel integration and raw/integrated seed proof [complete]
-EW-C1A.3  unified authoring workflow and 33-case single-chip acceptance [implemented; Unity pending]
+EW-C1A.3  unified authoring workflow and 33-case single-chip acceptance [superseded by C1A.3b performance repair]
+EW-C1A.3b bounded staged single-corner certification [superseded by C1A.3c]
+EW-C1A.3c complete integration preflight and one-final-build search [implemented; runtime not yet exercised]
+EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity validation pending]
 EW-C2      sparse chips, notches, and break events
 EW-N1      final artistic normal shaping across all accepted worn geometry
 EW-F1      broad-face finish, cracks, and crevices
@@ -7741,3 +7744,224 @@ The final failed result retains the deepest deterministic blocker in this order:
 - Exact scope is nine modified files across the unchanged `331`-file tree; frozen clipping, orchestration, shell, triangulation, final-normal, settings, shader, mesh-channel, and production owners remain byte-identical.
 - The changed-files ZIP and unified patch each reproduced the complete final `331/331`-file tree byte-for-byte, and ZIP CRC validation passed.
 - Unity compilation and the `33/33` runtime matrix remain pending.
+
+
+#### EW-C1A.3d — Validation-suite de-duplication and research scheduling
+
+**Patch identifier:** `EW-C1A.3d`
+
+**Status:** [implemented; static/compliance validation pending completion; Unity validation pending].
+
+**Objective:** ensure the existing one-click validator reaches the EW-C1A.3c corner matrix instead of exhausting its global budget in already-passing duplicate regressions. Preserve the exhaustive 33-case topology matrix, derive a 33-case artistic-selection fingerprint contract from its captured edge records, move the corner matrix before artistic mesh materialization, and materialize only the fixed 12-case difficult artistic sentinel set inside the one-click suite. The standalone Artistic Preview Parity Matrix remains exhaustive. The development-only complete-suite hard stop increases from `58 s` to `90 s`; the enabled per-rock corner hard stop remains `4 s`, below the user's stated `5 s` maximum.
+
+**Approved files:**
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Reviewed evidence:**
+
+- Unity report `Pasted text(140).txt` reports `totalElapsedMs=59008.2899`, `totalBudgetExceeded=1`, and `cornerChippingCases=0/0`; the 58-second boundary was exhausted before the corner stage.
+- The same report records current preview `2487.1697 ms`, Macro contract `6445.3241 ms`, topology `33/33`, artistic preview `33/33`, and only `2.125 ms` in the unstarted corner stage.
+- `GeneratedMassEditor.FinishEdgeWearViabilityMatrix` currently orders topology -> full 33-case artistic preview -> corner, so the active feature is scheduled after the duplicate materialization stage.
+- `GeneratedMassEditor.EvaluateEdgeWearViabilityMatrixCase` uses `GenerateUnifiedEdgeWearBatchAuditCase` for topology and `GenerateUnifiedEdgeWearPreviewParityAuditCase` for artistic parity. The topology path includes every geometric candidate; it is not byte-equivalent to the ordinary artistic baseline used by `GenerateUnifiedEdgeWearPreviewBaseline`. Therefore the topology mesh cannot truthfully replace the corner matrix's existing one-per-seed ordinary baseline cache without changing semantics.
+- Every topology result already captures `ArtisticEdges`, artistic eligibility, scores, and deterministic source-edge identities. These records are sufficient for a non-emitting 33-case artistic-selection fingerprint contract.
+- Git metadata is absent from the supplied archive. The accepted reconstructed EW-C1A.3c tree is the comparison baseline.
+
+**Invariants and non-goals:**
+
+- No corner-search, clipping, cap-ring, bevel-construction, triangulation, final-normal, shader, serialized setting, Inspector-control, production-generation, or per-frame behavior changes.
+- The standalone focused topology and artistic matrix buttons retain their existing exhaustive 33-case behavior.
+- The one-click suite retains exhaustive topology `33/33`, artistic fingerprint `33/33`, and a fixed difficult artistic materialization set of seeds `1`, `2223`, `8889`, and `5727` at minimum/default/maximum width (`12` cases).
+- The existing corner baseline cache remains one ordinary artistic baseline per seed. It is not replaced with the semantically different all-geometric topology mesh.
+- The corner enabled-case hard stop remains `4 s`; the corner matrix hard stop remains `35 s`. Only the development-only whole-suite boundary increases to `90 s`.
+- Any untouched stage after a budget/fail-fast exit reports `not-run`, never `failed` with `0/0` cases.
+
+**Implementation sequence:**
+
+1. [x] Add suite-owned artistic case scheduling so the standalone artistic matrix remains `33` cases while the one-click suite materializes only the fixed `12` sentinels.
+2. [x] Derive and validate deterministic artistic-selection fingerprints for all `33` topology cases from their captured `ArtisticEdges`; compare all `12` sentinel fingerprints with their materialized artistic results.
+3. [x] Reorder one-click stages to current preview -> Macro -> topology -> artistic fingerprint -> corner -> artistic sentinel materialization -> outlier/negative/comprehensive evidence.
+4. [x] Increase only the complete-suite development hard stop to `90 s`; retain the `4 s` enabled-rock and `35 s` corner-matrix boundaries.
+5. [x] Add truthful stage status/timing and `artisticFingerprintCases`, `artisticMaterializedCases`, remaining-budget, and cache-use telemetry to the combined report.
+6. [x] Update framework, recovery architecture, and code inventory ownership/contracts.
+7. [x] Complete exact-scope diff, full modified-file reread, caller/consumer consistency audit, structural checks, and delivery reproduction.
+
+**Acceptance criteria:**
+
+- The one-click suite reaches and executes the corner matrix before artistic mesh materialization.
+- `topologyCases=33/33`, `artisticFingerprintCases=33/33`, and `artisticMaterializedCases=12/12`.
+- The corner stage reports an actual result rather than `0/0`; untouched stages report `not-run` on early termination.
+- `totalElapsedMs < 90000` and `totalBudgetExceeded=0` for acceptance.
+- Enabled corner generation remains bounded by `4 s` per rock and the corner matrix remains bounded by `35 s`.
+- Every frozen baseline gate remains unchanged.
+
+**Implementation evidence:**
+
+- The one-click stage order is now current preview -> Macro -> exhaustive topology -> 33-case artistic fingerprint -> corner matrix -> 12-case artistic sentinel materialization -> comprehensive evidence.
+- Suite-owned artistic scheduling uses seeds `{1/2223/8889/5727}` across minimum/default/maximum widths; the standalone artistic action remains exhaustive over all 11 seeds and three widths.
+- Fingerprint derivation consumes already-captured topology `ArtisticEdges` and emits no mesh. Sentinel materializations must match the corresponding deterministic rank/score fingerprint.
+- Report contracts advance to `EW-C1A.3d-suite`, `EW-C1A.3d-33-case`, and `EW-C1A.3d-preview-sentinel`; untouched stages report `not-run`.
+- The development-only global hard stop is `90,000 ms`; corner enabled-case and matrix hard stops remain `4,000 ms` and `35,000 ms` respectively.
+- No generator, clipping, bevel, triangulation, normal, shader, settings, Inspector-layout, production, or per-frame owner changed.
+- Unity compilation and runtime acceptance remain pending.
+- Post-change audit: exactly the five approved files differ across the unchanged `331`-file tree; no file was created, deleted, moved, or renamed.
+- Targeted source/contract validation passed `78/78`; all `195/195` C# files passed lexical delimiter, preprocessor, and region checks.
+- The final projection clone is field-complete and non-destructive: topology audit records remain untouched while editor-only projected records carry the artistic rank/candidate contract.
+- Frozen MassGenerator, corner-search, bevel-construction, triangulation, final-normal, GeneratedMass, settings, shader, asset, and production owners remain byte-identical to the accepted EW-C1A.3c baseline.
+- Changed-files overlay and unified-patch replay each reproduce the complete final `331/331`-file tree byte-for-byte; ZIP CRC validation passes.
+
+#### EW-C1A.3c — Complete integration preflight and one-final-build search
+
+**Patch identifier:** `EW-C1A.3c`
+
+**Status:** [implemented; static/compliance validation passed; Unity compilation, runtime matrix completion, and performance acceptance pending].
+
+**Objective:** replace the remaining expensive candidate filter in EW-C1A.3b. Ranked corners must be evaluated with a complete non-emitting integration preflight. The search may execute exactly one final integrated mesh build for the highest-ranked preflight-certified corner. The outer fallback build is removed. Matrix and case budgets are tightened so the complete one-click suite remains below one minute.
+
+**Approved files:**
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+**Reviewed evidence:**
+
+- Unity report `Pasted text(139).txt`: EW-C1A.3b processed `20/33` cases in `55,987.809 ms`, hit six `5 s` case budgets and the `55 s` matrix budget, while all frozen Macro/topology/ordinary-preview/outlier/negative gates passed.
+- Seed `1/default`: ranking `0.176 ms`, transaction `1.835 ms`, ring preflight `15.916 ms`, integration `8647.886 ms`; the first integration plus fallback crossed the budget.
+- Seed `5556/default`: ten cheap transaction/preflight attempts but three complete integrations plus two fallbacks consumed `4157.288 ms`.
+- `MassGenerator.GenerateCornerDamageFullCertificationSearch` currently launches a complete integration for every ring-preflight-positive corner and may launch one lower-scale fallback.
+- `CornerDamageRingPreflight` currently proves only the three isolated mandatory edges. It does not prove the ordinary selected identity set, topology-context readiness, local mandatory coexistence, or predicted unrelated retention.
+- `GeneratedMassEditor.EvaluateCornerChippingMatrixCase` already caches one ordinary baseline per seed, but its `5 s` budget is checked only after an indivisible synchronous generation call returns.
+- Git metadata is absent from the supplied archive. The accepted EW-C1A.3b reconstructed source is the comparison baseline.
+
+**Invariants and non-goals:**
+
+- No new controls, Inspector groups, buttons, serialized defaults, assets, shaders, mesh channels, production generation, or per-frame work.
+- Corner cut remains after micro-topology normalization and before bevel candidate discovery.
+- Existing transaction, stable identities, mandatory complete ring, unrelated-retention rule, bounded construction, polygon-surface triangulation, and final-normal contracts remain unchanged.
+- No acceptance-gate weakening and no partial cap ring.
+- Exactly one complete final integration build is permitted per enabled case. `FullFallbackBuildCount` must remain zero.
+- If final integration disagrees with preflight, report `integration-preflight-mismatch`; do not search another full-build candidate in the same matrix case.
+
+**Implementation sequence:**
+
+1. [x] Add a complete integration-preflight record carrying transaction evidence, resolved shared ring scale, selected identity predictions, mandatory completion, topology-context readiness, candidate conservation, and predicted unrelated retention.
+2. [x] Add an editor-only `CornerDamageIntegrationPreflight` evaluation mode that performs candidate discovery/selection and topology-context construction without shell triangulation or final mesh emission.
+3. [x] Search all ranked corners with preflight only, retain the first fully certified record, then perform exactly one complete integration build. Remove the fallback build path.
+4. [x] Compare the final build against the retained preflight fingerprint and report `integration-preflight-mismatch` on disagreement.
+5. [x] Tighten enabled-case target/hard budgets to `2 s` / `4 s`, corner-matrix target/hard budgets to `25 s` / `35 s`, and add complete one-click-suite elapsed/hard-budget telemetry below `60 s`.
+6. [x] Update canonical architecture/code ownership and report contracts to EW-C1A.3c.
+7. [x] Complete exact-scope diff, caller/consumer reread, structural/static checks, package reproduction, and Unity-pending declaration.
+
+**Acceptance criteria:**
+
+- `fullIntegrationBuilds <= 1` and `fullFallbackBuilds = 0` for every enabled case.
+- A corner reaches final integration only when preflight predicts complete ring, selected-candidate conservation, topology-context readiness, and zero unrelated baseline loss.
+- A final/preflight disagreement reports `integration-preflight-mismatch`.
+- Case hard budget `4 s`; corner matrix hard budget `35 s`; whole one-click suite hard budget below `60 s`.
+- Disabled parity and every frozen edge-wear gate remain unchanged.
+- Unity matrix completion and performance acceptance remain pending until the user runs the suite.
+
+**Static completion evidence:**
+
+- Exactly the ten approved files differ from the accepted EW-C1A.3b reconstructed baseline; no file was created, deleted, moved, or renamed.
+- `CornerDamageIntegrationPreflight` performs full candidate discovery/selection, topology-context construction, candidate-conservation checking, non-emitting corner-width solving, mandatory-ring prediction, and ordinary-identity retention prediction.
+- The ranked search executes preflight only until one corner passes, then permits exactly one final integration build. The fallback integration path is absent and `FullFallbackBuildCount` remains telemetry-only at zero.
+- Matrix baseline timing and observed integration timing are passed into the case-budget admission gate; enabled cases use `4 s`, the corner matrix uses `35 s`, and the complete suite owns a `58 s` hard boundary with final-evidence reserve.
+- All 195 C# files passed lexical delimiter and preprocessor checks; approved caller/consumer references and report contracts were reread. Unity compilation is not available in this environment and is not claimed.
+
+#### EW-C1A.3b — Bounded staged single-corner certification
+
+**Patch identifier:** `EW-C1A.3b`
+
+**Status:** [implemented; static/compliance validation passed; Unity validation pending]
+
+**Goal:** preserve the deterministic fully certified single-corner search introduced by EW-C1A.3a while eliminating its unacceptable editor cost. The user cancelled the first runtime matrix after `2:38` at seed `1`, case `3/33`; the two enabled cases had each taken approximately `80–84 s`. The active patch must keep the same transaction, complete-ring, unrelated-retention, topology, normal, tangent, and disabled-parity gates while finishing or hard-stopping the entire corner matrix in less than one minute.
+
+##### Runtime evidence and diagnosed multiplier
+
+- `Pasted text(138).txt` reports `status=cancelled`, `cornerChippingCases=3/3`, and `terminalReason=cancelled by user` after the progress dialog reached only seed `1`, maximum-depth.
+- Seed `1` timings were `2890.7043 ms` disabled, `84189.3291 ms` default, and `80434.0495 ms` maximum-depth.
+- Each enabled matrix case called both the raw geometry preview and integrated preview; each endpoint independently reran the complete candidate-rank × six-ring-scale search.
+- Each scale attempt regenerated the entire post-chip edge-wear system even though the existing isolated viability preflight already reports every mandatory ring edge's maximum certified width.
+- The previous report's `attemptedConfigurations` counted only one endpoint search and therefore understated the real number of complete generation attempts.
+
+##### Approved file scope
+
+**Modify:**
+
+1. `Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+2. `Docs/Generated_Mass_Framework.md`
+3. `Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+4. `Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+5. `Game/Procedural/Masses/MassGenerator.cs`
+6. `Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+7. `Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+8. `Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+9. `Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+10. `Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No file may be created, deleted, moved, or renamed. `GeneratedMass.cs`, `MassSurfaceFeatureGenerator.cs`, clipping, plane-cut geometry, bounded bevel construction, coexistence solving, polygon triangulation, final shared normals, shaders, materials, assets, serialized controls/defaults, Inspector layout/actions, mesh channels, and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+##### Bounded staged search contract
+
+1. [x] Cache one frozen ordinary unified-preview baseline per shape seed across disabled/default/maximum-depth matrix policies. Disabled parity returns that exact mesh/status without a second generation.
+2. [x] Evaluate ranked corners in the unchanged deterministic order. Each rank runs the existing bounded transaction depth trials once per staged preflight.
+3. [x] Add an internal `CornerDamageRingPreflight` mode. It builds lifecycle/isolated-viability evidence only for the three mandatory cap-ring edges and returns before artistic selection, coexistence, shell construction, triangulation, or final mesh emission.
+4. [x] Resolve one uniform ring scale from the minimum of the three existing isolated maximum-certified-width ratios, quantized downward through `{1, 0.75, 0.5625, 0.421875, 0.31640625, 0.25}`. Reject the corner when no scale at or above `0.25` certifies all three mandatory edges.
+5. [x] Run one complete integrated construction at the resolved scale. Permit at most one next-lower uniform fallback only for cap-ring completion, post-chip construction, or unrelated-retention failure.
+6. [x] Accept only the existing complete preview predicate: one certified semantic cap, dense construction provenance, mandatory expected/candidate/selected/built equality, successful final preview, zero unrelated bevel loss, and valid final channels.
+7. [x] The 33-case matrix performs one integrated staged search per enabled case. It no longer invokes the raw preview. Selection determinism is checked with a lightweight repeated transaction fingerprint at the accepted rank.
+8. [x] The interactive raw preview still performs the same staged certification once, then emits only the accepted semantic cut; it does not start a second independent full search.
+9. [x] Preserve responsive cancellation between candidates/cases and restore all scoped candidate-rank/ring-scale state through `IDisposable`/`try-finally`.
+
+##### Performance and telemetry contract
+
+- Target per enabled case: `<= 2 s`; hard stop: `5 s`.
+- Target complete corner matrix: `<= 40 s`; hard stop: `55 s`.
+- A hard-stop breach reports `failureStage=performance-budget`, returns control, and preserves the selected object's mesh/preview state.
+- Reports expose `baselineBuilds`, `baselineCacheUses`, `transactionAttempts`, `ringPreflightAttempts`, `fullIntegrationBuilds`, `fullFallbackBuilds`, `geometrySearchReuses`, candidate-ranking/transaction/ring-preflight/integration milliseconds, and case/matrix budget flags.
+- The matrix CSV reports actual expensive build counts rather than the old hidden duplicated endpoint work.
+- No gameplay, recurring update, shader, GPU, texture, buffer, persistent cache, mesh-channel, or production-generation cost is added.
+
+##### File-by-file implementation result
+
+1. [x] `MassGenerator.EdgeWear.Types.cs` owns staged preflight and performance telemetry records.
+2. [x] `MassGenerator.EdgeWear.SelectionAndCorners.cs` times candidate ranking/transaction work and supports mandatory-ring-only viability preflight.
+3. [x] `MassGenerator.EdgeWear.Orchestration.cs` routes the internal preflight mode through transaction and mandatory candidate viability, then exits before full bevel construction.
+4. [x] `MassGenerator.cs` owns the bounded search, shared baseline input, resolved uniform scale, one optional fallback, lightweight selection fingerprint, and case hard stop.
+5. [x] `MassGenerator.EdgeWear.Diagnostics.Logging.cs` captures staged records and prints exact build/timing/budget evidence.
+6. [x] `GeneratedMassEditor.cs` caches one baseline per seed, removes the duplicate raw search from every matrix case, applies `5 s` case and `55 s` matrix gates, and advances report contracts to EW-C1A.3b.
+7. [x] The four canonical documents record the performance regression, replacement architecture, ownership, and pending Unity gate.
+8. [ ] Unity 6000.5.0f1 compilation and the complete runtime matrix remain pending user validation.
+
+##### Acceptance criteria
+
+- [x] Exactly the ten approved files differ; no file is created, deleted, moved, or renamed.
+- [x] No control, Inspector section, action, serialized default, clipping rule, final geometry rule, shader, mesh channel, or production path changes.
+- [x] Disabled cases use one cached baseline and exact mesh/status parity.
+- [x] Enabled matrix cases perform no raw geometry search and at most one complete build plus one lower fallback for each attempted corner.
+- [x] Mandatory-ring preflight evaluates only the three generated cap-ring candidates.
+- [x] A successful case cannot be accepted after crossing the `5 s` hard budget.
+- [x] The matrix aborts with `performance-budget` no later than the `55 s` hard stop.
+- [ ] Complete runtime acceptance requires `33/33`, disabled parity `11/11`, selection determinism `33/33`, transaction/ring/retention/channel gates `33/33`, `caseBudgetExceeded=0`, `matrixBudgetExceeded=0`, cancellation `0`, and terminal reason `none`.
+
+##### Static/compliance completion evidence
+
+- [x] Exact scope is the ten approved files across the unchanged `331`-file source tree; no file was created, deleted, moved, or renamed.
+- [x] Custom source/contract validation passed `81/81`, including staged-search routing, shared baseline ownership, mandatory-ring-only preflight, one integration plus at most one fallback, lightweight determinism fingerprinting, `5 s` case and `55 s` matrix hard stops, report telemetry, and absence of the raw geometry endpoint from matrix cases.
+- [x] All `195/195` C# files passed lexical delimiter, comment/string, preprocessor, and `#region`/`#endregion` balance checks.
+- [x] All changed files preserve CRLF, terminal newlines, BOM state, Markdown-fence balance, and contain no actual trailing spaces or tabs.
+- [x] `GeneratedMass.cs`, settings transport, clipping, plane-cut shell, bounded triangulation, final mesh normals, shaders, serialized controls/defaults, Inspector layout/actions, mesh channels, and production generation remain byte-identical to EW-C1A.3a.
+- [ ] Unity 6000.5.0f1 compilation, actual per-case/matrix timings, cancellation responsiveness, and complete `33/33` runtime acceptance remain pending; no runtime speedup is claimed from static evidence.

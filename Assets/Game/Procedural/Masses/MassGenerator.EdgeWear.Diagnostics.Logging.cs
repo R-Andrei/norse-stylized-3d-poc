@@ -56,6 +56,38 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static CornerDamagePreviewConstructionRecord
             capturedCornerDamagePreview;
 
+        private static CornerDamageIntegrationPreflightRecord
+            capturedCornerDamageIntegrationPreflight;
+
+        private static void ResetCornerDamageIntegrationPreflightCapture()
+        {
+            capturedCornerDamageIntegrationPreflight = null;
+        }
+
+        private static void CaptureCornerDamageIntegrationPreflight(
+            CornerDamageIntegrationPreflightRecord preflight)
+        {
+            capturedCornerDamageIntegrationPreflight = preflight;
+        }
+
+        private static CornerDamageIntegrationPreflightRecord
+            CompleteCornerDamageIntegrationPreflightCapture()
+        {
+            CornerDamageIntegrationPreflightRecord preflight =
+                capturedCornerDamageIntegrationPreflight;
+            capturedCornerDamageIntegrationPreflight = null;
+            return preflight;
+        }
+
+        private static CornerDamageTransactionAuditResult
+            CompleteCornerDamageTransactionAuditResultCapture()
+        {
+            CornerDamageTransactionAuditResult audit =
+                capturedCornerDamageTransactionAudit;
+            capturedCornerDamageTransactionAudit = null;
+            return audit;
+        }
+
         private static void ResetCornerDamagePreviewCapture()
         {
             capturedCornerDamagePreview = null;
@@ -498,7 +530,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float capRingCommittedScale,
             string searchFailureStage,
             string searchFailureReason,
-            string searchAttemptSummary)
+            string searchAttemptSummary,
+            CornerDamageSearchTelemetry telemetry)
         {
             if (status == null)
             {
@@ -526,6 +559,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     : searchFailureReason;
             status.SearchAttemptSummary =
                 searchAttemptSummary ?? string.Empty;
+            if (telemetry != null)
+            {
+                status.BaselineBuildCount = telemetry.BaselineBuildCount;
+                status.BaselineCacheUseCount =
+                    telemetry.BaselineCacheUseCount;
+                status.TransactionAttemptCount =
+                    telemetry.TransactionAttemptCount;
+                status.IntegrationPreflightAttemptCount =
+                    telemetry.IntegrationPreflightAttemptCount;
+                status.FullIntegrationBuildCount =
+                    telemetry.FullIntegrationBuildCount;
+                status.FullFallbackBuildCount =
+                    telemetry.FullFallbackBuildCount;
+                status.GeometrySearchReuseCount =
+                    telemetry.GeometrySearchReuseCount;
+                status.IntegrationPreflightMismatchCount =
+                    telemetry.IntegrationPreflightMismatchCount;
+                status.CandidateRankingMilliseconds =
+                    telemetry.CandidateRankingMilliseconds;
+                status.TransactionMilliseconds =
+                    telemetry.TransactionMilliseconds;
+                status.IntegrationPreflightMilliseconds =
+                    telemetry.IntegrationPreflightMilliseconds;
+                status.IntegrationMilliseconds =
+                    telemetry.IntegrationMilliseconds;
+                status.CaseBudgetExceeded =
+                    telemetry.CaseBudgetExceeded;
+                status.MatrixBudgetExceeded =
+                    telemetry.MatrixBudgetExceeded;
+            }
 
             StringBuilder builder = new StringBuilder(
                 status.Report == null ? 256 : status.Report.Length + 256);
@@ -556,6 +619,78 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.AppendLine(status.SearchFailureReason);
             builder.Append("searchAttempts=");
             builder.AppendLine(status.SearchAttemptSummary);
+            builder.Append("baselineBuilds=");
+            builder.AppendLine(status.BaselineBuildCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("baselineCacheUses=");
+            builder.AppendLine(status.BaselineCacheUseCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("transactionAttempts=");
+            builder.AppendLine(status.TransactionAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("integrationPreflightAttempts=");
+            builder.AppendLine(status.IntegrationPreflightAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("fullIntegrationBuilds=");
+            builder.AppendLine(status.FullIntegrationBuildCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("fullFallbackBuilds=");
+            builder.AppendLine(status.FullFallbackBuildCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("geometrySearchReuses=");
+            builder.AppendLine(status.GeometrySearchReuseCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("integrationPreflightMismatches=");
+            builder.AppendLine(status.IntegrationPreflightMismatchCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightCandidates=");
+            builder.AppendLine(status.PreflightCandidateCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightSelected=");
+            builder.AppendLine(status.PreflightSelectedCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightSelectedGraphEdges=");
+            builder.AppendLine(status.PreflightSelectedGraphEdgeCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightCandidateConservationValid=");
+            builder.AppendLine(
+                status.PreflightCandidateConservationValid ? "1" : "0");
+            builder.Append("preflightTopologyReady=");
+            builder.AppendLine(status.PreflightTopologyReady ? "1" : "0");
+            builder.Append("preflightWidthSolutionReady=");
+            builder.AppendLine(
+                status.PreflightWidthSolutionReady ? "1" : "0");
+            builder.Append("preflightMandatorySolved=");
+            builder.AppendLine(status.PreflightMandatorySolvedCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightRetention=");
+            builder.Append(status.PreflightUnrelatedRetainedCount);
+            builder.Append('/');
+            builder.Append(status.PreflightUnrelatedBaselineCount);
+            builder.Append('/');
+            builder.AppendLine(status.PreflightCollateralLostCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("integrationPreflightDiagnostic=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.IntegrationPreflightDiagnostic)
+                ? "none"
+                : status.IntegrationPreflightDiagnostic);
+            builder.Append("candidateRankingMilliseconds=");
+            builder.AppendLine(status.CandidateRankingMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("transactionMilliseconds=");
+            builder.AppendLine(status.TransactionMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("integrationPreflightMilliseconds=");
+            builder.AppendLine(status.IntegrationPreflightMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("integrationMilliseconds=");
+            builder.AppendLine(status.IntegrationMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("caseBudgetExceeded=");
+            builder.AppendLine(status.CaseBudgetExceeded ? "1" : "0");
+            builder.Append("matrixBudgetExceeded=");
+            builder.AppendLine(status.MatrixBudgetExceeded ? "1" : "0");
             status.Report = builder.ToString();
         }
 
@@ -697,11 +832,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CornerDamagePreviewKind.GeometryOnly;
             StringBuilder builder = new StringBuilder(8192);
             builder.AppendLine(geometryOnly
-                ? "GeneratedMass EW-C1A.3 corner-chip preview"
-                : "GeneratedMass EW-C1A.3 corner-chip and edge-wear preview");
+                ? "GeneratedMass EW-C1A.3b corner-chip preview"
+                : "GeneratedMass EW-C1A.3b corner-chip and edge-wear preview");
             builder.AppendLine(geometryOnly
-                ? "contract=EW-C1A.3-corner-chip-preview"
-                : "contract=EW-C1A.3-corner-chip-edge-wear");
+                ? "contract=EW-C1A.3b-corner-chip-preview"
+                : "contract=EW-C1A.3b-corner-chip-edge-wear");
             builder.Append("previewMode=");
             builder.AppendLine(geometryOnly
                 ? "geometry-only"

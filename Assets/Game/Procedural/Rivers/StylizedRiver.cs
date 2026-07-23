@@ -366,6 +366,11 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumShoreFoamFormationSpeedMetresPerSecond = 0.15f;
         private const float MaximumShoreFoamFormationSpeedMetresPerSecond = 2.5f;
         private const float DefaultShoreFoamFormationSpeedMetresPerSecond = 0.75f;
+        private const float MinimumFoamPacketGapMetres = 0f;
+        private const float MaximumFoamPacketGapMetres = 10f;
+        private const float DefaultShoreFoamPacketGapMetres = 0.75f;
+        private const float DefaultObjectContactPacketGapMetres = 1.00f;
+        private const float DefaultFreeWaterFoamPacketGapMetres = 1.00f;
         private const float MinimumFoamMaximumLateralSpeedRatio = 0f;
         private const float MaximumFoamMaximumLateralSpeedRatio = 1f;
         private const float DefaultFoamMaximumLateralSpeedRatio = 0.22f;
@@ -1055,9 +1060,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamCoverage = 0.45f;
 
-        [Tooltip("How often new shore source events start. Higher values create more full-strength shore ribbons or inward-wash tongues per second; it does not make individual events larger.")]
+        [Tooltip("How promptly an eligible Shore source slot starts a new finite packet. Zero disables new starts. One fires immediately when packet clearance permits; Activity cannot bypass Minimum Packet Gap.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamActivity = 0.45f;
+
+        [Tooltip("Minimum downstream clearance in metres required after one Shore packet completes before the same deterministic source slot may emit again.")]
+        [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
+        [SerializeField] private float foamShoreMinimumPacketGapMetres =
+            DefaultShoreFoamPacketGapMetres;
 
         [Tooltip("How large each deterministic shore source event is. Higher values lengthen/widen the spawned ribbon or inward-wash tongue.")]
         [FormerlySerializedAs("foamShoreFoamSize")]
@@ -1108,11 +1118,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 0.5f)]
         [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialPresenceMin = 0.90f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialPresenceMax = 1.00f;
 
@@ -1124,13 +1134,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialLifeMax = 1.00f;
 
-        [Tooltip("Minimum deterministic edge breakup strength for Shore Ribbon sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamShoreRibbonBreakupStrengthMin = 0.12f;
 
-        [Tooltip("Maximum deterministic edge breakup strength for Shore Ribbon sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamShoreRibbonBreakupStrengthMax = 0.38f;
 
         [Tooltip("Reveal Speed multiplier for Inward Wash events. One uses the Shore Foam Base Reveal Speed.")]
         [Range(0.10f, 3.00f)]
@@ -1168,11 +1172,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamInwardWashOffsetMaxMetres = 0.040f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialPresenceMin = 0.84f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialPresenceMax = 0.98f;
 
@@ -1184,13 +1188,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashInitialLifeMax = 1.00f;
 
-        [Tooltip("Minimum deterministic breakup strength for Inward Wash sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamInwardWashBreakupStrengthMin = 0.04f;
 
-        [Tooltip("Maximum deterministic breakup strength for Inward Wash sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamInwardWashBreakupStrengthMax = 0.14f;
 
 
         [Tooltip("Enables deterministic static object/contact Layer C material birth when the selected source preset allows object sources.")]
@@ -1204,11 +1202,16 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactCycleCoverage = 1.00f;
 
-        [Tooltip("How often supplemental Contact Fleck events start. Contact Arc and Contact Semi-Arc persistence is owned by the per-object Build / Hold / Progressive Release / Rest cycle below.")]
+        [Tooltip("How promptly an eligible Object Contact Fleck attempts to start. Zero disables new Flecks. Activity cannot bypass the shared per-object packet-clearance gate, and a successful Fleck yields the next eligible opportunity to Arc/Semi-Arc when contact cycles are enabled.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamActivity = 0.35f;
 
-        [Tooltip("Base reveal speed in metres per second for Object Foam. Arc/Semi-Arc use it for Build only; Flecks use it across their complete reveal. Per-pattern Reveal Speed multipliers remain available.")]
+        [Tooltip("Minimum downstream clearance in metres required after any Object Arc, Semi-Arc, or Fleck finishes before the same object may emit another packet. Rearm also includes conservative clearance through the authored object-contact slowdown halo.")]
+        [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
+        [SerializeField] private float foamObjectContactMinimumPacketGapMetres =
+            DefaultObjectContactPacketGapMetres;
+
+        [Tooltip("Base reveal speed in metres per second for one-shot Object Arc, Semi-Arc, and Fleck Build. Per-pattern Reveal Speed multipliers remain available. This does not change later Layer C transport.")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1216,31 +1219,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObjectFoamFormationSpeedMetresPerSecond =
             DefaultShoreFoamFormationSpeedMetresPerSecond;
 
-        [Tooltip("Minimum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
-        [Min(0f)]
-        [SerializeField] private float foamObjectContactHoldDurationMinSeconds = 5.0f;
-
-        [Tooltip("Maximum time in seconds that an eligible object's complete Contact Arc or Contact Semi-Arc remains actively replenished after the progressive build finishes.")]
-        [Min(0f)]
-        [SerializeField] private float foamObjectContactHoldDurationMaxSeconds = 10.0f;
-
-        [Tooltip("Minimum time in seconds for the contact emitter to release progressively in the same spatial order used during build. Earlier-built contact regions stop emitting first.")]
-        [Min(0.05f)]
-        [SerializeField] private float foamObjectContactReleaseDurationMinSeconds = 0.60f;
-
-        [Tooltip("Maximum time in seconds for the contact emitter to release progressively in the same spatial order used during build. Earlier-built contact regions stop emitting first.")]
-        [Min(0.05f)]
-        [SerializeField] private float foamObjectContactReleaseDurationMaxSeconds = 1.40f;
-
-        [Tooltip("Minimum source-off rest time in seconds after progressive release completes before the same object may start another contact cycle.")]
-        [Min(0f)]
-        [SerializeField] private float foamObjectContactRestDurationMinSeconds = 1.0f;
-
-        [Tooltip("Maximum source-off rest time in seconds after progressive release completes before the same object may start another contact cycle.")]
-        [Min(0f)]
-        [SerializeField] private float foamObjectContactRestDurationMaxSeconds = 3.0f;
-
-        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses Arc and Semi-Arc weights for per-object contact cycles and the Fleck weight for supplemental stochastic flecks; the pure modes force one pattern for debugging.")]
+        [Tooltip("Chooses the deterministic object-contact source recipe. Mixed uses Arc and Semi-Arc weights for per-object contact cycles and enables supplemental Flecks through the independent Fleck Coverage and Activity controls. Pure modes force one pattern for debugging.")]
         [SerializeField] private StylizedRiverFoamObjectPattern foamObjectFoamPattern =
             StylizedRiverFoamObjectPattern.Mixed;
 
@@ -1252,23 +1231,9 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcPatternWeight = 0.35f;
 
-        [Tooltip("Normalized Object Foam mix share for contact-fleck sources when Pattern is Mixed. The editor keeps object pattern weights summing to one.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactFleckPatternWeight = 0.20f;
-
         [Tooltip("Reveal Speed multiplier for Object Contact Arc Build across the upstream contact bridge and two straight downstream wake arms.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
-
-        [HideInInspector]
-        [Tooltip("Legacy normalized Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactArcArmReachMin = 0.45f;
-
-        [HideInInspector]
-        [Tooltip("Legacy normalized Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactArcArmReachMax = 0.70f;
 
         [Tooltip("Minimum straight downstream wake-arm length in metres for Object Contact Arcs. The source follows the physical obstacle only across its upstream face, then continues downstream from each side shoulder as a thin ribbon.")]
         [Min(0.05f)]
@@ -1304,11 +1269,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactArcOffsetMaxMetres = 0.120f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialPresenceMin = 0.88f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Arc material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialPresenceMax = 1.00f;
 
@@ -1320,29 +1285,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactArcInitialLifeMax = 1.00f;
 
-        [HideInInspector]
-        [Tooltip("Minimum deterministic breakup strength for Object Contact Arc sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactArcBreakupStrengthMin = 0.08f;
 
-        [HideInInspector]
-        [Tooltip("Maximum deterministic breakup strength for Object Contact Arc sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactArcBreakupStrengthMax = 0.28f;
 
         [Tooltip("Reveal Speed multiplier for Object Contact Semi-Arc Build from the arm-free face shoulder, across the upstream connector, and along the single selected-side downstream wake arm.")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
-
-        [HideInInspector]
-        [Tooltip("Legacy normalized Semi-Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcArmReachMin = 0.60f;
-
-        [HideInInspector]
-        [Tooltip("Legacy normalized Semi-Arc arm reach retained only for scene compatibility. 5.18H.3 no longer reads this field.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcArmReachMax = 0.90f;
 
         [Tooltip("Minimum straight downstream wake-arm length in metres for Object Contact Semi-Arcs. The selected side receives this arm; the opposite side stops at the face shoulder while the complete upstream connector remains present.")]
         [Min(0.05f)]
@@ -1378,11 +1325,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactSemiArcOffsetMaxMetres = 0.140f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialPresenceMin = 0.84f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Semi-Arc material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialPresenceMax = 0.98f;
 
@@ -1394,25 +1341,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcInitialLifeMax = 1.00f;
 
-        [HideInInspector]
-        [Tooltip("Minimum deterministic breakup strength for Object Contact Semi-Arc sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMin = 0.08f;
 
-        [HideInInspector]
-        [Tooltip("Maximum deterministic breakup strength for Object Contact Semi-Arc sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcBreakupStrengthMax = 0.32f;
-
-        [HideInInspector]
-        [Tooltip("Legacy Semi-Arc lopsidedness range retained only for serialization compatibility. 5.18H.5 always omits the non-selected arm and uses only a deterministic event-side choice.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcLopsidednessMin = 0.45f;
-
-        [HideInInspector]
-        [Tooltip("Legacy Semi-Arc lopsidedness range retained only for serialization compatibility. 5.18H.5 always omits the non-selected arm and uses only a deterministic event-side choice.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactSemiArcLopsidednessMax = 1.00f;
 
         [Tooltip("Reveal Speed multiplier for Object Contact Fleck reveal.")]
         [Range(0.10f, 3.00f)]
@@ -1442,11 +1371,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamObjectContactFleckOffsetMaxMetres = 0.160f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialPresenceMin = 0.82f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Object Contact Fleck material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialPresenceMax = 0.97f;
 
@@ -1458,13 +1387,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactFleckInitialLifeMax = 0.90f;
 
-        [Tooltip("Minimum deterministic breakup strength for Object Contact Fleck sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactFleckBreakupStrengthMin = 0.18f;
 
-        [Tooltip("Maximum deterministic breakup strength for Object Contact Fleck sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamObjectContactFleckBreakupStrengthMax = 0.45f;
 
         [Tooltip("Enables deterministic open-water Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off.")]
         [SerializeField] private bool foamAutomaticFreeWaterBirthEnabled = true;
@@ -1473,9 +1396,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFoamCoverage = 0.25f;
 
-        [Tooltip("How often new open-water source events start. Higher values start more lace connectors or torn fragments per second.")]
+        [Tooltip("How promptly an eligible Free Water source slot starts a new finite packet. Zero disables new starts. One fires immediately when packet clearance permits; Activity cannot bypass Minimum Packet Gap.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFoamActivity = 0.25f;
+
+        [Tooltip("Minimum downstream clearance in metres required after one Free Water packet completes before the same deterministic source slot may emit again.")]
+        [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
+        [SerializeField] private float foamFreeWaterMinimumPacketGapMetres =
+            DefaultFreeWaterFoamPacketGapMetres;
 
         [Tooltip("Base reveal speed in metres per second for Free Water Foam. Per-pattern Reveal Speed multipliers control Lace, Cross-Lace, and Torn Fragment source progression.")]
         [Range(
@@ -1521,11 +1449,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterLaceWidthMaxMetres = 0.115f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialPresenceMin = 0.78f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Lace Connector material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialPresenceMax = 0.96f;
 
@@ -1537,13 +1465,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceInitialLifeMax = 0.80f;
 
-        [Tooltip("Minimum deterministic breakup strength for Free Water Lace Connector sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterLaceBreakupStrengthMin = 0.22f;
 
-        [Tooltip("Maximum deterministic breakup strength for Free Water Lace Connector sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterLaceBreakupStrengthMax = 0.55f;
 
         [Tooltip("Minimum signed curvature magnitude for Free Water Lace Connector sources. The sign is chosen deterministically per event.")]
         [Range(0f, 1f)]
@@ -1573,11 +1495,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterCrossLaceWidthMaxMetres = 0.120f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMin = 0.78f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Cross-Lace Connector material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialPresenceMax = 0.96f;
 
@@ -1589,13 +1511,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterCrossLaceInitialLifeMax = 0.90f;
 
-        [Tooltip("Minimum deterministic breakup strength for Free Water Cross-Lace Connector sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterCrossLaceBreakupStrengthMin = 0.20f;
 
-        [Tooltip("Maximum deterministic breakup strength for Free Water Cross-Lace Connector sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterCrossLaceBreakupStrengthMax = 0.55f;
 
         [Tooltip("Reveal Speed multiplier for the complete Free Water Torn Fragment local sweep.")]
         [Range(0.10f, 3.00f)]
@@ -1617,11 +1533,11 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0.005f)]
         [SerializeField] private float foamFreeWaterFragmentWidthMaxMetres = 0.280f;
 
-        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialPresenceMin = 0.76f;
 
-        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, reveal, breakup, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
+        [Tooltip("Maximum intrinsic Presence written exactly to newly occupied Free Water Torn Fragment material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialPresenceMax = 0.94f;
 
@@ -1633,13 +1549,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMax = 0.65f;
 
-        [Tooltip("Minimum deterministic breakup strength for Free Water Torn Fragment sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterFragmentBreakupStrengthMin = 0.30f;
 
-        [Tooltip("Maximum deterministic breakup strength for Free Water Torn Fragment sources.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamFreeWaterFragmentBreakupStrengthMax = 0.70f;
 
         [SerializeField, HideInInspector] private float foamShoreFoamStrength = 0.35f;
         [SerializeField, HideInInspector] private float foamShoreFoamPersistence = 0.30f;
@@ -1744,7 +1654,7 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamMotionFieldAcrossRiverCoherence =
             DefaultFoamAcrossRiverCoherence;
 
-        [Tooltip("How strongly obstacle-routing influence reduces local downstream Foam speed. Zero preserves full downstream speed around obstacles; one permits the strongest authored slowdown.")]
+        [Tooltip("Controls how quickly the object-contact slowdown halo approaches its full authority. Zero disables contact slowdown. Any positive value reaches the exact Minimum Speed Factor at full contact influence.")]
         [Range(
             MinimumFoamObstacleSlowdownStrength,
             MaximumFoamObstacleSlowdownStrength)]
@@ -1752,13 +1662,23 @@ namespace ProgrammaticStylized3D.Rivers
         private float foamObstacleSlowdownStrength =
             DefaultFoamObstacleSlowdownStrength;
 
-        [Tooltip("Minimum downstream-speed factor at maximum obstacle slowdown. Zero permits temporary local stagnation; one disables downstream slowdown. Downstream speed is always clamped nonnegative.")]
+        [Tooltip("Exact speed factor applied to the complete routed Foam velocity vector at full object-contact slowdown influence. Zero permits local stagnation and prevents automatic object-source rearm while slowdown is enabled; one disables speed reduction.")]
         [Range(
             MinimumFoamObstacleMinimumDownstreamFactor,
             MaximumFoamObstacleMinimumDownstreamFactor)]
         [SerializeField]
         private float foamObstacleMinimumDownstreamFactor =
             DefaultFoamObstacleMinimumDownstreamFactor;
+
+        [Tooltip("Distance in metres from the obstacle surface over which the contact slowdown field remains at full influence.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactFullSlowdownReachMetres =
+            0.10f;
+
+        [Tooltip("Outer distance in metres from the obstacle surface where the contact slowdown field reaches zero. This value is clamped to at least Full Slowdown Reach.")]
+        [Min(0f)]
+        [SerializeField] private float foamObjectContactSlowdownOuterReachMetres =
+            0.45f;
 
         [Tooltip("Seconds for the Layer D temporal visual sheet to acquire newly supported film. This changes visual occupancy only; it never creates persistent material or changes Remaining Life.")]
         [Range(
@@ -2508,6 +2428,11 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamShoreFoamCoverage);
         public float FoamShoreFoamActivity =>
             Mathf.Clamp01(foamShoreFoamActivity);
+        public float FoamShoreMinimumPacketGapMetres =>
+            Mathf.Clamp(
+                foamShoreMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
         public float FoamShoreFoamPatchSize =>
             Mathf.Clamp01(foamShoreFoamPatchSize);
         public float FoamShoreFoamFormationSpeedMetresPerSecond =>
@@ -2553,14 +2478,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamShoreRibbonInitialLifeMin,
                 foamShoreRibbonInitialLifeMax));
-        public float FoamShoreRibbonBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamShoreRibbonBreakupStrengthMin,
-                foamShoreRibbonBreakupStrengthMax));
-        public float FoamShoreRibbonBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamShoreRibbonBreakupStrengthMin,
-                foamShoreRibbonBreakupStrengthMax));
         public float FoamInwardWashFormationSpeedMultiplier =>
             Mathf.Clamp(foamInwardWashFormationSpeedMultiplier, 0.10f, 3.00f);
         public float FoamInwardWashLengthMinMetres =>
@@ -2603,14 +2520,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamInwardWashInitialLifeMin,
                 foamInwardWashInitialLifeMax));
-        public float FoamInwardWashBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamInwardWashBreakupStrengthMin,
-                foamInwardWashBreakupStrengthMax));
-        public float FoamInwardWashBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamInwardWashBreakupStrengthMin,
-                foamInwardWashBreakupStrengthMax));
 
         public float FoamObjectFoamCoverage =>
             Mathf.Clamp01(foamObjectFoamCoverage);
@@ -2618,35 +2527,16 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(foamObjectContactCycleCoverage);
         public float FoamObjectFoamActivity =>
             Mathf.Clamp01(foamObjectFoamActivity);
+        public float FoamObjectContactMinimumPacketGapMetres =>
+            Mathf.Clamp(
+                foamObjectContactMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
         public float FoamObjectFoamFormationSpeedMetresPerSecond =>
             Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,
                 MaximumShoreFoamFormationSpeedMetresPerSecond);
-        public float FoamObjectContactHoldDurationMinSeconds =>
-            Mathf.Max(0f, Mathf.Min(
-                foamObjectContactHoldDurationMinSeconds,
-                foamObjectContactHoldDurationMaxSeconds));
-        public float FoamObjectContactHoldDurationMaxSeconds =>
-            Mathf.Max(
-                FoamObjectContactHoldDurationMinSeconds,
-                foamObjectContactHoldDurationMaxSeconds);
-        public float FoamObjectContactReleaseDurationMinSeconds =>
-            Mathf.Max(0.05f, Mathf.Min(
-                foamObjectContactReleaseDurationMinSeconds,
-                foamObjectContactReleaseDurationMaxSeconds));
-        public float FoamObjectContactReleaseDurationMaxSeconds =>
-            Mathf.Max(
-                FoamObjectContactReleaseDurationMinSeconds,
-                foamObjectContactReleaseDurationMaxSeconds);
-        public float FoamObjectContactRestDurationMinSeconds =>
-            Mathf.Max(0f, Mathf.Min(
-                foamObjectContactRestDurationMinSeconds,
-                foamObjectContactRestDurationMaxSeconds));
-        public float FoamObjectContactRestDurationMaxSeconds =>
-            Mathf.Max(
-                FoamObjectContactRestDurationMinSeconds,
-                foamObjectContactRestDurationMaxSeconds);
         public StylizedRiverFoamObjectPattern FoamObjectFoamPattern =>
             foamObjectFoamPattern;
         public bool FoamObjectContactCyclesEnabled =>
@@ -2656,18 +2546,8 @@ namespace ProgrammaticStylized3D.Rivers
              FoamObjectContactSemiArcPatternWeight > 0.0001f);
         public float FoamObjectContactArcPatternWeight =>
             Mathf.Clamp01(foamObjectContactArcPatternWeight);
-        public float FoamObjectContactFleckPatternWeight =>
-            Mathf.Clamp01(foamObjectContactFleckPatternWeight);
         public float FoamObjectContactArcFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactArcFormationSpeedMultiplier, 0.10f, 3.00f);
-        public float FoamObjectContactArcArmReachMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactArcArmReachMin,
-                foamObjectContactArcArmReachMax));
-        public float FoamObjectContactArcArmReachMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactArcArmReachMin,
-                foamObjectContactArcArmReachMax));
         public float FoamObjectContactArcLengthMinMetres =>
             Mathf.Max(0.05f, Mathf.Min(
                 foamObjectContactArcLengthMinMetres,
@@ -2710,26 +2590,10 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamObjectContactArcInitialLifeMin,
                 foamObjectContactArcInitialLifeMax));
-        public float FoamObjectContactArcBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactArcBreakupStrengthMin,
-                foamObjectContactArcBreakupStrengthMax));
-        public float FoamObjectContactArcBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactArcBreakupStrengthMin,
-                foamObjectContactArcBreakupStrengthMax));
         public float FoamObjectContactSemiArcPatternWeight =>
             Mathf.Clamp01(foamObjectContactSemiArcPatternWeight);
         public float FoamObjectContactSemiArcFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactSemiArcFormationSpeedMultiplier, 0.10f, 3.00f);
-        public float FoamObjectContactSemiArcArmReachMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactSemiArcArmReachMin,
-                foamObjectContactSemiArcArmReachMax));
-        public float FoamObjectContactSemiArcArmReachMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactSemiArcArmReachMin,
-                foamObjectContactSemiArcArmReachMax));
         public float FoamObjectContactSemiArcLengthMinMetres =>
             Mathf.Max(0.05f, Mathf.Min(
                 foamObjectContactSemiArcLengthMinMetres,
@@ -2772,22 +2636,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamObjectContactSemiArcInitialLifeMin,
                 foamObjectContactSemiArcInitialLifeMax));
-        public float FoamObjectContactSemiArcBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactSemiArcBreakupStrengthMin,
-                foamObjectContactSemiArcBreakupStrengthMax));
-        public float FoamObjectContactSemiArcBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactSemiArcBreakupStrengthMin,
-                foamObjectContactSemiArcBreakupStrengthMax));
-        public float FoamObjectContactSemiArcLopsidednessMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactSemiArcLopsidednessMin,
-                foamObjectContactSemiArcLopsidednessMax));
-        public float FoamObjectContactSemiArcLopsidednessMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactSemiArcLopsidednessMin,
-                foamObjectContactSemiArcLopsidednessMax));
         public float FoamObjectContactFleckFormationSpeedMultiplier =>
             Mathf.Clamp(foamObjectContactFleckFormationSpeedMultiplier, 0.10f, 3.00f);
         public float FoamObjectContactFleckLengthMinMetres =>
@@ -2824,19 +2672,16 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamObjectContactFleckInitialLifeMin,
                 foamObjectContactFleckInitialLifeMax));
-        public float FoamObjectContactFleckBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamObjectContactFleckBreakupStrengthMin,
-                foamObjectContactFleckBreakupStrengthMax));
-        public float FoamObjectContactFleckBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamObjectContactFleckBreakupStrengthMin,
-                foamObjectContactFleckBreakupStrengthMax));
 
         public float FoamFreeWaterFoamCoverage =>
             Mathf.Clamp01(foamFreeWaterFoamCoverage);
         public float FoamFreeWaterFoamActivity =>
             Mathf.Clamp01(foamFreeWaterFoamActivity);
+        public float FoamFreeWaterMinimumPacketGapMetres =>
+            Mathf.Clamp(
+                foamFreeWaterMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
         public float FoamFreeWaterFoamFormationSpeedMetresPerSecond =>
             Mathf.Clamp(
                 foamFreeWaterFoamFormationSpeedMetresPerSecond,
@@ -2880,14 +2725,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamFreeWaterLaceInitialLifeMin,
                 foamFreeWaterLaceInitialLifeMax));
-        public float FoamFreeWaterLaceBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamFreeWaterLaceBreakupStrengthMin,
-                foamFreeWaterLaceBreakupStrengthMax));
-        public float FoamFreeWaterLaceBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamFreeWaterLaceBreakupStrengthMin,
-                foamFreeWaterLaceBreakupStrengthMax));
         public float FoamFreeWaterLaceCurvatureMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamFreeWaterLaceCurvatureMin,
@@ -2926,14 +2763,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamFreeWaterCrossLaceInitialLifeMin,
                 foamFreeWaterCrossLaceInitialLifeMax));
-        public float FoamFreeWaterCrossLaceBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamFreeWaterCrossLaceBreakupStrengthMin,
-                foamFreeWaterCrossLaceBreakupStrengthMax));
-        public float FoamFreeWaterCrossLaceBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamFreeWaterCrossLaceBreakupStrengthMin,
-                foamFreeWaterCrossLaceBreakupStrengthMax));
         public float FoamFreeWaterFragmentFormationSpeedMultiplier =>
             Mathf.Clamp(foamFreeWaterFragmentFormationSpeedMultiplier, 0.10f, 3.00f);
         public float FoamFreeWaterFragmentLengthMinMetres =>
@@ -2964,14 +2793,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamFreeWaterFragmentInitialLifeMin,
                 foamFreeWaterFragmentInitialLifeMax));
-        public float FoamFreeWaterFragmentBreakupStrengthMin =>
-            Mathf.Clamp01(Mathf.Min(
-                foamFreeWaterFragmentBreakupStrengthMin,
-                foamFreeWaterFragmentBreakupStrengthMax));
-        public float FoamFreeWaterFragmentBreakupStrengthMax =>
-            Mathf.Clamp01(Mathf.Max(
-                foamFreeWaterFragmentBreakupStrengthMin,
-                foamFreeWaterFragmentBreakupStrengthMax));
         public float FoamShoreFoamStrength =>
             Mathf.Clamp01(foamShoreFoamStrength);
         public float FoamShoreFoamPersistence =>
@@ -3047,6 +2868,12 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObstacleMinimumDownstreamFactor,
                 MinimumFoamObstacleMinimumDownstreamFactor,
                 MaximumFoamObstacleMinimumDownstreamFactor);
+        public float FoamObjectContactFullSlowdownReachMetres =>
+            Mathf.Max(0f, foamObjectContactFullSlowdownReachMetres);
+        public float FoamObjectContactSlowdownOuterReachMetres =>
+            Mathf.Max(
+                FoamObjectContactFullSlowdownReachMetres,
+                foamObjectContactSlowdownOuterReachMetres);
         public float FoamVisualOccupancyBuildTime =>
             Mathf.Clamp(
                 foamVisualOccupancyBuildTime,
@@ -3308,22 +3135,17 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactArcPatternWeight);
             foamObjectContactSemiArcPatternWeight = Mathf.Clamp01(
                 foamObjectContactSemiArcPatternWeight);
-            foamObjectContactFleckPatternWeight = Mathf.Clamp01(
-                foamObjectContactFleckPatternWeight);
             float total = foamObjectContactArcPatternWeight +
-                foamObjectContactSemiArcPatternWeight +
-                foamObjectContactFleckPatternWeight;
+                foamObjectContactSemiArcPatternWeight;
             if (total <= 0.0001f)
             {
-                foamObjectContactArcPatternWeight = 0.45f;
-                foamObjectContactSemiArcPatternWeight = 0.35f;
-                foamObjectContactFleckPatternWeight = 0.20f;
+                foamObjectContactArcPatternWeight = 0.56f;
+                foamObjectContactSemiArcPatternWeight = 0.44f;
                 return;
             }
 
             foamObjectContactArcPatternWeight /= total;
             foamObjectContactSemiArcPatternWeight /= total;
-            foamObjectContactFleckPatternWeight /= total;
         }
 
         private void NormalizeFreeWaterPatternWeights()
@@ -3377,9 +3199,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamShoreRibbonInitialLifeMin,
                 ref foamShoreRibbonInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamShoreRibbonBreakupStrengthMin,
-                ref foamShoreRibbonBreakupStrengthMax);
 
             foamInwardWashFormationSpeedMultiplier = Mathf.Clamp(
                 foamInwardWashFormationSpeedMultiplier,
@@ -3407,9 +3226,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamInwardWashInitialLifeMin,
                 ref foamInwardWashInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamInwardWashBreakupStrengthMin,
-                ref foamInwardWashBreakupStrengthMax);
         }
 
         private void SanitizeObjectFoamPatternControls()
@@ -3418,18 +3234,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamObjectContactCycleCoverage = Mathf.Clamp01(
                 foamObjectContactCycleCoverage);
             foamObjectFoamActivity = Mathf.Clamp01(foamObjectFoamActivity);
-            SanitizePositiveRange(
-                ref foamObjectContactHoldDurationMinSeconds,
-                ref foamObjectContactHoldDurationMaxSeconds,
-                0f);
-            SanitizePositiveRange(
-                ref foamObjectContactReleaseDurationMinSeconds,
-                ref foamObjectContactReleaseDurationMaxSeconds,
-                0.05f);
-            SanitizePositiveRange(
-                ref foamObjectContactRestDurationMinSeconds,
-                ref foamObjectContactRestDurationMaxSeconds,
-                0f);
+            foamObjectContactMinimumPacketGapMetres = Mathf.Clamp(
+                foamObjectContactMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
             foamObjectFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
                 foamObjectFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,
@@ -3439,9 +3247,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObjectContactArcFormationSpeedMultiplier,
                 0.10f,
                 3.00f);
-            SanitizeUnitRange(
-                ref foamObjectContactArcArmReachMin,
-                ref foamObjectContactArcArmReachMax);
             SanitizePositiveRange(
                 ref foamObjectContactArcLengthMinMetres,
                 ref foamObjectContactArcLengthMaxMetres,
@@ -3464,17 +3269,11 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamObjectContactArcInitialLifeMin,
                 ref foamObjectContactArcInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamObjectContactArcBreakupStrengthMin,
-                ref foamObjectContactArcBreakupStrengthMax);
 
             foamObjectContactSemiArcFormationSpeedMultiplier = Mathf.Clamp(
                 foamObjectContactSemiArcFormationSpeedMultiplier,
                 0.10f,
                 3.00f);
-            SanitizeUnitRange(
-                ref foamObjectContactSemiArcArmReachMin,
-                ref foamObjectContactSemiArcArmReachMax);
             SanitizePositiveRange(
                 ref foamObjectContactSemiArcLengthMinMetres,
                 ref foamObjectContactSemiArcLengthMaxMetres,
@@ -3497,12 +3296,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamObjectContactSemiArcInitialLifeMin,
                 ref foamObjectContactSemiArcInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamObjectContactSemiArcBreakupStrengthMin,
-                ref foamObjectContactSemiArcBreakupStrengthMax);
-            SanitizeUnitRange(
-                ref foamObjectContactSemiArcLopsidednessMin,
-                ref foamObjectContactSemiArcLopsidednessMax);
 
             foamObjectContactFleckFormationSpeedMultiplier = Mathf.Clamp(
                 foamObjectContactFleckFormationSpeedMultiplier,
@@ -3526,15 +3319,16 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamObjectContactFleckInitialLifeMin,
                 ref foamObjectContactFleckInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamObjectContactFleckBreakupStrengthMin,
-                ref foamObjectContactFleckBreakupStrengthMax);
         }
 
         private void SanitizeFreeWaterFoamPatternControls()
         {
             foamFreeWaterFoamCoverage = Mathf.Clamp01(foamFreeWaterFoamCoverage);
             foamFreeWaterFoamActivity = Mathf.Clamp01(foamFreeWaterFoamActivity);
+            foamFreeWaterMinimumPacketGapMetres = Mathf.Clamp(
+                foamFreeWaterMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
             foamFreeWaterFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
                 foamFreeWaterFoamFormationSpeedMetresPerSecond,
                 MinimumShoreFoamFormationSpeedMetresPerSecond,
@@ -3560,9 +3354,6 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamFreeWaterLaceInitialLifeMin,
                 ref foamFreeWaterLaceInitialLifeMax);
             SanitizeUnitRange(
-                ref foamFreeWaterLaceBreakupStrengthMin,
-                ref foamFreeWaterLaceBreakupStrengthMax);
-            SanitizeUnitRange(
                 ref foamFreeWaterLaceCurvatureMin,
                 ref foamFreeWaterLaceCurvatureMax);
 
@@ -3584,9 +3375,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamFreeWaterCrossLaceInitialLifeMin,
                 ref foamFreeWaterCrossLaceInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamFreeWaterCrossLaceBreakupStrengthMin,
-                ref foamFreeWaterCrossLaceBreakupStrengthMax);
 
             foamFreeWaterFragmentFormationSpeedMultiplier = Mathf.Clamp(
                 foamFreeWaterFragmentFormationSpeedMultiplier,
@@ -3606,9 +3394,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeUnitRange(
                 ref foamFreeWaterFragmentInitialLifeMin,
                 ref foamFreeWaterFragmentInitialLifeMax);
-            SanitizeUnitRange(
-                ref foamFreeWaterFragmentBreakupStrengthMin,
-                ref foamFreeWaterFragmentBreakupStrengthMax);
         }
 
         private static void SanitizePositiveRange(
@@ -5438,6 +5223,10 @@ namespace ProgrammaticStylized3D.Rivers
                 foamShoreFoamCoverage);
             foamShoreFoamActivity = Mathf.Clamp01(
                 foamShoreFoamActivity);
+            foamShoreMinimumPacketGapMetres = Mathf.Clamp(
+                foamShoreMinimumPacketGapMetres,
+                MinimumFoamPacketGapMetres,
+                MaximumFoamPacketGapMetres);
             foamShoreFoamPatchSize = Mathf.Clamp01(
                 foamShoreFoamPatchSize);
             foamShoreFoamFormationSpeedMetresPerSecond = Mathf.Clamp(
@@ -5502,6 +5291,12 @@ namespace ProgrammaticStylized3D.Rivers
                 foamObstacleMinimumDownstreamFactor,
                 MinimumFoamObstacleMinimumDownstreamFactor,
                 MaximumFoamObstacleMinimumDownstreamFactor);
+            foamObjectContactFullSlowdownReachMetres = Mathf.Max(
+                0f,
+                foamObjectContactFullSlowdownReachMetres);
+            foamObjectContactSlowdownOuterReachMetres = Mathf.Max(
+                foamObjectContactFullSlowdownReachMetres,
+                foamObjectContactSlowdownOuterReachMetres);
             foamVisualOccupancyBuildTime = Mathf.Clamp(
                 foamVisualOccupancyBuildTime,
                 MinimumFoamVisualOccupancyBuildTime,

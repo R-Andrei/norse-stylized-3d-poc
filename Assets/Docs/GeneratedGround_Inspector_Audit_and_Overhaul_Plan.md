@@ -1,3 +1,12 @@
+## 2026-07-22 — Whole-feature transition control semantics
+
+The existing serialized Bank and Riverbed feature-transition fields are retained for migration, but their Inspector presentation is corrected:
+
+- `Discrete Feature Edge Clearance` is displayed as **Feature Safety Margin**. It is additional inward clearance measured from the complete conservative rock support, not a per-fragment empty band. Zero disables whole-feature boundary handling.
+- `Discrete Feature Return Fade` is displayed as **Whole Feature Return Fade**. It fades one shared rock retention value after the complete support clears the safety margin; zero is a hard whole-rock return.
+
+The controls remain in the existing compact `Application Transition > Whole Feature Handling` group. No new foldout, debug view, component, or duplicated Bank/Riverbed UI is introduced.
+
 ## 2026-07-22 — GSU-M2.7C.5E.2.2 Inspector contract: generic discrete-feature edge handling
 
 Both current secondary surface-application slots expose the same controls under their existing application transition:

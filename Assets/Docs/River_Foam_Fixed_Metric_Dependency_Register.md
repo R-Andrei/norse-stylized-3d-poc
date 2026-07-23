@@ -2308,3 +2308,84 @@ Impact classification:
 - per-face TVD arithmetic: one Coverage limiter plus coherent decode/encode instead of independent packed-channel limiting; measured GPU cost pending;
 - convergent capacity clipping: coherent Coverage re-encoding replaces independent packed-channel saturation; no new resource or dispatch;
 - source-visible quantity and Lifecycle-Faithful persistence may increase substantially by design because hidden suppression is removed.
+
+
+## RG-METRIC-P13B — Packet-rearmed birth and object-contact retention
+
+P13B changes automatic Layer C source ownership and the existing obstacle velocity field; it does not change the P13A material packing, transport schemes, Final Visibility modes, Presence Footprint modes, lifecycle, or P12t Chipping.
+
+Automatic-source contract:
+
+- Shore and Free-Water have fixed deterministic slot spacing. Coverage selects a stable share of those slots. Activity is linear from zero to the existing maximum attempt rate.
+- Each accepted slot is rearmed only after its event duration plus a distance-derived Minimum Packet Gap. Contact Flecks use per-object active/rearm ownership and cannot start while the same object owns an active contact cycle.
+- Current-minus-previous reveal is a permission test; newly reached cells receive the complete current Coverage target. This prevents repainting behind the head without making Coverage depend on reveal cadence.
+- Fleck reveal is spatial. Arc/Semi-Arc wakes are one-shot Build products. Only the immediate contact front is refreshed during Hold and progressively withdrawn during Release.
+- Flecks are independent of the normalized Arc/Semi-Arc cycle mix and are controlled directly by Fleck Coverage, Activity, and packet gap.
+
+Obstacle velocity contract:
+
+```text
+existing RGHalf obstacle texture
+R = signed lateral-routing influence
+G = independent slowdown influence
+```
+
+The existing one-sided collision route remains. A narrow dirty-time all-side contact halo writes slowdown only, allowing front/side/rear Foam to approach the exact authored Minimum Downstream Factor without lateral redirection. No texture, buffer, upload class, compute kernel, shader sample, pass, or draw call is added.
+
+Control cleanup removes automatic-source Breakup Strength authoring and shader evaluation, Lace/Cross-Lace gap masks, Torn Fragment bite masks, Fleck mix weight, and confirmed unused Arc/Semi-Arc arm-reach/lopsidedness controls. Reserved event-record lanes remain structurally present for ABI compatibility.
+
+Expected aggregate runtime work is lower because slots cannot immediately restart, finite packets stop writing behind their heads, and object wake arms are not refreshed after Build. Added CPU work is bounded rearm lookup and obstacle-dirty contact stamping; velocity adds a bounded multiply-and-lerp falloff calculation without a transcendental operation. Measured performance remains pending Unity profiling. P13B offline validation is `28/28 PASS`; Unity compilation, D3D11 import, Play Mode visual acceptance, and profiling remain pending.
+
+
+Dependency classification:
+
+- modified CPU producers: automatic source scheduler/event state and obstacle-routing field builder;
+- modified GPU consumers: automatic-source raster evaluation and canonical velocity resolver;
+- unchanged persistent material consumers: simulation packing/merge, Donor/TVD, lifecycle, Layer D/E state sampling;
+- unchanged rendering ownership: P13A visibility contract and P12t Chipping/Strands;
+- resource-count delta: zero;
+- serialization removal: obsolete source controls only; new packet-gap fields retain standard Unity missing-field defaults.
+
+## RG-METRIC-P13C — One-shot object packets and full-vector contact retention
+
+P13C supersedes only the P13B Object Arc/Semi-Arc persistence and object-contact velocity details. P13A packed material, Donor/TVD transport, lifecycle, visibility, P12t Chipping, P12u reveal-speed resolution, Shore sources, and Free-Water sources remain unchanged.
+
+Object-source dependency flow:
+
+```text
+registered object anchor
+    -> shared per-object eligibility state
+    -> Arc / Semi-Arc / Fleck selection
+    -> one-shot Build-only source event
+    -> current-minus-previous deposition permission
+    -> ordinary P13A Layer C material
+    -> shared halo + packet-gap rearm estimate
+```
+
+- Arc, Semi-Arc, and Fleck share one active-owner and `NextStartTime`; no recipe can overlap or bypass another recipe for the same object.
+- Arc/Semi-Arc event duration equals resolved Build duration. Hold, Release, Rest, and persistent contact-front refresh are removed from event state, scheduling, rasterization, diagnostics, and Inspector authoring.
+- The shared rearm estimate begins when the event completes. It includes the authored contact-slowdown outer reach travelled at the exact full-contact speed factor, then the authored Object Contact Minimum Packet Gap travelled at base Foam downstream speed.
+- If contact slowdown is enabled and the authored minimum speed factor is zero, automatic object rearm remains disabled until the authority changes. No hidden scheduler speed floor overrides stagnation.
+- A successful Fleck yields the next eligible opportunity to Arc/Semi-Arc when contact cycles are enabled, preventing high Fleck Activity from starving contact packets.
+
+Canonical velocity dependency:
+
+```text
+base downstream + signed lateral routing
+    -> routed float2 velocity
+existing obstacle G slowdown influence
+    -> one contact speed factor
+    -> multiply complete routed float2
+```
+
+At full slowdown influence, downstream, lateral, and total routed velocity are scaled by the exact authored Object Contact Minimum Speed Factor. Signed routing direction is preserved. Authored Full Slowdown Reach and Slowdown Outer Reach rebuild only the existing dirty-time RGHalf obstacle field and are included in its signature.
+
+Impact classification:
+
+- modified CPU producers: object event scheduling/state and existing obstacle-field stamping;
+- modified GPU consumers: Object Arc/Semi-Arc source evaluation and canonical velocity arithmetic;
+- resource-count delta: zero;
+- no new buffer, texture, kernel, dispatch, shader sample, pass, draw call, scene, prefab, material, layer, tag, or component;
+- expected active-gameplay source-raster work decreases because Build-only events leave the 32-slot pool sooner and perform no Hold/Release dispatches;
+- Offline validation passes `35/35`; Unity compilation, Play Mode source/retention acceptance, and profiling remain pending.
+

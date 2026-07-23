@@ -1175,6 +1175,8 @@ Shader "PS3D/Stylized River Water"
                             foamMotionFieldUV * (float2)routingDimensions),
                         int2(0, 0),
                         routingDimensions - 1);
+                    // R = signed lateral-routing influence; G = independent
+                    // contact-slowdown influence.
                     float2 obstacleRouting = _FoamObstacleRouting.Load(
                         int3(routingCoordinate, 0)).rg;
                     obstacleRouting.x = clamp(obstacleRouting.x, -1.0, 1.0);

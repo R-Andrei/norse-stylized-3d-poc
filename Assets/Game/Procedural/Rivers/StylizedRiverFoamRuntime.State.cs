@@ -126,10 +126,11 @@ namespace ProgrammaticStylized3D.Rivers
             FreeWaterCrossLaceConnector = 8
         }
 
-        private struct AutomaticObjectContactCycleState
+        private struct AutomaticObjectSourceState
         {
             public int CycleIndex;
             public float NextStartTime;
+            public AutomaticFoamSourceEventType LastEventType;
         }
 
         private struct AutomaticRevealTimingTelemetry
@@ -158,9 +159,6 @@ namespace ProgrammaticStylized3D.Rivers
             public float Duration;
             public float Elapsed;
             public float ObjectBuildDuration;
-            public float ObjectHoldDuration;
-            public float ObjectReleaseDuration;
-            public float ObjectRestDuration;
             public float FormationSpeedMetresPerSecond;
             public float RevealPathDistanceMetres;
             public float RawRevealDurationSeconds;
@@ -179,6 +177,8 @@ namespace ProgrammaticStylized3D.Rivers
             public float SourceFillFeatureSize;
             public float SourceFillBlend;
             public float ShapeSeed;
+            // Reserved legacy lanes retained in the fixed GPU event ABI.
+            // P13B no longer evaluates generic automatic-source breakup.
             public float BreakupScaleMetres;
             public float BreakupStrength;
             public float Curvature;
@@ -205,7 +205,7 @@ namespace ProgrammaticStylized3D.Rivers
         private struct FoamSourceEventGpuData
         {
             // x = source type, y = side sign except Object Arc/Semi-Arc
-            // deposition phase (Build = 0), z = reveal progress, w = shape seed.
+            // reserved Build code zero, z = reveal progress, w = shape seed.
             public Vector4 Header;
             // x/y = start/end storage global except Object Arc/Semi-Arc
             // contact point 0; z = centre storage global; w = flow direction
@@ -221,7 +221,7 @@ namespace ProgrammaticStylized3D.Rivers
             // Remaining Life, z = pattern seed, w = pattern feature size.
             public Vector4 Material;
             // x = source fill seed except Object Arc/Semi-Arc negative-half
-            // first-segment split; y/z = breakup scale/strength except Object
+            // first-segment split; y/z = reserved zero lanes except Object
             // Arc/Semi-Arc contact point 2.y / point 3.x; w = curvature,
             // selected Semi-Arc side, or fragment rotation.
             public Vector4 Variation;

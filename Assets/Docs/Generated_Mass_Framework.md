@@ -86,7 +86,7 @@ geometryCommit=disabled
 
 remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
 
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2a passed its seed-8889 Unity gate with one semantic cap, complete `17/17` construction provenance, mandatory cap ring `3/3/3/3`, and unrelated bevel retention `28/28`. EW-C1A.3 owns the compact authoring workflow: one normal `Corner Chipping` control group, one raw corner-chip preview, and the existing edge-wear preview automatically applying the certified corner cut before bevel discovery when enabled. Its first Unity matrix preserved every frozen baseline gate but passed only `14/33` corner cases: disabled parity `11/11` and enabled construction `3/22`. EW-C1A.3a therefore replaces fixed rank-0 commitment with deterministic score-ordered full-feature search and shared cap-ring width backoff. Production generation remains unchanged until a separate promotion patch.
+The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b is frozen. The EW-C1A ordering audit is complete and approves a pre-bevel corner cut after micro-topology normalization. EW-C1A.1 is implemented and certified diagnostically. EW-C1A.1a.8 is accepted and frozen: every accepted polygon owns one render surface after final placement deformation. EW-C1A.2a passed its seed-8889 Unity gate with one semantic cap, complete `17/17` construction provenance, mandatory cap ring `3/3/3/3`, and unrelated bevel retention `28/28`. EW-C1A.3 owns the compact authoring workflow: one normal `Corner Chipping` control group, one raw corner-chip preview, and the existing edge-wear preview automatically applying the certified corner cut before bevel discovery when enabled. Its first Unity matrix preserved every frozen baseline gate but passed only `14/33` corner cases: disabled parity `11/11` and enabled construction `3/22`. EW-C1A.3a replaced fixed rank-0 commitment with deterministic score-ordered full-feature search, but its first matrix attempt was cancelled after `2:38` at case `3/33`; enabled seed-1 cases each required roughly `80–84 s` because both preview endpoints repeated complete candidate-by-scale mesh construction. EW-C1A.3b proved the staged direction but still spent `55.99 s` on only `20/33` cases because ring-only preflight admitted multiple expensive complete builds. EW-C1A.3c replaces that filter with a complete non-emitting integration preflight, scans all ranked corners without mesh emission, and permits exactly one final integration build with no fallback. Its first one-click Unity run never reached corner evaluation because current-preview, Macro, exhaustive topology, and a duplicate exhaustive artistic-materialization stage consumed the former `58 s` total boundary. EW-C1A.3d changes validation scheduling only: topology remains exhaustive `33/33`; all 33 artistic rankings are derived as non-emitting fingerprints from captured topology records; the corner matrix runs before artistic materialization; and only 12 difficult artistic sentinels are deeply rebuilt in the one-click suite. The standalone artistic matrix remains exhaustive. The research suite may use `90 s`, while enabled corner generation remains hard-bounded at `4 s` per rock and the corner matrix at `35 s`. Production generation remains unchanged until a separate promotion patch.
 
 ## Post-baseline edge-wear visual contract
 
@@ -103,7 +103,10 @@ EW-C1A.2a committed corner cut, provenance bridge, and mandatory cap-ring previe
 EW-C1A.2b corner controls, live settings, and Scene marker [seed-8889 proof complete]
 EW-C1A.2c chip-only geometry endpoint and post-chip integration proof [seed-8889 proof complete]
 EW-C1A.3  unified authoring workflow and first 33-case gate [implemented; Unity result 14/33]
-EW-C1A.3a deterministic fully certified single-corner search [implemented; Unity validation pending]
+EW-C1A.3a deterministic fully certified single-corner search [superseded by C1A.3b performance repair]
+EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity validation pending]
+EW-C1A.3c complete integration preflight and one-final-build search [implemented; runtime not yet exercised]
+EW-C1A.3b bounded staged single-corner certification [implemented; Unity validation pending]
 EW-C2      sparse edge chips and notches [later]
 EW-N1      final artistic normal shaping [after geometry]
 EW-F1      face finish, cracks, and crevices [later]
@@ -660,3 +663,37 @@ The multiplier applies to the common ring request before the unchanged candidate
 The raw chip preview first resolves this same fully certified corner, then emits only that accepted semantic cut. Raw and integrated endpoints therefore remain visually distinct but must independently resolve the same candidate rank, graph vertex, depth trial, accepted depth, and generated ring identities. Search state is editor-only and scoped; disabled authoring, ordinary audits, and production `EdgeWearEvaluationMode.None` retain their prior behavior.
 
 Search telemetry records candidate and attempt counts, accepted rank, committed ring scale, the deepest deterministic failure stage, and a concise attempt trace. The search adds explicit dirty-time work only. For each eligible corner it performs at most the existing four transaction trials and, after transaction certification, at most six integrated ring attempts. It adds no per-frame, shader, texture, buffer, mesh-channel, serialized-control, or production-generation cost.
+
+### EW-C1A.3d validation-suite scheduling
+
+`GeneratedMassEditor` owns the validation-only de-duplication boundary. The one-click suite performs the exhaustive 33-case topology matrix once, derives deterministic artistic rank/score fingerprints from those captured records without another mesh build, runs the 33-case corner matrix next, then deeply materializes only seeds `1`, `2223`, `8889`, and `5727` at minimum/default/maximum width (`12` cases). Each sentinel must match its topology-derived fingerprint. The focused Artistic Preview Parity Matrix remains exhaustive `33/33` when invoked directly.
+
+The suite reports stage status as `passed`, `failed`, or `not-run`, per-stage elapsed time, remaining budget before expensive stages, prepared-record reuse, corner baseline builds/cache uses, and sentinel coverage. Its research-only total hard stop is `90 s`; the single enabled-rock corner gate remains `4 s` and the corner matrix remains `35 s`. This patch changes no generation result, candidate policy, settings, Inspector controls, production path, or per-frame work.
+
+### EW-C1A.3c complete integration preflight and one-final-build search
+
+The candidate filter now stops before shell construction while proving the same selected post-chip topology that the final build will consume. `CornerDamageIntegrationPreflight` performs the normalized corner transaction, complete ordinary and mandatory candidate discovery, ordinary coverage selection, shared cap-ring scale resolution, topology-context construction, candidate-conservation checking, and the existing non-emitting explicit corner-width solution. It records predicted active ordinary identities and all three mandatory generated identities, then compares those ordinary identities with the one cached ordinary baseline for the seed.
+
+Ranked corners are searched using preflight only. The first record with a complete ring, valid topology/context, valid candidate conservation, solved widths, and zero predicted unrelated loss is retained. The search then executes exactly one `CornerDamageIntegrationPreview` build at that corner and common ring scale. A final mismatch in selected transaction, mandatory completion, retention counts, or certified ordinary identity set reports `integration-preflight-mismatch`; it never launches a fallback or another complete candidate build.
+
+The matrix passes cached baseline build time and the largest observed integration duration for that seed into the admission gate before the sole final build. Enabled cases have a `4 s` hard budget, the corner matrix has a `35 s` hard stop, and the complete one-click suite has a `58 s` boundary with a `3 s` final-evidence reserve. Reports expose preflight candidates/selection/topology/width/mandatory/retention evidence, mismatch count, exact stage timings, and total-suite elapsed/budget state. These are editor dirty-time gates only; controls, Inspector actions, serialized defaults, production generation, shaders, mesh channels, and per-frame behavior are unchanged.
+
+### EW-C1A.3b bounded staged certification
+
+The C1A.3a exhaustive outer scale loop is retired. One staged search now separates cheap rejection from complete construction:
+
+```text
+per-seed ordinary baseline cache
+-> ranked-corner transaction
+-> mandatory three-edge isolated ring preflight
+-> resolve one common schedule scale
+-> one complete integrated build
+-> optional one-step lower fallback
+-> accept or advance to next corner
+```
+
+`CornerDamageRingPreflight` is an editor-only internal evaluation mode. Candidate collection skips every ordinary edge and evaluates only the three generated cap-ring edges through the existing structural, locality, topology-context, and isolated-width audit. The common ring scale is the largest schedule value not exceeding the minimum certified-width ratio across all three mandatory edges. If no common scale at or above `0.25` exists, the corner is rejected before shell construction.
+
+The 33-case matrix caches one ordinary baseline mesh/status per seed. Disabled policy returns that exact cached pair. Default and maximum-depth each execute one staged integrated search; they do not call the raw geometry endpoint. Determinism is verified by a lightweight repeated transaction fingerprint for the accepted rank. The interactive raw preview reuses one staged certification result and performs only one additional geometry emission for that accepted rank.
+
+The editor contract enforces a `5 s` hard budget per corner case and `55 s` hard stop for the complete corner matrix, with `2 s` and `40 s` targets respectively. A budget breach reports `performance-budget`, returns control, and prevents an over-budget valid mesh from being accepted. Telemetry distinguishes baseline builds/cache uses, transaction and ring-preflight attempts, complete/fallback builds, geometry reuse, stage timings, and case/matrix budget flags. These are editor-only safety limits; no production or per-frame owner exists.

@@ -576,6 +576,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CandidateCornerCount;
             public int AttemptedCornerCount;
             public int AttemptedConfigurationCount;
+            public int BaselineBuildCount;
+            public int BaselineCacheUseCount;
+            public int TransactionAttemptCount;
+            public int IntegrationPreflightAttemptCount;
+            public int FullIntegrationBuildCount;
+            public int FullFallbackBuildCount;
+            public int GeometrySearchReuseCount;
+            public int IntegrationPreflightMismatchCount;
+            public int PreflightCandidateCount;
+            public int PreflightSelectedCount;
+            public int PreflightSelectedGraphEdgeCount;
+            public bool PreflightCandidateConservationValid;
+            public bool PreflightTopologyReady;
+            public bool PreflightWidthSolutionReady;
+            public int PreflightMandatorySolvedCount;
+            public int PreflightUnrelatedBaselineCount;
+            public int PreflightUnrelatedRetainedCount;
+            public int PreflightCollateralLostCount;
+            public string IntegrationPreflightDiagnostic = string.Empty;
             public int AcceptedCornerRank = -1;
             public float CapRingCommittedScale;
             public string SearchFailureStage = string.Empty;
@@ -626,6 +645,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int TriangleCount;
             public double BaselineMilliseconds;
             public double CornerMilliseconds;
+            public double CandidateRankingMilliseconds;
+            public double TransactionMilliseconds;
+            public double IntegrationPreflightMilliseconds;
+            public double IntegrationMilliseconds;
+            public bool CaseBudgetExceeded;
+            public bool MatrixBudgetExceeded;
             public string Diagnostic = string.Empty;
             public string Report = string.Empty;
             public int[] AffectedOriginalEdgeIndices =
@@ -636,6 +661,36 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Array.Empty<int>();
             public EdgeWearDebugEdgeRecord[] DebugEdges =
                 Array.Empty<EdgeWearDebugEdgeRecord>();
+        }
+
+        public readonly struct CornerDamageSelectionFingerprint
+        {
+            public readonly bool Valid;
+            public readonly int CandidateCornerCount;
+            public readonly int SelectedCornerRank;
+            public readonly int SelectedGraphVertexIndex;
+            public readonly int AcceptedTrialIndex;
+            public readonly float AcceptedDepth;
+            public readonly int[] MandatoryCapRingIdentities;
+
+            public CornerDamageSelectionFingerprint(
+                bool valid,
+                int candidateCornerCount,
+                int selectedCornerRank,
+                int selectedGraphVertexIndex,
+                int acceptedTrialIndex,
+                float acceptedDepth,
+                int[] mandatoryCapRingIdentities)
+            {
+                Valid = valid;
+                CandidateCornerCount = candidateCornerCount;
+                SelectedCornerRank = selectedCornerRank;
+                SelectedGraphVertexIndex = selectedGraphVertexIndex;
+                AcceptedTrialIndex = acceptedTrialIndex;
+                AcceptedDepth = acceptedDepth;
+                MandatoryCapRingIdentities =
+                    mandatoryCapRingIdentities ?? Array.Empty<int>();
+            }
         }
 #endif
 
@@ -692,6 +747,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             UnifiedPreviewBatchAudit,
             SourceEdgeIndexDebug,
             CornerDamageTransactionAudit,
+            CornerDamageIntegrationPreflight,
             CornerDamageGeometryPreview,
             CornerDamageIntegrationPreview
         }
@@ -828,6 +884,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             0.25f
         };
 
+        private const double CornerDamageSearchHardBudgetMilliseconds = 4000d;
+
         public static MeshData GenerateCornerDamageGeometryPreview(
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
@@ -850,6 +908,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             GenerateCornerDamageFullCertificationSearch(
                 recipe,
                 surfaceFeatures,
+                false,
+                default,
+                0d,
+                0d,
+                CornerDamageSearchHardBudgetMilliseconds,
                 out CornerDamagePreviewStatus certifiedStatus,
                 out _);
             if (certifiedStatus == null ||
@@ -888,6 +951,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 geometryStatus,
                 0d,
                 geometryStopwatch.Elapsed.TotalMilliseconds);
+            CornerDamageSearchTelemetry telemetry =
+                CopyCornerDamageSearchTelemetry(certifiedStatus);
+            telemetry.GeometrySearchReuseCount++;
             ApplyCornerDamageSearchSummary(
                 previewStatus,
                 certifiedStatus.CandidateCornerCount,
@@ -903,7 +969,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     : previewStatus == null
                         ? "corner geometry preview status was unavailable"
                         : previewStatus.Diagnostic,
-                certifiedStatus.SearchAttemptSummary);
+                certifiedStatus.SearchAttemptSummary,
+                telemetry);
             if (previewStatus != null && previewStatus.PreviewApplied)
             {
                 return geometryMeshData;
@@ -922,6 +989,61 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 surfaceFeatures,
                 out previewStatus,
                 out _);
+        }
+
+        public static MeshData
+            GenerateCornerDamageIntegrationPreviewWithBaseline(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                UnifiedEdgeWearPreviewStatus baselineStatus,
+                out CornerDamagePreviewStatus previewStatus,
+                out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            return GenerateCornerDamageIntegrationPreviewWithBaseline(
+                recipe,
+                surfaceFeatures,
+                baselineStatus,
+                0d,
+                0d,
+                out previewStatus,
+                out unifiedStatus);
+        }
+
+        public static MeshData
+            GenerateCornerDamageIntegrationPreviewWithBaseline(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                UnifiedEdgeWearPreviewStatus baselineStatus,
+                double baselineBuildMilliseconds,
+                double estimatedIntegrationMilliseconds,
+                out CornerDamagePreviewStatus previewStatus,
+                out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+            if (!surfaceFeatures.CornerChippingEnabled)
+            {
+                ResetCornerDamagePreviewCapture();
+                previewStatus = BuildDisabledCornerDamagePreviewStatus(
+                    recipe,
+                    surfaceFeatures,
+                    CornerDamagePreviewKind.WithEdgeWear);
+                unifiedStatus = baselineStatus;
+                return Generate(recipe, surfaceFeatures);
+            }
+
+            return GenerateCornerDamageFullCertificationSearch(
+                recipe,
+                surfaceFeatures,
+                true,
+                baselineStatus,
+                baselineBuildMilliseconds,
+                estimatedIntegrationMilliseconds,
+                CornerDamageSearchHardBudgetMilliseconds,
+                out previewStatus,
+                out unifiedStatus);
         }
 
         private static MeshData GenerateCornerDamageIntegrationPreview(
@@ -950,27 +1072,100 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return GenerateCornerDamageFullCertificationSearch(
                 recipe,
                 surfaceFeatures,
+                false,
+                default,
+                0d,
+                0d,
+                CornerDamageSearchHardBudgetMilliseconds,
                 out previewStatus,
                 out unifiedStatus);
+        }
+
+        public static CornerDamageSelectionFingerprint
+            GenerateCornerDamageSelectionFingerprint(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                int candidateRank)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+
+            ResetCornerDamageTransactionAuditCapture();
+            using (new CornerDamageSearchAttemptScope(candidateRank, 1f))
+            {
+                GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    EdgeWearEvaluationMode.CornerDamageTransactionAudit,
+                    -1,
+                    out _,
+                    out _,
+                    out _);
+            }
+            CornerDamageTransactionAuditResult transaction =
+                CompleteCornerDamageTransactionAuditResultCapture();
+            if (transaction == null)
+            {
+                return default;
+            }
+
+            List<int> mandatory = new List<int>(
+                transaction.CapRingGeneratedIdentities);
+            mandatory.Sort();
+            return new CornerDamageSelectionFingerprint(
+                transaction.Succeeded,
+                transaction.EligibleCandidateCount,
+                transaction.SelectedCandidateRank,
+                transaction.SelectedGraphVertexIndex,
+                transaction.AcceptedTrialIndex,
+                transaction.AcceptedDepth,
+                mandatory.ToArray());
         }
 
         private static MeshData GenerateCornerDamageFullCertificationSearch(
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
+            bool useProvidedBaseline,
+            UnifiedEdgeWearPreviewStatus providedBaselineStatus,
+            double providedBaselineMilliseconds,
+            double estimatedIntegrationMilliseconds,
+            double hardBudgetMilliseconds,
             out CornerDamagePreviewStatus previewStatus,
             out UnifiedEdgeWearPreviewStatus unifiedStatus)
         {
-            System.Diagnostics.Stopwatch baselineStopwatch =
+            CornerDamageSearchTelemetry telemetry =
+                new CornerDamageSearchTelemetry();
+            System.Diagnostics.Stopwatch searchStopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
-            GenerateInternal(
-                recipe,
-                surfaceFeatures,
-                EdgeWearEvaluationMode.UnifiedBoundedPreview,
-                -1,
-                out _,
-                out _,
-                out UnifiedEdgeWearPreviewStatus baselineStatus);
-            baselineStopwatch.Stop();
+            UnifiedEdgeWearPreviewStatus baselineStatus;
+            double baselineMilliseconds = 0d;
+            if (useProvidedBaseline)
+            {
+                baselineStatus = providedBaselineStatus;
+                baselineMilliseconds = Mathf.Max(
+                    0f,
+                    (float)providedBaselineMilliseconds);
+                telemetry.BaselineCacheUseCount = 1;
+            }
+            else
+            {
+                System.Diagnostics.Stopwatch baselineStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
+                GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    EdgeWearEvaluationMode.UnifiedBoundedPreview,
+                    -1,
+                    out _,
+                    out _,
+                    out baselineStatus);
+                baselineStopwatch.Stop();
+                baselineMilliseconds =
+                    baselineStopwatch.Elapsed.TotalMilliseconds;
+                telemetry.BaselineBuildCount = 1;
+            }
 
             int candidateCornerCount = -1;
             int attemptedCornerCount = 0;
@@ -982,165 +1177,740 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             string bestFailureReason =
                 "no eligible corner-damage candidate was available";
             StringBuilder searchAttempts = new StringBuilder(512);
+            CornerDamageIntegrationPreflightRecord acceptedPreflight = null;
+            int acceptedCandidateRank = -1;
 
             for (int candidateRank = 0;
                  candidateCornerCount < 0 ||
                  candidateRank < candidateCornerCount;
                  candidateRank++)
             {
-                bool countedCorner = false;
-                for (int scaleIndex = 0;
-                     scaleIndex < CornerDamageCapRingSearchScales.Length;
-                     scaleIndex++)
+                if (IsEdgeWearAuditCancellationRequested())
                 {
-                    float capRingScale =
-                        CornerDamageCapRingSearchScales[scaleIndex];
-                    ResetCornerDamagePreviewCapture();
-                    System.Diagnostics.Stopwatch cornerStopwatch =
-                        System.Diagnostics.Stopwatch.StartNew();
-                    MeshData attemptMesh = null;
-                    UnifiedEdgeWearPreviewStatus attemptUnified = default;
-                    InvalidOperationException attemptException = null;
-                    try
+                    bestFailureStage = "cancelled";
+                    bestFailureReason = "cancelled by user";
+                    break;
+                }
+                if (searchStopwatch.Elapsed.TotalMilliseconds >=
+                    hardBudgetMilliseconds)
+                {
+                    telemetry.CaseBudgetExceeded = true;
+                    bestFailureStage = "performance-budget";
+                    bestFailureReason =
+                        "corner preflight exceeded the case hard budget";
+                    break;
+                }
+
+                telemetry.TransactionAttemptCount++;
+                telemetry.IntegrationPreflightAttemptCount++;
+                System.Diagnostics.Stopwatch preflightStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
+                CornerDamageIntegrationPreflightRecord preflight = null;
+                InvalidOperationException preflightException = null;
+                try
+                {
+                    ResetCornerDamageIntegrationPreflightCapture();
+                    using (new CornerDamageSearchAttemptScope(
+                               candidateRank,
+                               1f))
                     {
-                        using (new CornerDamageSearchAttemptScope(
-                                   candidateRank,
-                                   capRingScale))
-                        {
-                            attemptMesh = GenerateInternal(
-                                recipe,
-                                surfaceFeatures,
-                                EdgeWearEvaluationMode
-                                    .CornerDamageIntegrationPreview,
-                                -1,
-                                out _,
-                                out _,
-                                out attemptUnified);
-                        }
-                    }
-                    catch (InvalidOperationException exception)
-                    {
-                        attemptException = exception;
-                    }
-                    finally
-                    {
-                        cornerStopwatch.Stop();
-                    }
-                    CornerDamagePreviewStatus attemptStatus =
-                        CompleteCornerDamagePreviewCapture(
+                        GenerateInternal(
                             recipe,
-                            baselineStatus,
-                            attemptUnified,
-                            baselineStopwatch.Elapsed.TotalMilliseconds,
-                            cornerStopwatch.Elapsed.TotalMilliseconds);
-                    if (attemptException != null && attemptStatus != null)
-                    {
-                        attemptStatus.PreviewApplied = false;
-                        attemptStatus.Diagnostic =
-                            "post-chip construction exception: " +
-                            attemptException.Message;
+                            surfaceFeatures,
+                            EdgeWearEvaluationMode.
+                                CornerDamageIntegrationPreflight,
+                            -1,
+                            out _,
+                            out _,
+                            out _);
                     }
-                    attemptedConfigurationCount++;
-                    if (candidateCornerCount < 0)
-                    {
-                        candidateCornerCount = attemptStatus == null
-                            ? 0
-                            : attemptStatus.CandidateCornerCount;
-                    }
-                    if (!countedCorner &&
-                        candidateRank < candidateCornerCount)
-                    {
-                        attemptedCornerCount++;
-                        countedCorner = true;
-                    }
+                    preflight =
+                        CompleteCornerDamageIntegrationPreflightCapture();
+                }
+                catch (InvalidOperationException exception)
+                {
+                    preflightException = exception;
+                }
+                finally
+                {
+                    preflightStopwatch.Stop();
+                }
 
-                    string failureStage = attemptException == null
-                        ? ResolveCornerDamageSearchFailureStage(
-                            attemptStatus)
-                        : "post-chip-construction";
-                    AppendCornerDamageSearchAttempt(
-                        searchAttempts,
-                        candidateRank,
-                        capRingScale,
-                        failureStage,
-                        attemptStatus);
-                    if (attemptStatus != null &&
-                        attemptStatus.PreviewApplied)
+                CornerDamageTransactionAuditResult transaction =
+                    preflight == null ? null : preflight.Transaction;
+                if (transaction != null)
+                {
+                    telemetry.CandidateRankingMilliseconds +=
+                        transaction.CandidateRankingMilliseconds;
+                    telemetry.TransactionMilliseconds += Mathf.Max(
+                        0f,
+                        (float)(transaction.TransactionMilliseconds -
+                            transaction.CandidateRankingMilliseconds));
+                }
+                telemetry.IntegrationPreflightMilliseconds += Mathf.Max(
+                    0f,
+                    (float)(preflightStopwatch.Elapsed.TotalMilliseconds -
+                        (transaction == null
+                            ? 0d
+                            : transaction.TransactionMilliseconds)));
+
+                if (candidateCornerCount < 0)
+                {
+                    candidateCornerCount = transaction == null
+                        ? 0
+                        : transaction.EligibleCandidateCount;
+                }
+                if (candidateRank < candidateCornerCount)
+                {
+                    attemptedCornerCount++;
+                }
+
+                CornerDamagePreviewStatus preflightStatus =
+                    BuildCornerDamagePreflightStatus(
+                        recipe,
+                        surfaceFeatures,
+                        preflight,
+                        preflightException == null
+                            ? string.Empty
+                            : "integration preflight exception: " +
+                                preflightException.Message);
+                string preflightStage = preflightException != null
+                    ? "integration-preflight"
+                    : preflight == null
+                        ? "integration-preflight"
+                        : preflight.FailureStage;
+                if (string.IsNullOrEmpty(preflightStage))
+                {
+                    preflightStage = "integration-preflight";
+                }
+
+                if (preflightException == null && preflight != null &&
+                    string.Equals(
+                        preflight.FailureStage,
+                        "none",
+                        StringComparison.Ordinal))
+                {
+                    ApplyCornerDamageIntegrationPreflightRetention(
+                        preflight,
+                        baselineStatus);
+                    if (preflight.PredictedCollateralLostCount > 0)
                     {
-                        ApplyCornerDamageSearchSummary(
-                            attemptStatus,
-                            candidateCornerCount,
-                            attemptedCornerCount,
-                            attemptedConfigurationCount,
+                        preflight.FailureStage = "unrelated-retention";
+                        preflight.Diagnostic =
+                            "integration preflight predicts unrelated bevel loss";
+                        preflightStatus = BuildCornerDamagePreflightStatus(
+                            recipe,
+                            surfaceFeatures,
+                            preflight,
+                            preflight.Diagnostic);
+                        preflightStage = preflight.FailureStage;
+                    }
+                    else
+                    {
+                        acceptedPreflight = preflight;
+                        acceptedCandidateRank = candidateRank;
+                        AppendCornerDamageSearchAttempt(
+                            searchAttempts,
                             candidateRank,
-                            capRingScale,
-                            "none",
-                            "none",
-                            searchAttempts.ToString());
-                        previewStatus = attemptStatus;
-                        unifiedStatus = attemptUnified;
-                        return attemptMesh;
-                    }
-
-                    int failurePriority =
-                        ResolveCornerDamageSearchFailurePriority(
-                            failureStage);
-                    if (bestFailure == null ||
-                        failurePriority > bestFailurePriority)
-                    {
-                        bestFailure = attemptStatus;
-                        bestFailureUnified = attemptUnified;
-                        bestFailurePriority = failurePriority;
-                        bestFailureStage = failureStage;
-                        bestFailureReason = attemptStatus == null
-                            ? "corner search attempt status was unavailable"
-                            : attemptStatus.Diagnostic;
-                    }
-
-                    if (attemptStatus == null ||
-                        !attemptStatus.TransactionCertified ||
-                        string.Equals(
-                            attemptStatus.Diagnostic,
-                            "cap-ring requested width is below the minimum stable style width",
-                            StringComparison.Ordinal))
-                    {
+                            preflight.ResolvedUniformScale,
+                            "preflight-passed",
+                            preflightStatus);
                         break;
                     }
                 }
 
-                if (candidateCornerCount <= 0)
+                AppendCornerDamageSearchAttempt(
+                    searchAttempts,
+                    candidateRank,
+                    preflight == null
+                        ? 0f
+                        : preflight.ResolvedUniformScale,
+                    preflightStage,
+                    preflightStatus);
+                RetainCornerDamageSearchFailure(
+                    preflightStatus,
+                    default,
+                    preflightStage,
+                    ref bestFailure,
+                    ref bestFailureUnified,
+                    ref bestFailurePriority,
+                    ref bestFailureStage,
+                    ref bestFailureReason);
+            }
+
+            if (acceptedPreflight == null)
+            {
+                searchStopwatch.Stop();
+                previewStatus = bestFailure ??
+                    new CornerDamagePreviewStatus
+                    {
+                        PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
+                        ShapeSeed = recipe.ShapeSeed,
+                        AuthoringEnabled = true,
+                        Diagnostic = bestFailureReason
+                    };
+                unifiedStatus = bestFailureUnified;
+                ApplyCornerDamageSearchSummary(
+                    previewStatus,
+                    Mathf.Max(0, candidateCornerCount),
+                    attemptedCornerCount,
+                    attemptedConfigurationCount,
+                    -1,
+                    0f,
+                    bestFailureStage,
+                    bestFailureReason,
+                    searchAttempts.ToString(),
+                    telemetry);
+                return Generate(recipe, surfaceFeatures);
+            }
+
+            double remainingBudget = hardBudgetMilliseconds -
+                searchStopwatch.Elapsed.TotalMilliseconds;
+            double estimatedBuild = Math.Max(
+                250d,
+                Math.Max(
+                    estimatedIntegrationMilliseconds,
+                    baselineMilliseconds * 1.25d));
+            if (remainingBudget + 0.001d < estimatedBuild)
+            {
+                telemetry.CaseBudgetExceeded = true;
+                CornerDamagePreviewStatus budgetStatus =
+                    BuildCornerDamagePreflightStatus(
+                        recipe,
+                        surfaceFeatures,
+                        acceptedPreflight,
+                        "insufficient case budget remains for the one final integration build");
+                ApplyCornerDamageSearchSummary(
+                    budgetStatus,
+                    Mathf.Max(0, candidateCornerCount),
+                    attemptedCornerCount,
+                    0,
+                    -1,
+                    0f,
+                    "performance-budget",
+                    budgetStatus.Diagnostic,
+                    searchAttempts.ToString(),
+                    telemetry);
+                previewStatus = budgetStatus;
+                unifiedStatus = default;
+                return Generate(recipe, surfaceFeatures);
+            }
+
+            telemetry.FullIntegrationBuildCount = 1;
+            attemptedConfigurationCount = 1;
+            MeshData finalMesh = RunCornerDamageIntegrationAttempt(
+                recipe,
+                surfaceFeatures,
+                acceptedCandidateRank,
+                acceptedPreflight.ResolvedUniformScale,
+                baselineStatus,
+                baselineMilliseconds,
+                out CornerDamagePreviewStatus finalStatus,
+                out UnifiedEdgeWearPreviewStatus finalUnified,
+                out double finalMilliseconds,
+                out InvalidOperationException finalException);
+            telemetry.IntegrationMilliseconds = finalMilliseconds;
+            ApplyCornerDamageIntegrationPreflightEvidence(
+                finalStatus,
+                acceptedPreflight);
+
+            bool exceededBudget =
+                searchStopwatch.Elapsed.TotalMilliseconds >=
+                    hardBudgetMilliseconds;
+            string finalFailureStage = finalException == null
+                ? ResolveCornerDamageSearchFailureStage(finalStatus)
+                : "post-chip-construction";
+            string mismatchReason = string.Empty;
+            bool preflightMatchesFinal = finalException == null &&
+                finalStatus != null && finalStatus.PreviewApplied &&
+                TryValidateCornerDamageIntegrationPreflightResult(
+                    acceptedPreflight,
+                    finalStatus,
+                    finalUnified,
+                    out mismatchReason);
+            if (!preflightMatchesFinal && !exceededBudget)
+            {
+                telemetry.IntegrationPreflightMismatchCount = 1;
+                finalFailureStage = "integration-preflight-mismatch";
+                if (finalStatus == null)
                 {
-                    break;
+                    finalStatus = BuildCornerDamagePreflightStatus(
+                        recipe,
+                        surfaceFeatures,
+                        acceptedPreflight,
+                        mismatchReason);
+                }
+                finalStatus.PreviewApplied = false;
+                finalStatus.Diagnostic = string.IsNullOrEmpty(mismatchReason)
+                    ? "final integration disagreed with the certified preflight"
+                    : mismatchReason;
+            }
+            if (exceededBudget)
+            {
+                telemetry.CaseBudgetExceeded = true;
+                finalFailureStage = "performance-budget";
+                if (finalStatus != null)
+                {
+                    finalStatus.PreviewApplied = false;
+                    finalStatus.Diagnostic =
+                        "one final integration build exceeded the case hard budget";
                 }
             }
 
-            previewStatus = bestFailure ??
-                new CornerDamagePreviewStatus
-                {
-                    PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
-                    ShapeSeed = recipe.ShapeSeed,
-                    AuthoringEnabled = true,
-                    Diagnostic =
-                        "no eligible corner-damage candidate was available"
-                };
-            unifiedStatus = bestFailureUnified;
-            string finalFailureStage = bestFailure == null
-                ? ResolveCornerDamageSearchFailureStage(previewStatus)
-                : bestFailureStage;
-            string finalFailureReason = bestFailure == null
-                ? previewStatus.Diagnostic
-                : bestFailureReason;
+            AppendCornerDamageSearchAttempt(
+                searchAttempts,
+                acceptedCandidateRank,
+                acceptedPreflight.ResolvedUniformScale,
+                finalFailureStage,
+                finalStatus);
+            searchStopwatch.Stop();
+            if (!exceededBudget && preflightMatchesFinal)
+            {
+                ApplyCornerDamageSearchSummary(
+                    finalStatus,
+                    candidateCornerCount,
+                    attemptedCornerCount,
+                    attemptedConfigurationCount,
+                    acceptedCandidateRank,
+                    acceptedPreflight.ResolvedUniformScale,
+                    "none",
+                    "none",
+                    searchAttempts.ToString(),
+                    telemetry);
+                previewStatus = finalStatus;
+                unifiedStatus = finalUnified;
+                return finalMesh;
+            }
+
+            if (finalStatus == null)
+            {
+                finalStatus = BuildCornerDamagePreflightStatus(
+                    recipe,
+                    surfaceFeatures,
+                    acceptedPreflight,
+                    finalException == null
+                        ? mismatchReason
+                        : "post-chip construction exception: " +
+                            finalException.Message);
+            }
             ApplyCornerDamageSearchSummary(
-                previewStatus,
-                Mathf.Max(0, candidateCornerCount),
+                finalStatus,
+                candidateCornerCount,
                 attemptedCornerCount,
                 attemptedConfigurationCount,
                 -1,
                 0f,
                 finalFailureStage,
-                finalFailureReason,
-                searchAttempts.ToString());
+                finalStatus.Diagnostic,
+                searchAttempts.ToString(),
+                telemetry);
+            previewStatus = finalStatus;
+            unifiedStatus = finalUnified;
             return Generate(recipe, surfaceFeatures);
+        }
+
+        private static void ApplyCornerDamageIntegrationPreflightEvidence(
+            CornerDamagePreviewStatus status,
+            CornerDamageIntegrationPreflightRecord preflight)
+        {
+            if (status == null || preflight == null)
+            {
+                return;
+            }
+
+            status.PreflightCandidateCount = preflight.CandidateCount;
+            status.PreflightSelectedCount = preflight.SelectedCount;
+            status.PreflightSelectedGraphEdgeCount =
+                preflight.SelectedGraphEdgeCount;
+            status.PreflightCandidateConservationValid =
+                preflight.CandidateConservationValid;
+            status.PreflightTopologyReady = preflight.TopologyReady;
+            status.PreflightWidthSolutionReady =
+                preflight.WidthSolutionReady;
+            status.PreflightMandatorySolvedCount =
+                preflight.MandatorySolvedCount;
+            status.PreflightUnrelatedBaselineCount =
+                preflight.PredictedUnrelatedBaselineCount;
+            status.PreflightUnrelatedRetainedCount =
+                preflight.PredictedUnrelatedRetainedCount;
+            status.PreflightCollateralLostCount =
+                preflight.PredictedCollateralLostCount;
+            status.IntegrationPreflightDiagnostic =
+                preflight.Diagnostic ?? string.Empty;
+        }
+
+        private static void ApplyCornerDamageIntegrationPreflightRetention(
+            CornerDamageIntegrationPreflightRecord preflight,
+            UnifiedEdgeWearPreviewStatus baselineStatus)
+        {
+            if (preflight == null)
+            {
+                return;
+            }
+
+            HashSet<int> baseline = CollectCertifiedOrdinaryEdgeIdentities(
+                baselineStatus.DebugEdges);
+            HashSet<int> predicted = new HashSet<int>(
+                preflight.PredictedOrdinaryIdentities ??
+                    Array.Empty<int>());
+            HashSet<int> affected = preflight.Transaction == null
+                ? new HashSet<int>()
+                : new HashSet<int>(
+                    preflight.Transaction.AffectedOriginalEdgeIndices);
+            List<int> lost = new List<int>();
+            foreach (int identity in baseline)
+            {
+                if (affected.Contains(identity))
+                {
+                    continue;
+                }
+                preflight.PredictedUnrelatedBaselineCount++;
+                if (predicted.Contains(identity))
+                {
+                    preflight.PredictedUnrelatedRetainedCount++;
+                }
+                else
+                {
+                    lost.Add(identity);
+                }
+            }
+            lost.Sort();
+            preflight.PredictedCollateralLostIdentities = lost.ToArray();
+            preflight.PredictedCollateralLostCount = lost.Count;
+        }
+
+        private static bool TryValidateCornerDamageIntegrationPreflightResult(
+            CornerDamageIntegrationPreflightRecord preflight,
+            CornerDamagePreviewStatus finalStatus,
+            UnifiedEdgeWearPreviewStatus finalUnified,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (preflight == null || finalStatus == null)
+            {
+                blocker = "preflight or final integration status was unavailable";
+                return false;
+            }
+            CornerDamageTransactionAuditResult transaction =
+                preflight.Transaction;
+            if (transaction == null ||
+                finalStatus.AcceptedCornerRank !=
+                    transaction.SelectedCandidateRank ||
+                finalStatus.SelectedGraphVertexIndex !=
+                    transaction.SelectedGraphVertexIndex ||
+                finalStatus.AcceptedTrialIndex !=
+                    transaction.AcceptedTrialIndex ||
+                !finalStatus.AcceptedDepth.Equals(transaction.AcceptedDepth))
+            {
+                blocker = "final integration selected a different corner transaction";
+                return false;
+            }
+            if (finalStatus.MandatoryBuiltCount !=
+                    preflight.ExpectedMandatoryCount ||
+                finalStatus.CollateralLostCount != 0 ||
+                finalStatus.UnrelatedBaselineBuiltCount !=
+                    preflight.PredictedUnrelatedBaselineCount ||
+                finalStatus.UnrelatedRetainedCount !=
+                    preflight.PredictedUnrelatedRetainedCount)
+            {
+                blocker =
+                    "final integration disagreed with mandatory-ring or retention preflight";
+                return false;
+            }
+
+            HashSet<int> finalMandatory = new HashSet<int>(
+                finalStatus.MandatoryCapRingIdentities ??
+                    Array.Empty<int>());
+            HashSet<int> predictedMandatory = new HashSet<int>(
+                preflight.PredictedMandatoryIdentities ??
+                    Array.Empty<int>());
+            if (!finalMandatory.SetEquals(predictedMandatory))
+            {
+                blocker =
+                    "final mandatory cap-ring identity set differs from preflight";
+                return false;
+            }
+
+            HashSet<int> finalOrdinary =
+                CollectCertifiedOrdinaryEdgeIdentities(
+                    finalUnified.DebugEdges);
+            HashSet<int> predictedOrdinary = new HashSet<int>(
+                preflight.PredictedOrdinaryIdentities ??
+                    Array.Empty<int>());
+            if (!finalOrdinary.SetEquals(predictedOrdinary))
+            {
+                blocker =
+                    "final certified ordinary-edge identity set differs from preflight";
+                return false;
+            }
+            return true;
+        }
+
+        private static MeshData RunCornerDamageIntegrationAttempt(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            int candidateRank,
+            float capRingScale,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            double baselineMilliseconds,
+            out CornerDamagePreviewStatus attemptStatus,
+            out UnifiedEdgeWearPreviewStatus attemptUnified,
+            out double elapsedMilliseconds,
+            out InvalidOperationException attemptException)
+        {
+            ResetCornerDamagePreviewCapture();
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            MeshData attemptMesh = null;
+            attemptUnified = default;
+            attemptException = null;
+            try
+            {
+                using (new CornerDamageSearchAttemptScope(
+                           candidateRank,
+                           capRingScale))
+                {
+                    attemptMesh = GenerateInternal(
+                        recipe,
+                        surfaceFeatures,
+                        EdgeWearEvaluationMode.CornerDamageIntegrationPreview,
+                        -1,
+                        out _,
+                        out _,
+                        out attemptUnified);
+                }
+            }
+            catch (InvalidOperationException exception)
+            {
+                attemptException = exception;
+            }
+            finally
+            {
+                stopwatch.Stop();
+            }
+
+            elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+            attemptStatus = CompleteCornerDamagePreviewCapture(
+                recipe,
+                baselineStatus,
+                attemptUnified,
+                baselineMilliseconds,
+                elapsedMilliseconds);
+            if (attemptException != null && attemptStatus != null)
+            {
+                attemptStatus.PreviewApplied = false;
+                attemptStatus.Diagnostic =
+                    "post-chip construction exception: " +
+                    attemptException.Message;
+            }
+            return attemptMesh;
+        }
+
+        private static CornerDamagePreviewStatus
+            BuildCornerDamagePreflightStatus(
+                MassRecipe recipe,
+                MassSurfaceFeatureSettings surfaceFeatures,
+                CornerDamageIntegrationPreflightRecord preflight,
+                string overrideDiagnostic)
+        {
+            CornerDamageTransactionAuditResult transaction =
+                preflight == null ? null : preflight.Transaction;
+            CornerDamagePreviewStatus status =
+                new CornerDamagePreviewStatus
+                {
+                    PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
+                    ShapeSeed = recipe == null ? 0 : recipe.ShapeSeed,
+                    AuthoringEnabled = surfaceFeatures.CornerChippingEnabled,
+                    TransactionCertified = transaction != null &&
+                        transaction.Succeeded,
+                    CandidateCornerCount = transaction == null
+                        ? 0
+                        : transaction.EligibleCandidateCount,
+                    AcceptedCornerRank = transaction == null
+                        ? -1
+                        : transaction.SelectedCandidateRank,
+                    SelectedGraphVertexIndex = transaction == null
+                        ? -1
+                        : transaction.SelectedGraphVertexIndex,
+                    AcceptedTrialIndex = transaction == null
+                        ? -1
+                        : transaction.AcceptedTrialIndex,
+                    AcceptedDepth = transaction == null
+                        ? 0f
+                        : transaction.AcceptedDepth,
+                    ExpectedCapRingEdgeCount = preflight == null
+                        ? 0
+                        : preflight.ExpectedMandatoryCount,
+                    MandatoryCandidateCount = preflight == null
+                        ? 0
+                        : preflight.MandatoryRecordCount,
+                    MandatorySelectedCount = preflight == null
+                        ? 0
+                        : preflight.MandatorySelectedCount,
+                    MandatoryBuiltCount = preflight == null
+                        ? 0
+                        : preflight.MandatorySolvedCount,
+                    UnrelatedBaselineBuiltCount = preflight == null
+                        ? 0
+                        : preflight.PredictedUnrelatedBaselineCount,
+                    UnrelatedRetainedCount = preflight == null
+                        ? 0
+                        : preflight.PredictedUnrelatedRetainedCount,
+                    CollateralLostCount = preflight == null
+                        ? 0
+                        : preflight.PredictedCollateralLostCount,
+                    PreflightCandidateCount = preflight == null
+                        ? 0
+                        : preflight.CandidateCount,
+                    PreflightSelectedCount = preflight == null
+                        ? 0
+                        : preflight.SelectedCount,
+                    PreflightSelectedGraphEdgeCount = preflight == null
+                        ? 0
+                        : preflight.SelectedGraphEdgeCount,
+                    PreflightCandidateConservationValid = preflight != null &&
+                        preflight.CandidateConservationValid,
+                    PreflightTopologyReady = preflight != null &&
+                        preflight.TopologyReady,
+                    PreflightWidthSolutionReady = preflight != null &&
+                        preflight.WidthSolutionReady,
+                    PreflightMandatorySolvedCount = preflight == null
+                        ? 0
+                        : preflight.MandatorySolvedCount,
+                    PreflightUnrelatedBaselineCount = preflight == null
+                        ? 0
+                        : preflight.PredictedUnrelatedBaselineCount,
+                    PreflightUnrelatedRetainedCount = preflight == null
+                        ? 0
+                        : preflight.PredictedUnrelatedRetainedCount,
+                    PreflightCollateralLostCount = preflight == null
+                        ? 0
+                        : preflight.PredictedCollateralLostCount,
+                    IntegrationPreflightDiagnostic = preflight == null
+                        ? string.Empty
+                        : preflight.Diagnostic,
+                    Diagnostic = string.IsNullOrEmpty(overrideDiagnostic)
+                        ? preflight == null
+                            ? "integration preflight status was unavailable"
+                            : preflight.Diagnostic
+                        : overrideDiagnostic
+                };
+            if (transaction != null)
+            {
+                status.RequestedDepthFraction =
+                    transaction.RequestedDepthFraction;
+                status.DepthVariation = transaction.DepthVariation;
+                status.DepthVariationIdentity =
+                    transaction.DepthVariationIdentity;
+                status.ResolvedDepthFraction =
+                    transaction.ResolvedDepthFraction;
+                status.TopFacingPreference = transaction.TopFacingPreference;
+                status.ShortestIncidentEdgeLength =
+                    transaction.ShortestIncidentEdgeLength;
+                status.RequestedDepthAbsolute = transaction.BaseDepth;
+                status.AcceptedDepthFraction =
+                    transaction.ShortestIncidentEdgeLength >
+                        PointMergeDistance
+                        ? transaction.AcceptedDepth /
+                            transaction.ShortestIncidentEdgeLength
+                        : 0f;
+                status.AcceptedRetryFactor =
+                    transaction.AcceptedRetryFactor;
+                status.AcceptedVsRequestedRatio =
+                    transaction.BaseDepth > PointMergeDistance
+                        ? transaction.AcceptedDepth /
+                            transaction.BaseDepth
+                        : 0f;
+                status.CapFaceCount = transaction.AcceptedCapFace == null
+                    ? 0
+                    : 1;
+                List<int> mandatory = new List<int>(
+                    transaction.CapRingGeneratedIdentities);
+                mandatory.Sort();
+                status.MandatoryCapRingIdentities = mandatory.ToArray();
+            }
+            return status;
+        }
+
+        private static void RetainCornerDamageSearchFailure(
+            CornerDamagePreviewStatus attemptStatus,
+            UnifiedEdgeWearPreviewStatus attemptUnified,
+            string failureStage,
+            ref CornerDamagePreviewStatus bestFailure,
+            ref UnifiedEdgeWearPreviewStatus bestFailureUnified,
+            ref int bestFailurePriority,
+            ref string bestFailureStage,
+            ref string bestFailureReason)
+        {
+            int priority = ResolveCornerDamageSearchFailurePriority(
+                failureStage);
+            if (bestFailure != null && priority <= bestFailurePriority)
+            {
+                return;
+            }
+            bestFailure = attemptStatus;
+            bestFailureUnified = attemptUnified;
+            bestFailurePriority = priority;
+            bestFailureStage = failureStage;
+            bestFailureReason = attemptStatus == null
+                ? "corner search attempt status was unavailable"
+                : !string.IsNullOrEmpty(
+                      attemptStatus.SearchFailureReason) &&
+                  !string.Equals(
+                      attemptStatus.SearchFailureReason,
+                      "none",
+                      StringComparison.Ordinal)
+                    ? attemptStatus.SearchFailureReason
+                    : attemptStatus.Diagnostic;
+        }
+
+        private static CornerDamageSearchTelemetry
+            CopyCornerDamageSearchTelemetry(
+                CornerDamagePreviewStatus status)
+        {
+            return new CornerDamageSearchTelemetry
+            {
+                BaselineBuildCount = status == null
+                    ? 0
+                    : status.BaselineBuildCount,
+                BaselineCacheUseCount = status == null
+                    ? 0
+                    : status.BaselineCacheUseCount,
+                TransactionAttemptCount = status == null
+                    ? 0
+                    : status.TransactionAttemptCount,
+                IntegrationPreflightAttemptCount = status == null
+                    ? 0
+                    : status.IntegrationPreflightAttemptCount,
+                FullIntegrationBuildCount = status == null
+                    ? 0
+                    : status.FullIntegrationBuildCount,
+                FullFallbackBuildCount = status == null
+                    ? 0
+                    : status.FullFallbackBuildCount,
+                GeometrySearchReuseCount = status == null
+                    ? 0
+                    : status.GeometrySearchReuseCount,
+                IntegrationPreflightMismatchCount = status == null
+                    ? 0
+                    : status.IntegrationPreflightMismatchCount,
+                CandidateRankingMilliseconds = status == null
+                    ? 0d
+                    : status.CandidateRankingMilliseconds,
+                TransactionMilliseconds = status == null
+                    ? 0d
+                    : status.TransactionMilliseconds,
+                IntegrationPreflightMilliseconds = status == null
+                    ? 0d
+                    : status.IntegrationPreflightMilliseconds,
+                IntegrationMilliseconds = status == null
+                    ? 0d
+                    : status.IntegrationMilliseconds,
+                CaseBudgetExceeded = status != null &&
+                    status.CaseBudgetExceeded,
+                MatrixBudgetExceeded = status != null &&
+                    status.MatrixBudgetExceeded
+            };
         }
 
         private static string ResolveCornerDamageSearchFailureStage(
@@ -1180,9 +1950,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             return failureStage switch
             {
-                "unrelated-retention" => 4,
-                "post-chip-construction" => 3,
-                "cap-ring-completion" => 2,
+                "performance-budget" => 9,
+                "integration-preflight-mismatch" => 8,
+                "unrelated-retention" => 7,
+                "post-chip-construction" => 6,
+                "width-solution" => 5,
+                "candidate-conservation" => 4,
+                "topology-context" => 4,
+                "cap-ring-completion" => 3,
+                "cap-ring-preflight" => 2,
+                "integration-preflight" => 2,
                 "transaction-certification" => 1,
                 _ => 0
             };
@@ -1321,6 +2098,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out previewStatus);
         }
 
+        public static MeshData GenerateUnifiedEdgeWearPreviewWithBaseline(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            MeshData baselineMesh,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            out UnifiedEdgeWearPreviewStatus previewStatus,
+            out CornerDamagePreviewStatus cornerStatus)
+        {
+            return GenerateUnifiedEdgeWearPreviewWithBaseline(
+                recipe,
+                surfaceFeatures,
+                baselineMesh,
+                baselineStatus,
+                0d,
+                0d,
+                out previewStatus,
+                out cornerStatus);
+        }
+
+        public static MeshData GenerateUnifiedEdgeWearPreviewWithBaseline(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            MeshData baselineMesh,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            double baselineBuildMilliseconds,
+            double estimatedIntegrationMilliseconds,
+            out UnifiedEdgeWearPreviewStatus previewStatus,
+            out CornerDamagePreviewStatus cornerStatus)
+        {
+            if (surfaceFeatures.CornerChippingEnabled)
+            {
+                return GenerateCornerDamageIntegrationPreviewWithBaseline(
+                    recipe,
+                    surfaceFeatures,
+                    baselineStatus,
+                    baselineBuildMilliseconds,
+                    estimatedIntegrationMilliseconds,
+                    out cornerStatus,
+                    out previewStatus);
+            }
+
+            cornerStatus = null;
+            previewStatus = baselineStatus;
+            return baselineMesh;
+        }
+
         public static MeshData GenerateUnifiedEdgeWearPreviewBaseline(
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures,
@@ -1437,6 +2260,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out previewStatus,
                 out boundedPreviewStatus,
                 out unifiedPreviewStatus);
+#if UNITY_EDITOR
+            if (edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageIntegrationPreflight ||
+                edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.CornerDamageTransactionAudit)
+            {
+                return null;
+            }
+#endif
             if (placementReferenceSoup == null)
             {
                 placementReferenceSoup = soup;

@@ -169,7 +169,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float HighMaterialTemporalUpdateRate = 16f;
         private const float ManualTestShapeVariety = 0f;
 
-        private const float AutomaticObjectSourceMinimumEventsPerSecond = 0.08f;
         private const float AutomaticObjectSourceMaximumEventsPerSecond = 3.0f;
         private const int AutomaticObjectSourceMaximumStartsPerUpdate = 2;
         private const int AutomaticObjectSourceMaximumScansPerUpdate = 32;
@@ -178,9 +177,7 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticObjectBirthPatternSeedSalt = 337.183f;
         private const float AutomaticObjectBirthSourceFillSeedSalt = 613.719f;
         private const float AutomaticObjectBirthShapeSeedSalt = 877.421f;
-        private const float AutomaticFreeWaterSourceMinimumSlotSpacingMetres = 4.0f;
-        private const float AutomaticFreeWaterSourceMaximumSlotSpacingMetres = 14.0f;
-        private const float AutomaticFreeWaterSourceMinimumEventsPerSecond = 0.04f;
+        private const float AutomaticFreeWaterSourceSlotSpacingMetres = 4.0f;
         private const float AutomaticFreeWaterSourceMaximumEventsPerSecond = 1.10f;
         private const int AutomaticFreeWaterSourceMaximumStartsPerUpdate = 1;
         private const int AutomaticFreeWaterSourceMaximumScansPerUpdate = 24;
@@ -190,10 +187,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticFreeWaterBirthPatternSeedSalt = 719.227f;
         private const float AutomaticFreeWaterBirthSourceFillSeedSalt = 941.633f;
         private const float AutomaticFreeWaterBirthShapeSeedSalt = 1171.509f;
-        private const float AutomaticShoreSourceMinimumSlotSpacingMetres = 3.5f;
-        private const float AutomaticShoreSourceMaximumSlotSpacingMetres = 12.0f;
-        private const float AutomaticShoreSourceMinimumEventsPerSecond = 0.25f;
+        private const float AutomaticShoreSourceSlotSpacingMetres = 3.5f;
         private const float AutomaticShoreSourceMaximumEventsPerSecond = 5.0f;
+        private const float AutomaticPacketClearanceMinimumSpeedMetresPerSecond = 0.05f;
         private const int AutomaticShoreSourceMaximumStartsPerUpdate = 3;
         private const int AutomaticShoreSourceMaximumScansPerUpdate = 32;
         private const float AutomaticShoreSourceMinimumHeadTrailMetres = 0.12f;

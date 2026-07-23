@@ -84,6 +84,7 @@ Shader "PS3D/Pixel Ground Surface Lit"
         [HideInInspector] _GroundRiverbedLayerDetailA("Ground Riverbed Layer Detail A", Vector) = (0, 0, 1, 0)
         [HideInInspector] _GroundRiverbedLayerDetailB("Ground Riverbed Layer Detail B", Vector) = (0, 0.5, 0, 0)
         [HideInInspector] _GroundRiverbedLayerDetailC("Ground Riverbed Layer Detail C", Vector) = (0, 1, 0, 0)
+        [HideInInspector] _GroundBankRiverbedSameDrySurface("Ground Bank Riverbed Same Dry Surface", Float) = 0
         [HideInInspector] _GroundRiverbedMaterialStrength("Ground Riverbed Material Strength", Range(0, 1)) = 1
         [HideInInspector] _GroundRiverbedMaterialTransition("Ground Riverbed Material Transition", Vector) = (0.35, 0.75, 0, 0)
         [HideInInspector] _GroundRiverbedHydrologyEnabled("Ground Riverbed Hydrology Enabled", Float) = 0

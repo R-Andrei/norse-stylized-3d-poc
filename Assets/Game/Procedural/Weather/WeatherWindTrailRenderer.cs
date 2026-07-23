@@ -11,11 +11,14 @@ namespace ProgrammaticStylized3D.Weather
     public enum WeatherWindTrailCandidateStatus : byte
     {
         NotEvaluated = 0,
-        OutsideViewport = 1,
+        OutsideWeatherField = 1,
         BelowWindFloor = 2,
         TooClose = 3,
         Eligible = 4,
-        Selected = 5
+        Selected = 5,
+        OutsideCameraEntryRegion = 6,
+        IncompatibleWindDirection = 7,
+        InsufficientVisibleRunway = 8
     }
 
     [DisallowMultipleComponent]
@@ -24,7 +27,7 @@ namespace ProgrammaticStylized3D.Weather
     {
         private const int MaximumTopCandidateCapacity = 8;
         private const int MaximumSpawnSweepsPerFrame = 2;
-        private const int CurrentSerializedBaselineVersion = 2;
+        private const int CurrentSerializedBaselineVersion = 5;
         private const float MinimumDirectionMagnitudeSquared = 0.0000001f;
         private const float MinimumElapsedSeconds = 0.000001f;
 
@@ -91,7 +94,7 @@ namespace ProgrammaticStylized3D.Weather
 
         [Header("Capacity and Spawn Cadence")]
         [SerializeField, Range(1, 16)]
-        private int maximumActiveTrails = 3;
+        private int maximumActiveTrails = 5;
 
         [SerializeField, Range(0.25f, 8f)]
         private float spawnAttemptsPerSecond = 1f;
@@ -131,14 +134,19 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField, Range(0.1f, 2f)]
         private float integrationStepMetres = 0.5f;
 
+        [SerializeField, Range(2, 12)]
+        [Tooltip("Number of smooth render samples generated per authoritative Weather-backbone section. This affects presentation smoothness without increasing Weather integration frequency.")]
+        private int renderCurveSubdivisionsPerBackboneSection = 8;
+
         [SerializeField, Min(0f)]
         private float minimumPathWindStrength = 0.12f;
 
         [SerializeField, Min(0.25f)]
         private float minimumCompletedPathLengthMetres = 4f;
 
-        [SerializeField, Range(5f, 120f)]
-        private float maximumTurnDegreesPerSegment = 55f;
+        [SerializeField, Range(5f, 90f)]
+        [Tooltip("Maximum allowed difference between the direction locked at trail birth and local authoritative wind sampled along its backbone.")]
+        private float maximumLocalWindDirectionMismatchDegrees = 35f;
 
         [SerializeField, Range(0.05f, 2f)]
         private float selfApproachDistanceMetres = 0.3f;
@@ -192,13 +200,31 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField, Min(0f)]
         private float maximumVerticalDeviationMetres = 0.15f;
 
-        [SerializeField, Range(0f, 1f)]
-        [Tooltip("Probability that an accepted streamline receives one bounded broad lateral wave.")]
-        private float occasionalBroadWaveChance = 0.22f;
+        [SerializeField, Min(0f)]
+        [Tooltip("Minimum mandatory side-to-side displacement around the authoritative Weather streamline.")]
+        private float minimumLateralWobbleStrengthMetres = 0.18f;
 
+        [SerializeField, Min(0f)]
+        [Tooltip("Maximum mandatory side-to-side displacement around the authoritative Weather streamline.")]
+        private float maximumLateralWobbleStrengthMetres = 0.3f;
+
+        [SerializeField, Min(0.25f)]
+        [Tooltip("Minimum world-space distance covered by one complete lateral wobble cycle.")]
+        private float minimumLateralWobbleWavelengthMetres = 3.5f;
+
+        [SerializeField, Min(0.25f)]
+        [Tooltip("Maximum world-space distance covered by one complete lateral wobble cycle.")]
+        private float maximumLateralWobbleWavelengthMetres = 5f;
+
+        [FormerlySerializedAs("occasionalBroadWaveChance")]
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("Probability that one normal wobble cycle receives a localized extra amplitude boost.")]
+        private float occasionalLargerLoopChance = 0.22f;
+
+        [FormerlySerializedAs("occasionalBroadWaveStrengthMetres")]
         [SerializeField, Range(0f, 1.5f)]
-        [Tooltip("Maximum lateral XZ displacement for trails selected to receive an occasional broad wave.")]
-        private float occasionalBroadWaveStrengthMetres = 0.45f;
+        [Tooltip("Extra lateral displacement added only to one localized wobble cycle.")]
+        private float occasionalLargerLoopExtraStrengthMetres = 0.28f;
 
         [SerializeField, Range(0f, 1f)]
         private float trailOpacity = 0.95f;
@@ -206,9 +232,28 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField, HideInInspector]
         private int serializedBaselineVersion;
 
-        [Header("Camera Relevance")]
-        [SerializeField, Range(0f, 0.5f)]
-        private float candidateViewportMargin = 0.12f;
+        [Header("Camera Entry Placement")]
+        [FormerlySerializedAs("candidateViewportMargin")]
+        [SerializeField, Range(0f, 0.2f)]
+        [Tooltip("Small viewport-space margin permitted only beyond the edge from which wind enters the screen.")]
+        private float upwindEntryMarginViewport = 0.03f;
+
+        [SerializeField, Range(0.1f, 1f)]
+        [Tooltip("Fraction of the visible screen depth, measured from the upwind edge, that may contain on-screen spawn seeds.")]
+        private float upwindSpawnBandDepth = 0.3f;
+
+        [FormerlySerializedAs("cameraSpawnPreference")]
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("Strength of the preference for upwind positions with long visible downwind traversal.")]
+        private float cameraEntryPreference = 0.9f;
+
+        [SerializeField, Min(1f)]
+        [Tooltip("Visible downwind travel distance that receives the maximum camera-entry score.")]
+        private float preferredVisibleRunwayMetres = 12f;
+
+        [SerializeField, Min(0f)]
+        [Tooltip("Hard minimum visible downwind travel distance required before a candidate may spawn.")]
+        private float minimumAcceptedVisibleRunwayMetres = 7f;
 
 
         private WeatherWindDomain weatherDomain;
@@ -239,7 +284,13 @@ namespace ProgrammaticStylized3D.Weather
         private float[] trailLengths;
         private float[] trailStrengths;
         private float[] trailMinimumAlignments;
-        private bool[] trailUsesBroadWave;
+        private bool[] trailUsesLargerLoop;
+        private Vector2[] trailBirthWindDirectionsXZ;
+        private float[] trailBodyLengths;
+        private float[] trailTravelSpeeds;
+        private float[] trailAliveDurations;
+        private float[] trailSpawnDurations;
+        private float[] trailDespawnDurations;
         private Vector3[] trailPoints;
         private float[] trailPointDistances;
 
@@ -251,13 +302,21 @@ namespace ProgrammaticStylized3D.Weather
         private float[] candidateStrengths;
         private float[] candidateScores;
         private float[] candidateNearestDistances;
+        private float[] candidateForwardVisibilityScores;
+        private float[] candidateVisibleRunwayMetres;
+        private float[] candidateUpwindScores;
+        private Vector2[] candidateViewportPositions;
         private WeatherWindTrailCandidateStatus[] candidateStatuses;
         private int[] topCandidateIndices;
         private float[] topCandidateScores;
 
         private Vector2[] forwardScratch;
+        private Vector2[] backboneScratch;
+        private float[] backboneDistanceScratch;
         private Vector2[] combinedPathScratch;
         private Vector2[] undeformedPathScratch;
+        private float[] presentationBackboneDistanceScratch;
+        private Vector2[] baselineWobbleScratch;
         private Vector3[] worldPathScratch;
         private float[] pathDistanceScratch;
 
@@ -270,6 +329,9 @@ namespace ProgrammaticStylized3D.Weather
         private long totalSuccessfulSpawnCount;
         private long totalCandidateEvaluationCount;
         private long totalViewportRejectionCount;
+        private long totalCameraEntryRejectionCount;
+        private long totalDirectionMismatchRejectionCount;
+        private long totalRunwayRejectionCount;
         private long totalCalmRejectionCount;
         private long totalSeparationRejectionCount;
         private long totalNoEligibleCandidateCount;
@@ -278,6 +340,7 @@ namespace ProgrammaticStylized3D.Weather
         private int totalDomainConfigurationResetCount;
         private int totalSimulationRewindResetCount;
         private int totalLargeTeleportResetCount;
+        private long totalDownwindEarlyReleaseCount;
         private int lastCandidateCount;
         private int lastVisibleCandidateCount;
         private int lastEligibleCandidateCount;
@@ -285,16 +348,33 @@ namespace ProgrammaticStylized3D.Weather
         private float lastSampledCandidateMaximumStrength = -1f;
         private float lastAcceptedCandidateStrength = -1f;
         private float lastAcceptedNearestSeparation = -1f;
+        private int lastGeneratedBackbonePointCount;
         private int lastGeneratedPathPointCount;
         private float lastGeneratedPathLengthMetres;
+        private float lastAverageRenderSegmentLengthMetres;
+        private float lastMaximumRenderSegmentLengthMetres;
+        private float lastMaximumAdjacentRenderAngleDegrees;
         private float lastGeneratedPathMinimumAlignment = -1f;
         private int lastAttemptTargetWindSampleCount;
         private int currentAttemptTargetWindSampleCount;
         private int lastMeshUploadVertexCount;
         private long totalRenderSubmissionCount;
         private int lastRenderedTrailCount;
-        private long totalBroadWaveTrailCount;
-        private bool lastGeneratedPathUsedBroadWave;
+        private long totalLargerLoopTrailCount;
+        private bool lastGeneratedPathUsedLargerLoop;
+        private float lastGeneratedWobbleStrengthMetres = -1f;
+        private float lastGeneratedWobbleWavelengthMetres = -1f;
+        private float lastGeneratedLargerLoopExtraStrengthMetres = -1f;
+        private float lastAcceptedForwardVisibilityScore = -1f;
+        private float lastAcceptedVisibleRunwayMetres = -1f;
+        private float lastAcceptedUpwindScore = -1f;
+        private Vector2 lastAcceptedViewportPosition = new Vector2(-1f, -1f);
+        private Vector2 lastResolvedDominantWorldWindDirection = Vector2.zero;
+        private Vector2 lastResolvedScreenWindDirection = Vector2.zero;
+        private float lastMaximumLocalWindMismatchDegrees = -1f;
+        private float lastBackboneLateralDriftMetres = -1f;
+        private Vector2 resolvedAttemptWorldWindDirection = Vector2.zero;
+        private Vector2 resolvedAttemptScreenWindDirection = Vector2.zero;
         private float lastResolvedBodyLengthMetres = -1f;
         private float lastResolvedTravelSpeed = -1f;
         private float lastResolvedTipSpeedAllowance = -1f;
@@ -340,6 +420,9 @@ namespace ProgrammaticStylized3D.Weather
         public string LastError => lastError;
         public int MaximumActiveTrails => maximumActiveTrails;
         public int MaximumCentrelinePoints => maximumCentrelinePoints;
+        public int RenderCurveSubdivisionsPerBackboneSection =>
+            renderCurveSubdivisionsPerBackboneSection;
+        public int MaximumRenderCurvePoints => GetRenderPointCapacityPerTrail();
         public int CandidateCapacity => candidateGridResolution * candidateGridResolution;
         public int ActiveTrailCount => activeTrailCount;
         public int CooldownCount => cooldownCount;
@@ -410,14 +493,18 @@ namespace ProgrammaticStylized3D.Weather
             separationCooldownSeconds = Mathf.Max(0f, separationCooldownSeconds);
             maximumCentrelinePoints = Mathf.Clamp(maximumCentrelinePoints, 8, 96);
             integrationStepMetres = Mathf.Clamp(integrationStepMetres, 0.1f, 2f);
+            renderCurveSubdivisionsPerBackboneSection = Mathf.Clamp(
+                renderCurveSubdivisionsPerBackboneSection,
+                2,
+                12);
             minimumPathWindStrength = Mathf.Max(0f, minimumPathWindStrength);
             minimumCompletedPathLengthMetres = Mathf.Max(
                 0.25f,
                 minimumCompletedPathLengthMetres);
-            maximumTurnDegreesPerSegment = Mathf.Clamp(
-                maximumTurnDegreesPerSegment,
+            maximumLocalWindDirectionMismatchDegrees = Mathf.Clamp(
+                maximumLocalWindDirectionMismatchDegrees,
                 5f,
-                120f);
+                90f);
             selfApproachDistanceMetres = Mathf.Clamp(
                 selfApproachDistanceMetres,
                 0.05f,
@@ -455,10 +542,22 @@ namespace ProgrammaticStylized3D.Weather
             maximumVerticalDeviationMetres = Mathf.Max(
                 0f,
                 maximumVerticalDeviationMetres);
-            occasionalBroadWaveChance = Mathf.Clamp01(
-                occasionalBroadWaveChance);
-            occasionalBroadWaveStrengthMetres = Mathf.Clamp(
-                occasionalBroadWaveStrengthMetres,
+            minimumLateralWobbleStrengthMetres = Mathf.Max(
+                0f,
+                minimumLateralWobbleStrengthMetres);
+            maximumLateralWobbleStrengthMetres = Mathf.Max(
+                minimumLateralWobbleStrengthMetres,
+                maximumLateralWobbleStrengthMetres);
+            minimumLateralWobbleWavelengthMetres = Mathf.Max(
+                0.25f,
+                minimumLateralWobbleWavelengthMetres);
+            maximumLateralWobbleWavelengthMetres = Mathf.Max(
+                minimumLateralWobbleWavelengthMetres,
+                maximumLateralWobbleWavelengthMetres);
+            occasionalLargerLoopChance = Mathf.Clamp01(
+                occasionalLargerLoopChance);
+            occasionalLargerLoopExtraStrengthMetres = Mathf.Clamp(
+                occasionalLargerLoopExtraStrengthMetres,
                 0f,
                 1.5f);
             trailOpacity = Mathf.Clamp01(trailOpacity);
@@ -469,7 +568,22 @@ namespace ProgrammaticStylized3D.Weather
             edgeSoftness = Mathf.Clamp(edgeSoftness, 0.01f, 1f);
             strengthOpacityInfluence = Mathf.Clamp01(strengthOpacityInfluence);
             variationOpacityInfluence = Mathf.Clamp01(variationOpacityInfluence);
-            candidateViewportMargin = Mathf.Clamp(candidateViewportMargin, 0f, 0.5f);
+            upwindEntryMarginViewport = Mathf.Clamp(
+                upwindEntryMarginViewport,
+                0f,
+                0.2f);
+            upwindSpawnBandDepth = Mathf.Clamp(
+                upwindSpawnBandDepth,
+                0.1f,
+                1f);
+            cameraEntryPreference = Mathf.Clamp01(cameraEntryPreference);
+            preferredVisibleRunwayMetres = Mathf.Max(
+                1f,
+                preferredVisibleRunwayMetres);
+            minimumAcceptedVisibleRunwayMetres = Mathf.Clamp(
+                minimumAcceptedVisibleRunwayMetres,
+                0f,
+                preferredVisibleRunwayMetres);
 
             int configurationHash = ComputeConfigurationHash();
             if (!configurationHashInitialized)
@@ -507,6 +621,7 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             ExpireTrails();
+            ExpireTrailsBeyondDownwindEdge();
             PruneCooldowns();
 
             if (!CanRun(true))
@@ -698,7 +813,7 @@ namespace ProgrammaticStylized3D.Weather
                 out Vector2 totalRange);
 
             var builder = new StringBuilder(4608);
-            builder.AppendLine("[Weather Wind Trails V0.6 Lifecycle Report]");
+            builder.AppendLine("[Weather Wind Trails V0.9 Direction-Locked Upwind Entry Report]");
             builder.Append("Status: ")
                 .AppendLine(!playMode
                     ? "EDITOR IDLE"
@@ -727,8 +842,8 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Active / maximum trails: ")
                 .Append(activeTrailCount).Append(" / ")
                 .AppendLine(maximumActiveTrails.ToString());
-            builder.Append("Active broad-wave trails: ")
-                .AppendLine(CountActiveBroadWaveTrails().ToString());
+            builder.Append("Active larger-loop trails: ")
+                .AppendLine(CountActiveLargerLoopTrails().ToString());
             builder.Append("Cooldown positions: ")
                 .AppendLine(cooldownCount.ToString());
             builder.Append("Candidate lattice: ")
@@ -745,8 +860,11 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Minimum separation / cooldown: ")
                 .Append(minimumTrailSeparationMetres.ToString("0.###")).Append(" m / ")
                 .Append(separationCooldownSeconds.ToString("0.###")).AppendLine(" s");
-            builder.Append("Centreline point capacity: ")
+            builder.Append("Weather backbone point capacity: ")
                 .AppendLine(maximumCentrelinePoints.ToString());
+            builder.Append("Render subdivisions / point capacity per trail: ")
+                .Append(renderCurveSubdivisionsPerBackboneSection).Append(" / ")
+                .AppendLine(GetRenderPointCapacityPerTrail().ToString());
             builder.Append("Integration step / minimum path length: ")
                 .Append(integrationStepMetres.ToString("0.###")).Append(" m / ")
                 .Append(minimumCompletedPathLengthMetres.ToString("0.###")).AppendLine(" m");
@@ -773,9 +891,24 @@ namespace ProgrammaticStylized3D.Weather
                 .Append(totalRange.y.ToString("0.###")).AppendLine(" s");
             builder.Append("Uniform body opacity: ")
                 .AppendLine(uniformBodyOpacity ? "Yes" : "No");
-            builder.Append("Broad-wave chance / strength: ")
-                .Append((occasionalBroadWaveChance * 100f).ToString("0.#")).Append("% / ")
-                .Append(occasionalBroadWaveStrengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Mandatory lateral wobble strength: ")
+                .Append(minimumLateralWobbleStrengthMetres.ToString("0.###")).Append("–")
+                .Append(maximumLateralWobbleStrengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Mandatory lateral wobble wavelength: ")
+                .Append(minimumLateralWobbleWavelengthMetres.ToString("0.###")).Append("–")
+                .Append(maximumLateralWobbleWavelengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Larger-loop chance / extra strength: ")
+                .Append((occasionalLargerLoopChance * 100f).ToString("0.#")).Append("% / ")
+                .Append(occasionalLargerLoopExtraStrengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Upwind band / entry margin / camera preference: ")
+                .Append(upwindSpawnBandDepth.ToString("0.###")).Append(" / ")
+                .Append(upwindEntryMarginViewport.ToString("0.###")).Append(" / ")
+                .Append(cameraEntryPreference.ToString("0.###")).AppendLine();
+            builder.Append("Preferred / minimum visible runway: ")
+                .Append(preferredVisibleRunwayMetres.ToString("0.###")).Append(" / ")
+                .Append(minimumAcceptedVisibleRunwayMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Maximum local wind direction mismatch: ")
+                .Append(maximumLocalWindDirectionMismatchDegrees.ToString("0.###")).AppendLine(" deg");
             builder.Append("Mesh vertex / index capacity: ")
                 .Append(MeshVertexCapacity).Append(" / ")
                 .AppendLine(MeshIndexCapacity.ToString());
@@ -784,12 +917,16 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Total spawn attempts / successes: ")
                 .Append(totalSpawnAttemptCount.ToString("N0")).Append(" / ")
                 .AppendLine(totalSuccessfulSpawnCount.ToString("N0"));
-            builder.Append("Total broad-wave trails: ")
-                .AppendLine(totalBroadWaveTrailCount.ToString("N0"));
+            builder.Append("Total larger-loop trails: ")
+                .AppendLine(totalLargerLoopTrailCount.ToString("N0"));
             builder.Append("Total candidates evaluated: ")
                 .AppendLine(totalCandidateEvaluationCount.ToString("N0"));
-            builder.Append("Viewport / calm / separation rejections: ")
+            builder.Append("Projection-field / camera-entry / direction / runway rejections: ")
                 .Append(totalViewportRejectionCount.ToString("N0")).Append(" / ")
+                .Append(totalCameraEntryRejectionCount.ToString("N0")).Append(" / ")
+                .Append(totalDirectionMismatchRejectionCount.ToString("N0")).Append(" / ")
+                .AppendLine(totalRunwayRejectionCount.ToString("N0"));
+            builder.Append("Calm / separation rejections: ")
                 .Append(totalCalmRejectionCount.ToString("N0")).Append(" / ")
                 .AppendLine(totalSeparationRejectionCount.ToString("N0"));
             builder.Append("No-eligible / path rejections: ")
@@ -822,12 +959,36 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Last accepted strength / nearest separation: ")
                 .Append(lastAcceptedCandidateStrength.ToString("0.###")).Append(" / ")
                 .Append(lastAcceptedNearestSeparation.ToString("0.###")).AppendLine(" m");
-            builder.Append("Last path points / length / minimum alignment: ")
-                .Append(lastGeneratedPathPointCount).Append(" / ")
+            builder.Append("Last backbone / render points: ")
+                .Append(lastGeneratedBackbonePointCount).Append(" / ")
+                .AppendLine(lastGeneratedPathPointCount.ToString());
+            builder.Append("Last path length / minimum alignment: ")
                 .Append(lastGeneratedPathLengthMetres.ToString("0.###")).Append(" m / ")
                 .AppendLine(lastGeneratedPathMinimumAlignment.ToString("0.###"));
-            builder.Append("Last path used broad wave: ")
-                .AppendLine(lastGeneratedPathUsedBroadWave ? "Yes" : "No");
+            builder.Append("Last render segment average / maximum: ")
+                .Append(lastAverageRenderSegmentLengthMetres.ToString("0.####")).Append(" / ")
+                .Append(lastMaximumRenderSegmentLengthMetres.ToString("0.####")).AppendLine(" m");
+            builder.Append("Last maximum adjacent render angle: ")
+                .Append(lastMaximumAdjacentRenderAngleDegrees.ToString("0.###")).AppendLine(" deg");
+            builder.Append("Last path used larger loop: ")
+                .AppendLine(lastGeneratedPathUsedLargerLoop ? "Yes" : "No");
+            builder.Append("Last wobble strength / wavelength: ")
+                .Append(lastGeneratedWobbleStrengthMetres.ToString("0.###")).Append(" m / ")
+                .Append(lastGeneratedWobbleWavelengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Last larger-loop extra strength: ")
+                .Append(lastGeneratedLargerLoopExtraStrengthMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Resolved dominant world / screen wind direction: ")
+                .Append(lastResolvedDominantWorldWindDirection.ToString("F3")).Append(" / ")
+                .AppendLine(lastResolvedScreenWindDirection.ToString("F3"));
+            builder.Append("Last accepted viewport / upwind score: ")
+                .Append(lastAcceptedViewportPosition.ToString("F3")).Append(" / ")
+                .AppendLine(lastAcceptedUpwindScore.ToString("0.###"));
+            builder.Append("Last accepted runway score / visible runway: ")
+                .Append(lastAcceptedForwardVisibilityScore.ToString("0.###")).Append(" / ")
+                .Append(lastAcceptedVisibleRunwayMetres.ToString("0.###")).AppendLine(" m");
+            builder.Append("Last maximum local mismatch / backbone lateral drift: ")
+                .Append(lastMaximumLocalWindMismatchDegrees.ToString("0.###")).Append(" deg / ")
+                .Append(lastBackboneLateralDriftMetres.ToString("0.###")).AppendLine(" m");
             builder.Append("Last resolved body / travel / allowance: ")
                 .Append(lastResolvedBodyLengthMetres.ToString("0.###")).Append(" m / ")
                 .Append(lastResolvedTravelSpeed.ToString("0.###")).Append(" m/s / ")
@@ -846,6 +1007,8 @@ namespace ProgrammaticStylized3D.Weather
                 .AppendLine(lastAttemptTargetWindSampleCount.ToString());
             builder.Append("Last mesh upload: ")
                 .Append(lastMeshUploadVertexCount).AppendLine(" vertices");
+            builder.Append("Downwind off-screen early releases: ")
+                .AppendLine(totalDownwindEarlyReleaseCount.ToString("N0"));
             builder.Append("Total render submissions: ")
                 .AppendLine(totalRenderSubmissionCount.ToString("N0"));
             builder.Append("Last submitted active trails: ")
@@ -979,6 +1142,70 @@ namespace ProgrammaticStylized3D.Weather
                 changed = true;
             }
 
+            if (serializedBaselineVersion < 3)
+            {
+                changed |= ReplaceIfApproximately(
+                    ref upwindEntryMarginViewport,
+                    0.12f,
+                    0.05f);
+                changed |= ReplaceIfApproximately(
+                    ref occasionalLargerLoopExtraStrengthMetres,
+                    0.45f,
+                    0.28f);
+                serializedBaselineVersion = 3;
+                changed = true;
+            }
+
+            if (serializedBaselineVersion < 4)
+            {
+                changed |= ReplaceIfEqual(ref maximumActiveTrails, 3, 5);
+                if (renderCurveSubdivisionsPerBackboneSection < 2)
+                {
+                    renderCurveSubdivisionsPerBackboneSection = 8;
+                    changed = true;
+                }
+
+                serializedBaselineVersion = 4;
+                changed = true;
+            }
+
+            if (serializedBaselineVersion < 5)
+            {
+                changed |= ReplaceIfApproximately(
+                    ref upwindEntryMarginViewport,
+                    0.05f,
+                    0.03f);
+                changed |= ReplaceIfApproximately(
+                    ref cameraEntryPreference,
+                    0.75f,
+                    0.9f);
+                if (maximumLocalWindDirectionMismatchDegrees <= 0.0001f)
+                {
+                    maximumLocalWindDirectionMismatchDegrees = 35f;
+                    changed = true;
+                }
+                if (upwindSpawnBandDepth <= 0.0001f)
+                {
+                    upwindSpawnBandDepth = 0.3f;
+                    changed = true;
+                }
+
+                if (preferredVisibleRunwayMetres <= 0.0001f)
+                {
+                    preferredVisibleRunwayMetres = 12f;
+                    changed = true;
+                }
+
+                if (minimumAcceptedVisibleRunwayMetres <= 0.0001f)
+                {
+                    minimumAcceptedVisibleRunwayMetres = 7f;
+                    changed = true;
+                }
+
+                serializedBaselineVersion = 5;
+                changed = true;
+            }
+
             if (changed)
             {
                 resourcesDirty = true;
@@ -987,9 +1214,9 @@ namespace ProgrammaticStylized3D.Weather
             return changed;
         }
 
-        private int CountActiveBroadWaveTrails()
+        private int CountActiveLargerLoopTrails()
         {
-            if (trailActive == null || trailUsesBroadWave == null)
+            if (trailActive == null || trailUsesLargerLoop == null)
             {
                 return 0;
             }
@@ -997,7 +1224,7 @@ namespace ProgrammaticStylized3D.Weather
             int count = 0;
             for (int index = 0; index < trailActive.Length; index++)
             {
-                if (trailActive[index] && trailUsesBroadWave[index])
+                if (trailActive[index] && trailUsesLargerLoop[index])
                 {
                     count++;
                 }
@@ -1236,10 +1463,11 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             int expectedCandidates = candidateGridResolution * candidateGridResolution;
-            int expectedTrailPoints = maximumActiveTrails * maximumCentrelinePoints;
+            int renderPointCapacity = GetRenderPointCapacityPerTrail();
+            int expectedTrailPoints = maximumActiveTrails * renderPointCapacity;
             int expectedVertices = expectedTrailPoints * 2;
             int expectedIndices = maximumActiveTrails *
-                                  (maximumCentrelinePoints - 1) * 6;
+                                  (renderPointCapacity - 1) * 6;
 
             if (!resourcesDirty &&
                 resourcesReady &&
@@ -1249,13 +1477,47 @@ namespace ProgrammaticStylized3D.Weather
                 trailActive != null && trailActive.Length == maximumActiveTrails &&
                 trailTotalLifetimes != null &&
                 trailTotalLifetimes.Length == maximumActiveTrails &&
-                trailUsesBroadWave != null &&
-                trailUsesBroadWave.Length == maximumActiveTrails &&
+                trailUsesLargerLoop != null &&
+                trailUsesLargerLoop.Length == maximumActiveTrails &&
+                trailBirthWindDirectionsXZ != null &&
+                trailBirthWindDirectionsXZ.Length == maximumActiveTrails &&
+                trailBodyLengths != null &&
+                trailBodyLengths.Length == maximumActiveTrails &&
+                trailTravelSpeeds != null &&
+                trailTravelSpeeds.Length == maximumActiveTrails &&
+                trailAliveDurations != null &&
+                trailAliveDurations.Length == maximumActiveTrails &&
+                trailSpawnDurations != null &&
+                trailSpawnDurations.Length == maximumActiveTrails &&
+                trailDespawnDurations != null &&
+                trailDespawnDurations.Length == maximumActiveTrails &&
                 candidateWorldPositions != null &&
                 candidateWorldPositions.Length == expectedCandidates &&
+                candidateForwardVisibilityScores != null &&
+                candidateForwardVisibilityScores.Length == expectedCandidates &&
+                candidateVisibleRunwayMetres != null &&
+                candidateVisibleRunwayMetres.Length == expectedCandidates &&
+                candidateUpwindScores != null &&
+                candidateUpwindScores.Length == expectedCandidates &&
+                candidateViewportPositions != null &&
+                candidateViewportPositions.Length == expectedCandidates &&
                 trailPoints != null && trailPoints.Length == expectedTrailPoints &&
+                backboneScratch != null &&
+                backboneScratch.Length == maximumCentrelinePoints &&
+                backboneDistanceScratch != null &&
+                backboneDistanceScratch.Length == maximumCentrelinePoints &&
+                combinedPathScratch != null &&
+                combinedPathScratch.Length == renderPointCapacity &&
                 undeformedPathScratch != null &&
-                undeformedPathScratch.Length == maximumCentrelinePoints &&
+                undeformedPathScratch.Length == renderPointCapacity &&
+                presentationBackboneDistanceScratch != null &&
+                presentationBackboneDistanceScratch.Length == renderPointCapacity &&
+                baselineWobbleScratch != null &&
+                baselineWobbleScratch.Length == renderPointCapacity &&
+                worldPathScratch != null &&
+                worldPathScratch.Length == renderPointCapacity &&
+                pathDistanceScratch != null &&
+                pathDistanceScratch.Length == renderPointCapacity &&
                 meshVertices != null && meshVertices.Length == expectedVertices &&
                 meshIndices != null && meshIndices.Length == expectedIndices)
             {
@@ -1275,7 +1537,13 @@ namespace ProgrammaticStylized3D.Weather
                 trailLengths = new float[maximumActiveTrails];
                 trailStrengths = new float[maximumActiveTrails];
                 trailMinimumAlignments = new float[maximumActiveTrails];
-                trailUsesBroadWave = new bool[maximumActiveTrails];
+                trailUsesLargerLoop = new bool[maximumActiveTrails];
+                trailBirthWindDirectionsXZ = new Vector2[maximumActiveTrails];
+                trailBodyLengths = new float[maximumActiveTrails];
+                trailTravelSpeeds = new float[maximumActiveTrails];
+                trailAliveDurations = new float[maximumActiveTrails];
+                trailSpawnDurations = new float[maximumActiveTrails];
+                trailDespawnDurations = new float[maximumActiveTrails];
                 trailPoints = new Vector3[expectedTrailPoints];
                 trailPointDistances = new float[expectedTrailPoints];
 
@@ -1287,15 +1555,23 @@ namespace ProgrammaticStylized3D.Weather
                 candidateStrengths = new float[expectedCandidates];
                 candidateScores = new float[expectedCandidates];
                 candidateNearestDistances = new float[expectedCandidates];
+                candidateForwardVisibilityScores = new float[expectedCandidates];
+                candidateVisibleRunwayMetres = new float[expectedCandidates];
+                candidateUpwindScores = new float[expectedCandidates];
+                candidateViewportPositions = new Vector2[expectedCandidates];
                 candidateStatuses = new WeatherWindTrailCandidateStatus[expectedCandidates];
                 topCandidateIndices = new int[MaximumTopCandidateCapacity];
                 topCandidateScores = new float[MaximumTopCandidateCapacity];
 
                 forwardScratch = new Vector2[maximumCentrelinePoints];
-                combinedPathScratch = new Vector2[maximumCentrelinePoints];
-                undeformedPathScratch = new Vector2[maximumCentrelinePoints];
-                worldPathScratch = new Vector3[maximumCentrelinePoints];
-                pathDistanceScratch = new float[maximumCentrelinePoints];
+                backboneScratch = new Vector2[maximumCentrelinePoints];
+                backboneDistanceScratch = new float[maximumCentrelinePoints];
+                combinedPathScratch = new Vector2[renderPointCapacity];
+                undeformedPathScratch = new Vector2[renderPointCapacity];
+                presentationBackboneDistanceScratch = new float[renderPointCapacity];
+                baselineWobbleScratch = new Vector2[renderPointCapacity];
+                worldPathScratch = new Vector3[renderPointCapacity];
+                pathDistanceScratch = new float[renderPointCapacity];
 
                 meshVertices = new TrailVertex[expectedVertices];
                 meshIndices = new ushort[expectedIndices];
@@ -1387,12 +1663,13 @@ namespace ProgrammaticStylized3D.Weather
 
         private void BuildFixedIndexBuffer()
         {
+            int renderPointCapacity = GetRenderPointCapacityPerTrail();
             int indexCursor = 0;
             for (int trailIndex = 0; trailIndex < maximumActiveTrails; trailIndex++)
             {
-                int trailVertexStart = trailIndex * maximumCentrelinePoints * 2;
+                int trailVertexStart = trailIndex * renderPointCapacity * 2;
                 for (int pointIndex = 0;
-                     pointIndex < maximumCentrelinePoints - 1;
+                     pointIndex < renderPointCapacity - 1;
                      pointIndex++)
                 {
                     int currentLeft = trailVertexStart + pointIndex * 2;
@@ -1421,7 +1698,7 @@ namespace ProgrammaticStylized3D.Weather
         private void WriteInactiveSlotVertices(int trailIndex)
         {
             int firstVertex = TrailVertexIndex(trailIndex, 0, 0);
-            int vertexCount = maximumCentrelinePoints * 2;
+            int vertexCount = GetRenderPointCapacityPerTrail() * 2;
             var inactiveVertex = new TrailVertex
             {
                 position = Vector3.zero,
@@ -1466,10 +1743,13 @@ namespace ProgrammaticStylized3D.Weather
 
             Vector3 selectedPosition = candidateWorldPositions[selectedCandidate];
             bool pathBuilt;
+            int backbonePointCount;
             int pathPointCount;
             float pathLength;
             float minimumAlignment;
-            bool usedBroadWave;
+            float pathMaximumLocalWindMismatchDegrees;
+            float backboneLateralDriftMetres;
+            bool usedLargerLoop;
             using (PathIntegrationProfilerMarker.Auto())
             {
                 pathBuilt = TryBuildPath(
@@ -1477,10 +1757,14 @@ namespace ProgrammaticStylized3D.Weather
                     selectedPosition.y,
                     sampleTime,
                     attemptEpoch,
+                    resolvedAttemptWorldWindDirection,
+                    out backbonePointCount,
                     out pathPointCount,
                     out pathLength,
                     out minimumAlignment,
-                    out usedBroadWave);
+                    out pathMaximumLocalWindMismatchDegrees,
+                    out backboneLateralDriftMetres,
+                    out usedLargerLoop);
             }
 
             if (!pathBuilt)
@@ -1511,10 +1795,14 @@ namespace ProgrammaticStylized3D.Weather
                 freeSlot,
                 selectedCandidate,
                 attemptEpoch,
+                backbonePointCount,
                 pathPointCount,
                 pathLength,
                 minimumAlignment,
-                usedBroadWave,
+                pathMaximumLocalWindMismatchDegrees,
+                backboneLateralDriftMetres,
+                usedLargerLoop,
+                resolvedAttemptWorldWindDirection,
                 lifecycle);
             totalSuccessfulSpawnCount++;
             FinishAttemptSampling();
@@ -1526,8 +1814,8 @@ namespace ProgrammaticStylized3D.Weather
             float anchorY = weatherDomain.GetDebugAnchorPosition().y;
             int grid = candidateGridResolution;
             int candidateCount = grid * grid;
-            float cellWidth = fieldRect.width / grid;
-            float cellHeight = fieldRect.height / grid;
+            float viewportMinimum = -upwindEntryMarginViewport;
+            float viewportSpan = 1f + upwindEntryMarginViewport * 2f;
             int topCount = 0;
 
             lastCandidateCount = candidateCount;
@@ -1537,10 +1825,46 @@ namespace ProgrammaticStylized3D.Weather
             lastSampledCandidateMaximumStrength = float.NegativeInfinity;
             lastAcceptedCandidateStrength = -1f;
             lastAcceptedNearestSeparation = -1f;
+            lastAcceptedForwardVisibilityScore = -1f;
+            lastAcceptedVisibleRunwayMetres = -1f;
+            lastAcceptedUpwindScore = -1f;
+            lastAcceptedViewportPosition = new Vector2(-1f, -1f);
+            lastGeneratedBackbonePointCount = 0;
             lastGeneratedPathPointCount = 0;
             lastGeneratedPathLengthMetres = 0f;
+            lastAverageRenderSegmentLengthMetres = 0f;
+            lastMaximumRenderSegmentLengthMetres = 0f;
+            lastMaximumAdjacentRenderAngleDegrees = 0f;
             lastGeneratedPathMinimumAlignment = -1f;
-            lastGeneratedPathUsedBroadWave = false;
+            lastGeneratedPathUsedLargerLoop = false;
+            lastGeneratedWobbleStrengthMetres = -1f;
+            lastGeneratedWobbleWavelengthMetres = -1f;
+            lastGeneratedLargerLoopExtraStrengthMetres = -1f;
+            lastMaximumLocalWindMismatchDegrees = -1f;
+            lastBackboneLateralDriftMetres = -1f;
+            resolvedAttemptWorldWindDirection = Vector2.zero;
+            resolvedAttemptScreenWindDirection = Vector2.zero;
+
+            float directionPlaneY = anchorY +
+                (minimumAltitudeMetres + maximumAltitudeMetres) * 0.5f;
+            if (!TryResolveDominantVisibleWindDirection(
+                    sampleTime,
+                    directionPlaneY,
+                    fieldRect,
+                    out resolvedAttemptWorldWindDirection,
+                    out resolvedAttemptScreenWindDirection))
+            {
+                lastResolvedDominantWorldWindDirection = Vector2.zero;
+                lastResolvedScreenWindDirection = Vector2.zero;
+                return -1;
+            }
+
+            lastResolvedDominantWorldWindDirection =
+                resolvedAttemptWorldWindDirection;
+            lastResolvedScreenWindDirection =
+                resolvedAttemptScreenWindDirection;
+            float minimumDirectionAlignment = Mathf.Cos(
+                maximumLocalWindDirectionMismatchDegrees * Mathf.Deg2Rad);
 
             for (int candidateIndex = 0;
                  candidateIndex < candidateCount;
@@ -1553,39 +1877,68 @@ namespace ProgrammaticStylized3D.Weather
                                 candidateCellJitter;
                 float jitterY = (Hash01(baseHash ^ 0x63d83595u) - 0.5f) *
                                 candidateCellJitter;
-                float worldX = fieldRect.xMin +
-                    (cellX + 0.5f + jitterX) * cellWidth;
-                float worldZ = fieldRect.yMin +
-                    (cellY + 0.5f + jitterY) * cellHeight;
+                float viewportX = viewportMinimum +
+                    (cellX + 0.5f + jitterX) / grid * viewportSpan;
+                float viewportY = viewportMinimum +
+                    (cellY + 0.5f + jitterY) / grid * viewportSpan;
+                var viewportPosition = new Vector2(viewportX, viewportY);
                 float altitude = RandomRange(
                     minimumAltitudeMetres,
                     maximumAltitudeMetres,
                     baseHash ^ 0xb5297a4du);
-                Vector3 worldPosition = new Vector3(
-                    worldX,
-                    anchorY + altitude,
-                    worldZ);
+                float worldY = anchorY + altitude;
 
-                candidateWorldPositions[candidateIndex] = worldPosition;
+                candidateViewportPositions[candidateIndex] = viewportPosition;
                 candidateStrengths[candidateIndex] = 0f;
                 candidateScores[candidateIndex] = 0f;
                 candidateNearestDistances[candidateIndex] = -1f;
+                candidateForwardVisibilityScores[candidateIndex] = 0f;
+                candidateVisibleRunwayMetres[candidateIndex] = 0f;
+                candidateUpwindScores[candidateIndex] = 0f;
                 candidateStatuses[candidateIndex] =
                     WeatherWindTrailCandidateStatus.NotEvaluated;
                 totalCandidateEvaluationCount++;
 
-                if (!IsInsideExpandedViewport(worldPosition, candidateViewportMargin))
+                if (!TryProjectViewportPointToHorizontalPlane(
+                        viewportPosition,
+                        worldY,
+                        out Vector3 worldPosition))
                 {
-                    candidateStatuses[candidateIndex] =
-                        WeatherWindTrailCandidateStatus.OutsideViewport;
                     totalViewportRejectionCount++;
                     continue;
                 }
 
-                lastVisibleCandidateCount++;
-                Vector2 targetWind = SampleTargetWind(
-                    new Vector2(worldX, worldZ),
-                    sampleTime);
+                candidateWorldPositions[candidateIndex] = worldPosition;
+                if (!TryEvaluateUpwindEntryRegion(
+                        viewportPosition,
+                        resolvedAttemptScreenWindDirection,
+                        out float upwindScore,
+                        out bool seedVisible))
+                {
+                    candidateStatuses[candidateIndex] =
+                        WeatherWindTrailCandidateStatus.OutsideCameraEntryRegion;
+                    totalCameraEntryRejectionCount++;
+                    continue;
+                }
+
+                candidateUpwindScores[candidateIndex] = upwindScore;
+                if (!fieldRect.Contains(new Vector2(
+                        worldPosition.x,
+                        worldPosition.z)))
+                {
+                    candidateStatuses[candidateIndex] =
+                        WeatherWindTrailCandidateStatus.OutsideWeatherField;
+                    totalViewportRejectionCount++;
+                    continue;
+                }
+
+                if (seedVisible)
+                {
+                    lastVisibleCandidateCount++;
+                }
+
+                Vector2 worldXZ = new Vector2(worldPosition.x, worldPosition.z);
+                Vector2 targetWind = SampleTargetWind(worldXZ, sampleTime);
                 float strength = targetWind.magnitude;
                 candidateStrengths[candidateIndex] = strength;
                 lastSampledCandidateMinimumStrength = Mathf.Min(
@@ -1603,8 +1956,18 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                float nearestDistance = ComputeNearestOccupiedDistance(
-                    new Vector2(worldX, worldZ));
+                float localDirectionAlignment = Vector2.Dot(
+                    targetWind / strength,
+                    resolvedAttemptWorldWindDirection);
+                if (localDirectionAlignment < minimumDirectionAlignment)
+                {
+                    candidateStatuses[candidateIndex] =
+                        WeatherWindTrailCandidateStatus.IncompatibleWindDirection;
+                    totalDirectionMismatchRejectionCount++;
+                    continue;
+                }
+
+                float nearestDistance = ComputeNearestOccupiedDistance(worldXZ);
                 candidateNearestDistances[candidateIndex] =
                     float.IsPositiveInfinity(nearestDistance)
                         ? -1f
@@ -1615,6 +1978,18 @@ namespace ProgrammaticStylized3D.Weather
                     candidateStatuses[candidateIndex] =
                         WeatherWindTrailCandidateStatus.TooClose;
                     totalSeparationRejectionCount++;
+                    continue;
+                }
+
+                float visibleRunway = ComputeVisibleRunwayMetres(
+                    worldPosition,
+                    resolvedAttemptWorldWindDirection);
+                candidateVisibleRunwayMetres[candidateIndex] = visibleRunway;
+                if (visibleRunway + 0.001f < minimumAcceptedVisibleRunwayMetres)
+                {
+                    candidateStatuses[candidateIndex] =
+                        WeatherWindTrailCandidateStatus.InsufficientVisibleRunway;
+                    totalRunwayRejectionCount++;
                     continue;
                 }
 
@@ -1632,12 +2007,22 @@ namespace ProgrammaticStylized3D.Weather
                         Mathf.Clamp01(
                             (nearestDistance - minimumTrailSeparationMetres) /
                             minimumTrailSeparationMetres));
+                float runwayScore = Mathf.Clamp01(
+                    visibleRunway / Mathf.Max(1f, preferredVisibleRunwayMetres));
+                candidateForwardVisibilityScores[candidateIndex] = runwayScore;
+                float cameraQuality = Mathf.Sqrt(
+                    Mathf.Clamp01(upwindScore * runwayScore));
+                float cameraFactor = Mathf.Lerp(
+                    1f,
+                    Mathf.Lerp(0.15f, 1f, cameraQuality),
+                    cameraEntryPreference);
                 float score = Mathf.Pow(
                                   Mathf.Max(0.0001f, strength01),
                                   strengthScoreExponent) *
                               Mathf.Pow(
                                   Mathf.Max(0.0001f, spacing01),
-                                  spacingScoreExponent);
+                                  spacingScoreExponent) *
+                              cameraFactor;
 
                 candidateScores[candidateIndex] = score;
                 candidateStatuses[candidateIndex] =
@@ -1744,16 +2129,30 @@ namespace ProgrammaticStylized3D.Weather
             float seedWorldY,
             float sampleTime,
             int attemptEpoch,
+            Vector2 birthWindDirection,
+            out int backbonePointCount,
             out int pointCount,
             out float pathLength,
             out float minimumAlignment,
-            out bool usedBroadWave)
+            out float pathMaximumLocalWindMismatchDegrees,
+            out float backboneLateralDriftMetres,
+            out bool usedLargerLoop)
         {
+            backbonePointCount = 0;
             pointCount = 0;
             pathLength = 0f;
             minimumAlignment = -1f;
-            usedBroadWave = false;
+            pathMaximumLocalWindMismatchDegrees = -1f;
+            backboneLateralDriftMetres = -1f;
+            usedLargerLoop = false;
 
+            if (birthWindDirection.sqrMagnitude <=
+                MinimumDirectionMagnitudeSquared)
+            {
+                return false;
+            }
+
+            birthWindDirection.Normalize();
             Rect fieldRect = weatherDomain.GetFieldWorldRectXZ();
             float safetyMargin = Mathf.Max(
                 weatherDomain.CellSizeMetres,
@@ -1768,40 +2167,66 @@ namespace ProgrammaticStylized3D.Weather
                 safeRect = fieldRect;
             }
 
-            int combinedCount = BuildIntegrationSide(
+            int coarseCount = BuildDirectionLockedBackbone(
                 seedXZ,
                 sampleTime,
-                1f,
+                birthWindDirection,
                 maximumCentrelinePoints - 1,
                 safeRect,
                 forwardScratch);
-            if (combinedCount < 2)
+            if (coarseCount < 2)
             {
                 return false;
             }
 
-            Array.Copy(
-                forwardScratch,
-                combinedPathScratch,
-                combinedCount);
-
-            if (!TryEvaluateCompletedPath(
-                    combinedCount,
+            Array.Copy(forwardScratch, backboneScratch, coarseCount);
+            if (!TryEvaluateWeatherBackbonePath(
+                    backboneScratch,
+                    backboneDistanceScratch,
+                    coarseCount,
                     sampleTime,
+                    birthWindDirection,
                     safeRect,
-                    out pathLength,
-                    out minimumAlignment))
+                    out _,
+                    out float weatherBackboneAlignment,
+                    out pathMaximumLocalWindMismatchDegrees,
+                    out backboneLateralDriftMetres))
             {
                 return false;
             }
 
-            usedBroadWave = TryApplyOccasionalBroadWave(
-                combinedCount,
-                sampleTime,
-                attemptEpoch,
-                safeRect,
-                ref pathLength,
-                ref minimumAlignment);
+            int denseCount = BuildSmoothPresentationBackbone(coarseCount);
+            if (denseCount < 3)
+            {
+                return false;
+            }
+
+            if (!TryEvaluatePresentationPath(
+                    undeformedPathScratch,
+                    undeformedPathScratch,
+                    presentationBackboneDistanceScratch,
+                    denseCount,
+                    safeRect,
+                    out float smoothPathLength,
+                    out _))
+            {
+                return false;
+            }
+
+            pathLength = smoothPathLength;
+            minimumAlignment = weatherBackboneAlignment;
+            if (!TryApplyMandatoryLateralWobble(
+                    denseCount,
+                    weatherBackboneAlignment,
+                    attemptEpoch,
+                    safeRect,
+                    ref pathLength,
+                    ref minimumAlignment,
+                    out usedLargerLoop) &&
+                minimumLateralWobbleStrengthMetres > 0.0001f)
+            {
+                return false;
+            }
 
             uint verticalHash = MixHash(
                 unchecked((uint)trailSeed),
@@ -1809,7 +2234,7 @@ namespace ProgrammaticStylized3D.Weather
                 0x9e3779b9u,
                 0x85ebca6bu);
             float verticalPhase = Hash01(verticalHash) * Mathf.PI * 2f;
-            for (int index = 0; index < combinedCount; index++)
+            for (int index = 0; index < denseCount; index++)
             {
                 float normalizedDistance = pathLength > 0f
                     ? pathDistanceScratch[index] / pathLength
@@ -1824,35 +2249,53 @@ namespace ProgrammaticStylized3D.Weather
                     pointXZ.y);
             }
 
-            pointCount = combinedCount;
+            backbonePointCount = coarseCount;
+            pointCount = denseCount;
+            ComputeRenderCurveMetrics(denseCount);
             return true;
         }
 
-        private bool TryEvaluateCompletedPath(
+        private bool TryEvaluateWeatherBackbonePath(
+            Vector2[] points,
+            float[] distances,
             int pointCount,
             float sampleTime,
+            Vector2 birthWindDirection,
             Rect safeRect,
             out float pathLength,
-            out float minimumAlignment)
+            out float minimumAlignment,
+            out float maximumMismatchDegrees,
+            out float maximumLateralDriftMetres)
         {
             pathLength = 0f;
             minimumAlignment = 1f;
-            pathDistanceScratch[0] = 0f;
+            maximumMismatchDegrees = 0f;
+            maximumLateralDriftMetres = 0f;
+            distances[0] = 0f;
+            Vector2 normalizedBirthDirection = birthWindDirection.normalized;
+            Vector2 birthLateral = new Vector2(
+                -normalizedBirthDirection.y,
+                normalizedBirthDirection.x);
+            Vector2 origin = points[0];
+            float minimumAllowedAlignment = Mathf.Cos(
+                maximumLocalWindDirectionMismatchDegrees * Mathf.Deg2Rad);
 
             for (int index = 0; index < pointCount; index++)
             {
-                Vector2 point = combinedPathScratch[index];
+                Vector2 point = points[index];
                 if (!safeRect.Contains(point))
                 {
                     return false;
                 }
 
+                maximumLateralDriftMetres = Mathf.Max(
+                    maximumLateralDriftMetres,
+                    Mathf.Abs(Vector2.Dot(point - origin, birthLateral)));
+
                 if (index > 0)
                 {
-                    pathLength += Vector2.Distance(
-                        combinedPathScratch[index - 1],
-                        point);
-                    pathDistanceScratch[index] = pathLength;
+                    pathLength += Vector2.Distance(points[index - 1], point);
+                    distances[index] = pathLength;
                 }
             }
 
@@ -1863,17 +2306,21 @@ namespace ProgrammaticStylized3D.Weather
 
             for (int index = 0; index < pointCount - 1; index++)
             {
-                Vector2 segment =
-                    combinedPathScratch[index + 1] - combinedPathScratch[index];
+                Vector2 segment = points[index + 1] - points[index];
                 float segmentMagnitude = segment.magnitude;
                 if (segmentMagnitude <= 0.0001f)
                 {
                     return false;
                 }
 
-                Vector2 midpoint =
-                    (combinedPathScratch[index] + combinedPathScratch[index + 1]) *
-                    0.5f;
+                Vector2 segmentDirection = segment / segmentMagnitude;
+                if (Vector2.Dot(segmentDirection, normalizedBirthDirection) <
+                    0.999f)
+                {
+                    return false;
+                }
+
+                Vector2 midpoint = (points[index] + points[index + 1]) * 0.5f;
                 Vector2 targetWind = SampleTargetWind(midpoint, sampleTime);
                 float windMagnitude = targetWind.magnitude;
                 if (windMagnitude < minimumPathWindStrength)
@@ -1882,10 +2329,14 @@ namespace ProgrammaticStylized3D.Weather
                 }
 
                 float alignment = Vector2.Dot(
-                    segment / segmentMagnitude,
+                    normalizedBirthDirection,
                     targetWind / windMagnitude);
                 minimumAlignment = Mathf.Min(minimumAlignment, alignment);
-                if (alignment < minimumSegmentWindAlignment)
+                maximumMismatchDegrees = Mathf.Max(
+                    maximumMismatchDegrees,
+                    Mathf.Acos(Mathf.Clamp(alignment, -1f, 1f)) *
+                    Mathf.Rad2Deg);
+                if (alignment < minimumAllowedAlignment)
                 {
                     return false;
                 }
@@ -1894,106 +2345,454 @@ namespace ProgrammaticStylized3D.Weather
             return true;
         }
 
-        private bool TryApplyOccasionalBroadWave(
+        private int BuildSmoothPresentationBackbone(int backbonePointCount)
+        {
+            if (backbonePointCount < 2)
+            {
+                return 0;
+            }
+
+            int outputIndex = 0;
+            undeformedPathScratch[outputIndex++] = backboneScratch[0];
+
+            Vector2 firstMidpoint =
+                (backboneScratch[0] + backboneScratch[1]) * 0.5f;
+            AppendQuadraticPresentationSection(
+                backboneScratch[0],
+                backboneScratch[0],
+                firstMidpoint,
+                ref outputIndex);
+
+            for (int index = 1; index < backbonePointCount - 1; index++)
+            {
+                Vector2 start =
+                    (backboneScratch[index - 1] + backboneScratch[index]) * 0.5f;
+                Vector2 end =
+                    (backboneScratch[index] + backboneScratch[index + 1]) * 0.5f;
+                AppendQuadraticPresentationSection(
+                    start,
+                    backboneScratch[index],
+                    end,
+                    ref outputIndex);
+            }
+
+            Vector2 lastMidpoint =
+                (backboneScratch[backbonePointCount - 2] +
+                 backboneScratch[backbonePointCount - 1]) * 0.5f;
+            Vector2 lastPoint = backboneScratch[backbonePointCount - 1];
+            AppendQuadraticPresentationSection(
+                lastMidpoint,
+                lastPoint,
+                lastPoint,
+                ref outputIndex);
+
+            return outputIndex;
+        }
+
+        private void AppendQuadraticPresentationSection(
+            Vector2 start,
+            Vector2 control,
+            Vector2 end,
+            ref int outputIndex)
+        {
+            int subdivisions = renderCurveSubdivisionsPerBackboneSection;
+            for (int step = 1; step <= subdivisions; step++)
+            {
+                float t = step / (float)subdivisions;
+                float oneMinusT = 1f - t;
+                undeformedPathScratch[outputIndex++] =
+                    oneMinusT * oneMinusT * start +
+                    2f * oneMinusT * t * control +
+                    t * t * end;
+            }
+        }
+
+        private bool TryEvaluatePresentationPath(
+            Vector2[] points,
+            Vector2[] referenceBackbone,
+            float[] distances,
             int pointCount,
-            float sampleTime,
+            Rect safeRect,
+            out float pathLength,
+            out float minimumBackboneAlignment)
+        {
+            pathLength = 0f;
+            minimumBackboneAlignment = 1f;
+            distances[0] = 0f;
+
+            for (int index = 0; index < pointCount; index++)
+            {
+                if (!safeRect.Contains(points[index]))
+                {
+                    return false;
+                }
+
+                if (index <= 0)
+                {
+                    continue;
+                }
+
+                Vector2 segment = points[index] - points[index - 1];
+                float segmentLength = segment.magnitude;
+                if (segmentLength <= 0.00001f)
+                {
+                    return false;
+                }
+
+                pathLength += segmentLength;
+                distances[index] = pathLength;
+
+                Vector2 referenceSegment =
+                    referenceBackbone[index] - referenceBackbone[index - 1];
+                float referenceLength = referenceSegment.magnitude;
+                if (referenceLength <= 0.00001f)
+                {
+                    continue;
+                }
+
+                float alignment = Vector2.Dot(
+                    segment / segmentLength,
+                    referenceSegment / referenceLength);
+                minimumBackboneAlignment = Mathf.Min(
+                    minimumBackboneAlignment,
+                    alignment);
+                if (alignment < minimumSegmentWindAlignment)
+                {
+                    return false;
+                }
+            }
+
+            return pathLength >= minimumCompletedPathLengthMetres;
+        }
+
+        private bool TryApplyMandatoryLateralWobble(
+            int pointCount,
+            float weatherBackboneAlignment,
             int attemptEpoch,
             Rect safeRect,
             ref float pathLength,
-            ref float minimumAlignment)
+            ref float minimumAlignment,
+            out bool usedLargerLoop)
         {
-            if (occasionalBroadWaveChance <= 0f ||
-                occasionalBroadWaveStrengthMetres <= 0.0001f ||
-                pointCount < 4)
+            usedLargerLoop = false;
+            if (pointCount < 4 ||
+                maximumLateralWobbleStrengthMetres <= 0.0001f)
             {
+                Array.Copy(
+                    undeformedPathScratch,
+                    combinedPathScratch,
+                    pointCount);
+                RebuildPathDistances(
+                    combinedPathScratch,
+                    pathDistanceScratch,
+                    pointCount,
+                    out pathLength);
+                minimumAlignment = weatherBackboneAlignment;
                 return false;
             }
 
+            float backbonePathLength = pathLength;
             uint waveHash = MixHash(
                 unchecked((uint)trailSeed),
                 unchecked((uint)attemptEpoch),
                 0x6a09e667u,
                 0xbb67ae85u);
-            if (Hash01(waveHash ^ 0x3c6ef372u) > occasionalBroadWaveChance)
+            float requestedAmplitude = RandomRange(
+                minimumLateralWobbleStrengthMetres,
+                maximumLateralWobbleStrengthMetres,
+                waveHash ^ 0xa54ff53au);
+            float requestedWavelength = RandomRange(
+                minimumLateralWobbleWavelengthMetres,
+                maximumLateralWobbleWavelengthMetres,
+                waveHash ^ 0x510e527fu);
+            int cycleCount = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    backbonePathLength / Mathf.Max(0.25f, requestedWavelength)));
+            float resolvedWavelength = backbonePathLength / cycleCount;
+            float sideSign = Hash01(waveHash ^ 0x9b05688cu) < 0.5f
+                ? -1f
+                : 1f;
+
+            float minimumAmplitude = Mathf.Min(
+                requestedAmplitude,
+                minimumLateralWobbleStrengthMetres);
+            float acceptedAmplitude = -1f;
+            float acceptedRelativeAlignment = 1f;
+            for (int attempt = 0; attempt < 5; attempt++)
             {
+                float interpolation = attempt / 4f;
+                float amplitude = Mathf.Lerp(
+                    requestedAmplitude,
+                    minimumAmplitude,
+                    interpolation);
+                ApplyWobbleDeformation(
+                    undeformedPathScratch,
+                    pointCount,
+                    backbonePathLength,
+                    cycleCount,
+                    amplitude,
+                    0f,
+                    -1,
+                    sideSign);
+
+                if (TryEvaluatePresentationPath(
+                        combinedPathScratch,
+                        undeformedPathScratch,
+                        pathDistanceScratch,
+                        pointCount,
+                        safeRect,
+                        out pathLength,
+                        out acceptedRelativeAlignment) &&
+                    !PathSelfApproaches(
+                        combinedPathScratch,
+                        pathDistanceScratch,
+                        pointCount))
+                {
+                    acceptedAmplitude = amplitude;
+                    break;
+                }
+            }
+
+            if (acceptedAmplitude < 0f)
+            {
+                Array.Copy(
+                    undeformedPathScratch,
+                    combinedPathScratch,
+                    pointCount);
+                RebuildPathDistances(
+                    combinedPathScratch,
+                    pathDistanceScratch,
+                    pointCount,
+                    out pathLength);
+                minimumAlignment = weatherBackboneAlignment;
                 return false;
             }
 
+            minimumAlignment = Mathf.Min(
+                weatherBackboneAlignment,
+                acceptedRelativeAlignment);
             Array.Copy(
                 combinedPathScratch,
-                undeformedPathScratch,
+                baselineWobbleScratch,
                 pointCount);
-            float originalPathLength = pathLength;
-            float originalMinimumAlignment = minimumAlignment;
-            float amplitude = occasionalBroadWaveStrengthMetres * Mathf.Lerp(
-                0.65f,
-                1f,
-                Hash01(waveHash ^ 0xa54ff53au));
-            float sideSign = Hash01(waveHash ^ 0x510e527fu) < 0.5f
-                ? -1f
-                : 1f;
-            float phase = Hash01(waveHash ^ 0x9b05688cu) * Mathf.PI;
+            float baselinePathLength = pathLength;
+            float baselineMinimumAlignment = minimumAlignment;
+            float acceptedExtraStrength = 0f;
 
+            if (occasionalLargerLoopChance > 0f &&
+                occasionalLargerLoopExtraStrengthMetres > 0.0001f &&
+                Hash01(waveHash ^ 0x3c6ef372u) <=
+                    occasionalLargerLoopChance)
+            {
+                int largerLoopCycle;
+                if (cycleCount <= 2)
+                {
+                    largerLoopCycle = Mathf.Clamp(
+                        cycleCount / 2,
+                        0,
+                        cycleCount - 1);
+                }
+                else
+                {
+                    int interiorCycleCount = cycleCount - 2;
+                    int interiorOffset = Mathf.Min(
+                        interiorCycleCount - 1,
+                        Mathf.FloorToInt(
+                            Hash01(waveHash ^ 0x1f83d9abu) *
+                            interiorCycleCount));
+                    largerLoopCycle = 1 + interiorOffset;
+                }
+
+                float requestedExtraStrength =
+                    occasionalLargerLoopExtraStrengthMetres * Mathf.Lerp(
+                        0.7f,
+                        1f,
+                        Hash01(waveHash ^ 0x5be0cd19u));
+
+                for (int attempt = 0; attempt < 4; attempt++)
+                {
+                    float extraStrength = requestedExtraStrength *
+                        (1f - attempt / 4f);
+                    ApplyWobbleDeformation(
+                        undeformedPathScratch,
+                        pointCount,
+                        backbonePathLength,
+                        cycleCount,
+                        acceptedAmplitude,
+                        extraStrength,
+                        largerLoopCycle,
+                        sideSign);
+
+                    if (TryEvaluatePresentationPath(
+                            combinedPathScratch,
+                            undeformedPathScratch,
+                            pathDistanceScratch,
+                            pointCount,
+                            safeRect,
+                            out pathLength,
+                            out float largerLoopRelativeAlignment) &&
+                        !PathSelfApproaches(
+                            combinedPathScratch,
+                            pathDistanceScratch,
+                            pointCount))
+                    {
+                        usedLargerLoop = true;
+                        acceptedExtraStrength = extraStrength;
+                        minimumAlignment = Mathf.Min(
+                            weatherBackboneAlignment,
+                            largerLoopRelativeAlignment);
+                        break;
+                    }
+                }
+
+                if (!usedLargerLoop)
+                {
+                    Array.Copy(
+                        baselineWobbleScratch,
+                        combinedPathScratch,
+                        pointCount);
+                    RebuildPathDistances(
+                        combinedPathScratch,
+                        pathDistanceScratch,
+                        pointCount,
+                        out pathLength);
+                    pathLength = baselinePathLength;
+                    minimumAlignment = baselineMinimumAlignment;
+                }
+            }
+
+            lastGeneratedWobbleStrengthMetres = acceptedAmplitude;
+            lastGeneratedWobbleWavelengthMetres = resolvedWavelength;
+            lastGeneratedLargerLoopExtraStrengthMetres =
+                acceptedExtraStrength;
+            return true;
+        }
+
+        private void ApplyWobbleDeformation(
+            Vector2[] backbone,
+            int pointCount,
+            float backbonePathLength,
+            int cycleCount,
+            float baseAmplitude,
+            float largerLoopExtraStrength,
+            int largerLoopCycle,
+            float sideSign)
+        {
+            float safeLength = Mathf.Max(0.0001f, backbonePathLength);
             for (int index = 0; index < pointCount; index++)
             {
-                float normalizedDistance = originalPathLength > 0f
-                    ? pathDistanceScratch[index] / originalPathLength
-                    : 0f;
+                float backboneDistance = presentationBackboneDistanceScratch[index];
+                float normalizedDistance = Mathf.Clamp01(
+                    backboneDistance / safeLength);
+                float cyclePosition = normalizedDistance * cycleCount;
+                float cyclePhase = cyclePosition * Mathf.PI * 2f;
+                float amplitude = baseAmplitude;
+                if (largerLoopCycle >= 0)
+                {
+                    float localCycle = cyclePosition - largerLoopCycle;
+                    if (localCycle >= 0f && localCycle <= 1f)
+                    {
+                        float envelope = Mathf.Sin(localCycle * Mathf.PI);
+                        amplitude += largerLoopExtraStrength *
+                            envelope * envelope;
+                    }
+                }
+
                 Vector2 tangent = ComputeScratchTangent(
-                    undeformedPathScratch,
+                    backbone,
                     index,
                     pointCount);
                 Vector2 lateral = new Vector2(-tangent.y, tangent.x);
-                float endpointEnvelope = Mathf.Sin(
-                    normalizedDistance * Mathf.PI);
-                float wave = Mathf.Sin(
-                    normalizedDistance * Mathf.PI * 2f + phase);
-                combinedPathScratch[index] = undeformedPathScratch[index] +
-                    lateral * (wave * endpointEnvelope * amplitude * sideSign);
+                float wave = Mathf.Sin(cyclePhase) * amplitude * sideSign;
+                combinedPathScratch[index] = backbone[index] +
+                    lateral * wave;
             }
-
-            if (!PathSelfApproaches(combinedPathScratch, pointCount) &&
-                TryEvaluateCompletedPath(
-                    pointCount,
-                    sampleTime,
-                    safeRect,
-                    out pathLength,
-                    out minimumAlignment))
-            {
-                return true;
-            }
-
-            Array.Copy(
-                undeformedPathScratch,
-                combinedPathScratch,
-                pointCount);
-            pathLength = originalPathLength;
-            minimumAlignment = originalMinimumAlignment;
-            RebuildPathDistances(pointCount, out pathLength);
-            return false;
         }
 
-        private void RebuildPathDistances(int pointCount, out float pathLength)
+        private static void RebuildPathDistances(
+            Vector2[] points,
+            float[] distances,
+            int pointCount,
+            out float pathLength)
         {
             pathLength = 0f;
-            pathDistanceScratch[0] = 0f;
+            distances[0] = 0f;
             for (int index = 1; index < pointCount; index++)
             {
                 pathLength += Vector2.Distance(
-                    combinedPathScratch[index - 1],
-                    combinedPathScratch[index]);
-                pathDistanceScratch[index] = pathLength;
+                    points[index - 1],
+                    points[index]);
+                distances[index] = pathLength;
             }
         }
 
-        private bool PathSelfApproaches(Vector2[] points, int count)
+        private void ComputeRenderCurveMetrics(int pointCount)
+        {
+            if (pointCount < 2)
+            {
+                lastAverageRenderSegmentLengthMetres = 0f;
+                lastMaximumRenderSegmentLengthMetres = 0f;
+                lastMaximumAdjacentRenderAngleDegrees = 0f;
+                return;
+            }
+
+            float totalLength = 0f;
+            float maximumLength = 0f;
+            float maximumAngle = 0f;
+            Vector2 previousDirection = Vector2.zero;
+            for (int index = 1; index < pointCount; index++)
+            {
+                Vector2 segment =
+                    combinedPathScratch[index] - combinedPathScratch[index - 1];
+                float segmentLength = segment.magnitude;
+                totalLength += segmentLength;
+                maximumLength = Mathf.Max(maximumLength, segmentLength);
+                if (segmentLength <= 0.00001f)
+                {
+                    continue;
+                }
+
+                Vector2 direction = segment / segmentLength;
+                if (previousDirection.sqrMagnitude > 0.5f)
+                {
+                    maximumAngle = Mathf.Max(
+                        maximumAngle,
+                        Vector2.Angle(previousDirection, direction));
+                }
+
+                previousDirection = direction;
+            }
+
+            lastAverageRenderSegmentLengthMetres =
+                totalLength / Mathf.Max(1, pointCount - 1);
+            lastMaximumRenderSegmentLengthMetres = maximumLength;
+            lastMaximumAdjacentRenderAngleDegrees = maximumAngle;
+        }
+
+        private bool PathSelfApproaches(
+            Vector2[] points,
+            float[] cumulativeDistances,
+            int count)
         {
             float minimumSquared =
                 selfApproachDistanceMetres * selfApproachDistanceMetres;
-            for (int index = 2; index < count; index++)
+            float localArcExclusion = Mathf.Max(
+                integrationStepMetres * 2f,
+                selfApproachDistanceMetres * 2f);
+
+            for (int index = 1; index < count; index++)
             {
-                for (int earlier = 0; earlier < index - 1; earlier++)
+                float currentDistance = cumulativeDistances[index];
+                for (int earlier = 0; earlier < index; earlier++)
                 {
+                    float alongPathDistance = currentDistance -
+                        cumulativeDistances[earlier];
+                    if (alongPathDistance < localArcExclusion)
+                    {
+                        continue;
+                    }
+
                     if ((points[index] - points[earlier]).sqrMagnitude <
                         minimumSquared)
                     {
@@ -2029,10 +2828,10 @@ namespace ProgrammaticStylized3D.Weather
                 : Vector2.right;
         }
 
-        private int BuildIntegrationSide(
+        private int BuildDirectionLockedBackbone(
             Vector2 seedXZ,
             float sampleTime,
-            float directionSign,
+            Vector2 birthWindDirection,
             int maximumNewPoints,
             Rect safeRect,
             Vector2[] output)
@@ -2040,23 +2839,14 @@ namespace ProgrammaticStylized3D.Weather
             output[0] = seedXZ;
             int count = 1;
             Vector2 current = seedXZ;
-            Vector2 previousDirection = Vector2.zero;
-            float minimumTurnDot = Mathf.Cos(
-                maximumTurnDegreesPerSegment * Mathf.Deg2Rad);
+            Vector2 movementDirection = birthWindDirection.normalized;
+            float minimumAllowedAlignment = Mathf.Cos(
+                maximumLocalWindDirectionMismatchDegrees * Mathf.Deg2Rad);
 
             for (int stepIndex = 0; stepIndex < maximumNewPoints; stepIndex++)
             {
-                Vector2 initialWind = SampleTargetWind(current, sampleTime);
-                float initialMagnitude = initialWind.magnitude;
-                if (initialMagnitude < minimumPathWindStrength)
-                {
-                    break;
-                }
-
-                Vector2 initialDirection =
-                    initialWind / initialMagnitude * directionSign;
                 Vector2 midpoint = current +
-                    initialDirection * (integrationStepMetres * 0.5f);
+                    movementDirection * (integrationStepMetres * 0.5f);
                 Vector2 midpointWind = SampleTargetWind(midpoint, sampleTime);
                 float midpointMagnitude = midpointWind.magnitude;
                 if (midpointMagnitude < minimumPathWindStrength)
@@ -2064,16 +2854,16 @@ namespace ProgrammaticStylized3D.Weather
                     break;
                 }
 
-                Vector2 movementDirection =
-                    midpointWind / midpointMagnitude * directionSign;
-                if (previousDirection.sqrMagnitude >
-                        MinimumDirectionMagnitudeSquared &&
-                    Vector2.Dot(previousDirection, movementDirection) < minimumTurnDot)
+                float localAlignment = Vector2.Dot(
+                    midpointWind / midpointMagnitude,
+                    movementDirection);
+                if (localAlignment < minimumAllowedAlignment)
                 {
                     break;
                 }
 
-                Vector2 next = current + movementDirection * integrationStepMetres;
+                Vector2 next = current +
+                    movementDirection * integrationStepMetres;
                 if (!safeRect.Contains(next) ||
                     SelfApproaches(output, count, next))
                 {
@@ -2082,7 +2872,6 @@ namespace ProgrammaticStylized3D.Weather
 
                 output[count++] = next;
                 current = next;
-                previousDirection = movementDirection;
             }
 
             return count;
@@ -2293,10 +3082,14 @@ namespace ProgrammaticStylized3D.Weather
             int trailIndex,
             int selectedCandidate,
             int attemptEpoch,
+            int backbonePointCount,
             int pointCount,
             float pathLength,
             float minimumAlignment,
-            bool usedBroadWave,
+            float maximumLocalWindMismatchDegrees,
+            float backboneLateralDriftMetres,
+            bool usedLargerLoop,
+            Vector2 birthWindDirection,
             ResolvedTrailLifecycle lifecycle)
         {
             uint propertyHash = MixHash(
@@ -2323,15 +3116,29 @@ namespace ProgrammaticStylized3D.Weather
             trailLengths[trailIndex] = pathLength;
             trailStrengths[trailIndex] = strength;
             trailMinimumAlignments[trailIndex] = minimumAlignment;
-            trailUsesBroadWave[trailIndex] = usedBroadWave;
+            trailUsesLargerLoop[trailIndex] = usedLargerLoop;
+            trailBirthWindDirectionsXZ[trailIndex] = birthWindDirection.normalized;
+            trailBodyLengths[trailIndex] = lifecycle.bodyLength;
+            trailTravelSpeeds[trailIndex] = lifecycle.travelSpeed;
+            trailAliveDurations[trailIndex] = lifecycle.aliveDuration;
+            trailSpawnDurations[trailIndex] = lifecycle.spawnDuration;
+            trailDespawnDurations[trailIndex] = lifecycle.despawnDuration;
             activeTrailCount++;
             lastAcceptedCandidateStrength = candidateStrengths[selectedCandidate];
             lastAcceptedNearestSeparation =
                 candidateNearestDistances[selectedCandidate];
+            lastAcceptedForwardVisibilityScore =
+                candidateForwardVisibilityScores[selectedCandidate];
+            lastAcceptedVisibleRunwayMetres =
+                candidateVisibleRunwayMetres[selectedCandidate];
+            lastAcceptedUpwindScore = candidateUpwindScores[selectedCandidate];
+            lastAcceptedViewportPosition =
+                candidateViewportPositions[selectedCandidate];
 
             int firstPoint = TrailPointIndex(trailIndex, 0);
+            int renderPointCapacity = GetRenderPointCapacityPerTrail();
             for (int pointIndex = 0;
-                 pointIndex < maximumCentrelinePoints;
+                 pointIndex < renderPointCapacity;
                  pointIndex++)
             {
                 int sourceIndex = Mathf.Min(pointIndex, pointCount - 1);
@@ -2349,10 +3156,14 @@ namespace ProgrammaticStylized3D.Weather
                 lifecycle);
             UploadTrailSlot(trailIndex);
 
+            lastGeneratedBackbonePointCount = backbonePointCount;
             lastGeneratedPathPointCount = pointCount;
             lastGeneratedPathLengthMetres = pathLength;
             lastGeneratedPathMinimumAlignment = minimumAlignment;
-            lastGeneratedPathUsedBroadWave = usedBroadWave;
+            lastMaximumLocalWindMismatchDegrees =
+                maximumLocalWindMismatchDegrees;
+            lastBackboneLateralDriftMetres = backboneLateralDriftMetres;
+            lastGeneratedPathUsedLargerLoop = usedLargerLoop;
             lastResolvedBodyLengthMetres = lifecycle.bodyLength;
             lastResolvedTravelSpeed = lifecycle.travelSpeed;
             lastResolvedTipSpeedAllowance = lifecycle.tipSpeedAllowance;
@@ -2361,9 +3172,9 @@ namespace ProgrammaticStylized3D.Weather
             lastResolvedDespawnDuration = lifecycle.despawnDuration;
             lastResolvedTotalLifetime = lifecycle.totalLifetime;
             lastRequiredPathLengthMetres = lifecycle.requiredPathLength;
-            if (usedBroadWave)
+            if (usedLargerLoop)
             {
-                totalBroadWaveTrailCount++;
+                totalLargerLoopTrailCount++;
             }
 
             nextSlotSearchIndex = (trailIndex + 1) % maximumActiveTrails;
@@ -2393,8 +3204,9 @@ namespace ProgrammaticStylized3D.Weather
                 lifecycle.pointedEndLength,
                 lifecycle.totalLifetime);
 
+            int renderPointCapacity = GetRenderPointCapacityPerTrail();
             for (int pointIndex = 0;
-                 pointIndex < maximumCentrelinePoints;
+                 pointIndex < renderPointCapacity;
                  pointIndex++)
             {
                 bool pointActive = pointIndex < pointCount;
@@ -2492,6 +3304,187 @@ namespace ProgrammaticStylized3D.Weather
             }
         }
 
+        private void ExpireTrailsBeyondDownwindEdge()
+        {
+            if (trailActive == null || resolvedCamera == null)
+            {
+                return;
+            }
+
+            for (int trailIndex = 0;
+                 trailIndex < trailActive.Length;
+                 trailIndex++)
+            {
+                if (!trailActive[trailIndex])
+                {
+                    continue;
+                }
+
+                float age = presentationTime - trailBirthTimes[trailIndex];
+                ResolveVisibleTrailInterval(
+                    trailIndex,
+                    age,
+                    out float tailDistance,
+                    out float headDistance);
+                if (headDistance - tailDistance <= 0.01f)
+                {
+                    continue;
+                }
+
+                float middleDistance = (tailDistance + headDistance) * 0.5f;
+                if (!TrySampleTrailPointAtDistance(
+                        trailIndex,
+                        tailDistance,
+                        out Vector3 tailPoint) ||
+                    !TrySampleTrailPointAtDistance(
+                        trailIndex,
+                        middleDistance,
+                        out Vector3 middlePoint) ||
+                    !TrySampleTrailPointAtDistance(
+                        trailIndex,
+                        headDistance,
+                        out Vector3 headPoint))
+                {
+                    continue;
+                }
+
+                Vector2 worldDirection = trailBirthWindDirectionsXZ[trailIndex];
+                if (!TryProjectWorldDirectionToViewport(
+                        middlePoint,
+                        worldDirection,
+                        out Vector2 screenDirection))
+                {
+                    continue;
+                }
+
+                ComputeViewportProjectionRange(
+                    screenDirection,
+                    out _,
+                    out float maximumProjection);
+                const float ReleaseMargin = 0.02f;
+                if (IsBeyondDownwindViewport(
+                        tailPoint,
+                        screenDirection,
+                        maximumProjection + ReleaseMargin) &&
+                    IsBeyondDownwindViewport(
+                        middlePoint,
+                        screenDirection,
+                        maximumProjection + ReleaseMargin) &&
+                    IsBeyondDownwindViewport(
+                        headPoint,
+                        screenDirection,
+                        maximumProjection + ReleaseMargin))
+                {
+                    ExpireTrail(trailIndex, true);
+                    totalDownwindEarlyReleaseCount++;
+                }
+            }
+        }
+
+        private void ResolveVisibleTrailInterval(
+            int trailIndex,
+            float age,
+            out float tailDistance,
+            out float headDistance)
+        {
+            float bodyLength = trailBodyLengths[trailIndex];
+            float travelSpeed = trailTravelSpeeds[trailIndex];
+            float aliveDuration = trailAliveDurations[trailIndex];
+            float spawnDuration = Mathf.Max(
+                MinimumElapsedSeconds,
+                trailSpawnDurations[trailIndex]);
+            float despawnDuration = Mathf.Max(
+                MinimumElapsedSeconds,
+                trailDespawnDurations[trailIndex]);
+
+            if (age < spawnDuration)
+            {
+                float spawn01 = Mathf.Clamp01(age / spawnDuration);
+                tailDistance = 0f;
+                headDistance = bodyLength * spawn01;
+                return;
+            }
+
+            float aliveAge = age - spawnDuration;
+            if (aliveAge < aliveDuration)
+            {
+                tailDistance = travelSpeed * aliveAge;
+                headDistance = tailDistance + bodyLength;
+                return;
+            }
+
+            float despawnAge = Mathf.Min(
+                Mathf.Max(0f, aliveAge - aliveDuration),
+                despawnDuration);
+            float tipAllowance = bodyLength / (2f * despawnDuration);
+            float aliveTravel = travelSpeed * aliveDuration;
+            tailDistance = aliveTravel +
+                (travelSpeed + tipAllowance) * despawnAge;
+            headDistance = bodyLength + aliveTravel +
+                (travelSpeed - tipAllowance) * despawnAge;
+        }
+
+        private bool TrySampleTrailPointAtDistance(
+            int trailIndex,
+            float distance,
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            int pointCount = trailPointCounts[trailIndex];
+            if (pointCount <= 0)
+            {
+                return false;
+            }
+
+            int firstPoint = TrailPointIndex(trailIndex, 0);
+            float clampedDistance = Mathf.Clamp(
+                distance,
+                0f,
+                trailPointDistances[firstPoint + pointCount - 1]);
+            int lower = 0;
+            int upper = pointCount - 1;
+            while (upper - lower > 1)
+            {
+                int middle = (lower + upper) / 2;
+                if (trailPointDistances[firstPoint + middle] <= clampedDistance)
+                {
+                    lower = middle;
+                }
+                else
+                {
+                    upper = middle;
+                }
+            }
+
+            float lowerDistance = trailPointDistances[firstPoint + lower];
+            float upperDistance = trailPointDistances[firstPoint + upper];
+            float interpolation = upperDistance > lowerDistance + 0.00001f
+                ? (clampedDistance - lowerDistance) /
+                  (upperDistance - lowerDistance)
+                : 0f;
+            worldPosition = Vector3.Lerp(
+                trailPoints[firstPoint + lower],
+                trailPoints[firstPoint + upper],
+                interpolation);
+            return true;
+        }
+
+        private bool IsBeyondDownwindViewport(
+            Vector3 worldPosition,
+            Vector2 screenDirection,
+            float downwindThreshold)
+        {
+            Vector3 viewport = resolvedCamera.WorldToViewportPoint(worldPosition);
+            if (viewport.z <= 0f)
+            {
+                return false;
+            }
+
+            return Vector2.Dot(
+                new Vector2(viewport.x, viewport.y),
+                screenDirection) > downwindThreshold;
+        }
+
         private void ExpireTrail(int trailIndex, bool preserveSeparation)
         {
             if (!trailActive[trailIndex])
@@ -2512,7 +3505,13 @@ namespace ProgrammaticStylized3D.Weather
             trailLengths[trailIndex] = 0f;
             trailStrengths[trailIndex] = 0f;
             trailMinimumAlignments[trailIndex] = 0f;
-            trailUsesBroadWave[trailIndex] = false;
+            trailUsesLargerLoop[trailIndex] = false;
+            trailBirthWindDirectionsXZ[trailIndex] = Vector2.zero;
+            trailBodyLengths[trailIndex] = 0f;
+            trailTravelSpeeds[trailIndex] = 0f;
+            trailAliveDurations[trailIndex] = 0f;
+            trailSpawnDurations[trailIndex] = 0f;
+            trailDespawnDurations[trailIndex] = 0f;
             activeTrailCount = Mathf.Max(0, activeTrailCount - 1);
             WriteInactiveSlotVertices(trailIndex);
             UploadTrailSlot(trailIndex);
@@ -2661,18 +3660,308 @@ namespace ProgrammaticStylized3D.Weather
             }
         }
 
-        private bool IsInsideExpandedViewport(Vector3 worldPosition, float margin)
+        private bool TryProjectViewportPointToHorizontalPlane(
+            Vector2 viewportPoint,
+            float planeY,
+            out Vector3 worldPosition)
         {
+            worldPosition = default;
             if (resolvedCamera == null)
             {
                 return false;
             }
 
-            Vector3 viewport = resolvedCamera.WorldToViewportPoint(worldPosition);
-            return viewport.z > 0f &&
-                   viewport.z <= resolvedCamera.farClipPlane &&
-                   viewport.x >= -margin && viewport.x <= 1f + margin &&
-                   viewport.y >= -margin && viewport.y <= 1f + margin;
+            Ray ray = resolvedCamera.ViewportPointToRay(
+                new Vector3(viewportPoint.x, viewportPoint.y, 0f));
+            if (Mathf.Abs(ray.direction.y) <= 0.00001f)
+            {
+                return false;
+            }
+
+            float distance = (planeY - ray.origin.y) / ray.direction.y;
+            if (distance <= 0f || distance > resolvedCamera.farClipPlane)
+            {
+                return false;
+            }
+
+            worldPosition = ray.origin + ray.direction * distance;
+            return true;
+        }
+
+        private bool TryResolveDominantVisibleWindDirection(
+            float sampleTime,
+            float planeY,
+            Rect fieldRect,
+            out Vector2 worldDirection,
+            out Vector2 screenDirection)
+        {
+            worldDirection = Vector2.zero;
+            screenDirection = Vector2.zero;
+            if (resolvedCamera == null)
+            {
+                return false;
+            }
+
+            const int SampleGrid = 3;
+            Vector2 weightedDirection = Vector2.zero;
+            Vector3 weightedReference = Vector3.zero;
+            float totalWeight = 0f;
+            Vector2 strongestWind = Vector2.zero;
+            Vector3 strongestReference = Vector3.zero;
+            float strongestMagnitude = 0f;
+
+            for (int y = 0; y < SampleGrid; y++)
+            {
+                for (int x = 0; x < SampleGrid; x++)
+                {
+                    var viewportPoint = new Vector2(
+                        (x + 0.5f) / SampleGrid,
+                        (y + 0.5f) / SampleGrid);
+                    if (!TryProjectViewportPointToHorizontalPlane(
+                            viewportPoint,
+                            planeY,
+                            out Vector3 worldPosition))
+                    {
+                        continue;
+                    }
+
+                    var worldXZ = new Vector2(worldPosition.x, worldPosition.z);
+                    if (!fieldRect.Contains(worldXZ))
+                    {
+                        continue;
+                    }
+
+                    Vector2 wind = SampleTargetWind(worldXZ, sampleTime);
+                    float magnitude = wind.magnitude;
+                    if (magnitude <= 0.0001f)
+                    {
+                        continue;
+                    }
+
+                    if (magnitude > strongestMagnitude)
+                    {
+                        strongestMagnitude = magnitude;
+                        strongestWind = wind;
+                        strongestReference = worldPosition;
+                    }
+
+                    float weight = magnitude * magnitude;
+                    weightedDirection += wind / magnitude * weight;
+                    weightedReference += worldPosition * weight;
+                    totalWeight += weight;
+                }
+            }
+
+            Vector3 referenceWorldPosition;
+            if (weightedDirection.sqrMagnitude > MinimumDirectionMagnitudeSquared &&
+                totalWeight > 0.0001f)
+            {
+                worldDirection = weightedDirection.normalized;
+                referenceWorldPosition = weightedReference / totalWeight;
+            }
+            else if (strongestWind.sqrMagnitude > MinimumDirectionMagnitudeSquared)
+            {
+                worldDirection = strongestWind.normalized;
+                referenceWorldPosition = strongestReference;
+            }
+            else
+            {
+                return false;
+            }
+
+            return TryProjectWorldDirectionToViewport(
+                referenceWorldPosition,
+                worldDirection,
+                out screenDirection);
+        }
+
+        private bool TryProjectWorldDirectionToViewport(
+            Vector3 referenceWorldPosition,
+            Vector2 worldDirection,
+            out Vector2 screenDirection)
+        {
+            screenDirection = Vector2.zero;
+            if (resolvedCamera == null ||
+                worldDirection.sqrMagnitude <= MinimumDirectionMagnitudeSquared)
+            {
+                return false;
+            }
+
+            Vector3 viewportStart = resolvedCamera.WorldToViewportPoint(
+                referenceWorldPosition);
+            Vector3 viewportEnd = resolvedCamera.WorldToViewportPoint(
+                referenceWorldPosition + new Vector3(
+                    worldDirection.x,
+                    0f,
+                    worldDirection.y) * 10f);
+            if (viewportStart.z <= 0f || viewportEnd.z <= 0f)
+            {
+                return false;
+            }
+
+            var delta = new Vector2(
+                viewportEnd.x - viewportStart.x,
+                viewportEnd.y - viewportStart.y);
+            if (delta.sqrMagnitude <= MinimumDirectionMagnitudeSquared)
+            {
+                return false;
+            }
+
+            screenDirection = delta.normalized;
+            return true;
+        }
+
+        private bool TryEvaluateUpwindEntryRegion(
+            Vector2 viewportPosition,
+            Vector2 screenWindDirection,
+            out float upwindScore,
+            out bool seedVisible)
+        {
+            upwindScore = 0f;
+            seedVisible = IsViewportPointVisible(viewportPosition);
+            ComputeViewportProjectionRange(
+                screenWindDirection,
+                out float minimumProjection,
+                out float maximumProjection);
+            float projectionRange = Mathf.Max(
+                0.0001f,
+                maximumProjection - minimumProjection);
+            float projection = Vector2.Dot(
+                viewportPosition,
+                screenWindDirection);
+
+            if (seedVisible)
+            {
+                float downwind01 = Mathf.Clamp01(
+                    (projection - minimumProjection) / projectionRange);
+                if (downwind01 > upwindSpawnBandDepth)
+                {
+                    return false;
+                }
+
+                upwindScore = 1f - Mathf.Clamp01(
+                    downwind01 / Mathf.Max(0.0001f, upwindSpawnBandDepth));
+                return true;
+            }
+
+            Vector2 clamped = new Vector2(
+                Mathf.Clamp01(viewportPosition.x),
+                Mathf.Clamp01(viewportPosition.y));
+            Vector2 outsideVector = viewportPosition - clamped;
+            float outsideMagnitude = outsideVector.magnitude;
+            if (outsideMagnitude <= 0.00001f)
+            {
+                return false;
+            }
+
+            float upwindComponent = -Vector2.Dot(
+                outsideVector,
+                screenWindDirection);
+            if (upwindComponent <= 0f ||
+                upwindComponent / outsideMagnitude < 0.35f)
+            {
+                return false;
+            }
+
+            float maximumAxisOutside = Mathf.Max(
+                Mathf.Max(
+                    Mathf.Max(0f, -viewportPosition.x),
+                    Mathf.Max(0f, viewportPosition.x - 1f)),
+                Mathf.Max(
+                    Mathf.Max(0f, -viewportPosition.y),
+                    Mathf.Max(0f, viewportPosition.y - 1f)));
+            if (maximumAxisOutside > upwindEntryMarginViewport + 0.0001f)
+            {
+                return false;
+            }
+
+            upwindScore = 0.85f;
+            return true;
+        }
+
+        private float ComputeVisibleRunwayMetres(
+            Vector3 seedWorldPosition,
+            Vector2 worldDirection)
+        {
+            if (resolvedCamera == null ||
+                worldDirection.sqrMagnitude <= MinimumDirectionMagnitudeSquared)
+            {
+                return 0f;
+            }
+
+            Vector2 direction = worldDirection.normalized;
+            float probeDistance = Mathf.Max(
+                preferredVisibleRunwayMetres,
+                minimumAcceptedVisibleRunwayMetres) +
+                maximumVisibleBodyLengthMetres + 2f;
+            float probeStep = Mathf.Clamp(
+                integrationStepMetres,
+                0.25f,
+                0.75f);
+            int probeCount = Mathf.Max(
+                2,
+                Mathf.CeilToInt(probeDistance / probeStep) + 1);
+            bool enteredViewport = false;
+            float entryDistance = 0f;
+            float lastVisibleDistance = 0f;
+
+            for (int index = 0; index < probeCount; index++)
+            {
+                float distance = Mathf.Min(
+                    probeDistance,
+                    index * probeStep);
+                Vector3 point = seedWorldPosition + new Vector3(
+                    direction.x,
+                    0f,
+                    direction.y) * distance;
+                Vector3 viewport = resolvedCamera.WorldToViewportPoint(point);
+                bool visible = IsViewportPointVisible(viewport);
+                if (visible)
+                {
+                    if (!enteredViewport)
+                    {
+                        enteredViewport = true;
+                        entryDistance = distance;
+                    }
+
+                    lastVisibleDistance = distance;
+                }
+                else if (enteredViewport)
+                {
+                    break;
+                }
+            }
+
+            return enteredViewport
+                ? Mathf.Max(0f, lastVisibleDistance - entryDistance)
+                : 0f;
+        }
+
+        private static void ComputeViewportProjectionRange(
+            Vector2 direction,
+            out float minimumProjection,
+            out float maximumProjection)
+        {
+            minimumProjection = Mathf.Min(
+                Mathf.Min(0f, direction.x),
+                Mathf.Min(direction.y, direction.x + direction.y));
+            maximumProjection = Mathf.Max(
+                Mathf.Max(0f, direction.x),
+                Mathf.Max(direction.y, direction.x + direction.y));
+        }
+
+        private static bool IsViewportPointVisible(Vector2 viewportPoint)
+        {
+            return viewportPoint.x >= 0f && viewportPoint.x <= 1f &&
+                   viewportPoint.y >= 0f && viewportPoint.y <= 1f;
+        }
+
+        private bool IsViewportPointVisible(Vector3 viewportPoint)
+        {
+            return viewportPoint.z > 0f &&
+                   viewportPoint.z <= resolvedCamera.farClipPlane &&
+                   viewportPoint.x >= 0f && viewportPoint.x <= 1f &&
+                   viewportPoint.y >= 0f && viewportPoint.y <= 1f;
         }
 
         private Vector2 SampleTargetWind(Vector2 worldXZ, float sampleTime)
@@ -2697,7 +3986,7 @@ namespace ProgrammaticStylized3D.Weather
 
             using var profilerScope = MeshUploadProfilerMarker.Auto();
             int firstVertex = TrailVertexIndex(trailIndex, 0, 0);
-            int vertexCount = maximumCentrelinePoints * 2;
+            int vertexCount = GetRenderPointCapacityPerTrail() * 2;
             trailMesh.SetVertexBufferData(
                 meshVertices,
                 firstVertex,
@@ -2796,6 +4085,9 @@ namespace ProgrammaticStylized3D.Weather
             totalSuccessfulSpawnCount = 0;
             totalCandidateEvaluationCount = 0;
             totalViewportRejectionCount = 0;
+            totalCameraEntryRejectionCount = 0;
+            totalDirectionMismatchRejectionCount = 0;
+            totalRunwayRejectionCount = 0;
             totalCalmRejectionCount = 0;
             totalSeparationRejectionCount = 0;
             totalNoEligibleCandidateCount = 0;
@@ -2804,6 +4096,7 @@ namespace ProgrammaticStylized3D.Weather
             totalDomainConfigurationResetCount = 0;
             totalSimulationRewindResetCount = 0;
             totalLargeTeleportResetCount = 0;
+            totalDownwindEarlyReleaseCount = 0;
             lastCandidateCount = 0;
             lastVisibleCandidateCount = 0;
             lastEligibleCandidateCount = 0;
@@ -2811,15 +4104,32 @@ namespace ProgrammaticStylized3D.Weather
             lastSampledCandidateMaximumStrength = -1f;
             lastAcceptedCandidateStrength = -1f;
             lastAcceptedNearestSeparation = -1f;
+            lastGeneratedBackbonePointCount = 0;
             lastGeneratedPathPointCount = 0;
             lastGeneratedPathLengthMetres = 0f;
+            lastAverageRenderSegmentLengthMetres = 0f;
+            lastMaximumRenderSegmentLengthMetres = 0f;
+            lastMaximumAdjacentRenderAngleDegrees = 0f;
             lastGeneratedPathMinimumAlignment = -1f;
             lastAttemptTargetWindSampleCount = 0;
             lastMeshUploadVertexCount = 0;
             totalRenderSubmissionCount = 0;
             lastRenderedTrailCount = 0;
-            totalBroadWaveTrailCount = 0;
-            lastGeneratedPathUsedBroadWave = false;
+            totalLargerLoopTrailCount = 0;
+            lastGeneratedPathUsedLargerLoop = false;
+            lastGeneratedWobbleStrengthMetres = -1f;
+            lastGeneratedWobbleWavelengthMetres = -1f;
+            lastGeneratedLargerLoopExtraStrengthMetres = -1f;
+            lastAcceptedForwardVisibilityScore = -1f;
+            lastAcceptedVisibleRunwayMetres = -1f;
+            lastAcceptedUpwindScore = -1f;
+            lastAcceptedViewportPosition = new Vector2(-1f, -1f);
+            lastResolvedDominantWorldWindDirection = Vector2.zero;
+            lastResolvedScreenWindDirection = Vector2.zero;
+            lastMaximumLocalWindMismatchDegrees = -1f;
+            lastBackboneLateralDriftMetres = -1f;
+            resolvedAttemptWorldWindDirection = Vector2.zero;
+            resolvedAttemptScreenWindDirection = Vector2.zero;
             lastResolvedBodyLengthMetres = -1f;
             lastResolvedTravelSpeed = -1f;
             lastResolvedTipSpeedAllowance = -1f;
@@ -2848,9 +4158,10 @@ namespace ProgrammaticStylized3D.Weather
                 hash = hash * 31 + separationCooldownSeconds.GetHashCode();
                 hash = hash * 31 + maximumCentrelinePoints;
                 hash = hash * 31 + integrationStepMetres.GetHashCode();
+                hash = hash * 31 + renderCurveSubdivisionsPerBackboneSection;
                 hash = hash * 31 + minimumPathWindStrength.GetHashCode();
                 hash = hash * 31 + minimumCompletedPathLengthMetres.GetHashCode();
-                hash = hash * 31 + maximumTurnDegreesPerSegment.GetHashCode();
+                hash = hash * 31 + maximumLocalWindDirectionMismatchDegrees.GetHashCode();
                 hash = hash * 31 + selfApproachDistanceMetres.GetHashCode();
                 hash = hash * 31 + minimumSegmentWindAlignment.GetHashCode();
                 hash = hash * 31 + minimumAliveDurationSeconds.GetHashCode();
@@ -2866,15 +4177,23 @@ namespace ProgrammaticStylized3D.Weather
                 hash = hash * 31 + minimumAltitudeMetres.GetHashCode();
                 hash = hash * 31 + maximumAltitudeMetres.GetHashCode();
                 hash = hash * 31 + maximumVerticalDeviationMetres.GetHashCode();
-                hash = hash * 31 + occasionalBroadWaveChance.GetHashCode();
-                hash = hash * 31 + occasionalBroadWaveStrengthMetres.GetHashCode();
+                hash = hash * 31 + minimumLateralWobbleStrengthMetres.GetHashCode();
+                hash = hash * 31 + maximumLateralWobbleStrengthMetres.GetHashCode();
+                hash = hash * 31 + minimumLateralWobbleWavelengthMetres.GetHashCode();
+                hash = hash * 31 + maximumLateralWobbleWavelengthMetres.GetHashCode();
+                hash = hash * 31 + occasionalLargerLoopChance.GetHashCode();
+                hash = hash * 31 + occasionalLargerLoopExtraStrengthMetres.GetHashCode();
                 hash = hash * 31 + trailOpacity.GetHashCode();
                 hash = hash * 31 + trailColor.GetHashCode();
                 hash = hash * 31 + uniformBodyOpacity.GetHashCode();
                 hash = hash * 31 + edgeSoftness.GetHashCode();
                 hash = hash * 31 + strengthOpacityInfluence.GetHashCode();
                 hash = hash * 31 + variationOpacityInfluence.GetHashCode();
-                hash = hash * 31 + candidateViewportMargin.GetHashCode();
+                hash = hash * 31 + upwindEntryMarginViewport.GetHashCode();
+                hash = hash * 31 + upwindSpawnBandDepth.GetHashCode();
+                hash = hash * 31 + cameraEntryPreference.GetHashCode();
+                hash = hash * 31 + preferredVisibleRunwayMetres.GetHashCode();
+                hash = hash * 31 + minimumAcceptedVisibleRunwayMetres.GetHashCode();
                 hash = hash * 31 +
                     (trailShader != null
                         ? trailShader.GetEntityId().GetHashCode()
@@ -2920,7 +4239,13 @@ namespace ProgrammaticStylized3D.Weather
             trailLengths = null;
             trailStrengths = null;
             trailMinimumAlignments = null;
-            trailUsesBroadWave = null;
+            trailUsesLargerLoop = null;
+            trailBirthWindDirectionsXZ = null;
+            trailBodyLengths = null;
+            trailTravelSpeeds = null;
+            trailAliveDurations = null;
+            trailSpawnDurations = null;
+            trailDespawnDurations = null;
             trailPoints = null;
             trailPointDistances = null;
             cooldownActive = null;
@@ -2930,12 +4255,20 @@ namespace ProgrammaticStylized3D.Weather
             candidateStrengths = null;
             candidateScores = null;
             candidateNearestDistances = null;
+            candidateForwardVisibilityScores = null;
+            candidateVisibleRunwayMetres = null;
+            candidateUpwindScores = null;
+            candidateViewportPositions = null;
             candidateStatuses = null;
             topCandidateIndices = null;
             topCandidateScores = null;
             forwardScratch = null;
+            backboneScratch = null;
+            backboneDistanceScratch = null;
             combinedPathScratch = null;
             undeformedPathScratch = null;
+            presentationBackboneDistanceScratch = null;
+            baselineWobbleScratch = null;
             worldPathScratch = null;
             pathDistanceScratch = null;
             meshVertices = null;
@@ -2946,9 +4279,15 @@ namespace ProgrammaticStylized3D.Weather
             resourcesDirty = true;
         }
 
+        private int GetRenderPointCapacityPerTrail()
+        {
+            return maximumCentrelinePoints *
+                   renderCurveSubdivisionsPerBackboneSection + 1;
+        }
+
         private int TrailPointIndex(int trailIndex, int pointIndex)
         {
-            return trailIndex * maximumCentrelinePoints + pointIndex;
+            return trailIndex * GetRenderPointCapacityPerTrail() + pointIndex;
         }
 
         private int TrailVertexIndex(
@@ -2956,7 +4295,7 @@ namespace ProgrammaticStylized3D.Weather
             int pointIndex,
             int sideIndex)
         {
-            return (trailIndex * maximumCentrelinePoints + pointIndex) * 2 +
+            return (trailIndex * GetRenderPointCapacityPerTrail() + pointIndex) * 2 +
                    sideIndex;
         }
 
