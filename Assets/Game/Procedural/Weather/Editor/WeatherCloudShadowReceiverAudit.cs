@@ -35,7 +35,9 @@ namespace ProgrammaticStylized3D.Weather.Editor
             "PS3D/Pixel Ground Surface Lit",
             "PS3D/Pixel Surface Lit",
             "PS3D/Vegetation/Stylized Vegetation Benchmark",
-            "PS3D/Stylized River Water"
+            "PS3D/Stylized River Water",
+            "PS3D/Trees/Stylized Tree Bark",
+            "PS3D/Trees/Stylized Tree Foliage"
         };
 
         private enum ReceiverStatus

@@ -11,6 +11,14 @@ Shader "PS3D/Stylized River Water"
         _WaterTintStrength("Water Tint Strength", Range(0, 1)) = 0.72
         _SurfacePresence("Surface Presence", Range(0, 1)) = 0.46
 
+        [Header(Shoreline Accent)]
+        [HDR] _ShorelineAccentColor("Shoreline Accent Colour", Color) = (0.58, 0.72, 0.76, 1)
+        _ShorelineAccentStrength("Shoreline Accent Strength", Range(0, 1)) = 0.45
+        _ShorelineAccentWidth("Shoreline Accent Width", Range(0.005, 0.5)) = 0.08
+        _ShorelineEdgeBlendWidth("Shoreline Edge Blend Width", Range(0, 0.15)) = 0.04
+        _ShorelineAccentBrightness("Shoreline Accent Brightness", Range(-1, 1)) = 0
+        [HideInInspector] _ShorelineBankCover("Shoreline Bank Cover", Float) = 0.05
+
         [Header(Surface State)]
         _FreezeAmount("Freeze Amount", Range(0, 1)) = 0
 
@@ -38,11 +46,14 @@ Shader "PS3D/Stylized River Water"
         _ShoreMotionWidth("Shore Motion Width", Range(0.05, 5)) = 0.75
         _ShoreWaveHeightScale("Shore Wave Height Scale", Range(0, 2.5)) = 1
         _ShoreWaveLengthScale("Shore Wave Length Scale", Range(0.25, 4)) = 1
+        _ShoreWaveSpacingScale("Shore Wave Gap Scale", Range(0, 4)) = 1
         _ShoreWaveReach("Shore Wave Reach", Range(0, 1)) = 1
         _ShoreWaveTransitionLength("Shore Wave Transition Length", Range(0.25, 3)) = 1
         _ShoreWaveSizeVariation("Shore Wave Size Variation", Range(0, 1)) = 0
         _ShoreWaveSideAsymmetry("Shore Side Asymmetry", Range(0, 1)) = 0
         _ShoreWaveProfileVariation("Shore Wave Profile Variation", Range(0, 1)) = 0
+        _ShoreWaveProfileEvolutionStrength("Shore Wave Profile Evolution Strength", Range(0, 1)) = 0
+        _ShoreWaveProfileEvolutionDuration("Shore Wave Profile Evolution Duration", Range(1, 30)) = 8
         [HideInInspector] _MotionTime("Motion Time", Float) = 0
         [HideInInspector] _MotionSeed("Motion Seed", Float) = 1731
         _MotionDebugView("Motion Debug View", Range(0, 5)) = 0
@@ -210,6 +221,12 @@ Shader "PS3D/Stylized River Water"
                 float _BodyDepthContrast;
                 float _WaterTintStrength;
                 float _SurfacePresence;
+                half4 _ShorelineAccentColor;
+                float _ShorelineAccentStrength;
+                float _ShorelineAccentWidth;
+                float _ShorelineEdgeBlendWidth;
+                float _ShorelineAccentBrightness;
+                float _ShorelineBankCover;
 
                 float _FreezeAmount;
                 half4 _IceColor;
@@ -243,11 +260,14 @@ Shader "PS3D/Stylized River Water"
                 float _ShoreMotionWidth;
                 float _ShoreWaveHeightScale;
                 float _ShoreWaveLengthScale;
+                float _ShoreWaveSpacingScale;
                 float _ShoreWaveReach;
                 float _ShoreWaveTransitionLength;
                 float _ShoreWaveSizeVariation;
                 float _ShoreWaveSideAsymmetry;
                 float _ShoreWaveProfileVariation;
+                float _ShoreWaveProfileEvolutionStrength;
+                float _ShoreWaveProfileEvolutionDuration;
                 float _MotionTime;
                 float _MotionSeed;
                 float _MotionDebugView;
@@ -465,11 +485,15 @@ Shader "PS3D/Stylized River Water"
                     _ShoreMotionWidth,
                     _ShoreWaveHeightScale,
                     _ShoreWaveLengthScale,
+                    _ShoreWaveSpacingScale,
                     _ShoreWaveReach,
                     _ShoreWaveTransitionLength,
                     _ShoreWaveSizeVariation,
                     _ShoreWaveSideAsymmetry,
                     _ShoreWaveProfileVariation,
+                    _ShoreWaveProfileEvolutionStrength,
+                    _ShoreWaveProfileEvolutionDuration,
+                    _ShorelineBankCover,
                     _MotionSeed);
 
                 RiverWaterDisturbanceResult disturbance =
@@ -614,12 +638,37 @@ Shader "PS3D/Stylized River Water"
                     _ShoreMotionWidth,
                     _ShoreWaveHeightScale,
                     _ShoreWaveLengthScale,
+                    _ShoreWaveSpacingScale,
                     _ShoreWaveReach,
                     _ShoreWaveTransitionLength,
                     _ShoreWaveSizeVariation,
                     _ShoreWaveSideAsymmetry,
                     _ShoreWaveProfileVariation,
+                    _ShoreWaveProfileEvolutionStrength,
+                    _ShoreWaveProfileEvolutionDuration,
+                    _ShorelineBankCover,
                     _MotionSeed);
+
+                float shorelineDistanceInside =
+                    motion.currentShoreHalfWidth -
+                    abs(input.domainData.y);
+                float shorelineAntialiasWidth = max(
+                    0.0005,
+                    fwidth(shorelineDistanceInside));
+                clip(
+                    shorelineDistanceInside +
+                    shorelineAntialiasWidth * 0.5);
+                float shorelineEdgeBlendWidth = max(
+                    0.0,
+                    _ShorelineEdgeBlendWidth);
+                float shorelineCoverage =
+                    shorelineEdgeBlendWidth <= 0.0001
+                        ? 1.0
+                        : smoothstep(
+                            -shorelineAntialiasWidth,
+                            shorelineEdgeBlendWidth +
+                                shorelineAntialiasWidth,
+                            shorelineDistanceInside);
 
                 float4 resolvedDisturbanceData =
                     input.disturbanceData;
@@ -797,11 +846,14 @@ Shader "PS3D/Stylized River Water"
                         _ShoreMotionWidth,
                         _ShoreWaveHeightScale,
                         _ShoreWaveLengthScale,
+                        _ShoreWaveSpacingScale,
                         _ShoreWaveReach,
                         _ShoreWaveTransitionLength,
                         _ShoreWaveSizeVariation,
                         _ShoreWaveSideAsymmetry,
-                        _ShoreWaveProfileVariation);
+                        _ShoreWaveProfileVariation,
+                        _ShoreWaveProfileEvolutionStrength,
+                        _ShoreWaveProfileEvolutionDuration);
 
                 integration.refractionOffset = refraction.offset;
                 float3 sceneColour = refraction.sceneColour;
@@ -863,6 +915,32 @@ Shader "PS3D/Stylized River Water"
                     _IceScattering,
                     liquidBodyLighting,
                     frozenBodyLighting);
+
+                float shorelineAccentWidth = max(
+                    0.0001,
+                    _ShorelineAccentWidth);
+                float shorelineAccentMask =
+                    (1.0 - smoothstep(
+                        max(
+                            0.0,
+                            shorelineAccentWidth -
+                            shorelineAntialiasWidth),
+                        shorelineAccentWidth +
+                        shorelineAntialiasWidth,
+                        max(0.0, shorelineDistanceInside))) *
+                    step(0.0001, _ShorelineAccentStrength);
+                float shorelineAccentBrightnessMultiplier = max(
+                    0.0,
+                    1.0 + _ShorelineAccentBrightness);
+                float3 shorelineAccentColour = max(
+                    0.0,
+                    _ShorelineAccentColor.rgb *
+                    shorelineAccentBrightnessMultiplier);
+                body.colour = lerp(
+                    body.colour,
+                    shorelineAccentColour,
+                    saturate(_ShorelineAccentStrength) *
+                    shorelineAccentMask);
 
                 RiverWaterFoamSurfaceInfluence foamSurface =
                     RiverWaterCreateFoamSurfaceInfluence();
@@ -1020,6 +1098,15 @@ Shader "PS3D/Stylized River Water"
                     foamComposition.colour,
                     foamComposition.opacity);
                 finalColour = MixFog(finalColour, input.motionData.w);
+                // The analytical shoreline remains the hard geometry/depth
+                // boundary. This narrow visual coverage blend reuses the
+                // already-evaluated opaque-scene colour so the water, Foam,
+                // and accent contact can soften without transparent sorting,
+                // alpha-to-coverage, dither, or another scene-colour sample.
+                finalColour = lerp(
+                    sceneColour,
+                    finalColour,
+                    shorelineCoverage);
 
                 if (foamDebug == 18 || foamDebug == 25 || foamDebug == 26)
                 {

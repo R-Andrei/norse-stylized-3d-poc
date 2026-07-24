@@ -561,6 +561,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 searchAttemptSummary ?? string.Empty;
             if (telemetry != null)
             {
+                CaptureCornerDamagePreflightReplayTelemetry(telemetry);
                 status.BaselineBuildCount = telemetry.BaselineBuildCount;
                 status.BaselineCacheUseCount =
                     telemetry.BaselineCacheUseCount;
@@ -590,6 +591,107 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     telemetry.PlanMaterializationMismatchCount;
                 status.DeadlineAbortCount =
                     telemetry.DeadlineAbortCount;
+                status.EndpointConflictGuardAttemptCount =
+                    telemetry.EndpointConflictGuardAttemptCount;
+                status.EndpointConflictGuardPassCount =
+                    telemetry.EndpointConflictGuardPassCount;
+                status.EndpointConflictGuardRejectCount =
+                    telemetry.EndpointConflictGuardRejectCount;
+                status.EndpointConflictGuardFalseNegativeCount =
+                    telemetry.EndpointConflictGuardFalseNegativeCount;
+                status.EndpointConflictGuardTestedRailCount =
+                    telemetry.EndpointConflictGuardTestedRailCount;
+                status.EndpointConflictGuardMilliseconds =
+                    telemetry.EndpointConflictGuardMilliseconds;
+                status.EndpointPatchRecoveryAttemptCount =
+                    telemetry.EndpointPatchRecoveryAttemptCount;
+                status.EndpointPatchRecoveryPreparedCount =
+                    telemetry.EndpointPatchRecoveryPreparedCount;
+                status.EndpointPatchRecoveryRejectCount =
+                    telemetry.EndpointPatchRecoveryRejectCount;
+                status.EndpointPatchRecoveryAppliedCount =
+                    telemetry.EndpointPatchRecoveryAppliedCount;
+                status.EndpointPatchRecoveryFalsePositiveCount =
+                    telemetry.EndpointPatchRecoveryFalsePositiveCount;
+                status.EndpointPatchRecoveryUnsupportedStarCount =
+                    telemetry.EndpointPatchRecoveryUnsupportedStarCount;
+                status.EndpointPatchRecoveryPatchExtractionCount =
+                    telemetry.EndpointPatchRecoveryPatchExtractionCount;
+                status.EndpointPatchRecoveryDisconnectedPatchCount =
+                    telemetry.EndpointPatchRecoveryDisconnectedPatchCount;
+                status.EndpointPatchRecoveryBoundaryLoopCount =
+                    telemetry.EndpointPatchRecoveryBoundaryLoopCount;
+                status.EndpointPatchRecoveryBoundaryCrossingCount =
+                    telemetry.EndpointPatchRecoveryBoundaryCrossingCount;
+                status.EndpointPatchRecoveryNoLocalRemovalCount =
+                    telemetry.EndpointPatchRecoveryNoLocalRemovalCount;
+                status.EndpointPatchRecoveryCapCreationCount =
+                    telemetry.EndpointPatchRecoveryCapCreationCount;
+                status.EndpointPatchRecoveryIncidentBandJoinCount =
+                    telemetry.EndpointPatchRecoveryIncidentBandJoinCount;
+                status.EndpointPatchRecoveryStitchTopologyCount =
+                    telemetry.EndpointPatchRecoveryStitchTopologyCount;
+                status.EndpointPatchRecoveryLocalityCount =
+                    telemetry.EndpointPatchRecoveryLocalityCount;
+                status.EndpointPatchRecoveryBandIntegrityCount =
+                    telemetry.EndpointPatchRecoveryBandIntegrityCount;
+                status.EndpointPatchRecoveryPreparedMinimumParityCount =
+                    telemetry.EndpointPatchRecoveryPreparedMinimumParityCount;
+                status.EndpointPatchRecoveryMaterializationSignatureCount =
+                    telemetry.EndpointPatchRecoveryMaterializationSignatureCount;
+                status.EndpointPatchRecoveryMaximumRemovedVertexRadius =
+                    telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius;
+                status.EndpointPatchRecoveryMaximumIntersectionRadius =
+                    telemetry.EndpointPatchRecoveryMaximumIntersectionRadius;
+                status.EndpointPatchRecoveryMaximumReplacementVertexRadius =
+                    telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius;
+                status.EndpointPatchRecoveryRetainedOutsideRadiusCount =
+                    telemetry.EndpointPatchRecoveryRetainedOutsideRadiusCount;
+                status.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter =
+                    telemetry.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+                status.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter =
+                    telemetry.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+                status.EndpointPatchRecoveryLocalSupportSampleCount =
+                    telemetry.EndpointPatchRecoveryLocalSupportSampleCount;
+                status.EndpointPatchRecoveryMinimumSamplesPerIncident =
+                    telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident;
+                status.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta =
+                    telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta;
+                status.EndpointPatchRecoveryMaximumControllingSupportRadius =
+                    telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius;
+                status.EndpointPatchRecoveryMaximumAxialInfluence =
+                    telemetry.EndpointPatchRecoveryMaximumAxialInfluence;
+                status.EndpointPatchRecoveryMinimumAllowedAxialInfluence =
+                    float.IsInfinity(
+                        telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence)
+                        ? 0f
+                        : telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence;
+                status.EndpointPatchRecoveryFacesSubdivided =
+                    telemetry.EndpointPatchRecoveryFacesSubdivided;
+                status.EndpointPatchRecoveryLocalFragmentCount =
+                    telemetry.EndpointPatchRecoveryLocalFragmentCount;
+                status.EndpointPatchRecoveryRemoteRemainderCount =
+                    telemetry.EndpointPatchRecoveryRemoteRemainderCount;
+                status.EndpointPatchRecoverySyntheticIncidentFragmentCount =
+                    telemetry.EndpointPatchRecoverySyntheticIncidentFragmentCount;
+                status.EndpointPatchRecoveryMaximumCellVertexCount =
+                    telemetry.EndpointPatchRecoveryMaximumCellVertexCount;
+                status.EndpointPatchRecoveryMaximumCellFaceCount =
+                    telemetry.EndpointPatchRecoveryMaximumCellFaceCount;
+                status.EndpointPatchRecoveryMilliseconds =
+                    telemetry.EndpointPatchRecoveryMilliseconds;
+                status.PreflightFoundationBuildCount =
+                    telemetry.PreflightFoundationBuildCount;
+                status.PreflightFoundationReuseCount =
+                    telemetry.PreflightFoundationReuseCount;
+                status.IsolatedReplayAttemptCount =
+                    telemetry.IsolatedReplayAttemptCount;
+                status.IsolatedReplayHitCount =
+                    telemetry.IsolatedReplayHitCount;
+                status.IsolatedReplayMissCount =
+                    telemetry.IsolatedReplayMissCount;
+                status.IsolatedFullEvaluationCount =
+                    telemetry.IsolatedFullEvaluationCount;
                 status.CandidateRankingMilliseconds =
                     telemetry.CandidateRankingMilliseconds;
                 status.TransactionMilliseconds =
@@ -684,6 +786,337 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             builder.Append("deadlineAborts=");
             builder.AppendLine(status.DeadlineAbortCount.ToString(
                 CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardAttempts=");
+            builder.AppendLine(status.EndpointConflictGuardAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardPasses=");
+            builder.AppendLine(status.EndpointConflictGuardPassCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardRejects=");
+            builder.AppendLine(status.EndpointConflictGuardRejectCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardFalseNegatives=");
+            builder.AppendLine(status.EndpointConflictGuardFalseNegativeCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardTestedRails=");
+            builder.AppendLine(status.EndpointConflictGuardTestedRailCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAttempts=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryPrepared=");
+            builder.AppendLine(status.EndpointPatchRecoveryPreparedCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryRejects=");
+            builder.AppendLine(status.EndpointPatchRecoveryRejectCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryApplied=");
+            builder.AppendLine(status.EndpointPatchRecoveryAppliedCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryFalsePositives=");
+            builder.AppendLine(status.EndpointPatchRecoveryFalsePositiveCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryUnsupportedStar=");
+            builder.AppendLine(status.EndpointPatchRecoveryUnsupportedStarCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryPatchExtraction=");
+            builder.AppendLine(status.EndpointPatchRecoveryPatchExtractionCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryDisconnectedPatch=");
+            builder.AppendLine(status.EndpointPatchRecoveryDisconnectedPatchCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryBoundaryLoop=");
+            builder.AppendLine(status.EndpointPatchRecoveryBoundaryLoopCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryBoundaryCrossing=");
+            builder.AppendLine(status.EndpointPatchRecoveryBoundaryCrossingCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryNoLocalRemoval=");
+            builder.AppendLine(status.EndpointPatchRecoveryNoLocalRemovalCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCapCreation=");
+            builder.AppendLine(status.EndpointPatchRecoveryCapCreationCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryIncidentBandJoin=");
+            builder.AppendLine(status.EndpointPatchRecoveryIncidentBandJoinCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryStitchTopology=");
+            builder.AppendLine(status.EndpointPatchRecoveryStitchTopologyCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryLocality=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalityCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryBandIntegrity=");
+            builder.AppendLine(status.EndpointPatchRecoveryBandIntegrityCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryPreparedMinimumParity=");
+            builder.AppendLine(status.EndpointPatchRecoveryPreparedMinimumParityCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMaterializationSignature=");
+            builder.AppendLine(status.EndpointPatchRecoveryMaterializationSignatureCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateFacesSubdivided=");
+            builder.AppendLine(status.EndpointPatchRecoveryFacesSubdivided.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateLocalFragments=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalFragmentCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateRemoteRemainders=");
+            builder.AppendLine(status.EndpointPatchRecoveryRemoteRemainderCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateSyntheticIncidentFragments=");
+            builder.AppendLine(status.EndpointPatchRecoverySyntheticIncidentFragmentCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateMaximumCellVertices=");
+            builder.AppendLine(status.EndpointPatchRecoveryMaximumCellVertexCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAggregateMaximumCellFaces=");
+            builder.AppendLine(status.EndpointPatchRecoveryMaximumCellFaceCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightFoundationBuilds=");
+            builder.AppendLine(status.PreflightFoundationBuildCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("preflightFoundationReuses=");
+            builder.AppendLine(status.PreflightFoundationReuseCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("isolatedReplayAttempts=");
+            builder.AppendLine(status.IsolatedReplayAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("isolatedReplayHits=");
+            builder.AppendLine(status.IsolatedReplayHitCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("isolatedReplayMisses=");
+            builder.AppendLine(status.IsolatedReplayMissCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("isolatedFullEvaluations=");
+            builder.AppendLine(status.IsolatedFullEvaluationCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardAttempted=");
+            builder.AppendLine(status.EndpointConflictGuardAttempted ? "1" : "0");
+            builder.Append("endpointConflictGuardPassed=");
+            builder.AppendLine(status.EndpointConflictGuardPassed ? "1" : "0");
+            builder.Append("endpointConflictGuardConflicts=");
+            builder.AppendLine(status.EndpointConflictGuardConflictCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardVictimEdge=");
+            builder.AppendLine(status.EndpointConflictGuardVictimEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardForeignEdge=");
+            builder.AppendLine(status.EndpointConflictGuardForeignEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardAxial=");
+            builder.AppendLine(status.EndpointConflictGuardAxialParameter.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardAllowance=");
+            builder.AppendLine(status.EndpointConflictGuardEndpointAllowance.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardVictimMinimumScale=");
+            builder.AppendLine(status.EndpointConflictGuardVictimMinimumScale.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardForeignMinimumScale=");
+            builder.AppendLine(status.EndpointConflictGuardForeignMinimumScale.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardVictimRetreatCapacity=");
+            builder.AppendLine(status.EndpointConflictGuardVictimRetreatCapacity.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardForeignRetreatCapacity=");
+            builder.AppendLine(status.EndpointConflictGuardForeignRetreatCapacity.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardCluster={");
+            builder.Append(FormatCornerDamageIdentitySet(
+                status.EndpointConflictGuardClusterEdges));
+            builder.AppendLine("}");
+            builder.Append("endpointConflictGuardFalseNegative=");
+            builder.AppendLine(status.EndpointConflictGuardFalseNegative ? "1" : "0");
+            builder.Append("endpointConflictGuardDiagnostic=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointConflictGuardDiagnostic)
+                ? "none"
+                : status.EndpointConflictGuardDiagnostic);
+            builder.Append("endpointPatchRecoveryAttempted=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttempted ? "1" : "0");
+            builder.Append("endpointPatchRecoveryPrepared=");
+            builder.AppendLine(status.EndpointPatchRecoveryPrepared ? "1" : "0");
+            builder.Append("endpointPatchRecoveryApplied=");
+            builder.AppendLine(status.EndpointPatchRecoveryApplied ? "1" : "0");
+            builder.Append("endpointPatchRecoveryFalsePositive=");
+            builder.AppendLine(status.EndpointPatchRecoveryFalsePositive ? "1" : "0");
+            builder.Append("endpointPatchRecoveryLocalAttemptCount=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalAttemptCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryVertex=");
+            builder.AppendLine(status.EndpointPatchRecoveryVertexIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryVictimEdge=");
+            builder.AppendLine(status.EndpointPatchRecoveryVictimEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryForeignEdge=");
+            builder.AppendLine(status.EndpointPatchRecoveryForeignEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryIncidentBands=");
+            builder.AppendLine(status.EndpointPatchRecoveryIncidentBandCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryNormalRank=");
+            builder.AppendLine(status.EndpointPatchRecoveryNormalRank.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCapVertices=");
+            builder.AppendLine(status.EndpointPatchRecoveryCapVertexCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCutDepth=");
+            builder.AppendLine(status.EndpointPatchRecoveryCutDepth.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCompactness=");
+            builder.AppendLine(status.EndpointPatchRecoveryCompactness.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAspectRatio=");
+            builder.AppendLine(status.EndpointPatchRecoveryAspectRatio.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryRejection=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryRejection)
+                ? "none"
+                : status.EndpointPatchRecoveryRejection);
+            builder.Append("endpointPatchRecoverySelectedFaces=");
+            builder.AppendLine(status.EndpointPatchRecoverySelectedFaceCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryBoundaryVertices=");
+            builder.AppendLine(status.EndpointPatchRecoveryBoundaryVertexCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryBoundarySignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryBoundarySignature)
+                ? "none"
+                : status.EndpointPatchRecoveryBoundarySignature);
+            builder.Append("endpointPatchRecoveryMaximumRemovedVertexRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalMaximumRemovedVertexRadius.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMaximumIntersectionRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalMaximumIntersectionRadius.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMaximumReplacementVertexRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalMaximumReplacementVertexRadius.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryRetainedOutsideRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalRetainedOutsideRadiusCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySelectedFacesBeforeLocalFilter=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalSelectedFaceCountBeforeLocalFilter.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySelectedFacesAfterLocalFilter=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalSelectedFaceCountAfterLocalFilter.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryLocalityFailureSource=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryLocalityFailureSource)
+                ? "none"
+                : status.EndpointPatchRecoveryLocalityFailureSource);
+            builder.Append("endpointPatchRecoveryLocalSupportSamples=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptSupportSampleCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMinimumSamplesPerIncident=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptMinimumSamplesPerIncident.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySamplesPerIncident=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoverySamplesPerIncident)
+                ? "none"
+                : status.EndpointPatchRecoverySamplesPerIncident);
+            builder.Append("endpointPatchRecoveryLocalSupportRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalSupportRadius.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryLocalSupportProjection=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalSupportProjection.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryGlobalSupportProjection=");
+            builder.AppendLine(status.EndpointPatchRecoveryGlobalSupportProjection.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryGlobalMinusLocalSupportDelta=");
+            builder.AppendLine(status.EndpointPatchRecoveryGlobalMinusLocalSupportDelta.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryControllingSupportEdge=");
+            builder.AppendLine(status.EndpointPatchRecoveryControllingSupportEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryControllingSupportRadius=");
+            builder.AppendLine(status.EndpointPatchRecoveryControllingSupportRadius.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySupportFailureSource=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoverySupportFailureSource)
+                ? "none"
+                : status.EndpointPatchRecoverySupportFailureSource);
+            builder.Append("endpointPatchRecoveryMaximumAxialInfluence=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptMaximumAxialInfluence.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMinimumAllowedAxialInfluence=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptMinimumAllowedAxialInfluence.ToString(
+                "G12", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAxialRejectedEdge=");
+            builder.AppendLine(status.EndpointPatchRecoveryAxialRejectedEdgeIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAxialRejectedEndpointVertex=");
+            builder.AppendLine(status.EndpointPatchRecoveryAxialRejectedEndpointVertexIndex.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryAxialInfluenceSignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryAxialInfluenceSignature)
+                ? "none"
+                : status.EndpointPatchRecoveryAxialInfluenceSignature);
+            builder.Append("endpointPatchRecoveryCellLimitSignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryCellLimitSignature)
+                ? "none"
+                : status.EndpointPatchRecoveryCellLimitSignature);
+            builder.Append("endpointPatchRecoveryFacesSubdivided=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptFacesSubdivided.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryLocalFragments=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptLocalFragmentCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryRemoteRemainders=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptRemoteRemainderCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySyntheticIncidentFragments=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptSyntheticIncidentFragmentCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoverySyntheticIncidentIdentities=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoverySyntheticIncidentIdentities)
+                ? "none"
+                : status.EndpointPatchRecoverySyntheticIncidentIdentities);
+            builder.Append("endpointPatchRecoveryCellVertices=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptCellVertexCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCellFaces=");
+            builder.AppendLine(status.EndpointPatchRecoveryAttemptCellFaceCount.ToString(
+                CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryCellSplitSignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryCellSplitSignature)
+                ? "none"
+                : status.EndpointPatchRecoveryCellSplitSignature);
+            builder.Append("endpointPatchRecoveryLocalFragmentSignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryLocalFragmentSignature)
+                ? "none"
+                : status.EndpointPatchRecoveryLocalFragmentSignature);
+            builder.Append("endpointPatchRecoveryRemoteRemainderSignature=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryRemoteRemainderSignature)
+                ? "none"
+                : status.EndpointPatchRecoveryRemoteRemainderSignature);
+            builder.Append("endpointPatchRecoveryCellFailureSource=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryCellFailureSource)
+                ? "none"
+                : status.EndpointPatchRecoveryCellFailureSource);
+            builder.Append("endpointPatchRecoveryDiagnostic=");
+            builder.AppendLine(string.IsNullOrEmpty(
+                    status.EndpointPatchRecoveryDiagnostic)
+                ? "none"
+                : status.EndpointPatchRecoveryDiagnostic);
+            builder.Append("endpointPatchRecoveryLocalMilliseconds=");
+            builder.AppendLine(status.EndpointPatchRecoveryLocalMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
             builder.Append("preparedPlanHash=");
             builder.AppendLine(string.IsNullOrEmpty(status.PreparedPlanHash)
                 ? "none"
@@ -771,6 +1204,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 "F3", CultureInfo.InvariantCulture));
             builder.Append("integrationPlanMilliseconds=");
             builder.AppendLine(status.IntegrationPlanMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("endpointConflictGuardMilliseconds=");
+            builder.AppendLine(status.EndpointConflictGuardMilliseconds.ToString(
+                "F3", CultureInfo.InvariantCulture));
+            builder.Append("endpointPatchRecoveryMilliseconds=");
+            builder.AppendLine(status.EndpointPatchRecoveryMilliseconds.ToString(
                 "F3", CultureInfo.InvariantCulture));
             builder.Append("candidatePreparationMilliseconds=");
             builder.AppendLine(status.AuthoritativeSolveMilliseconds.ToString(
@@ -935,11 +1374,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 CornerDamagePreviewKind.GeometryOnly;
             StringBuilder builder = new StringBuilder(8192);
             builder.AppendLine(geometryOnly
-                ? "GeneratedMass EW-C1A.3g corner-chip preview"
-                : "GeneratedMass EW-C1A.3g corner-chip and edge-wear preview");
+                ? "GeneratedMass EW-C1A.3o corner-chip preview"
+                : "GeneratedMass EW-C1A.3o corner-chip and edge-wear preview");
             builder.AppendLine(geometryOnly
-                ? "contract=EW-C1A.3g-corner-chip-preview"
-                : "contract=EW-C1A.3g-corner-chip-edge-wear");
+                ? "contract=EW-C1A.3o-corner-chip-preview"
+                : "contract=EW-C1A.3o-corner-chip-edge-wear");
             builder.Append("previewMode=");
             builder.AppendLine(geometryOnly
                 ? "geometry-only"

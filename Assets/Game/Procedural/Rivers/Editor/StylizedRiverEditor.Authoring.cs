@@ -149,11 +149,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawAdvancedShoreline()
         {
             EditorGUILayout.PropertyField(
-                Find("additionalShorelineOverlap"),
-                new GUIContent(
-                    "Additional Shoreline Overlap",
-                    "Optional extra hidden water width beyond the automatically resolved overlap. Leave at zero unless a specific material or camera angle proves the automatic amount insufficient."));
-            EditorGUILayout.PropertyField(
                 Find("shorelineWetClearance"),
                 new GUIContent(
                     "Wet Clearance",
@@ -324,12 +319,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("shoreMotion"),
                 new GUIContent(
                     "Shore Motion",
-                    "Displacement retained where water visibly meets the bank. It fades to zero inside the hidden overlap."));
+                    "Positive displacement retained where water visibly meets the bank. Negative troughs return to the static waterline at the exact shoreline."));
             EditorGUILayout.PropertyField(
                 Find("shoreMotionWidth"),
                 new GUIContent(
                     "Shore Motion Width",
-                    "Distance inside the visible shoreline over which centre motion blends toward Shore Motion."));
+                    "Distance inside the visible shoreline over which centre motion blends toward Shore Motion and negative troughs return smoothly to the static waterline."));
             MarkMotionPresetCustomIfChanged();
         }
 
@@ -342,25 +337,48 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Shore Wave Height Scale",
                     "Vertical shore-wave amplitude relative to the centre-river macro wave."));
             EditorGUILayout.PropertyField(
-                Find("shoreWaveLengthScale"),
+                Find("shoreWaveShapeLengthScale"),
                 new GUIContent(
                     "Shore Wave Length Scale",
-                    "Longitudinal shore-wave length relative to the centre-river macro wave."));
+                    "Longitudinal size of each individual shore wave relative to the centre-river macro wave. Lower values create shorter, tighter waves; higher values create broader waves that occupy more shoreline length."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveSpacingScale"),
+                new GUIContent(
+                    "Shore Wave Gap Scale",
+                    "Clear longitudinal gap between successive shore-wave packets relative to the centre-river macro wave. Zero makes adjacent packets touch; higher values insert wider calm shoreline gaps without changing individual wave length."));
             EditorGUILayout.PropertyField(
                 Find("shoreWaveReach"),
                 new GUIContent(
                     "Shore Wave Reach",
-                    "Maximum fraction of the generated hidden shoreline allowance that a shore wave may wet."));
+                    "Maximum fraction of the generated hidden shoreline allowance that a positive shore-wave crest may wet."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                Find("motionPreset").enumValueIndex =
+                    (int)StylizedRiverMotionPreset.Custom;
+            }
+
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.PropertyField(
+                Find("additionalShorelineOverlap"),
+                new GUIContent(
+                    "Positive Overflow Allowance (m)",
+                    "Additional hidden water width per bank beyond the automatic overlap. Positive shore-wave crests may use this space according to Shore Wave Reach. Changing it structurally regenerates the river domain and corridor."));
+            if (EditorGUI.EndChangeCheck())
+            {
+                structuralAuthoringChanged = true;
+            }
+
+            EditorGUI.BeginChangeCheck();
             EditorGUILayout.PropertyField(
                 Find("shoreWaveTransitionLength"),
                 new GUIContent(
                     "Shore Wave Transition Length",
-                    "World-space smoothing distance for shore-wave profiles and neighbouring size transitions."));
+                    "World-space shoulder-shaping distance inside each wave packet. It does not change packet length or the authored gap."));
             EditorGUILayout.PropertyField(
                 Find("shoreWaveSizeVariation"),
                 new GUIContent(
                     "Shore Wave Size Variation",
-                    "Stable deterministic differences between successive shore waves."));
+                    "Stable deterministic differences between successive shore waves. Height and positive overflow reach remain related but are no longer identical."));
             EditorGUILayout.PropertyField(
                 Find("shoreWaveSideAsymmetry"),
                 new GUIContent(
@@ -371,6 +389,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 new GUIContent(
                     "Shore Wave Profile Variation",
                     "Varies each shore wave smoothly between its start, middle, and end."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveProfileEvolutionStrength"),
+                new GUIContent(
+                    "Profile Evolution Strength",
+                    "Changes each travelling shore wave's normalized roundness and shoulder shape over time. Zero preserves the exact current profile."));
+            EditorGUILayout.PropertyField(
+                Find("shoreWaveProfileEvolutionDuration"),
+                new GUIContent(
+                    "Profile Evolution Duration (s)",
+                    "Seconds for one predictable narrow-to-broad-to-narrow evolution cycle. Neighbouring waves receive deterministic phase offsets and do not morph in lockstep."));
             MarkMotionPresetCustomIfChanged();
         }
 
@@ -548,6 +576,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
 
             DrawNestedSection(
+                InspectorSection.WaterShorelineAccent,
+                "Shoreline Accent",
+                DrawShorelineAccentControls);
+
+            DrawNestedSection(
                 InspectorSection.WaterLightingResponse,
                 "Lighting Response",
                 DrawWaterLightingControls);
@@ -578,6 +611,41 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Freeze Amount",
                         "Zero is fully liquid and one is fully frozen."));
             }
+        }
+
+        private void DrawShorelineAccentControls()
+        {
+            EditorGUILayout.HelpBox(
+                "Draws one stylized water-side line along the complete current shoreline. " +
+                "Ordinary and positive-overflow regions use the same dynamic edge; " +
+                "interior rocks and other scene silhouettes are not outlined.",
+                MessageType.None);
+
+            EditorGUILayout.PropertyField(
+                Find("shorelineAccentColor"),
+                new GUIContent(
+                    "Colour",
+                    "Authored shoreline-line colour before the signed Brightness adjustment."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineAccentStrength"),
+                new GUIContent(
+                    "Strength",
+                    "Overall blend amount. Zero disables the accent without changing shoreline geometry or overflow."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineAccentWidth"),
+                new GUIContent(
+                    "Width (m)",
+                    "World-space thickness measured inward from the current shoreline on the water side."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineEdgeBlendWidth"),
+                new GUIContent(
+                    "Edge Blend Width (m)",
+                    "World-space width over which the completed water, Foam, and accent colour blends back to the already-rendered opaque scene at the shoreline. Zero preserves a hard edge. This remains active when Accent Strength is zero."));
+            EditorGUILayout.PropertyField(
+                Find("shorelineAccentBrightness"),
+                new GUIContent(
+                    "Brightness",
+                    "Signed colour multiplier. Negative values darken the accent; positive values brighten it. Minus one reaches black and plus one doubles the authored colour."));
         }
 
         private void DrawWaterLightingControls()

@@ -1233,14 +1233,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
             Bounds sourceBounds = CalculateFaceBounds(sourceFaces);
             double sourceVolume = CalculatePlaneCutPolyhedronVolume(sourceFaces);
-            List<PlaneCutVertexJunctionCandidate> noJunctions =
+            List<PlaneCutVertexJunctionCandidate> preparedJunctions =
+                solvedPlan.PreparedJunctions ??
                 new List<PlaneCutVertexJunctionCandidate>();
+            PlaneCutEndpointPatchReplacement preparedEndpointPatch =
+                solvedPlan.PreparedEndpointPatch;
 
             if (!TryBuildCleanPlaneCutEdgeOnlyShell(
                     sourceFaces,
                     context,
                     planeCandidates,
-                    noJunctions,
+                    preparedJunctions,
+                    preparedEndpointPatch,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
@@ -1331,7 +1335,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             AuditPlaneCutFaceQuality(
                 edgeOnlyFaces,
-                noJunctions,
+                preparedJunctions,
                 minimumStableEdgeLength,
                 ref result);
             AuditPlaneCutLocalJunctionStars(
@@ -1999,6 +2003,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
             List<PlaneCutVertexJunctionCandidate> noJunctions,
+            PlaneCutEndpointPatchReplacement endpointPatch,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             int localityDeferredCount,
@@ -2016,6 +2021,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     context,
                     allCandidates,
                     noJunctions,
+                    endpointPatch,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
@@ -2031,6 +2037,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 context,
                 allCandidates,
                 noJunctions,
+                endpointPatch,
                 minimumStableEdgeLength,
                 minimumStableFaceArea,
                 localityDeferredCount,
@@ -2046,6 +2053,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferTopologyContext context,
                 List<PlaneCutBevelCandidate> allCandidates,
                 List<PlaneCutVertexJunctionCandidate> noJunctions,
+                PlaneCutEndpointPatchReplacement endpointPatch,
                 float minimumStableEdgeLength,
                 float minimumStableFaceArea,
                 int localityDeferredCount,
@@ -2114,7 +2122,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         out List<PolygonFace> rawFaces,
                         out int edgeCapsBuilt,
                         out string buildBlocker,
-                        numericalRepairs))
+                        numericalRepairs,
+                        endpointPatch))
                 {
                     blocker = string.IsNullOrEmpty(buildBlocker)
                         ? "the deterministic width-reduced edge shell could not be built"
@@ -2142,6 +2151,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             context,
                             allCandidates,
                             noJunctions,
+                            endpointPatch,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             localityDeferredCount,
@@ -2231,6 +2241,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             context,
                             allCandidates,
                             noJunctions,
+                            endpointPatch,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             localityDeferredCount,
@@ -2496,6 +2507,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                 context,
                                 allCandidates,
                                 noJunctions,
+                                endpointPatch,
                                 minimumStableEdgeLength,
                                 minimumStableFaceArea,
                                 minimumScaleByEdge,
@@ -2558,6 +2570,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                     context,
                                     allCandidates,
                                     noJunctions,
+                                    endpointPatch,
                                     minimumStableEdgeLength,
                                     minimumStableFaceArea,
                                     minimumScaleByEdge,
@@ -2908,6 +2921,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     context,
                     allCandidates,
                     noJunctions,
+                    endpointPatch,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     localityDeferredCount,
@@ -2934,6 +2948,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
             List<PlaneCutVertexJunctionCandidate> noJunctions,
+            PlaneCutEndpointPatchReplacement endpointPatch,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             int localityDeferredCount,
@@ -3204,6 +3219,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             context,
                             allCandidates,
                             noJunctions,
+                            endpointPatch,
                             minimumStableEdgeLength,
                             minimumStableFaceArea,
                             minimumScaleByEdge,
@@ -3278,6 +3294,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 ChamferTopologyContext context,
                 List<PlaneCutBevelCandidate> allCandidates,
                 List<PlaneCutVertexJunctionCandidate> noJunctions,
+                PlaneCutEndpointPatchReplacement endpointPatch,
                 float minimumStableEdgeLength,
                 float minimumStableFaceArea,
                 Dictionary<int, float> minimumScaleByEdge,
@@ -3389,6 +3406,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 context,
                 subset,
                 noJunctions,
+                endpointPatch,
                 minimumStableEdgeLength,
                 minimumStableFaceArea,
                 minimumScaleByEdge,
@@ -5808,6 +5826,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
             List<PlaneCutVertexJunctionCandidate> noJunctions,
+            PlaneCutEndpointPatchReplacement endpointPatch,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             Dictionary<int, float> minimumScaleByEdge,
@@ -5882,6 +5901,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     context,
                     allCandidates,
                     noJunctions,
+                    endpointPatch,
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     minimumScaleByEdge,
@@ -6055,6 +6075,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
             List<PlaneCutVertexJunctionCandidate> noJunctions,
+            PlaneCutEndpointPatchReplacement endpointPatch,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             Dictionary<int, float> minimumScaleByEdge,
@@ -6166,7 +6187,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out List<PolygonFace> rawFaces,
                     out int edgeCapsBuilt,
                     out string buildBlocker,
-                    numericalRepairs))
+                    numericalRepairs,
+                    endpointPatch))
             {
                 trial.FailureStage = "PlaneConstruction";
                 trial.FailureCause = string.IsNullOrEmpty(buildBlocker)
@@ -7196,6 +7218,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferTopologyContext context,
             List<PlaneCutBevelCandidate> allCandidates,
             List<PlaneCutVertexJunctionCandidate> noJunctions,
+            PlaneCutEndpointPatchReplacement endpointPatch,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
             int localityDeferredCount,
@@ -7235,7 +7258,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         out List<PolygonFace> rawFaces,
                         out int edgeCapsBuilt,
                         out string buildBlocker,
-                        numericalRepairs))
+                        numericalRepairs,
+                        endpointPatch))
                 {
                     blocker = string.IsNullOrEmpty(buildBlocker)
                         ? "the deterministic edge-only shell could not be built"
@@ -7879,7 +7903,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         bevelFaceCount++;
                     }
                     else if (face.ProvenanceKind ==
-                        PolygonFaceProvenanceKind.VertexJunctionPlane)
+                                 PolygonFaceProvenanceKind.VertexJunctionPlane ||
+                             face.ProvenanceKind ==
+                                 PolygonFaceProvenanceKind.BoundedEndpointCap)
                     {
                         junctionFaceCount++;
                     }
@@ -9500,8 +9526,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 PolygonFace face = faces[faceIndex];
                 if (face != null &&
-                    face.ProvenanceKind ==
-                        PolygonFaceProvenanceKind.VertexJunctionPlane &&
+                    (face.ProvenanceKind ==
+                         PolygonFaceProvenanceKind.VertexJunctionPlane ||
+                     face.ProvenanceKind ==
+                         PolygonFaceProvenanceKind.BoundedEndpointCap) &&
                     face.ProvenanceIndex == vertexIndex)
                 {
                     count++;

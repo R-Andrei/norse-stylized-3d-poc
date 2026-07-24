@@ -644,6 +644,9 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamShoreWaveLengthScale",
                 river.ShoreWaveLengthScale);
             computeShader.SetFloat(
+                "_FoamShoreWaveSpacingScale",
+                river.ShoreWaveSpacingScale);
+            computeShader.SetFloat(
                 "_FoamShoreWaveReach",
                 river.ShoreWaveReach);
             computeShader.SetFloat(
@@ -658,6 +661,12 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamShoreWaveProfileVariation",
                 river.ShoreWaveProfileVariation);
+            computeShader.SetFloat(
+                "_FoamShoreWaveProfileEvolutionStrength",
+                river.ShoreWaveProfileEvolutionStrength);
+            computeShader.SetFloat(
+                "_FoamShoreWaveProfileEvolutionDuration",
+                river.ShoreWaveProfileEvolutionDuration);
             computeShader.SetFloat(
                 "_FoamShoreBankCover",
                 river.ShorelineBankCover);

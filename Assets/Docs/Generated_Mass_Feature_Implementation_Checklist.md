@@ -22,10 +22,448 @@ Historical ledger rule: sections below preserve method history and old acceptanc
 ## Active feature
 
 ```text
-EW-C1A.3g — Complete authoritative build with truthful ordinary-baseline fallback
+EW-C1A.3o — Bounded endpoint-cell subface reconstruction
 ```
 
-EW-V1A.3b and EW-C1A.1a.8 are accepted and frozen. Seed `8889` has passed both raw corner geometry and post-chip edge-wear integration, including one semantic cap, dense construction provenance, mandatory cap ring `3/3/3/3`, unrelated bevel retention `28/28`, and no collateral loss. EW-C1A.3 established the compact normal Corner Chipping workflow and internal 33-case matrix. EW-C1A.3d repaired validator scheduling. EW-C1A.3e removed predictive/final identity divergence but remained too slow. EW-C1A.3f split candidate preparation from one shell materialization, but Unity report `Pasted text(148).txt` runtime-rejected that boundary: the ordinary all-edge preview certified `30/30/30` with render-valid polygon, plane, and mesh evidence while the public current-preview status returned all-zero/default state and failed fast before topology or corner matrices. Source inspection confirms the cached ordinary mesh was discarded, corner failure exits returned production geometry with default or mismatched unified status, and solve-only identities were incorrectly treated as authoritative before conflict reduction, clean-shell construction, triangulation, and coverage finalization. EW-C1A.3g preserves the ordinary mesh/status/timing as one baseline bundle, treats solve-only work as candidate preparation, permits exactly one complete authoritative shell build, and routes every failed corner attempt to the exact ordinary baseline while preserving the real corner failure. The production target remains `<= 4 s`, the hard per-rock maximum remains `5 s`, the corner matrix remains `35 s`, and the research suite remains `90 s`. Production generation remains unchanged.
+EW-V1A.3b and EW-C1A.1a.8 remain accepted and frozen. EW-C1A.3g remains the accepted ownership/fallback boundary, EW-C1A.3h remains the accepted minimum-width endpoint-conflict detector, and EW-C1A.3i remains the accepted preparation-performance baseline. Unity report `Pasted text(162).txt` runtime-rejects C1A.3n as a recovery result while preserving every frozen correctness and timing gate: complete matrix `33/33`, enabled success baseline `6/22`, `104` endpoint-patch attempts, `0` prepared/applied, `0` false positives, `0` guard false negatives, and no identity/materialization mismatch. Endpoint-local support executed, but the replacement still owned complete long polygon faces; maximum removed radius remained `1.02464962` and patch-native axial influence reached `1.48524439` against `0.0346355699` minimum allowance. C1A.3o keeps the same corner-chip transaction, ordinary bevel identities, guard, cache, fallback, controls, and visual intent. It changes only the recovery ownership unit from a complete face to a bounded endpoint-local subface, preserves remote remainders, and reconstructs a missing local incident bevel fragment from its already prepared candidate when the failed multi-bevel shell has consumed it.
+
+**Scope sanity:** this is still the original corner-chip/ordinary-edge-bevel coexistence problem. It is not a new edge-wear feature, shader task, material task, or general mesh rewrite. The research became deep because the proven failure occurs inside exact convex-polyhedron topology at one shared endpoint; C1A.3o is the final justified ownership correction before another runtime decision.
+
+## EW-C1A.3o implementation plan — bounded endpoint-cell subface reconstruction
+
+### Status
+
+- [x] Interruption/status audit complete; no C1A.3o source or package survived.
+- [x] Exact delivered C1A.3n baseline reconstructed and byte-reconciled.
+- [x] Canonical plan recorded before implementation.
+- [x] Replace whole-face endpoint-patch ownership with bounded endpoint-cell face subdivision.
+- [x] Preserve remote face remainders with original feature, provenance, normal, and surface ownership.
+- [x] Reconstruct missing local incident bevel fragments from prepared bevel/source planes inside the bounded cell.
+- [x] Store and verify cell planes, source-face signatures, split/remainder signatures, local fragments, stitch loops, and cap evidence.
+- [x] Add endpoint-cell and synthetic-fragment telemetry through report, matrix CSV, and aggregate suite.
+- [x] Reconcile framework, recovery architecture, and code inventory.
+- [x] Run static, scope, package-replay, and compliance validation.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### Runtime evidence and current blocker
+
+- Unity report `Pasted text(162).txt` completes all `33/33` cases within budget but leaves the corner matrix at `17/33`: `104` endpoint-patch attempts, `0` prepared, `0` applied, `66` locality rejections, `34` patch-extraction rejections, `1` disconnected patch, `1` boundary crossing, and `2` incident-band-join failures.
+- Endpoint-local support executed (`480` samples, minimum `6` per successful incident set), but maximum removed-vertex radius remained `1.02464962`; maximum patch-native axial influence reached `1.48524439` against a minimum allowance of `0.0346355699`.
+- The remaining defect is ownership, not tolerance: the recovery still selects and replaces complete polygon faces. A locally valid cut on one end of a long bevel/source face can therefore remove a remote vertex or make the stored stitch boundary span most of the source edge.
+- Some incident bevel fragments are already absent from the failed edge-only shell. A recovery cannot require the exact fragment it is meant to reconstruct to survive as an existing `EdgeBevelPlane` polygon.
+
+### Approved implementation
+
+1. Preserve the accepted C1A.3g exact-baseline fallback, C1A.3h endpoint-conflict guard, C1A.3i preparation cache/replay, one complete authoritative build, exact identities, mandatory ring, unrelated retention, topology/render gates, and all timing limits.
+2. Build one deterministic endpoint cell around the implicated source vertex. For each retained incident source edge, create an axial limit plane perpendicular to that edge at the existing patch-native allowed endpoint influence. The local cell is the intersection of all source-side axial half-spaces.
+3. Partition every intersected source or incident-bevel polygon into endpoint-local fragments and untouched remote remainders. Apply the junction boundary only to local fragments. Preserve remote remainders exactly in feature, strength, provenance, normal, and shared split positions.
+4. Reject any local removal that reaches a non-incident bevel identity, any open/non-manifold split, multiple or branched local boundaries, remote remainder loss, or cell influence beyond an incident axial limit. Do not enlarge endpoint or axial allowances.
+5. When an incident bevel polygon is absent from the failed edge-only shell, reconstruct a synthetic local incident fragment from its prepared bevel plane, its two owner source-face planes, the source shell, and the endpoint cell. The synthetic fragment retains that incident source-edge identity and is used only inside the bounded cell.
+6. Generate one connecting `BoundedEndpointCap`, require it to join every incident local fragment, and require the recombined remote remainders plus local replacement to form one closed manifold shell.
+7. At prepared and legal-minimum widths, require matching incident identities, endpoint-cell plane identities/limits, source-face selection signatures, local/remote split topology, local stitch-loop class, and one stable cap.
+8. Store the prepared cell planes, matched source-face signatures, replacement faces including remote remainders, local fragment signatures, remote remainder signatures, split-loop signatures, synthetic incident identities, and cap metrics.
+9. During the existing one authoritative materialization, reproduce the ordinary shell once, verify all prepared source/split signatures, replace only the matched source faces with the stored partitioned faces, then run every existing final identity, coverage, topology, triangulation, render-channel, and soup check. Any mismatch is a recovery false positive and returns the exact ordinary baseline.
+10. Add diagnostics for axial cell limits, faces subdivided, local fragments, remote remainders, synthetic incident fragments, missing synthetic identities, cell vertices/faces, local/remote split signatures, cap joins, and authoritative split-signature mismatches.
+
+### Implemented result
+
+- [x] Every reached source or incident-bevel polygon is subdivided through deterministic source-edge axial planes. The source-side fragment remains endpoint-local; every opposite fragment is retained as a remote remainder with unchanged feature, strength, provenance identity, and authored normal.
+- [x] The junction plane clips only the endpoint-local fragment. The recombined trial shell contains all untouched original faces, preserved remote remainders, retained local fragments, any required synthetic incident fragment, and exactly one `BoundedEndpointCap`.
+- [x] Missing incident bevel fragments are reconstructed from an isolated shell built with the same prepared bevel candidate and source faces, then clipped through the identical endpoint cell. No new authored bevel identity is introduced.
+- [x] Prepared and legal-minimum trials reuse the exact prepared cell limits and require matching incident/synthetic identities plus selected-face, boundary, fragment, remainder, cell-vertex, and cell-face topology cardinalities.
+- [x] Authoritative application verifies cell-limit integrity, exact selected source-face signatures, outer stitch-boundary signatures, replacement cardinality, exactly one bounded cap, and the exact multiset of stored local-fragment and remote-remainder signatures before splicing.
+- [x] Endpoint-cell evidence reaches the integration plan, search aggregate, current report, 135-column matrix CSV, matrix aggregate, one-click suite, sentinel, and comprehensive C1A.3o contracts.
+- [x] Final scope is exactly nine files. `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, `MassGenerator.EdgeWear.SelectionAndCorners.cs`, and the C1A.3h guard body remain byte-identical to the delivered C1A.3n baseline.
+- [x] Static architecture, ownership, field, arity, CSV, directive, lexical, scope, and format validation passed `499/499`; patch and changed-files ZIP replay each reproduce all `353/353` Assets files byte-for-byte with zero mismatches.
+- [ ] Unity 6000.5.0f1 compilation and the complete `EW-C1A.3o-suite` remain pending user execution. Runtime acceptance still requires at least one previously rejected recovery to prepare and apply while every frozen gate remains green.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No file may be created, deleted, moved, or renamed inside `Assets`. No Inspector control, serialized field/default, production generation mode, shader/material/cloud integration, scene, prefab, endpoint allowance, width floor, corner ranking, or global solver behavior may change.
+
+### Unity acceptance gate
+
+- Complete matrix `33/33`, retain the existing six enabled successes, and prepare/apply at least one previously rejected endpoint-cell recovery.
+- Recovery false positives `0`, guard false negatives `0`, plan/materialization mismatches `0`, disabled parity `11/11`, unrelated retention and mesh channels `33/33`.
+- Corner matrix below `35 s`, every case below `5 s`, full suite below `90 s`.
+
+## EW-C1A.3n implementation plan — endpoint-anchored support and patch-native axial certification
+
+### Status
+
+- [x] Read-only review complete.
+- [x] Canonical plan recorded before implementation.
+- [x] Replace full incident-face maximum support with deterministic endpoint-local support sampling.
+- [x] Add candidate pre-extraction rejection for missing local incident support and remote controlling support.
+- [x] Replace endpoint-patch use of `IsPlaneCutJunctionInfluenceLocal(...)` with patch-native axial certification.
+- [x] Add support and axial evidence through plan, status, report, case CSV, and aggregate outputs.
+- [x] Advance active contracts and reconcile stable architecture documents.
+- [x] Run static, scope, package-replay, and final compliance checks.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### Read-only evidence
+
+- Authoritative reconstructed baseline is `/mnt/data/ew_c1a3n_baseline`: `Assets-Code-Archive(18).zip` overlaid with the corrected full C1A.3l package and then the delivered C1A.3m package. No `.git` directory is present, so repository status/history are unavailable; byte comparison against this reconstructed baseline is the scope authority.
+- Unity report `/mnt/data/Pasted text(161).txt` reports `cornerEndpointPatchRecoveryAttempts=104`, `Prepared=0`, `Applied=0`, `Rejects=104`, `FalsePositives=0`, `Locality=66`, `PatchExtraction=25`, `DisconnectedPatch=10`, `BoundaryCrossing=1`, `IncidentBandJoin=2`, `cornerChippingCases=17/33`, `cornerChippingElapsedMs=18906.103`, and all case/matrix/suite budgets passing.
+- The same report records `MaximumRemovedVertexRadius=1.02464962`, while maximum generated intersection and replacement radii are `0.21821025`. This proves that the dominant locality failure is remote original geometry being placed on the removed side, not generated replacement geometry exceeding the endpoint neighborhood.
+- `TryBuildPlaneCutEndpointPatchCandidate(...)` computes `currentSupport` as the maximum projection over every vertex of every incident `EdgeBevelPlane` face, then sets `planeDistance=currentSupport-targetCutback`. Incident bevel polygons span the full source edge, so a remote vertex can control boundary placement.
+- `TryExtractPlaneCutEndpointPatch(...)` and `TryClipPlaneCutEndpointPatchFaces(...)` already implement exact removed/intersection/replacement locality, cut-local component growth, conservative non-incident-bevel rejection, one closed untouched stitch loop, and stored replacement signatures. These remain the active ownership model.
+- `TryBuildPlaneCutEndpointPatchReplacement(...)` still calls `IsPlaneCutJunctionInfluenceLocal(...)`, which first requires one global connector face and measures full connector influence/shared-axis ratios. This validator belongs to historical global junction planes and must remain unchanged there, but it must no longer certify a bounded endpoint patch.
+- Direct callers/consumers reviewed: `TryPrepareCornerDamageEndpointPatchRecovery(...)`, prepared/minimum replacement parity, `MaterializePlaneCutBevelSolvedPlan(...)`, coexistence/exclusion/retreat propagation, integration-plan evidence transfer, current status, diagnostics logging, matrix case capture/CSV, suite aggregation, and the four canonical Generated Mass documents.
+- Historical comparison reviewed: accepted C1A.3g fallback authority, C1A.3h guard, C1A.3i cache/replay, runtime-rejected C1A.3j/C1A.3k, bounded C1A.3l, exact-locality C1A.3m, the corrected C1A.3l kernel propagation, and the current reconstructed baseline.
+
+### Approved implementation
+
+1. Preserve C1A.3m exact removed/intersection/replacement locality, cut-local component traversal, conservative non-incident-bevel extraction rejection, one closed untouched stitch loop, exact selected-face/boundary signatures, prepared/minimum parity, authoritative splice, exact baseline fallback, and one complete authoritative build maximum.
+2. Compute `localRadius` before candidate plane placement from the existing minimum-stable-length, incident-width, and target-cutback policy.
+3. For each incident bevel identity, gather deterministic endpoint-local support samples from its bevel faces: vertices inside the radius, closest points where face edges enter/cross the radius, and local segment endpoints/intersections required to represent support inside the endpoint neighborhood.
+4. Require at least one finite local support sample for every incident identity. Compute the selected support projection only from those samples. Record the global incident-face support separately for evidence, but never use it to place the endpoint boundary.
+5. Place the candidate plane at `localSupport-targetCutback`. Reject before extraction if any incident identity lacks local support, no endpoint-local shell geometry lies on the removed side, the controlling support sample is remote, or the removed-side component is already provably nonlocal.
+6. Replace only the endpoint-patch call to `IsPlaneCutJunctionInfluenceLocal(...)` with a dedicated patch-native axial validator. For each incident source edge, project the stored replacement/cap geometry onto the edge from the implicated endpoint, record maximum axial influence, derive allowed endpoint consumption from existing incident width, candidate cut depth, plane tolerance, and minimum stable edge length, and reject opposite-end influence or excessive axial consumption.
+7. Keep the historical global-junction influence method and all historical global solver declarations unchanged and uncalled.
+8. Add per-candidate and aggregate evidence for local support sample counts, local support radius/projection, global-minus-local support delta, controlling support identity/radius, maximum/allowed axial influence, and axial rejection identity/endpoint.
+9. Advance active contracts to `EW-C1A.3n` without adding serialized state, controls, Inspector actions, assets, or new geometry dependencies.
+10. Unity acceptance requires at least one previously rejected endpoint patch to prepare and apply, existing six enabled successes retained, zero recovery false positives/guard false negatives/identity mismatches, unrelated retention and channels `33/33`, complete matrix below `35 s`, and no case above `5 s`.
+
+### Implemented result
+
+- [x] Candidate placement now uses endpoint-local support only. Every incident identity must contribute finite in-radius support; full-face support is diagnostic evidence and no longer controls `planeDistance`.
+- [x] The bounded replacement now uses patch-native axial certification over its ordered stitch loop and cap. The historical global-junction influence validator and `SolvePlaneCutGlobalJunctionSystem(...)` remain unchanged for their historical owner, with the global solver still declaration-only.
+- [x] Support and axial evidence reaches the integration plan, per-attempt status, certified search telemetry, current report, 123-column case CSV, matrix aggregate, suite aggregate, sentinel, and comprehensive contracts under `EW-C1A.3n`.
+- [x] Final scope is exactly the nine approved files. `MassGenerator.EdgeWear.PlaneCutKernel.cs`, C1A.3i replay owners, and the C1A.3h guard body remain byte-identical to the corrected C1A.3m baseline. No file was created, deleted, moved, or renamed.
+- [x] Static/compliance validation passed `79/79`; all `209` C# files passed lexical/delimiter/directive checks; patch and changed-files ZIP replay each reproduced all `353/353` project files byte-for-byte with zero mismatches.
+- [ ] Unity 6000.5.0f1 compilation and the complete `EW-C1A.3n-suite` remain pending user execution. Runtime acceptance still requires at least one prepared/applied recovery and every frozen correctness/performance gate.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+`MassGenerator.EdgeWear.PlaneCutKernel.cs` remains frozen at corrected C1A.3l/C1A.3m propagation. No file may be created, deleted, moved, or renamed inside `Assets`. Production generation, shaders/includes, cloud integration, materials, scenes, prefabs, serialized controls/defaults, Inspector actions, endpoint allowance, width floors, guard decisions, C1A.3i cache/replay keys, and the historical global junction solver remain unchanged.
+
+## EW-C1A.3m implementation plan — exact cut-locality semantics
+
+### Status
+
+- [x] Read-only review complete.
+- [x] Canonical plan recorded before implementation.
+- [x] Replace full-selected-face extent locality with exact removed/intersection/replacement locality.
+- [x] Restrict connected-component growth to locally affected shared edges.
+- [x] Add exact locality evidence through plan, status, report, case CSV, and aggregate outputs.
+- [x] Advance active contracts and reconcile stable architecture documents.
+- [x] Run static, scope, package-replay, and final compliance checks.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### Read-only evidence
+
+- Corrected C1A.3l source is the complete hotfixed tree at `/mnt/data/ew_c1a3l_compile_hotfix_build/full-patch-replay`; the compile hotfix propagates `PlaneCutEndpointPatchReplacement` consistently through coexistence and retreat trials.
+- Unity report `/mnt/data/Pasted text(160).txt` reports `cornerEndpointPatchRecoveryAttempts=104`, `Prepared=0`, `Applied=0`, `Rejects=104`, `FalsePositives=0`, `Locality=102`, `PatchExtraction=2`, `cornerChippingCases=17/33`, `cornerChippingElapsedMs=18454.468`, and all case/matrix/suite budgets passing.
+- No attempt reached boundary-loop, boundary-crossing, cap creation, incident-band joining, stitch topology, band integrity, prepared/minimum parity, or materialization-signature checks. Runtime evidence therefore isolates the active blocker before those stages.
+- `TryExtractPlaneCutEndpointPatch(...)` currently rejects every selected face if any original face vertex lies outside `localRadius`. Long bevel/source polygons can be locally clipped near the endpoint while retaining distant negative-side vertices unchanged, so this check measures original face extent rather than modified geometry extent.
+- Component growth currently traverses any shared edge between two faces that each contain at least one positive-side vertex. C1A.3m must instead traverse only edges whose local segment is actually affected by the cut, so a distant positive vertex cannot pull unrelated face area into the patch.
+- `TryClipPlaneCutEndpointPatchFaces(...)` already exposes the exact removed side, generated intersections, surviving replacement polygons, and cap vertices required for cut-locality certification without adding a geometry dependency.
+
+### Approved implementation
+
+1. Keep C1A.3l selected-face-only clipping, one closed untouched stitch loop, exact selected-face/boundary signatures, prepared/minimum parity, authoritative splice, false-positive fallback, and one-complete-build maximum.
+2. During extraction, classify each vertex and edge by signed distance to the local boundary. Seed from incident bevel faces with a real local cut. Grow the selected component only across shared edges whose segment participates in the positive-side region or intersects the plane within the certified radius.
+3. Remove the rule that every original selected-face vertex must lie inside `localRadius`.
+4. Before clipping, reject only positive-side vertices that will be removed and lie outside `localRadius`.
+5. During clipping, certify every new edge-plane intersection, every generated cap vertex, and every new replacement vertex against `localRadius`. Original retained negative/on-plane vertices outside the radius are permitted and counted diagnostically.
+6. Record maximum removed-vertex radius, maximum intersection radius, maximum replacement-vertex radius, retained-outside-radius count, selected-face count before/after cut-local filtering, and locality failure source (`removed-vertex`, `intersection`, `cap`, or `replacement`).
+7. Preserve the two current non-incident-bevel `PatchExtraction` rejections unless the local-edge traversal proves they are no longer part of the selected component; do not broaden ownership to non-incident bevels.
+8. Advance active contracts to `EW-C1A.3m` and propagate the new evidence through current status, report, matrix case CSV, aggregate suite, sentinel, and comprehensive outputs without adding controls.
+9. Unity acceptance requires at least one previously rejected endpoint patch to prepare and apply, existing six enabled successes retained, zero recovery false positives/guard false negatives/identity mismatches, unrelated retention and channels `33/33`, complete matrix below `35 s`, and no case above `5 s`.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+`MassGenerator.EdgeWear.PlaneCutKernel.cs` is excluded unless exact implementation evidence requires a signature change; its corrected C1A.3l endpoint-patch propagation is frozen. No file may be created, deleted, moved, or renamed inside `Assets`. Production generation, shaders/includes, cloud integration, materials, scenes, prefabs, serialized controls/defaults, Inspector actions, endpoint allowance, width floors, guard decisions, C1A.3i cache/replay keys, and the historical global junction solver remain unchanged.
+
+### Implemented result
+
+- [x] Removed the full-selected-face radius rejection. Original retained negative/on-plane vertices may remain outside the endpoint radius and are counted rather than rejected.
+- [x] Selected-component traversal now crosses only shared edges whose positive segment or exact plane intersection is locally affected; distant positive vertices can no longer pull unrelated face area into the replacement.
+- [x] Exact locality certification now applies separately to removed positive vertices, generated edge-plane intersections, generated non-original replacement vertices, and cap vertices. Failure evidence identifies `removed-vertex`, `intersection`, `replacement`, or `cap` ownership.
+- [x] Added maximum removed/intersection/replacement radii, retained-outside count, selected-face counts before/after local filtering, and locality failure source through the plan, current status, report, case CSV, matrix aggregate, suite aggregate, sentinel, and comprehensive output.
+- [x] Preserved C1A.3l selected-face-only clipping, the one closed untouched stitch loop, exact selected-face and ordered-boundary signatures, prepared/minimum parity, authoritative splice, false-positive fallback, and one-complete-build maximum. The two non-incident-bevel extraction rejections remain conservative.
+- [x] Active contracts advanced to `EW-C1A.3m`; framework, recovery architecture, and code inventory now describe exact cut-locality ownership without adding controls or serialized state.
+- [x] Final implementation scope is exactly nine approved files. Corrected C1A.3l `MassGenerator.EdgeWear.PlaneCutKernel.cs`, C1A.3i replay owners, the C1A.3h guard algorithm, production generation, shaders, assets, controls, endpoint allowance, and width floors remain byte-identical or behaviorally frozen as specified.
+- [x] Static/compliance validation passed `46/46`; all `209` C# files introduced no new structural findings relative to corrected C1A.3l. Final patch and changed-files ZIP replay each reproduced all `353/353` project files byte-for-byte with zero mismatches.
+- [ ] Unity 6000.5.0f1 compilation and the complete `EW-C1A.3m-suite` remain pending user execution. Runtime acceptance requires at least one previously rejected patch to prepare and apply, existing six enabled successes retained, zero false positives/guard false negatives/identity mismatches, unrelated retention and channels `33/33`, complete matrix below `35 s`, and no case above `5 s`.
+
+## EW-C1A.3l implementation plan — bounded local endpoint-star face-patch replacement
+
+### Status
+
+- [x] Read-only review complete.
+- [x] Canonical plan recorded before implementation.
+- [x] C1A.3k global half-space endpoint-star recovery removed or superseded.
+- [x] Bounded local patch extraction, clipping, replacement, and signature verification implemented.
+- [x] Prepared/minimum-width parity and authoritative splice integrated.
+- [x] Per-attempt rejection classification and `EW-C1A.3l` contracts implemented.
+- [x] Stable architecture documents reconciled.
+- [x] Static, scope, package-replay, and final compliance checks passed.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### EW-C1A.3l compile hotfix — endpoint-patch signature propagation
+
+- [x] Read-only review of the two Unity compiler errors and all direct coexistence-search callers/definitions completed before code edits.
+- [x] Root cause recorded: `PlaneCutEndpointPatchReplacement endpointPatch` was added to one coexistence caller and to `EvaluatePlaneCutCoexistenceExclusionTrial(...)`, but not to `TryResolvePlaneCutCoexistenceByExclusion(...)`; the recursive exclusion-trial call also omitted the new argument.
+- [x] Added `endpointPatch` to the coexistence resolver signature, passed it from all three callers, and passed it into every exclusion-trial evaluation.
+- [x] Propagated the replacement into retreat-search and retreat-trial shell construction so exclusion/retreat certification evaluates the same prepared local replacement as the authoritative path.
+- [x] Exact call-arity/signature scans, all-209-file C# structural checks, scope audit, and package replay passed; Unity compilation remains the required runtime gate.
+
+Approved hotfix scope is limited to this checklist and `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs`. No behavior, thresholds, telemetry schema, controls, shaders, assets, fallback ownership, guard decisions, cache keys, or one-build limits may change.
+
+Hotfix result: the four affected private method chains now have aligned call/definition arity (`16`, `20`, `24`, and `22` arguments respectively), and the prepared endpoint patch reaches coexistence and retreat trial shell construction. Static/compliance validation passes `54/54`; Unity compilation and the complete suite remain pending.
+
+### Read-only evidence
+
+- Authoritative implementation tree is Git working tree `/mnt/data/ew_c1a3k_patchrepo`: `HEAD` is synthetic delivered C1A.3j baseline commit `3b1ff68`; the nine-file working-tree diff is the delivered C1A.3k overlay. `Assets/AGENTS.md` requires this checklist to be the first persistent implementation write.
+- Unity report `/mnt/data/Pasted text(158).txt`, SHA-256 `dfda321bae169d963c3ab454897c511de2bc963003d7754c67e436b05a0db584`, reports `cornerEndpointStarRecoveryAttempts=104`, `Prepared=0`, `Applied=0`, `Rejects=104`, `FalsePositives=0`, `cornerChippingCases=17/33`, `cornerChippingElapsedMs=19470.682`, and all case/matrix/suite budgets passing.
+- The report's terminal case rows contain five supported two-band stars and eleven supported three-band stars. Thirteen terminal diagnostics state `the endpoint-star boundary could not remove a local prepared-shell vertex without affecting unrelated geometry`; three state `endpoint-star boundary exceeded local influence or shared-axis limits`. The supported star-size gate therefore passes, but the additional infinite plane still has global ownership.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryPrepareCornerDamageEndpointStarRecovery(...)` builds the complete prepared edge-only shell, chooses up to three normals and two depths, then calls `TryBuildPlaneCutVertexJunctionCandidate(...)` and `TryValidateCornerDamageEndpointStarTrial(...)`.
+- `TryBuildPlaneCutVertexJunctionCandidate(...)` rejects any plane that removes a vertex outside one local radius. `TryValidateCornerDamageEndpointStarTrial(...)` passes the candidate into `TryBuildPlaneCutSystemFaces(...)`, which applies `ClipPolyhedron(...)` to every face through a global `VertexJunctionPlane`. This is the exact ownership mismatch demonstrated by the runtime diagnostics.
+- `MassGenerator.Polyhedron.cs::ClipPolygon(...)`, `SanitizePolygon(...)`, `CreateOrientedFace(...)`, shared `EdgeKey`/`VertexKey`, welding, topology audit, face-quality audit, one-surface triangulation, and render-channel checks already provide the primitives required to clip a selected face set and validate a stitched replacement without adding a new geometry dependency.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs::MaterializePlaneCutBevelSolvedPlan(...)` owns the single authoritative shell build and all final identities, coverage, topology, triangulation, render validity, and soup. It currently consumes only `PreparedJunctions`; C1A.3l must add one prepared local replacement while retaining this ownership boundary and the one-build maximum.
+- Direct callers/consumers reviewed: `GenerateCornerDamageFullCertificationSearch`, `TryPrepareCornerDamageIntegrationPlan`, `TryPassCornerDamageEndpointConflictGuard`, `TryCompleteCornerDamageIntegrationPlan`, `ApplyCornerDamageIntegrationPlanEvidence`, corner report construction, matrix case capture, CSV output, aggregate suite counters, and the four canonical Generated Mass documents.
+- Historical comparison reviewed: C1A.3g exact baseline bundle/fallback, C1A.3h guard, C1A.3i replay/cache, C1A.3j exact-two global cap, C1A.3k two/three-band global endpoint-star plane, current `HEAD`, and the complete current working diff.
+
+### Objective and acceptance
+
+1. Replace C1A.3k's global junction-plane cut with one prepared `PlaneCutEndpointPatchReplacement` that owns the implicated source vertex, sorted incident bevel identities, exact selected-face signatures, one ordered untouched boundary loop/signature, replacement faces, cap metrics, and prepared/minimum-width parity evidence.
+2. Build the ordinary prepared edge-only shell once. For each deterministic local normal/depth trial, classify only faces connected to the incident bevel seeds that the trial plane actually removes or crosses. Reject when the selected patch is disconnected, branched, contains multiple boundary loops, crosses a selected/unselected boundary edge, or requires modification of an unrelated face.
+3. Clip only the selected patch faces with exact shared intersections. Preserve every untouched face unchanged, retain the outside portion of each selected source/bevel face with original provenance, create exactly one `BoundedEndpointCap`, weld/sanitize, and require one closed manifold stitched shell.
+4. Require one ordered, closed, non-branching boundary loop between the replacement patch and untouched shell. Store exact prepared face signatures and boundary positions/signature. At legal-minimum widths, require the same incident identities, selected provenance set, boundary topology/signature class, one cap, and all existing local/full certification gates.
+5. During the one authoritative materialization, rebuild ordinary bevel faces once, verify the prepared selected-face and boundary signatures, remove only the matched local faces, splice cloned stored replacement faces, then run all existing final cap/band/identity/coverage/topology/triangulation/render checks. Signature mismatch or final failure is a recovery false positive and returns the exact C1A.3g ordinary baseline.
+6. Add per-attempt rejection classification for unsupported star, patch extraction, disconnected/branched/multiple loops, boundary crossing, no local removal, cap creation, incident-band join, stitch topology, locality, band integrity, prepared/minimum parity, and final materialization false positive.
+7. Preserve C1A.3h guard decisions for unsupported or failed replacements, C1A.3i cache/replay behavior, mandatory ring, unrelated retention, exact identities, normal/tangent channels, stored-soup emission, endpoint allowance, width floors, and all performance budgets.
+8. Unity target: complete `33/33`; retain the existing six enabled successes; prepare and apply at least one previously rejected endpoint-star replacement; zero recovery false positives, guard false negatives, identity mismatches, topology/render failures, or budget violations.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No file may be created, deleted, moved, renamed, or generated inside `Assets`. `MassGenerator.Types.cs`, `MassGenerator.Polyhedron.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, `MassGenerator.EdgeWear.SelectionAndCorners.cs`, `GeneratedMass.cs`, mesh output, shaders/includes including cloud integration, materials, scenes, prefabs, recipes, metadata, serialized settings/defaults, Inspector controls/actions, production `EdgeWearEvaluationMode.None`, and active-gameplay generation remain unchanged.
+
+### File-by-file sequence
+
+1. Extend non-serialized plan/status/telemetry with a prepared local replacement record, exact patch/boundary signatures, rejection-class counters, and final-splice evidence.
+2. Replace `TryPrepareCornerDamageEndpointStarRecovery(...)` with deterministic selected-face extraction, one-loop boundary construction, selected-face-only clipping, cap generation, stitch validation, and dual-width parity.
+3. Extend `TryBuildPlaneCutSystemFaces(...)`/materialization to apply at most one stored local replacement after ordinary bevel planes, verify all prepared signatures, and never execute the old global junction-plane cut for C1A.3l.
+4. Preserve ranked search behavior and the C1A.3h guard; a failed local replacement remains an endpoint-conflict-guard rejection, while a prepared replacement permits the existing one complete authoritative build.
+5. Propagate rejection-class, preparation, application, false-positive, face/loop/cap, signature, and timing evidence through the existing corner report, matrix CSV, aggregate suite, sentinel, and comprehensive outputs; advance active contracts to `EW-C1A.3l` without new controls.
+6. Reconcile framework, recovery architecture, and code inventory after implementation behavior is final.
+7. Reread complete modified files and direct producers/consumers; compare final behavior with C1A.3k, C1A.3i, current `HEAD`, and the plan; run exact-scope diff, structural C# checks, contract scans, line-ending/BOM checks, patch/ZIP replay, and record Unity validation as pending.
+
+### Risks and controls
+
+- **Patch leaks into unrelated geometry:** selected/unselected shared edges must remain entirely inside/on the local cut; any crossed boundary edge rejects the trial before mutation.
+- **Disconnected or ambiguous ownership:** selected faces must form one connected component with one closed non-branching boundary loop; multiple components/loops or degree other than two reject.
+- **Stale authoritative splice:** prepared face signatures and ordered boundary positions must match the materialized edge-only shell exactly within existing `VertexKey`/merge tolerances; mismatch fails closed as a recovery false positive.
+- **Identity loss:** selected bevel faces retain original edge provenance; the new cap uses `BoundedEndpointCap` and does not replace an incident edge identity. Existing mandatory/unrelated identity checks remain authoritative.
+- **Prepared/minimum drift:** both widths must produce the same incident set, selected provenance signature, boundary topology/signature class, and one cap; uncertainty or mismatch rejects preparation.
+- **Performance regression:** at most six local trials per guard conflict, one selected connected component, one prepared replacement, and one complete authoritative build. No search queue, second build, persistent cache, runtime callback, or per-frame work is permitted.
+
+### Implemented result
+
+- [x] Replaced the active C1A.3k additional half-space recovery with a prepared `PlaneCutEndpointPatchReplacement` that owns exact selected-face signatures, one ordered untouched stitch loop, replacement faces, and prepared/minimum boundary evidence. The historical global junction solver remains declaration-only.
+- [x] Preparation now starts from crossed incident bevel faces, extracts only their connected affected face component, rejects non-incident bevel ownership or local-radius overflow, and requires exactly one closed degree-two selected/unselected boundary loop before any mutation.
+- [x] Only selected patch faces are clipped. Surviving selected faces retain their original feature/provenance; one `BoundedEndpointCap` supplies connecting geometry; unrelated faces are neither globally clipped, welded, nor sanitized.
+- [x] Prepared and legal-minimum-width trials must agree on incident identities, selected provenance, and boundary topology. The one authoritative materializer exact-matches selected-face signatures plus ordered boundary positions before removing only those local faces and inserting the stored replacement. Any mismatch is a recovery false positive and returns the exact C1A.3g ordinary baseline.
+- [x] Added explicit rejection classes and per-case/suite evidence for unsupported stars, extraction, disconnected patches, boundary loops/crossings, no local removal, cap creation, incident-band joining, stitch topology, locality, band integrity, prepared/minimum parity, and materialization signatures. Active contracts are `EW-C1A.3l`.
+- [x] Final scope is exactly the ten approved files; no shader, material, scene, prefab, serialized setting, Inspector control, replay key, endpoint allowance, width floor, production mode, or unrelated system changed.
+- [x] Static and compliance validation passed `48/48`; all `209` C# files introduced no new structural findings; patch and changed-files ZIP replay reproduced all `353/353` project files byte-for-byte from the delivered C1A.3k baseline.
+- [ ] Unity 6000.5.0f1 compilation and the complete `EW-C1A.3l-suite` remain pending user execution. Runtime acceptance requires at least one previously rejected endpoint conflict to prepare and apply, zero false positives/guard false negatives/identity mismatches, complete `33/33` matrix coverage, and all existing timing and fallback gates.
+
+## EW-C1A.3k implementation plan — three-band endpoint-star preconstruction ownership
+
+### Status
+
+- [x] Read-only review complete.
+- [x] Canonical plan recorded before implementation.
+- [x] C1A.3j exact-two post-bevel recovery removed or superseded.
+- [x] Two/three-band endpoint-star boundary preparation implemented.
+- [x] Dual-width local star certification integrated with the one authoritative build.
+- [x] Telemetry and active contracts advanced to `EW-C1A.3k`.
+- [x] Stable architecture documents reconciled.
+- [x] Static, scope, package-replay, and final compliance checks passed.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### Read-only evidence
+
+- Authoritative source is Git working tree `/mnt/data/ew_c1a3i_git`: `HEAD` is synthetic accepted C1A.3i commit `21a5351`; the ten-file working-tree diff is the delivered C1A.3j overlay. `Assets/AGENTS.md` requires this checklist to be the first implementation write.
+- `Pasted text(157).txt` reports `cornerSharedEndpointJunctionRecoveryAttempts=104`, `Prepared=0`, `Applied=0`, `Rejects=104`, `FalsePositives=0`, `cornerChippingCases=17/33`, `cornerChippingElapsedMs=18230.049`, and all case/matrix/suite budgets passing.
+- Eleven final failure diagnostics state `shared endpoint recovery supports exactly two retained bevel bands at one source vertex`; five state `a selected vertex-junction plane emitted no unique cap`. This proves the exact-two eligibility rule excludes the common local star and the conflict-rail-derived plane does not necessarily cut the surviving edge-only shell.
+- `TryPrepareCornerDamageSharedEndpointJunctionRecovery` currently computes one cap from only victim/foreign normals and conflict-segment support, then clips it after all edge planes. `TryBuildPlaneCutVertexJunctionCandidate` already derives a guaranteed local removal plane from the actual edge-only shell support and protects unrelated source vertices, but it is currently reachable only through the rejected global solver.
+- `BuildPlaneCutJunctionNormalOptions`, `TryBuildPlaneCutVertexJunctionCandidate`, `TryBuildPlaneCutSystemFaces`, `DoesPlaneCutJunctionJoinIncidentBevels`, `IsPlaneCutJunctionInfluenceLocal`, and `IsPlaneCutJunctionTrialGeometryValid` provide deterministic local construction and full exact certification without requiring `SolvePlaneCutGlobalJunctionSystem`.
+- `MaterializePlaneCutBevelSolvedPlan` already consumes `PlaneCutBevelSolvedPlan.PreparedJunctions` during the existing single complete shell build. Final identities, coverage, topology, triangulation, render validity, and soup remain materialization-owned.
+
+### Objective and acceptance
+
+1. Replace the exact-two conflict-rail cap with one endpoint-star transaction that gathers the complete retained incident set at the implicated source vertex and supports only deterministic stars of `2..3` bands.
+2. Build the edge-only prepared shell once for the ranked candidate, derive bounded normal options from the complete incident star, and place each trial plane from the shell's actual support using the existing unrelated-source-vertex and locality limits. No global search queue, edge deferral, breadth-first state, or second complete authoritative build is permitted.
+3. Select at most one deterministic boundary by fixed normal/depth ordering. The identical boundary must emit one unique stable cap, join every incident band, remain local, and pass full topology, face-quality, band-integrity, triangulation, and render certification at both prepared and legal-minimum widths.
+4. Store only the dual-width-certified boundary in `PreparedJunctions`; final materialization remains sole authority. A final mismatch or failure is a recovery false positive and returns the exact ordinary baseline under C1A.3g.
+5. Preserve C1A.3h guard decisions for unsupported or failed stars, C1A.3i cache/replay behavior, mandatory ring, unrelated retention, exact identities, normal/tangent channels, stored-soup emission, and all performance budgets.
+6. Unity target: complete `33/33`; retain the existing six enabled successes; prepare and apply at least one endpoint-star recovery; zero recovery false positives, guard false negatives, identity mismatches, topology/render failures, or budget violations.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutKernel.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No files may be created, deleted, moved, renamed, or generated inside `Assets`. No shader/include, cloud, material, scene, prefab, serialized setting, Inspector control, production mode, triangulation policy, corner scoring, cut-depth control, width floor, endpoint allowance, replay key, or historical global-junction solver activation may change.
+
+### File-by-file sequence
+
+1. Replace C1A.3j recovery fields and report labels with endpoint-star preparation/application evidence in `MassGenerator.EdgeWear.Types.cs`, `MassGenerator.cs`, diagnostics, and editor matrix contracts.
+2. Replace `TryPrepareCornerDamageSharedEndpointJunctionRecovery` with a bounded two/three-band endpoint-star preparation routine in `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`; reuse deterministic local helper routines only and keep `SolvePlaneCutGlobalJunctionSystem` uncalled.
+3. Keep `PreparedJunctions` threading in `MassGenerator.EdgeWear.PlaneCutKernel.cs`, but update final application/false-positive ownership checks for the endpoint-star contract.
+4. Preserve the C1A.3h guard flow in `MassGenerator.cs`: only guard-proven conflicts invoke the local star preparation, unsupported/failed stars continue ranked rejection, and only the first prepared or guard-clear candidate receives the one complete authoritative build.
+5. Update framework, recovery architecture, and code inventory with C1A.3j runtime rejection and C1A.3k current ownership.
+6. Run exact-scope diff review, editor/player C# structural checks, duplicate-field and contract scans, global-solver call scan, line-ending/BOM checks, and full 353-file ZIP/patch replay.
+
+### Risks and controls
+
+- **Reactivating rejected global junction behavior:** direct prohibition on calling `SolvePlaneCutGlobalJunctionSystem`; no queue, deferred-edge set, state search, backtracking, or independent time budget.
+- **Combinatorial local search:** maximum three incident bands, fixed normal ordering, fixed depth factors, first fully dual-width-certified result only, one prepared junction maximum.
+- **Post-bevel redundancy:** candidate distance derives from actual edge-only shell support through `TryBuildPlaneCutVertexJunctionCandidate`, not conflict-segment support.
+- **Overlong influence or identity loss:** unrelated-source support protection, existing local-influence/shared-axis gates, all-incident band joining, exact band audit, mandatory/unrelated identity checks, and final materialization authority remain mandatory.
+- **False-positive preparation:** identical fixed plane must pass prepared and legal-minimum shell certification; final materialization failure increments false-positive evidence and falls back exactly.
+- **Performance regression:** no additional complete build; local trial count is statically bounded and remains inside existing `4 s`, `5 s`, `35 s`, and `90 s` budgets.
+
+### Implemented result
+
+- C1A.3j is retained only as runtime-rejected history. Its exact-two conflict-rail cap method and active field/report names are superseded by the C1A.3k endpoint-star contract.
+- Guard-proven conflicts gather the complete retained incident identity set at the implicated endpoint. Only matching prepared/minimum stars of two or three bands are eligible; unsupported counts remain ranked rejections and now report the actual incident count.
+- Preparation builds the actual edge-only shell once, evaluates at most three deterministic normal options and two fixed depth factors, protects every unrelated source vertex, and counts each bounded local trial explicitly.
+- The identical candidate boundary must pass unique-cap, every-incident-band join, locality/shared-axis, topology, face-quality, band-integrity, triangulation, and render-validity certification at both prepared and legal-minimum widths.
+- At most one dual-width-certified boundary is stored in `PlaneCutBevelSolvedPlan.PreparedJunctions`. The unchanged single materialization remains final authority; failure after preparation is a recovery false positive and returns the exact C1A.3g ordinary baseline.
+- Current status, per-case CSV, matrix aggregate, suite summary, sentinel, and comprehensive contracts now use `EW-C1A.3k` and expose attempts, local trials, prepared/rejected/applied/false-positive counts, endpoint/edge identities, incident count, normal rank, cap metrics, diagnostics, and duration.
+- Relative to the delivered C1A.3j baseline, nine files change. `MassGenerator.EdgeWear.PlaneCutKernel.cs` was declared in scope but remains byte-identical because its existing prepared-junction materialization path already satisfies C1A.3k ownership.
+- Static validation passes `26/26` explicit architecture checks, reports no new structural findings across all `209` C# files, preserves one historical global-solver declaration with no call site, one complete materialization call, four centralized baseline-fallback exits, and original file-format shape. Full patch and ZIP replay reproduce the authoritative `353`-file C1A.3k tree byte-for-byte.
+
+## EW-C1A.3i implementation plan — cached normalized foundation and guarded isolated-viability replay
+
+### Status
+
+- [x] Read-only review complete.
+- [x] Canonical plan recorded before implementation.
+- [x] Normalized source foundation cache implemented.
+- [x] Candidate-local isolated-viability replay implemented with exact-match guards.
+- [x] Search and matrix telemetry updated to `EW-C1A.3i`.
+- [x] Stable architecture documents reconciled.
+- [x] Static, scope, replay-package, and final compliance checks passed.
+- [ ] Unity compile and complete one-click suite pending user execution.
+
+### Read-only evidence
+
+- Authoritative source is `Assets-Code-Archive(18).zip` overlaid by `GeneratedMass_EW-C1A.3h_ChangedFiles.zip`; the resulting tree contains `353` project files and no Git metadata.
+- `Pasted text(155).txt` reports `cornerChippingElapsedMs=37717.684`, `cornerChippingCases=17/32`, `cornerEndpointConflictGuardMilliseconds=781.288`, `cornerCandidatePreparationAttempts=106`, `cornerCandidatePreparationRejects=100`, and `cornerCompleteAuthoritativeBuilds=6`.
+- The matrix case rows total approximately `33.898 s` in `integrationPreflightMs`; complete materialization totals approximately `1.220 s`. The dominant cost is repeated preflight, not the guard or the one complete build.
+- `MassGenerator.GenerateCornerDamageFullCertificationSearch` currently invokes `GenerateInternal(...CornerDamageIntegrationPreflight...)` once per ranked candidate.
+- `MassGenerator.EdgeWear.Orchestration.ApplyGeneratedEdgeWearBevels` repeats `NormalizeEdgeWearMicroTopology` and `BuildEdgeWearBevelCandidates` for every candidate.
+- `BuildEdgeWearBevelCandidates` runs `RunEdgeWearIsolatedViabilityPreflight` across every provisional edge; `AuditBoundedSingleEdgeBevel` is the expensive per-edge construction.
+- `CornerDamageTransactionAuditResult.AffectedOriginalEdgeIndices` provides the mandatory exclusion set for replay. `EdgeWearCoverageAudit.CloneForTrial` and lifecycle stable identities provide existing immutable audit semantics, but no current search-level replay cache exists.
+
+### Objective and acceptance
+
+1. Reuse the exact normalized micro-topology result across ranked candidates within one corner search.
+2. Cache isolated-viability evidence after a full audit and replay it only when the current ordinary edge is provably unchanged: same stable identity, endpoints, owner normals, length, dihedral, requested width, locality interval/limiting evidence, and not present in the current transaction's affected identity set.
+3. Treat every failed comparison, missing record, mandatory edge, non-finite value, or ambiguous orientation as a replay miss and execute the unchanged full audit.
+4. Preserve C1A.3h guard pass/reject logic, one-complete-build maximum, final authority, exact fallback, mandatory ring, unrelated retention, identity, topology, normal/tangent, and production contracts.
+5. Add report evidence for normalized-foundation builds/reuses and isolated-replay attempts/hits/misses/full evaluations.
+6. Unity target: complete `33/33`; corner matrix `<35 s`; each enabled case `<=4 s` target and `<5 s` hard maximum; zero guard false negatives, plan mismatches, or replay parity diagnostics.
+
+### Approved file scope
+
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md`
+- `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md`
+- `Assets/Game/Procedural/Masses/MassGenerator.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.SelectionAndCorners.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Orchestration.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs`
+
+No files may be created, deleted, moved, renamed, or generated inside `Assets`. No shader/include, cloud, material, scene, prefab, serialized setting, Inspector control, production mode, triangulation, corner scoring, cut depth, width floor, or guard threshold may change.
+
+### File-by-file sequence
+
+1. Add non-serialized foundation/replay records and telemetry fields in `MassGenerator.EdgeWear.Types.cs` and public status fields in `MassGenerator.cs`.
+2. Establish one search-scoped replay cache in `GenerateCornerDamageFullCertificationSearch`; preserve all C1A.3g fallback exits and C1A.3h completion logic.
+3. Reuse normalized micro-topology in `MassGenerator.EdgeWear.Orchestration.cs`.
+4. Add exact-match replay/store helpers around `RunEdgeWearIsolatedViabilityPreflight` in `MassGenerator.EdgeWear.SelectionAndCorners.cs`; full audit remains the fallback.
+5. Propagate counters and timings through existing diagnostics and the 33-case editor matrix; advance active contracts to `EW-C1A.3i`.
+6. Update framework, recovery architecture, and code inventory with only accepted current ownership facts.
+7. Run full-scope diff, structural C# checks, contract scans, line-ending/BOM checks, and ZIP/patch replay against the 353-file authoritative tree.
+
+### Risks and controls
+
+- **Stale viability reuse:** controlled by exact stable-identity, geometry, normal, width, locality, and affected-edge checks; uncertainty is a cache miss.
+- **Mutable shared records:** cached evidence is copied into current records; current coverage/context objects are never shared across candidates.
+- **Normalization mutation:** the normalized foundation is reused read-only; candidate transactions continue producing their own construction-face clones.
+- **Decision drift:** guard, prepared identity, complete build, and emission code remain unchanged; new telemetry exposes replay use and full-audit fallback.
+- **Performance regression:** no new full build, candidate retry, persistent cache, runtime callback, per-frame work, or player allocation is permitted.
+
+### Implemented result
+
+- One thread-local, search-scoped replay cache is created and disposed inside `GenerateCornerDamageFullCertificationSearch`.
+- The first editor integration preflight stores its normalized micro-topology foundation; later ranked attempts reuse that same read-only result.
+- Successful isolated viability is copied only for unaffected ordinary identities with exact endpoint/owner-normal pairing, length, dihedral, requested/minimum widths, artistic eligibility, and locality interval/limiting position/projection parity.
+- Mandatory, affected, missing, changed, unsuccessful, or ambiguous records execute the original `AuditBoundedSingleEdgeBevel` path.
+- Replay code and the normalization optimization are compiled only under `UNITY_EDITOR`; preprocessed player projections of `MassGenerator.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, and `MassGenerator.EdgeWear.SelectionAndCorners.cs` are byte-for-byte equal to C1A.3h.
+- Existing C1A.3g baseline fallback, C1A.3h endpoint guard, one-complete-build maximum, materialization, emission, and production ownership remain unchanged.
+- Corner report, per-case CSV, matrix aggregate, suite summary, comprehensive projection, and sentinel contracts now expose C1A.3i replay evidence.
+- Static validation covers all `209` C# files in editor and player preprocessor projections, `39/39` architecture contracts, exact ten-file scope, preserved line-ending/BOM/terminal-newline state, and byte-identical 353-file patch/ZIP replay.
 
 ## Visual-development sequence
 
@@ -44,7 +482,13 @@ EW-C1A.3c predictive complete preflight and one-final-build search [superseded b
 EW-C1A.3d validation-suite de-duplication and research scheduling [implemented; Unity scheduling accepted]
 EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; Unity result: identity parity fixed, performance failed]
 EW-C1A.3f solve/materialization split [runtime rejected: valid ordinary preview status lost on corner failure]
-EW-C1A.3g complete authoritative build and truthful ordinary-baseline fallback [active implementation]
+EW-C1A.3g complete authoritative build and truthful ordinary-baseline fallback [architecture accepted; corner matrix 15/33]
+EW-C1A.3h minimum-width foreign-plane endpoint-conflict preparation guard [functionally accepted; performance rejected]
+EW-C1A.3i cached normalized foundation and guarded isolated-viability replay [accepted performance baseline]
+EW-C1A.3j bounded two-band shared endpoint-junction recovery [runtime rejected: 0/104 prepared]
+EW-C1A.3k bounded two/three-band endpoint-star half-space recovery [runtime rejected: 0/104 prepared]
+EW-C1A.3l bounded local endpoint face-patch replacement [runtime rejected: 0/104 prepared; 102 locality, 2 extraction]
+EW-C1A.3m exact cut-locality semantics [implemented; static validation complete; Unity pending]
 EW-C2      sparse chips, notches, and break events
 EW-N1      final artistic normal shaping across all accepted worn geometry
 EW-F1      broad-face finish, cracks, and crevices
@@ -8285,3 +8729,78 @@ No file may be created, deleted, moved, renamed, generated, or modified outside 
 - [x] All C# files pass delimiter, comment/string, preprocessor, and region-balance checks; changed files preserve their original line-ending convention, terminal newline, BOM state, and whitespace hygiene.
 - [x] Changed-files ZIP and unified patch replay reproduce the final tree byte-for-byte from the untouched archive extraction.
 - [ ] Unity 6000.5.0f1 compilation and `EW-C1A.3g-suite` runtime validation pending user execution; no runtime success or performance improvement may be claimed from static checks.
+
+
+## EW-C1A.3h implementation plan — minimum-width foreign-plane endpoint-conflict preparation guard
+
+### Objective and acceptance criteria
+
+- [x] Record the C1A.3g Unity result accurately: ownership/fallback and one-build architecture passed, but corner acceptance remained `15/33`; enabled success was `4/22`, candidate preparation rejected `0/22`, and the complete authoritative shell rejected `18/22`.
+- [x] Add a deterministic preparation guard that rejects a candidate only when an actual prepared foreign edge plane still intersects a victim bevel-band rail away from both permitted endpoint zones after the complete local conflict cluster has retreated to every member's legal minimum scale.
+- [x] Continue ranked transaction/preflight/preparation after a guard rejection. The first guard-clear candidate alone may consume the one complete authoritative build.
+- [x] Preserve the exact C1A.3g ordinary baseline bundle, centralized truthful fallback, final completed-shell authority, stored-soup emission, production path, and one-complete-build maximum.
+- [x] Report guard attempts, passes, proven rejects, tested rail intersections, selected victim/foreign identities, axial parameter, endpoint allowance, local cluster, minimum scales, retreat capacity, guard duration, and any same-class complete-build false negative.
+- [x] Retain mandatory cap-ring, unrelated-retention, exact identity, mesh-channel, `<=4 s` target, `<5 s` hard case, `35 s` matrix, and `90 s` suite gates without relaxation.
+
+### Approved files
+
+- [x] `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md` — first persistent write, runtime evidence, plan, implementation status, and final compliance audit.
+- [x] `Assets/Docs/Generated_Mass_Framework.md` — record the accepted C1A.3g ownership boundary and C1A.3h preparation guard.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Recovery_Architecture.md` — define the minimum-width local-cluster proof and its non-authoritative role.
+- [x] `Assets/Docs/Generated_Mass_Edge_Wear_Code_Inventory.md` — record exact C1A.3h code ownership.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.cs` — preparation guard, deterministic ranked continuation, complete-build false-negative classification, and evidence propagation.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Types.cs` — non-serialized plan/search telemetry for guard evidence.
+- [x] `Assets/Game/Procedural/Masses/MassGenerator.EdgeWear.Diagnostics.Logging.cs` — C1A.3h contracts and guard evidence in the existing corner report.
+- [x] `Assets/Game/Procedural/Masses/Editor/GeneratedMassEditor.cs` — aggregate guard telemetry in the existing one-click suite and 33-case matrix.
+
+No file may be created, deleted, moved, renamed, generated, or modified outside this eight-file scope. `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, `GeneratedMass.cs`, `MeshData.cs`, `MassGenerator.MeshOutput.cs`, all shaders/includes including cloud integration, materials, scenes, prefabs, serialized assets, metadata, and production owners are reviewed unchanged.
+
+### Read-only evidence reviewed before implementation
+
+- [x] Current source root `/mnt/data/ew_c1a3g_work` exactly matches all eight entries in `GeneratedMass_EW-C1A.3g_ChangedFiles.zip`, SHA-256 `9a6ba3d4357499bdd1093fc1612ab8b5cd1ecba7078984762170aedb7afd497a`, over authoritative post-cloud archive `Assets-Code-Archive(18).zip`, SHA-256 `862adafc137d885207ffb0debdeaaba0b6fb18dc96744830af24831a4e19088a`.
+- [x] No `.git` directory exists in the supplied source, so real branch, `HEAD`, status, diff, and history are unavailable; the C1A.3g changed-files package and current byte comparison are the accepted-version comparison evidence.
+- [x] Unity report `Pasted text(153).txt`, SHA-256 `1be52b5c6bdaf86e68d7f6b0745c84ae82debabd4c4272de3fdb2d210c54d030`: suite elapsed `59703.5626 ms`, current preview passed, topology and artistic fingerprints `33/33`, corner matrix `15/33`, disabled parity `11/11`, complete builds `22`, build mismatches `0`, deadline aborts `0`, unrelated retention and channels `33/33`.
+- [x] The same report records seventeen complete-build failures of the form `foreign generated plane EdgeBevelPlane:X splits bevel-band edge Y at axial parameter T; conflict cluster reached its geometric minimum width`; every reported `T` is endpoint-adjacent (`0.03379..0.1854` or `0.9303..0.9632`). The remaining seed `7778` default failure is the separate generalized-retry class.
+- [x] `MassGenerator.cs::GenerateCornerDamageFullCertificationSearch` currently accepts the first solve-valid prepared candidate and breaks before the one complete build; therefore a proof rejection inside `TryPrepareCornerDamageIntegrationPlan` naturally continues deterministic candidate ranking without adding another complete build.
+- [x] `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs:1087-1159` defines the authoritative band-split classification: project a foreign bevel-face boundary segment onto the victim source-edge axis and reject only when its midpoint lies outside the endpoint allowance `clamp(max(width*4, minimumStableEdgeLength*0.5)/edgeLength, 0.03, 0.25)`.
+- [x] `MassGenerator.EdgeWear.PlaneCutKernel.cs:2043-2075, 2700-2844, 6970-7039, 7041-7087` defines legal retreat: the conflict cluster is victim/foreign endpoints plus incident candidate edges; each candidate may retreat only to `ResolvePlaneCutCandidateMinimumScale`; unresolved geometry at those floors is the exact failure class.
+- [x] `PlaneCutBevelSolvedPlan` already owns the actual prepared edge planes, post-cut source faces, topology graph, widths, tolerances, and stability limits required for a non-materializing proof. No plane-kernel edit is required.
+- [x] `GeneratedMassEditor` already copies all corner search telemetry into each matrix case and aggregate; new non-serialized counters can be propagated without new controls, actions, or serialized state.
+- [x] `Assets/AGENTS.md`, the complete C1A.3g search/preparation/completion/emission methods, status and telemetry contracts, report builders, matrix case/aggregate/job consumers, canonical framework/architecture/inventory sections, and unchanged plane-kernel/junction-solver producers were reviewed before this first write.
+
+### Invariants and non-goals
+
+- [x] The guard is preparation-only and predictive. Only `MaterializePlaneCutBevelSolvedPlan` remains authoritative for final retained identities, topology, coverage, render validity, and soup.
+- [x] Reject only a geometrically proven persistent minimum-width rail split. Do not use a fixed global axial threshold, report-string parsing, seed-specific exclusions, or artistic heuristics.
+- [x] Do not change edge/corner scoring, depth, cap-ring tuning, width schedules, conflict reduction, clipping, topology certification, triangulation, normals/tangents, shaders, materials, serialized settings, production generation, or per-frame work.
+- [x] Do not run a second complete build after an accepted guard-clear candidate fails. Such a failure remains a truthful baseline fallback and is counted as guard false-negative evidence when it matches the guarded class.
+- [x] The generalized-retry seed `7778` default failure is outside this patch unless the new guard independently proves a foreign-plane floor conflict for a later ranked candidate.
+
+### File-by-file implementation sequence
+
+1. [x] Extend non-serialized plan/status/telemetry with endpoint-conflict guard evidence and timing.
+2. [x] Reconstruct deterministic local conflict clusters from victim/foreign candidate endpoints, scale only those cluster planes to each legal minimum, and retain all non-cluster planes at their prepared widths.
+3. [x] Intersect the minimum-width victim and foreign bevel planes with the victim owner source-face planes, then clip the resulting rail against every post-cut source-face half-space and every non-defining retained candidate half-space.
+4. [x] Apply the exact authoritative endpoint allowance to the projected victim-edge axial parameter; reject only an interior rail split that survives the complete local cluster's minimum-width retreat.
+5. [x] Integrate the guard after solve-valid identity/retention preparation and before setting `plan.Valid`; let existing ranked search continue on proof rejection.
+6. [x] Classify a later complete-build foreign-plane geometric-floor failure as a guard false negative without changing fallback or retry behavior.
+7. [x] Propagate guard evidence through the existing corner report, matrix cases, suite aggregate, and C1A.3h contracts.
+8. [x] Update stable framework, recovery architecture, and code inventory only after implementation behavior is final.
+9. [x] Run exact-scope diff review, complete modified-file and affected-owner reread, C# delimiter/comment/string/preprocessor/region checks, contract checks, patch/ZIP replay, and record Unity validation as pending.
+
+### Risks and controls
+
+- [x] Risk: false-positive rejection from an infinite plane intersection outside the finite shell. Control: clip the reconstructed victim/foreign rail against every post-cut source-face half-space and every non-defining retained candidate half-space after only the implicated local cluster retreats.
+- [x] Risk: rejecting legal endpoint junctions. Control: use the same width/stability-derived endpoint allowance and strict interior test as the authoritative band audit.
+- [x] Risk: optimistic proof from scaling unrelated planes. Control: keep non-cluster planes at prepared widths; only the exact victim/foreign endpoint-star cluster receives legal minimum retreat.
+- [x] Risk: numerical near-coplanarity. Control: reject parallel/ill-conditioned triple-plane systems and require finite values plus explicit tolerance checks; uncertain geometry passes to the authoritative build rather than being rejected.
+- [x] Risk: performance regression from pairwise checks. Control: the guard is dirty/editor-time `O(e^3)` worst case over tens of retained edges, has no mesh construction or triangulation, records duration, and remains under the existing `5 s` case gate.
+
+### Validation and audit status
+
+- [x] Final diff restricted to the eight approved files.
+- [x] Complete final files and direct producers/consumers reread against C1A.3g accepted source.
+- [x] C# lexical/preprocessor/region checks pass for all current source files.
+- [x] Static contracts prove deterministic guard placement, exact endpoint formula, local-cluster-only minimum scaling, half-space proof, ranked continuation, one complete build, unchanged fallback, and C1A.3h telemetry/contracts.
+- [x] Changed-files ZIP and unified patch replay reproduce the final tree byte-for-byte.
+- [ ] Unity 6000.5.0f1 compilation and `EW-C1A.3h-suite` runtime validation pending user execution.

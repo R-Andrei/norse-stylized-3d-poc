@@ -2395,3 +2395,99 @@ Unchanged owners: `GeneratedMass.cs`, Inspector layout, settings transport, clip
   - retains exact cross-stage cache, one-complete-build maximum, `5 s` hard cases, `35 s` corner matrix, and `90 s` suite gates.
 
 Reviewed unchanged owners: `GeneratedMass.cs`, settings transport, Inspector layout/actions, clipping and cap creation, corner ranking/scoring, bounded triangulation algorithms, final shared normals/tangents, shaders/includes including cloud integration, assets, serialized defaults, runtime callbacks, and production `EdgeWearEvaluationMode.None`.
+## EW-C1A.3h code ownership
+
+Modified owners:
+
+- `MassGenerator.cs`
+  - runs `TryPassCornerDamageEndpointConflictGuard` after solve-valid prepared identity/retention checks and before setting `CornerDamageIntegrationPlan.Valid`;
+  - reconstructs and convex-clips minimum-width victim/foreign shared rails using prepared planes, source-face planes, the existing legal minimum-scale resolver, and the exact authoritative endpoint allowance;
+  - continues ranked preparation after a proven guard rejection while preserving one complete authoritative build at most;
+  - classifies same-class complete-build failures after a guard pass as false negatives and propagates plan evidence through `CornerDamagePreviewStatus`.
+- `MassGenerator.EdgeWear.Types.cs`
+  - adds non-serialized plan and search telemetry for attempts, passes, proven rejects, tested rails, victim/foreign identities, axial/allowance values, cluster identities, legal minimum scales, retreat capacities, timing, diagnostics, and false negatives.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - copies aggregate guard telemetry into the existing search summary;
+  - reports aggregate and selected-plan guard evidence in the existing corner report;
+  - advances corner report contracts to `EW-C1A.3h`.
+- `Editor/GeneratedMassEditor.cs`
+  - copies guard evidence into existing corner matrix cases and aggregates attempts, passes, rejects, tested rails, false negatives, and duration;
+  - reports per-case victim/foreign/axial/allowance evidence and advances matrix, suite, comprehensive projection, and preview sentinel contracts to `EW-C1A.3h`.
+
+Reviewed unchanged owners:
+
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` retains legal candidate minimum-scale resolution, conflict-cluster reduction, complete shell construction, final coverage, and soup authority.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs` retains the authoritative foreign-face band-split classification and endpoint allowance.
+- `MassGenerator.EdgeWear.Orchestration.cs` retains stored-soup emission ownership.
+- `GeneratedMass.cs`, settings transport, Inspector controls/actions, clipping and cap creation, corner scoring, triangulation, final normals/tangents, mesh channels, shaders/includes including cloud integration, materials, serialized assets, runtime callbacks, and production `EdgeWearEvaluationMode.None` remain unchanged.
+
+## EW-C1A.3i code ownership
+
+- `MassGenerator.cs`
+  - creates and disposes one thread-local `CornerDamagePreflightReplayCache` per complete corner search;
+  - captures replay counters into the existing corner search/status telemetry;
+  - leaves C1A.3g baseline fallback and C1A.3h single-complete-build routing unchanged.
+- `MassGenerator.EdgeWear.Types.cs`
+  - owns the non-serialized normalized-foundation cache, exact replay key/evidence record, and replay counters.
+- `MassGenerator.EdgeWear.Orchestration.cs`
+  - builds normalized micro-topology on the first integration-preflight attempt and reuses that immutable foundation on later ranked attempts in the same search;
+  - keeps all transaction augmentation, candidate construction, topology, coverage, and solving candidate-local.
+- `MassGenerator.EdgeWear.SelectionAndCorners.cs`
+  - attempts replay only for non-mandatory, unaffected ordinary edges;
+  - validates exact stable identity, paired orientation/normals, structural measurements, requested/minimum width, and locality evidence;
+  - copies successful isolated viability into the current lifecycle record or executes the unchanged full isolated audit on every miss;
+  - never replays failed or ambiguous viability.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs`
+  - reports normalized-foundation builds/reuses and isolated replay attempts/hits/misses/full evaluations;
+  - advances corner report contracts to `EW-C1A.3i`.
+- `Editor/GeneratedMassEditor.cs`
+  - aggregates the replay counters into case, matrix, suite, and comprehensive evidence;
+  - advances active matrix/suite/sentinel contracts to `EW-C1A.3i` without adding Inspector controls.
+
+At the C1A.3i boundary, frozen owners were `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs`, shaders/includes, materials, assets, serialized settings, and production generation. Later bounded endpoint-patch sections below explicitly supersede only the junction-solver portion of that historical boundary.
+
+## EW-C1A.3n endpoint-local support and axial ownership
+
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryBuildPlaneCutEndpointPatchCandidate(...)` owns endpoint-local support selection. It computes the existing local radius before placement, requires support samples for every incident bevel identity, samples in-radius bevel vertices and segment/sphere interval points, records global support only for comparison, and places the boundary from local support.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryGetPlaneCutEndpointPatchSphereSegmentInterval(...)` and `AddPlaneCutEndpointPatchSupportSample(...)` own deterministic local segment sampling without introducing a new geometry dependency.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::IsPlaneCutEndpointPatchAxiallyLocal(...)` owns bounded-patch axial certification. It measures the ordered stitch loop and generated cap from the implicated endpoint along every incident source edge and replaces only the endpoint-patch call to the historical global-junction influence validator.
+- `PlaneCutEndpointPatchSupportEvidence`, `PlaneCutEndpointPatchAxialEvidence`, `CornerDamageIntegrationPlan`, `CornerDamageSearchTelemetry`, and `CornerDamagePreviewStatus` carry local support and axial evidence. `MassGenerator.EdgeWear.Diagnostics.Logging.cs` and `Editor/GeneratedMassEditor.cs` project that evidence into current reports, case CSV, matrix aggregates, suite output, sentinel, and comprehensive evidence under `EW-C1A.3n`.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` remains byte-identical to corrected C1A.3l/C1A.3m. Its prepared replacement propagation and one authoritative splice remain frozen.
+- No production generation, controls, assets, shaders, endpoint allowances, width floors, replay keys, or historical global-solver call sites change.
+
+## EW-C1A.3m exact cut-locality ownership
+
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryExtractPlaneCutEndpointPatch(...)` owns cut-local selected-component extraction. It records the old unfiltered affected component for evidence, traverses only shared edges whose removed segment or plane intersection is local, rejects non-incident bevel ownership, and permits retained negative/on-plane vertices outside the radius.
+- `TryClipPlaneCutEndpointPatchFaces(...)` owns exact modified-geometry locality. Removed positive vertices, exact intersections, generated replacement vertices, and the `BoundedEndpointCap` must remain local. It records maximum radii, retained-outside count, before/after face counts, and failure source.
+- `MassGenerator.EdgeWear.Types.cs::PlaneCutEndpointPatchLocalityEvidence`, `PlaneCutEndpointPatchReplacement`, `CornerDamageIntegrationPlan`, and `CornerDamageSearchTelemetry` own non-serialized candidate, prepared, and aggregate locality evidence.
+- `MassGenerator.cs` propagates candidate-local evidence into current status and aggregates maximum radii plus retained/before/after counts across ranked preparation. Guard decisions, ranked continuation, C1A.3i replay, one complete build, and exact baseline fallback are unchanged.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs` reports current candidate cut-local metrics and failure source. `Editor/GeneratedMassEditor.cs` adds case CSV, matrix, suite, sentinel, and comprehensive aggregate evidence under `EW-C1A.3m` without adding controls.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs` remains byte-identical to corrected C1A.3l; its endpoint-patch propagation through authoritative, coexistence, exclusion, and retreat shell construction is frozen.
+
+## EW-C1A.3l bounded endpoint-patch ownership
+
+- `MassGenerator.cs::TryPassCornerDamageEndpointConflictGuard(...)` remains detector and ranked gate. A proven endpoint conflict invokes one bounded local patch preparation. Failed/unsupported preparation preserves the guard rejection; a prepared patch admits the existing single complete authoritative build. Search telemetry aggregates preparation, rejection-class, application, false-positive, signature, and timing evidence.
+- `MassGenerator.EdgeWear.Types.cs::PlaneCutEndpointPatchReplacement` owns one non-serialized prepared replacement: implicated vertex and source position, local plane/tolerances, sorted incident identities, exact selected-face signatures, selected-provenance signature, stitch-loop topology/position signatures, ordered loop, cloned replacement faces, and cap metrics. `PlaneCutBevelSolvedPlan.PreparedEndpointPatch` carries it to materialization.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryPrepareCornerDamageEndpointPatchRecovery(...)` owns bounded trial orchestration. `TryExtractPlaneCutEndpointPatch(...)` selects one connected crossed component from incident bevel seeds, rejects non-incident bevel ownership, enforces local radius, and extracts one closed degree-two untouched boundary. `TryClipPlaneCutEndpointPatchFaces(...)` clips only selected faces and creates one `BoundedEndpointCap`. Prepared/minimum replacements must match incident, provenance, and boundary topology.
+- `TryApplyPlaneCutEndpointPatchReplacement(...)` is the authoritative splice helper. It matches every exact prepared selected-face signature, verifies the exact stitch-loop topology and position signature, removes only matched faces, inserts cloned stored replacement faces, and requires one unique bounded endpoint cap. It never clips unrelated faces.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs::MaterializePlaneCutBevelSolvedPlan(...)` passes the prepared endpoint patch into the unchanged one-build shell owner. Width-reduction/deferral shell construction applies it after ordinary bevel planes. Existing band audits treat `BoundedEndpointCap` as endpoint connector geometry while all edge identities remain owned by `EdgeBevelPlane` faces.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs` and `Editor/GeneratedMassEditor.cs` expose aggregate and current-case attempts, prepared/rejected/applied/false-positive totals, all rejection classes, selected-face and boundary counts/signature, endpoint/edge identities, cap metrics, and timing under `EW-C1A.3l`. No Inspector control or serialized field is added.
+- C1A.3k remains runtime-rejected history (`104` attempts, `0` prepared/applied). `SolvePlaneCutGlobalJunctionSystem(...)` and historical global junction search remain declaration-only and uncalled.
+
+## Historical runtime-rejected EW-C1A.3k endpoint-star recovery ownership
+
+- C1A.3j exact-two conflict-rail recovery and C1A.3k global endpoint-star half-space recovery are runtime-rejected and superseded. The C1A.3k Unity matrix completed `33/33` within budget but remained `17/33`, with `104` attempts and `0` prepared/applied boundaries. Their field names, report labels, and active contracts are removed from current ownership.
+- `MassGenerator.cs::TryPassCornerDamageEndpointConflictGuard(...)` remains the detector and ranked-candidate gate. After recording a persistent conflict, it identifies the implicated endpoint and invokes one bounded endpoint-star preparation; unsupported or failed preparation preserves the original guard rejection. Search telemetry owns attempt/prepared/reject/applied/false-positive counts and duration.
+- `MassGenerator.EdgeWear.Types.cs::PlaneCutBevelSolvedPlan.PreparedJunctions` owns the non-authoritative immutable prepared boundary list. `CornerDamageIntegrationPlan` owns candidate-local incident-count, selected-normal, cap, edge, diagnostic, and timing evidence; `CornerDamageSearchTelemetry` owns aggregate evidence.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs::TryPrepareCornerDamageEndpointStarRecovery(...)` owns two/three-band full-star eligibility, edge-only shell construction, fixed local normal/depth ordering, unrelated-source protection, and dual-width certification. `TryValidateCornerDamageEndpointStarTrial(...)` delegates to existing exact face/topology/band/triangle validators. `SolvePlaneCutGlobalJunctionSystem(...)` remains without an active call site.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs::MaterializePlaneCutBevelSolvedPlan(...)` consumes `PreparedJunctions` in the existing clean-shell and face-quality paths. It remains sole authority for final shell, retained candidates, coverage, topology, triangulation, render validity, and soup.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs` and `Editor/GeneratedMassEditor.cs` expose endpoint-star attempts, prepared/rejected/applied/false-positive totals, selected vertex/edges, incident-band count, normal rank, cap metrics, diagnostics, and duration under `EW-C1A.3k`; no controls or serialized state are added.
+
+## EW-C1A.3o bounded endpoint-cell ownership
+
+- `MassGenerator.EdgeWear.Types.cs` owns `PlaneCutEndpointCellLimit`, endpoint-cell partition/evidence records, the extended prepared replacement payload, integration-plan evidence, and aggregate search telemetry.
+- `MassGenerator.EdgeWear.PlaneCutJunctionSolver.cs` owns deterministic axial cell limits, convex local/remote face partitioning, synthetic incident-fragment reconstruction from an isolated prepared bevel shell, connecting-cap construction, prepared/minimum topology parity, replacement signature verification, and the authoritative local splice payload.
+- `MassGenerator.cs` transfers endpoint-cell evidence through candidate plans, aggregate search telemetry, preview status, certified-status copying, and fallback-safe materialization diagnostics.
+- `MassGenerator.EdgeWear.Diagnostics.Logging.cs` projects per-attempt and aggregate cell-limit, subdivision, fragment, synthetic-identity, split-signature, and failure-source evidence into the current C1A.3o reports.
+- `Editor/GeneratedMassEditor.cs` owns C1A.3o contract labels, matrix case capture, expanded case CSV, matrix aggregation, one-click suite aggregation, preview sentinel, and comprehensive evidence projection.
+- `MassGenerator.EdgeWear.PlaneCutKernel.cs`, `MassGenerator.EdgeWear.Orchestration.cs`, and `MassGenerator.EdgeWear.SelectionAndCorners.cs` remain unchanged. The accepted C1A.3h guard, C1A.3i foundation/replay owners, production generation path, and global-junction history remain frozen.

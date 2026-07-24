@@ -2508,3 +2508,148 @@ C1A.3f correctly removed complete shell construction from rejected candidate pre
 The ordinary baseline is retained as one `MeshData` / `UnifiedEdgeWearPreviewStatus` / duration bundle. A supplied suite cache is used only when both mesh and applied status are present; otherwise one local ordinary unified baseline is built and retained. Every no-candidate, deadline, preparation-exhaustion, complete-build, retention, mandatory-ring, and emission failure returns the exact ordinary baseline mesh and unified status while preserving a failed corner status with the actual failure stage and diagnostic. Production `Generate(...)` is not used as a corner-preview failure substitute.
 
 At most one complete authoritative build occurs per enabled case. A failed complete build never launches a second expensive candidate. The thread-scoped deadline probe, exact authored-settings baseline fingerprint, `4 s` target, `5 s` hard case maximum, `35 s` matrix, and `90 s` research suite remain unchanged. No runtime, shader, serialized, mesh-channel, or production-generation owner changes.
+## EW-C1A.3h endpoint-conflict preparation proof
+
+### Position in the recovery pipeline
+
+```text
+ranked corner transaction
+    -> integration preflight
+    -> solve-only candidate preparation
+    -> prepared mandatory/ordinary identity and unrelated-retention checks
+    -> minimum-width foreign-plane endpoint-conflict proof [C1A.3h]
+    -> first proof-clear candidate only
+    -> one complete authoritative shell build [C1A.3g authority]
+    -> stored-soup emission or exact ordinary-baseline fallback
+```
+
+The proof is intentionally one-sided. It may reject only a conflict that remains geometrically present after the implicated local endpoint-star cluster has exhausted all legal retreat. It may not certify final shell validity, final identities, final coverage, triangulation, or rendering. Uncertain plane systems pass through to the complete build.
+
+### Proof construction
+
+1. Sort retained prepared candidates by canonical source-edge identity.
+2. For an ordered victim/foreign pair, seed the cluster with both edges and both endpoints, then include every retained candidate incident to any seeded endpoint. This matches complete conflict-cluster membership.
+3. Scale cluster candidates to `ResolvePlaneCutCandidateMinimumScale`; retain every non-cluster candidate at prepared width.
+4. Intersect the minimum-width victim and foreign bevel planes with each of the victim edge's two owner source-face planes to obtain the unbounded shared-rail endpoints.
+5. Clip that segment against all post-cut source-face half-spaces and every non-defining retained candidate half-space. Require finite non-degenerate span and a midpoint strictly interior to non-defining bevel planes.
+6. Project the clipped segment onto the victim source-edge axis and apply the exact complete-band endpoint allowance. Reject only when the midpoint remains in the protected interior interval.
+
+The diagnostic records victim and foreign source-edge identities, axial midpoint, endpoint allowance, cluster identities, victim/foreign minimum scales, retreat capacities, tested-rail count, duration, and proof result. Complete-build failures matching `foreign generated plane ... geometric minimum width` after a guard pass are classified as false negatives. Rejected candidates are not materialized merely to estimate false positives because that would violate the one-complete-build cost contract.
+
+### Frozen behavior
+
+C1A.3g baseline ownership and fallback are unchanged. Final authority remains `MaterializePlaneCutBevelSolvedPlan`. No second complete candidate is attempted. Mandatory-ring completion, unrelated-retention, exact identity, topology, render-channel, and performance gates remain unchanged. Production `EdgeWearEvaluationMode.None`, shaders/includes including cloud integration, materials, assets, serialized settings, and runtime callbacks remain untouched.
+
+## EW-C1A.3i search-scoped preflight replay boundary
+
+The C1A.3h endpoint-conflict guard is retained unchanged. C1A.3i removes only repeated rank-invariant preparation work and does not promote cached evidence to geometry authority.
+
+One `CornerDamagePreflightReplayCache` exists for the duration of a single `GenerateCornerDamageFullCertificationSearch`. The first integration-preflight attempt owns normalization of the source micro-topology. Subsequent attempts reuse that normalized foundation read-only, then construct independent candidate-local transaction faces, topology context, lifecycle coverage, mandatory ring, solved planes, guard evidence, and integration plan.
+
+Isolated ordinary-edge viability is replayable only as copied evidence. The cache is keyed by stable original source-edge identity and additionally requires exact equality of endpoints, owner-normal pairing, length, dihedral, requested width, minimum style width, and complete locality limiting evidence. Reversed edge orientation is accepted only when endpoints and both owner normals reverse as one exact pair. The current corner transaction must not list the identity as affected. Mandatory edges and unsuccessful or ambiguous evidence are never replayed.
+
+A replay miss is not a rejection. It executes the original `AuditBoundedSingleEdgeBevel` path and may seed a later exact replay after successful certification. Thus the optimization is conservative: it can remove redundant successful isolated audits but cannot invent eligibility, suppress a changed audit, alter the endpoint-conflict proof, or bypass complete materialization.
+
+The cache lifetime ends with the search scope. No cache survives between rocks, seeds, policies, editor actions, domain reloads, or player generation. The one-complete-build maximum, completed-shell authority, exact ordinary fallback, mandatory-ring and unrelated-retention requirements, identity validation, and production `EdgeWearEvaluationMode.None` behavior remain unchanged.
+
+## EW-C1A.3n endpoint-anchored support and patch-native axial certification
+
+The C1A.3m matrix is runtime-rejected as a recovery result but validates exact cut-locality: `620` retained remote vertices were allowed, selection reduced from `628` unfiltered faces to `402` cut-local faces, and attempts reached extraction, connectivity, boundary, and band-join checks. It still prepared `0/104` patches because the candidate plane was placed from maximum support across complete incident bevel faces. The report's maximum removed original-vertex radius (`1.02464962`) far exceeded maximum generated intersection/replacement radius (`0.21821025`), proving that remote original support still controlled removal.
+
+`TryBuildPlaneCutEndpointPatchCandidate(...)` now establishes target cutback and local radius before support selection. For each retained incident bevel identity it samples only geometry inside the endpoint neighborhood: in-radius bevel-face vertices, closest in-radius edge points, and exact segment/sphere interval endpoints. Missing support for any incident identity rejects the trial. The selected plane distance is `localSupport - targetCutback`; global face support is retained only as evidence. The candidate must remove a stable amount of endpoint-local incident-shell support.
+
+`TryBuildPlaneCutEndpointPatchReplacement(...)` retains C1A.3m extraction, exact selected-face clipping, closed untouched stitch loop, replacement/cap locality, manifold audit, incident-band join, band-integrity audit, prepared/minimum parity, and stored authoritative splice. Its endpoint-patch path replaces `IsPlaneCutJunctionInfluenceLocal(...)` with `IsPlaneCutEndpointPatchAxiallyLocal(...)`. The new validator measures the stored stitch loop and cap along every incident source edge from the implicated endpoint, bounds influence from existing width/cut-depth/minimum-stable-length policy, and rejects backward or opposite-end reach. The historical global-junction influence validator and solver remain unchanged and uncalled by endpoint-patch recovery.
+
+Preparation records support and axial evidence even on rejection. A certified prepared/minimum pair still receives at most one complete authoritative materialization. Any signature or final geometry failure remains a recovery false positive and returns the exact C1A.3g ordinary baseline.
+
+## C1A.3m exact cut-locality semantics
+
+The hotfixed C1A.3l matrix is runtime-rejected as an implementation: all `104` bounded endpoint-patch attempts rejected, with `102` classified as locality and `2` as non-incident-bevel extraction. Because no attempt reached cap creation, stitch topology, band integrity, prepared/minimum parity, or final materialization, the bounded replacement architecture itself was not exercised beyond extraction. C1A.3m retains that architecture and corrects the locality owner.
+
+### Cut-local component selection
+
+`TryExtractPlaneCutEndpointPatch(...)` still identifies incident bevel faces cut by the local boundary and rejects unsupported ownership. It now records an unfiltered connected affected-face count for evidence, then builds the actual selected component only across shared edges whose positive-side segment or exact plane intersection lies inside the certified endpoint radius. Incident seeds must remain one cut-local connected component. This prevents a distant positive vertex elsewhere on a long polygon from pulling unrelated neighboring faces into the replacement.
+
+### Exact locality contract
+
+Original selected-face extent is not a locality gate. For every selected face, positive-side vertices are the vertices actually removed by the cut and must lie inside the radius. Negative/on-plane vertices survive and may lie outside the radius; those vertices are counted but do not reject. During exact selected-face clipping, all generated edge-plane intersections, non-original replacement vertices, and cap vertices must lie inside the same radius. Failure identifies its source as `removed-vertex`, `intersection`, `replacement`, or `cap`.
+
+The prepared replacement stores maximum removed/intersection/replacement radii, retained-outside count, and selected-face counts before/after cut-local filtering. Prepared and legal-minimum replacements retain the existing incident/provenance/boundary parity requirement. A failed or unsupported trial remains the original C1A.3h guard rejection; a prepared trial receives at most one complete authoritative build.
+
+### Frozen authority
+
+C1A.3g exact baseline fallback, C1A.3h minimum-width proof, C1A.3i replay/cache, C1A.3l selected-face-only clipping and exact selected-face/stitch signatures, one authoritative materialization, mandatory-ring and unrelated-retention checks, final topology/triangulation/render authority, and stored-soup emission remain unchanged. The two observed non-incident-bevel extraction cases remain conservative. No endpoint allowance, width floor, control, serialized state, shader, material, runtime callback, or global junction search changes.
+
+## C1A.3l bounded local endpoint face-patch replacement
+
+C1A.3k is runtime-rejected as a recovery design. The complete matrix exercised supported two- and three-band stars, but all `104` attempts rejected and no boundary prepared. The dominant blocker was ownership: an additional infinite half-space able to remove the endpoint also reached unrelated shell geometry. C1A.3l therefore removes the active global junction-plane operation from the recovery path.
+
+### Preparation ownership
+
+The C1A.3h guard remains the detector. On a proven minimum-width endpoint conflict, C1A.3l may prepare one `PlaneCutEndpointPatchReplacement`. The complete incident retained star must contain two or three unique identities and match at prepared and legal-minimum widths. Fixed local normal/depth trials remain bounded; there is no queue, global search, backtracking, second materialization, or separate budget.
+
+For each trial, the prepared edge-only shell is classified face-by-face. Seeds are crossed incident `EdgeBevelPlane` faces. Selection expands only through edge-connected crossed faces. Every incident identity must participate, no non-incident bevel may enter, every selected vertex must remain inside the local radius, and selected/unselected ownership must expose exactly one closed non-branching loop. A boundary edge crossed by the cut rejects because it would require changing an untouched face.
+
+### Local replacement construction
+
+Each selected face is clipped independently with exact shared intersections. Surviving source/bevel polygons retain original provenance and feature ownership. Untouched faces remain unchanged. Unique local intersection points create one `BoundedEndpointCap` owned by the implicated source vertex. Replacement faces are individually sanitized during clipping and retain exact stitch-boundary positions from the prepared shell. The complete splice performs no global weld or sanitize pass over untouched faces, and must pass closed-manifold topology, incident-band joining, locality, face quality, band integrity, triangle, and render certification.
+
+Preparation stores sorted selected-face signatures, selected provenance, ordered stitch-loop topology and position signatures, cloned replacement faces, incident identities, and cap metrics. The legal-minimum trial must match the incident set, selected provenance, and boundary topology. Any uncertainty rejects preparation.
+
+### Final authority and failure semantics
+
+The existing one complete `MaterializePlaneCutBevelSolvedPlan(...)` remains final authority. It builds ordinary bevel planes once, verifies every stored selected-face signature and the exact stitch-loop signature, removes only the matched local faces, and inserts cloned stored replacement faces. The historical `VertexJunctionPlane` global clipping loop is skipped when a prepared endpoint patch exists; its solver remains declaration-only history.
+
+Final shell, identities, coverage, mandatory ring, unrelated retention, topology, triangulation, normals/tangents, and soup remain authoritative materialization outputs. A selected-face or boundary mismatch, missing unique cap, or later certification failure is a recovery false positive, fails the suite, and returns the exact C1A.3g baseline mesh/status. Rejection telemetry distinguishes unsupported star, extraction, disconnected patch, boundary loop/crossing, no local removal, cap creation, incident join, stitch topology, locality, band integrity, prepared/minimum parity, and materialization signature.
+
+## Historical runtime-rejected C1A.3k endpoint-star half-space preparation
+
+C1A.3j is runtime-rejected. C1A.3k is independently runtime-rejected: the complete `33/33` Unity matrix remained `17/33`, all `104` supported two/three-band endpoint-star attempts rejected, and `0` boundaries were prepared or applied. Thirteen terminal outcomes could not remove a local endpoint without changing unrelated geometry; three exceeded locality/shared-axis limits. The global half-space ownership is superseded and must not be restored.
+
+The rejection of `SolvePlaneCutGlobalJunctionSystem(...)` remains absolute. Its queue, 48-state search, independent time budget, deferred-edge states, adaptive global normal search, and junction-driven edge backtracking remain uncalled history. C1A.3k reuses only deterministic local helper routines.
+
+A guard-proven victim/foreign conflict may invoke one endpoint-star preparation. Eligibility requires one unambiguous shared source vertex matching the endpoint implicated by the victim axial parameter, identical prepared/minimum incident identity sets, and a complete retained star of two or three bevel bands. The complete incident set participates; no pair is treated independently inside a larger star.
+
+Preparation first builds the actual edge-only prepared shell. `BuildPlaneCutJunctionNormalOptions(...)` supplies a fixed ordered prefix: bevel-plane sum, incident source-face sum, and radial normal. `TryBuildPlaneCutVertexJunctionCandidate(...)` places each trial plane from current shell support, protects every unrelated source vertex, and bounds removal to the local star. Only fixed depth factors `0.60/0.90` are allowed. The first fully certified result wins; at most one junction is prepared.
+
+`TryValidateCornerDamageEndpointStarTrial(...)` requires the identical boundary to certify at prepared and C1A.3h legal-minimum widths. It delegates to the existing exact system-face builder and junction geometry validator, retaining unique stable cap, all-incident join, locality, shared-axis, face-quality, manifold, T-junction, band-integrity, triangulation, and render-validity gates.
+
+The prepared boundary is immutable evidence, not authority. `MaterializePlaneCutBevelSolvedPlan(...)` consumes `PreparedJunctions` during the sole complete authoritative build and may still reject. Final coverage, identities, topology, triangulation, render validity, and soup remain materialization-owned. Every unsupported star, failed trial, final mismatch, or complete-build failure preserves the exact C1A.3g ordinary baseline and truthful corner diagnostic.
+
+## EW-C1A.3o endpoint-cell subface ownership
+
+### Problem isolated by C1A.3n
+
+C1A.3n proved that endpoint-local support selection and patch-native axial measurement were active, but all `104` recovery attempts still rejected. The remaining failure was ownership: a local cut selected complete source or bevel polygons, so one remote vertex on a long face could be removed and the stitch loop could extend far beyond the shared endpoint. Some failed shells also no longer contained the incident bevel fragment that recovery was intended to restore.
+
+### Bounded cell
+
+For the implicated source vertex and each retained incident bevel candidate, C1A.3o derives one edge-axis plane at the existing allowed endpoint influence. The plane normal points from the shared endpoint toward the opposite source-edge endpoint; the retained half-space is the shared-endpoint side. These deterministic planes are ordered by source-edge identity and stored as `PlaneCutEndpointCellLimit` records. Their signature is reused unchanged for prepared and legal-minimum trials.
+
+### Subface partition
+
+`TryPartitionPlaneCutEndpointCellFace(...)` clips a convex polygon successively against every endpoint-cell plane. At each stage, the source-side polygon continues as the local candidate and the opposite polygon is retained as an untouched remote remainder. The final local candidate is then split by the junction boundary. Only a stable negative-side local fragment is retained; the positive-side local fragment is removed. Shared `TopologyEdgeKey` intersection caches ensure coincident source polygons reuse exact split positions.
+
+A face enters the transaction only when its endpoint-local subface is actually removed by the junction boundary. A reached non-incident bevel face remains a conservative extraction rejection. The recombined shell consists of all unselected original faces, every remote remainder, every retained endpoint-local fragment, any required synthetic incident fragment, and one `BoundedEndpointCap`.
+
+### Missing incident fragment reconstruction
+
+When the failed multi-bevel shell does not expose one incident `EdgeBevelPlane` polygon, C1A.3o builds an isolated shell from that already prepared bevel candidate and the same source faces. The isolated bevel polygon is partitioned through the identical endpoint cell and junction boundary. Only its bounded retained local fragment is admitted, with the original incident source-edge provenance. Failure to reconstruct every incident identity remains an `IncidentBandJoin` or extraction rejection.
+
+### Certification and authority
+
+The prepared replacement stores cell limits, selected source-face signatures, replacement faces, local/remote signature sets, cell split signature, synthetic incident identities, cap metrics, and stitch-boundary signatures. Legal-minimum certification must match incident/synthetic identities and subface topology cardinalities while using the exact prepared cell limits. Exact geometric positions are not required to match across different legal widths, but the topology class must.
+
+Before authoritative splicing, the stored replacement verifies:
+
+- cell-limit signature and count;
+- exactly one bounded endpoint cap;
+- replacement face count;
+- exact multiset of stored local-fragment and remote-remainder signatures;
+- selected authoritative source-face signatures and outer stitch-boundary signature.
+
+The final shell then remains subject to all existing manifold, bevel-band, identity, cap-ring, triangulation, render-validity, and soup checks. The C1A.3g baseline fallback remains the only failure result.
+
+### Explicit non-goals
+
+C1A.3o does not enlarge endpoint influence, loosen the C1A.3h guard, activate the historical global junction solver, add a global plane search, modify width floors, or create a new visual feature. It corrects the geometric ownership granularity inside the existing corner-chip/ordinary-bevel coexistence transaction.

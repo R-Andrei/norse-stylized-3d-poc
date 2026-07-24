@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MAT_TreeBark_Twisted
+  m_Shader: {fileID: 4800000, guid: dfe05490bd3b47a280d78f2e9f5c2190, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: e6febea844a22ca45b2a9c9788ad678b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 2800000, guid: 68c42f5c750dac44d8433b77fed22494, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BumpScale: 1
+    - _Smoothness: 0.18
+    - _TreeBoundsHeight: 1
+    - _TreeBoundsMinY: 0
+    - _TreeDebugMode: 0
+    - _TreeFoliageFlutterStrength: 0
+    - _TreeMacroWindStrength: 0.5
+    - _TreePhase: 0
+    - _TreeStiffness: 0.5
+    - _TreeWindEnabled: 1
+    - _TreeWindMaskMode: 0
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SpecularColor: {r: 0.15999997, g: 0.15999997, b: 0.15999997, a: 1}
+    - _TreeRootPositionOS: {r: 0, g: 0, b: 0, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

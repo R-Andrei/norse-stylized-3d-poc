@@ -722,7 +722,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStyleWidth,
                         minimumStableEdgeLength,
                         minimumStableFaceArea,
+#if UNITY_EDITOR
+                        coverageAudit,
+                        cornerDamageTransaction);
+#else
                         coverageAudit);
+#endif
                 }
                 else
                 {
@@ -1324,7 +1329,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float minimumStyleWidth,
             float minimumStableEdgeLength,
             float minimumStableFaceArea,
+#if UNITY_EDITOR
+            EdgeWearCoverageAudit audit,
+            CornerDamageTransactionAuditResult cornerDamageTransaction)
+#else
             EdgeWearCoverageAudit audit)
+#endif
         {
             List<EdgeWearSelectedGraphEdge> eligible =
                 BuildBoundedSingleEdgeEligibleList(context);
@@ -1337,6 +1347,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         audit,
                         graphEdgeIndex,
                         requestedWidth);
+#if UNITY_EDITOR
+                if (audit.RecordByGraphEdge.TryGetValue(
+                        graphEdgeIndex,
+                        out EdgeWearEdgeLifecycleRecord replayLifecycle) &&
+                    TryReplayCornerDamageIsolatedViability(
+                        replayLifecycle,
+                        edgeRequestedWidth,
+                        minimumStyleWidth,
+                        cornerDamageTransaction))
+                {
+                    continue;
+                }
+
+                CornerDamagePreflightReplayCache replayCache =
+                    ResolveCornerDamagePreflightReplayCache();
+                if (replayCache != null)
+                {
+                    replayCache.IsolatedFullEvaluationCount++;
+                }
+#endif
                 BoundedSingleEdgeAuditResult isolated =
                     AuditBoundedSingleEdgeBevel(
                         sourceFaces,
@@ -1495,9 +1525,247 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 lifecycle.ViabilityState =
                     EdgeWearViabilityState.ViableUnselected;
                 lifecycle.FinalReason = "viable-unselected";
+#if UNITY_EDITOR
+                StoreCornerDamageIsolatedViabilityReplay(
+                    lifecycle,
+                    cornerDamageTransaction);
+#endif
             }
         }
 
+#if UNITY_EDITOR
+        private static bool TryReplayCornerDamageIsolatedViability(
+            EdgeWearEdgeLifecycleRecord lifecycle,
+            float requestedWidth,
+            float minimumStyleWidth,
+            CornerDamageTransactionAuditResult transaction)
+        {
+            CornerDamagePreflightReplayCache cache =
+                ResolveCornerDamagePreflightReplayCache();
+            if (cache == null || lifecycle == null ||
+                lifecycle.Viability == null || lifecycle.Mandatory ||
+                lifecycle.OriginalSourceEdgeIndex < 0 ||
+                transaction == null ||
+                transaction.AffectedOriginalEdgeIndices.Contains(
+                    lifecycle.OriginalSourceEdgeIndex))
+            {
+                return false;
+            }
+
+            cache.IsolatedReplayAttemptCount++;
+            if (!cache.IsolatedByOriginalIdentity.TryGetValue(
+                    lifecycle.OriginalSourceEdgeIndex,
+                    out CornerDamagePreflightReplayRecord record) ||
+                !DoesCornerDamageReplayRecordMatch(
+                    record,
+                    lifecycle,
+                    requestedWidth,
+                    minimumStyleWidth))
+            {
+                cache.IsolatedReplayMissCount++;
+                return false;
+            }
+
+            CopyCornerDamageIsolatedViabilityEvidence(
+                record.Viability,
+                lifecycle.Viability);
+            lifecycle.GeometricEligible = record.GeometricEligible;
+            lifecycle.CoexistenceEligible = record.CoexistenceEligible;
+            lifecycle.ViabilityState = record.ViabilityState;
+            lifecycle.CoexistenceFailureReason =
+                record.CoexistenceFailureReason;
+            lifecycle.FinalReason = record.FinalReason;
+            cache.IsolatedReplayHitCount++;
+            return true;
+        }
+
+        private static void StoreCornerDamageIsolatedViabilityReplay(
+            EdgeWearEdgeLifecycleRecord lifecycle,
+            CornerDamageTransactionAuditResult transaction)
+        {
+            CornerDamagePreflightReplayCache cache =
+                ResolveCornerDamagePreflightReplayCache();
+            if (cache == null || lifecycle == null ||
+                lifecycle.Viability == null || lifecycle.Mandatory ||
+                !lifecycle.GeometricEligible ||
+                lifecycle.OriginalSourceEdgeIndex < 0 ||
+                transaction == null ||
+                transaction.AffectedOriginalEdgeIndices.Contains(
+                    lifecycle.OriginalSourceEdgeIndex))
+            {
+                return;
+            }
+
+            EdgeWearEdgeViabilityRecord viabilityCopy =
+                new EdgeWearEdgeViabilityRecord();
+            CopyCornerDamageIsolatedViabilityEvidence(
+                lifecycle.Viability,
+                viabilityCopy);
+            cache.IsolatedByOriginalIdentity[
+                lifecycle.OriginalSourceEdgeIndex] =
+                new CornerDamagePreflightReplayRecord
+                {
+                    OriginalSourceEdgeIndex =
+                        lifecycle.OriginalSourceEdgeIndex,
+                    Start = lifecycle.Start,
+                    End = lifecycle.End,
+                    OwnerNormalA = lifecycle.OwnerNormalA,
+                    OwnerNormalB = lifecycle.OwnerNormalB,
+                    Length = lifecycle.Length,
+                    DihedralDegrees = lifecycle.DihedralDegrees,
+                    RequestedWidth = lifecycle.Viability.RequestedWidth,
+                    LocalityRetainPlaneFloor =
+                        lifecycle.Viability.LocalityRetainPlaneFloor,
+                    LocalityRemovalPlaneCeiling =
+                        lifecycle.Viability.LocalityRemovalPlaneCeiling,
+                    LocalityFeasibleMargin =
+                        lifecycle.Viability.LocalityFeasibleMargin,
+                    LocalityGuardMargin =
+                        lifecycle.Viability.LocalityGuardMargin,
+                    LocalityMinimumRemoval =
+                        lifecycle.Viability.LocalityMinimumRemoval,
+                    LocalityLimitingPosition =
+                        lifecycle.Viability.LocalityLimitingPosition,
+                    LocalityLimitingProjection =
+                        lifecycle.Viability.LocalityLimitingProjection,
+                    Viability = viabilityCopy,
+                    ArtisticEligible = lifecycle.ArtisticEligible,
+                    GeometricEligible = lifecycle.GeometricEligible,
+                    CoexistenceEligible = lifecycle.CoexistenceEligible,
+                    ViabilityState = lifecycle.ViabilityState,
+                    CoexistenceFailureReason =
+                        lifecycle.CoexistenceFailureReason,
+                    FinalReason = lifecycle.FinalReason
+                };
+        }
+
+        private static bool DoesCornerDamageReplayRecordMatch(
+            CornerDamagePreflightReplayRecord record,
+            EdgeWearEdgeLifecycleRecord lifecycle,
+            float requestedWidth,
+            float minimumStyleWidth)
+        {
+            if (record == null || record.Viability == null ||
+                lifecycle == null || lifecycle.Viability == null ||
+                !record.GeometricEligible ||
+                record.ArtisticEligible != lifecycle.ArtisticEligible ||
+                record.OriginalSourceEdgeIndex !=
+                    lifecycle.OriginalSourceEdgeIndex ||
+                record.Length != lifecycle.Length ||
+                record.DihedralDegrees != lifecycle.DihedralDegrees ||
+                record.RequestedWidth != requestedWidth ||
+                record.Viability.MinimumStyleWidth != minimumStyleWidth ||
+                record.LocalityRetainPlaneFloor !=
+                    lifecycle.Viability.LocalityRetainPlaneFloor ||
+                record.LocalityRemovalPlaneCeiling !=
+                    lifecycle.Viability.LocalityRemovalPlaneCeiling ||
+                record.LocalityFeasibleMargin !=
+                    lifecycle.Viability.LocalityFeasibleMargin ||
+                record.LocalityGuardMargin !=
+                    lifecycle.Viability.LocalityGuardMargin ||
+                record.LocalityMinimumRemoval !=
+                    lifecycle.Viability.LocalityMinimumRemoval ||
+                !record.LocalityLimitingPosition.Equals(
+                    lifecycle.Viability.LocalityLimitingPosition) ||
+                record.LocalityLimitingProjection !=
+                    lifecycle.Viability.LocalityLimitingProjection)
+            {
+                return false;
+            }
+
+            bool direct = record.Start.Equals(lifecycle.Start) &&
+                record.End.Equals(lifecycle.End) &&
+                record.OwnerNormalA.Equals(lifecycle.OwnerNormalA) &&
+                record.OwnerNormalB.Equals(lifecycle.OwnerNormalB);
+            bool reversed = record.Start.Equals(lifecycle.End) &&
+                record.End.Equals(lifecycle.Start) &&
+                record.OwnerNormalA.Equals(lifecycle.OwnerNormalB) &&
+                record.OwnerNormalB.Equals(lifecycle.OwnerNormalA);
+            return direct || reversed;
+        }
+
+        private static void CopyCornerDamageIsolatedViabilityEvidence(
+            EdgeWearEdgeViabilityRecord source,
+            EdgeWearEdgeViabilityRecord target)
+        {
+            if (source == null || target == null)
+            {
+                return;
+            }
+
+            target.MaximumLocallyFeasibleWidth =
+                source.MaximumLocallyFeasibleWidth;
+            target.FeasibleWidthFraction = source.FeasibleWidthFraction;
+            target.MinimumStyleWidth = source.MinimumStyleWidth;
+            target.MinimumRequiredCertifiedWidth =
+                source.MinimumRequiredCertifiedWidth;
+            target.IsolatedSucceeded = source.IsolatedSucceeded;
+            target.IsolatedWidthAttemptCount =
+                source.IsolatedWidthAttemptCount;
+            target.IsolatedLastAttemptedWidth =
+                source.IsolatedLastAttemptedWidth;
+            target.IsolatedAttemptScheduleComplete =
+                source.IsolatedAttemptScheduleComplete;
+            target.IsolatedTerminalConstructionAtMinimum =
+                source.IsolatedTerminalConstructionAtMinimum;
+            target.IsolatedAttemptScheduleResolution =
+                source.IsolatedAttemptScheduleResolution;
+            target.IsolatedWidthAttemptEvidence =
+                source.IsolatedWidthAttemptEvidence;
+            target.IsolatedMaximumCertifiedWidth =
+                source.IsolatedMaximumCertifiedWidth;
+            target.IsolatedMaximumCertifiedWidthFraction =
+                source.IsolatedMaximumCertifiedWidthFraction;
+            target.IsolatedAlternateBoundaryRailCount =
+                source.IsolatedAlternateBoundaryRailCount;
+            target.IsolatedMaximumBoundaryCandidateCount =
+                source.IsolatedMaximumBoundaryCandidateCount;
+            target.IsolatedMaximumBoundarySnapDistance =
+                source.IsolatedMaximumBoundarySnapDistance;
+            target.IsolatedMaximumBoundaryPointTolerance =
+                source.IsolatedMaximumBoundaryPointTolerance;
+            target.IsolatedMaximumBoundaryDiagnosticRailIndex =
+                source.IsolatedMaximumBoundaryDiagnosticRailIndex;
+            target.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex =
+                source.IsolatedMaximumBoundaryOriginalAdjacentEdgeIndex;
+            target.IsolatedMaximumBoundaryResolvedEdgeIndex =
+                source.IsolatedMaximumBoundaryResolvedEdgeIndex;
+            target.IsolatedMaximumBoundaryOriginalRawParameter =
+                source.IsolatedMaximumBoundaryOriginalRawParameter;
+            target.IsolatedMaximumBoundaryOriginalSegmentDistance =
+                source.IsolatedMaximumBoundaryOriginalSegmentDistance;
+            target.IsolatedMinimumBoundaryEndpointDistance =
+                source.IsolatedMinimumBoundaryEndpointDistance;
+            target.EndpointConsumptionA = source.EndpointConsumptionA;
+            target.EndpointConsumptionB = source.EndpointConsumptionB;
+            target.RemainingCentralSpan = source.RemainingCentralSpan;
+            target.MinimumCentralSpan = source.MinimumCentralSpan;
+            target.IsolatedOpenEdgeCount = source.IsolatedOpenEdgeCount;
+            target.IsolatedNonManifoldEdgeCount =
+                source.IsolatedNonManifoldEdgeCount;
+            target.IsolatedTJunctionCount =
+                source.IsolatedTJunctionCount;
+            target.IsolatedInvalidFaceCount =
+                source.IsolatedInvalidFaceCount;
+            target.IsolatedDiagnostic = source.IsolatedDiagnostic;
+            target.IsolatedConstructionValid =
+                source.IsolatedConstructionValid;
+            target.FeasibleWidthFractionValid =
+                source.FeasibleWidthFractionValid;
+            target.WidthRecoveryProvisional =
+                source.WidthRecoveryProvisional;
+            target.MaterialWidthRecoveryEligible =
+                source.MaterialWidthRecoveryEligible;
+            target.MaterialWidthRecoveryRequiredLength =
+                source.MaterialWidthRecoveryRequiredLength;
+            target.MultiSupportHullRecovery =
+                source.MultiSupportHullRecovery;
+            target.EndpointSpanValid = source.EndpointSpanValid;
+            target.Evaluated = source.Evaluated;
+            target.Viable = source.Viable;
+            target.FailureReason = source.FailureReason;
+        }
+#endif
         private static bool IsEdgeWearMaterialWidthRecoveryEligible(
             EdgeWearEdgeLifecycleRecord lifecycle)
         {

@@ -28,12 +28,18 @@ namespace ProgrammaticStylized3D.Weather.Editor
         private static readonly Color TrailPathColor =
             new Color(0.72f, 0.96f, 1.00f, 0.98f);
 
-        private bool showVisualCalibration = true;
-        private bool showPlacement = true;
-        private bool showAdvancedGeneration;
-        private bool showSceneDiagnostics = true;
-        private bool showReport = true;
-        private Vector2 reportScrollPosition;
+        private bool showAppearance;
+        private bool showShapeAltitude;
+        private bool showLifecycleTravel;
+        private bool showWobbleShape;
+        private bool showPopulationSeparation;
+        private bool showCameraEntry;
+        private bool showCandidateSelection;
+        private bool showPathConstruction;
+        private bool showDebugDiagnostics;
+        private bool showActionsReports;
+        private bool showLiveStatus;
+        private bool showSceneDiagnostics;
 
         private void OnEnable()
         {
@@ -58,143 +64,200 @@ namespace ProgrammaticStylized3D.Weather.Editor
             bool upgradedBaseline = TryUpgradeSerializedBaselineIfNeeded(
                 trailRenderer);
             bool assignedDefaultShader = TryAssignDefaultShaderIfMissing();
+
             serializedObject.UpdateIfRequiredOrScript();
-            EditorGUI.BeginChangeCheck();
-            DrawScriptReference();
-            DrawVisualCalibration(trailRenderer);
-            DrawPlacementAndDensity();
-            DrawAdvancedGeneration();
-            if (EditorGUI.EndChangeCheck())
+            WeatherInspectorGui.DrawScriptReference(serializedObject);
+            DrawImmediateWarnings(trailRenderer);
+
+            DrawAppearance();
+            DrawShapeAltitude();
+            DrawLifecycleTravel(trailRenderer);
+            DrawWobbleShape();
+            DrawPopulationSeparation();
+            DrawCameraEntry();
+            DrawCandidateSelection();
+            DrawPathConstruction();
+
+            bool changed = serializedObject.ApplyModifiedProperties();
+            if (changed)
             {
-                serializedObject.ApplyModifiedProperties();
                 EditorUtility.SetDirty(trailRenderer);
                 SceneView.RepaintAll();
-            }
-            else
-            {
-                serializedObject.ApplyModifiedProperties();
             }
 
             if (upgradedBaseline)
             {
-                EditorGUILayout.HelpBox(
+                WeatherInspectorGui.Info(
                     "Updated exact earlier baseline values to the V0.9 " +
-                    "direction-locked upwind-entry baseline. Existing non-default tuning " +
-                    "was preserved.",
-                    MessageType.Info);
+                    "direction-locked upwind-entry baseline. Existing non-default tuning was preserved.");
             }
 
             if (assignedDefaultShader)
             {
-                EditorGUILayout.HelpBox(
-                    "Assigned the default serialized wind-trail shader: " +
-                    "SH_WeatherWindTrails.",
-                    MessageType.Info);
+                WeatherInspectorGui.Info(
+                    "Assigned the default serialized wind-trail shader: SH_WeatherWindTrails.");
             }
 
-            DrawRuntimeStatus(trailRenderer);
-            DrawActions(trailRenderer);
-            DrawReport(trailRenderer);
-            DrawSceneDiagnosticControls();
+            DrawDebugDiagnostics();
+            DrawActionsReports(trailRenderer);
+            DrawLiveStatus(trailRenderer);
         }
 
-        private void DrawScriptReference()
-        {
-            SerializedProperty scriptProperty =
-                serializedObject.FindProperty("m_Script");
-            if (scriptProperty == null)
-            {
-                return;
-            }
-
-            using (new EditorGUI.DisabledScope(true))
-            {
-                EditorGUILayout.PropertyField(scriptProperty);
-            }
-        }
-
-        private void DrawVisualCalibration(
+        private static void DrawImmediateWarnings(
             WeatherWindTrailRenderer trailRenderer)
         {
-            EditorGUILayout.Space();
-            showVisualCalibration = EditorGUILayout.Foldout(
-                showVisualCalibration,
-                "Visual Calibration",
-                true);
-            if (!showVisualCalibration)
+            if (Application.isPlaying &&
+                !string.IsNullOrEmpty(trailRenderer.LastError))
+            {
+                WeatherInspectorGui.Error(trailRenderer.LastError);
+            }
+        }
+
+        private void DrawAppearance()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showAppearance,
+                    "Appearance",
+                    "Controls trail material, colour, opacity, and cross-width alpha response."))
             {
                 return;
             }
 
             using (new EditorGUI.IndentLevelScope())
             {
-                DrawProperty("trailShader");
-                DrawProperty("trailColor");
-                DrawProperty("trailOpacity");
-                DrawProperty("uniformBodyOpacity");
-                SerializedProperty uniformBodyProperty =
-                    serializedObject.FindProperty("uniformBodyOpacity");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "trailShader",
+                    "Trail Shader",
+                    "Serialized shader reference retained in builds and used to create the hidden runtime material.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "trailColor",
+                    "Trail Colour",
+                    "HDR tint multiplied into the wind-trail shader output.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "trailOpacity",
+                    "Trail Opacity",
+                    "Overall alpha multiplier applied to every visible trail.");
+                SerializedProperty uniformBody = WeatherInspectorGui.Property(
+                    serializedObject,
+                    "uniformBodyOpacity",
+                    "Uniform Body Opacity",
+                    "Keeps alpha spatially uniform across the visible body. Head and tail shaping then use physical width taper instead of broad alpha gradients.");
                 using (new EditorGUI.DisabledScope(
-                    uniformBodyProperty != null &&
-                    uniformBodyProperty.boolValue))
+                    uniformBody != null && uniformBody.boolValue))
                 {
-                    DrawProperty("edgeSoftness");
+                    WeatherInspectorGui.Property(
+                        serializedObject,
+                        "edgeSoftness",
+                        "Edge Softness",
+                        "Cross-width alpha softness. Used only when Uniform Body Opacity is disabled.");
                 }
 
-                DrawMinMaxProperties(
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "strengthOpacityInfluence",
+                    "Wind Strength Opacity Influence",
+                    "How strongly local authoritative wind strength modulates trail opacity. Zero keeps opacity independent of wind strength.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "variationOpacityInfluence",
+                    "Per-Trail Variation Opacity Influence",
+                    "How strongly deterministic per-trail variation modulates opacity. Zero keeps all trails equally opaque before lifecycle shaping.");
+            }
+        }
+
+        private void DrawShapeAltitude()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showShapeAltitude,
+                    "Shape & Altitude",
+                    "Controls physical width and vertical placement above the sampled world path."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
                     "Width",
                     "minimumWidthMetres",
-                    "maximumWidthMetres");
-
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
-                    "Lifecycle",
-                    EditorStyles.miniBoldLabel);
-                using (new EditorGUI.IndentLevelScope())
-                {
-                    DrawMinMaxProperties(
-                        "Alive Duration",
-                        "minimumAliveDurationSeconds",
-                        "maximumAliveDurationSeconds");
-                    DrawMinMaxProperties(
-                        "Travel Speed",
-                        "minimumPresentationSpeed",
-                        "maximumPresentationSpeed");
-                    DrawMinMaxProperties(
-                        "Visible Body Length",
-                        "minimumVisibleBodyLengthMetres",
-                        "maximumVisibleBodyLengthMetres");
-                    DrawProperty("lifecycleTipSpeedAllowance");
-                    DrawProperty("pointedEndLengthMetres");
-                    DrawResolvedLifecycleSummary(trailRenderer);
-                }
-
-                DrawMinMaxProperties(
+                    "Minimum Width (m)",
+                    "Smallest physical ribbon width selected for a spawned trail.",
+                    "maximumWidthMetres",
+                    "Maximum Width (m)",
+                    "Largest physical ribbon width selected for a spawned trail.");
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
                     "Altitude",
                     "minimumAltitudeMetres",
-                    "maximumAltitudeMetres");
-                DrawProperty("maximumVerticalDeviationMetres");
+                    "Minimum Altitude (m)",
+                    "Minimum vertical offset above the generated world-space path.",
+                    "maximumAltitudeMetres",
+                    "Maximum Altitude (m)",
+                    "Maximum vertical offset above the generated world-space path.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "maximumVerticalDeviationMetres",
+                    "Maximum Vertical Deviation (m)",
+                    "Maximum deterministic vertical shape variation applied along a trail after its base altitude is chosen.");
+            }
+        }
 
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
-                    "Wind-Directed Wobble",
-                    EditorStyles.miniBoldLabel);
-                using (new EditorGUI.IndentLevelScope())
-                {
-                    DrawMinMaxProperties(
-                        "Wobble Strength",
-                        "minimumLateralWobbleStrengthMetres",
-                        "maximumLateralWobbleStrengthMetres");
-                    DrawMinMaxProperties(
-                        "Wobble Wavelength",
-                        "minimumLateralWobbleWavelengthMetres",
-                        "maximumLateralWobbleWavelengthMetres");
-                    DrawProperty("occasionalLargerLoopChance");
-                    DrawProperty("occasionalLargerLoopExtraStrengthMetres");
-                }
+        private void DrawLifecycleTravel(
+            WeatherWindTrailRenderer trailRenderer)
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showLifecycleTravel,
+                    "Lifecycle & Travel",
+                    "Controls alive duration, motion speed, visible body length, and pointed endpoint timing."))
+            {
+                return;
+            }
 
-                DrawProperty("strengthOpacityInfluence");
-                DrawProperty("variationOpacityInfluence");
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
+                    "Alive Duration",
+                    "minimumAliveDurationSeconds",
+                    "Minimum Alive Duration (s)",
+                    "Minimum fully spawned lifetime before despawn begins.",
+                    "maximumAliveDurationSeconds",
+                    "Maximum Alive Duration (s)",
+                    "Maximum fully spawned lifetime before despawn begins.");
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
+                    "Travel Speed",
+                    "minimumPresentationSpeed",
+                    "Minimum Travel Speed (m/s)",
+                    "Minimum presentation speed selected for an accepted trail.",
+                    "maximumPresentationSpeed",
+                    "Maximum Travel Speed (m/s)",
+                    "Maximum presentation speed selected for an accepted trail.");
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
+                    "Visible Body Length",
+                    "minimumVisibleBodyLengthMetres",
+                    "Minimum Visible Body Length (m)",
+                    "Minimum fully visible trail-body length after spawn completes.",
+                    "maximumVisibleBodyLengthMetres",
+                    "Maximum Visible Body Length (m)",
+                    "Maximum fully visible trail-body length after spawn completes.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "lifecycleTipSpeedAllowance",
+                    "Lifecycle Tip-Speed Allowance (m/s)",
+                    "Maximum extra endpoint speed used only while growing or shrinking a trail. Each trail clamps this allowance below its normal travel speed.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "pointedEndLengthMetres",
+                    "Pointed End Length (m)",
+                    "Physical distance over which each visible endpoint tapers to a point.");
+
+                DrawResolvedLifecycleSummary(trailRenderer);
             }
         }
 
@@ -206,148 +269,377 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 out Vector2 despawnRange,
                 out Vector2 totalRange);
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(2f);
             EditorGUILayout.LabelField(
                 "Resolved Timing",
                 EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(true))
-            {
-                EditorGUILayout.TextField(
-                    "Spawn Duration",
-                    $"{spawnRange.x:0.##}–{spawnRange.y:0.##} s");
-                EditorGUILayout.TextField(
-                    "Despawn Duration",
-                    $"{despawnRange.x:0.##}–{despawnRange.y:0.##} s");
-                EditorGUILayout.TextField(
-                    "Total Lifetime",
-                    $"{totalRange.x:0.##}–{totalRange.y:0.##} s");
-            }
+            WeatherInspectorGui.ReadOnlyRow(
+                "Spawn Duration",
+                $"{spawnRange.x:0.##}–{spawnRange.y:0.##} s");
+            WeatherInspectorGui.ReadOnlyRow(
+                "Despawn Duration",
+                $"{despawnRange.x:0.##}–{despawnRange.y:0.##} s");
+            WeatherInspectorGui.ReadOnlyRow(
+                "Total Lifetime",
+                $"{totalRange.x:0.##}–{totalRange.y:0.##} s");
 
-            EditorGUILayout.HelpBox(
+            WeatherInspectorGui.Help(
                 "Spawn and despawn durations are resolved from body length, " +
-                "travel speed, and lifecycle tip-speed allowance. Accepted " +
-                "trails may reduce speed, alive duration, or body length to " +
-                "guarantee the complete lifecycle fits their generated path.",
-                MessageType.None);
+                "travel speed, and lifecycle tip-speed allowance. Accepted trails may reduce speed, alive duration, or body length so the complete lifecycle fits the generated path.");
         }
 
-        private void DrawPlacementAndDensity()
+        private void DrawWobbleShape()
         {
-            EditorGUILayout.Space();
-            showPlacement = EditorGUILayout.Foldout(
-                showPlacement,
-                "Placement & Density",
-                true);
-            if (!showPlacement)
+            if (!WeatherInspectorGui.Foldout(
+                    ref showWobbleShape,
+                    "Wobble & Local Shape",
+                    "Controls subtle lateral movement around the direction-locked Weather backbone."))
             {
                 return;
             }
 
             using (new EditorGUI.IndentLevelScope())
             {
-                DrawProperty("maximumActiveTrails");
-                DrawProperty("spawnAttemptsPerSecond");
-                DrawProperty("minimumWindStrength");
-                DrawProperty("minimumTrailSeparationMetres");
-                DrawProperty("separationCooldownSeconds");
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
+                    "Wobble Strength",
+                    "minimumLateralWobbleStrengthMetres",
+                    "Minimum Wobble Strength (m)",
+                    "Minimum mandatory side-to-side displacement around the authoritative Weather streamline.",
+                    "maximumLateralWobbleStrengthMetres",
+                    "Maximum Wobble Strength (m)",
+                    "Maximum mandatory side-to-side displacement around the authoritative Weather streamline.");
+                WeatherInspectorGui.MinMaxProperties(
+                    serializedObject,
+                    "Wobble Wavelength",
+                    "minimumLateralWobbleWavelengthMetres",
+                    "Minimum Wobble Wavelength (m)",
+                    "Minimum world distance covered by one complete lateral wobble cycle.",
+                    "maximumLateralWobbleWavelengthMetres",
+                    "Maximum Wobble Wavelength (m)",
+                    "Maximum world distance covered by one complete lateral wobble cycle.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "occasionalLargerLoopChance",
+                    "Larger Loop Chance",
+                    "Probability that one normal wobble cycle receives a localized extra-amplitude boost.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "occasionalLargerLoopExtraStrengthMetres",
+                    "Larger Loop Extra Strength (m)",
+                    "Extra lateral displacement added only to the selected localized wobble cycle.");
+            }
+        }
 
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
+        private void DrawPopulationSeparation()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showPopulationSeparation,
+                    "Population & Separation",
+                    "Controls trail capacity, spawn cadence, wind eligibility, and spacing."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "maximumActiveTrails",
+                    "Maximum Active Trails",
+                    "Fixed maximum number of simultaneous wind trails and the primary mesh-capacity driver.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "spawnAttemptsPerSecond",
+                    "Spawn Attempts / Second",
+                    "Frequency at which the renderer evaluates the current candidate set while capacity is available.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumWindStrength",
+                    "Minimum Wind Strength",
+                    "Minimum authoritative Weather strength required for a candidate spawn location.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumTrailSeparationMetres",
+                    "Minimum Trail Separation (m)",
+                    "Minimum world-space distance from active trails and recent spawn cooldown records.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "separationCooldownSeconds",
+                    "Separation Cooldown (s)",
+                    "Duration for which a released trail location continues to repel new spawn candidates.");
+            }
+        }
+
+        private void DrawCameraEntry()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showCameraEntry,
                     "Camera Entry Placement",
-                    EditorStyles.miniBoldLabel);
-                using (new EditorGUI.IndentLevelScope())
+                    "Biases spawns toward the upwind screen edge and requires useful visible downwind traversal."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "upwindSpawnBandDepth",
+                    "Upwind Spawn Band Depth",
+                    "Fraction of visible screen depth, measured from the upwind edge, that may contain on-screen spawn seeds.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "upwindEntryMarginViewport",
+                    "Upwind Edge Margin",
+                    "Small normalized viewport margin permitted beyond only the edge from which wind enters the screen.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "preferredVisibleRunwayMetres",
+                    "Preferred Visible Runway (m)",
+                    "Visible downwind travel distance that receives the maximum camera-entry score.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumAcceptedVisibleRunwayMetres",
+                    "Minimum Accepted Runway (m)",
+                    "Hard minimum visible downwind travel distance required before a candidate may spawn.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "cameraEntryPreference",
+                    "Camera Entry Preference",
+                    "Strength of the score bias toward upwind positions with long visible downwind traversal.");
+
+                WeatherInspectorGui.Help(
+                    "Trails prefer the edge from which wind enters the camera and " +
+                    "reject candidates that would immediately travel away from the visible view.");
+            }
+        }
+
+        private void DrawCandidateSelection()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showCandidateSelection,
+                    "Advanced Candidate Selection",
+                    "Controls the deterministic screen candidate grid and score weighting."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "candidateGridResolution",
+                    "Candidate Grid Resolution",
+                    "Number of screen candidate cells per axis. Higher values evaluate more possible positions per spawn attempt.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "strongestCandidateSubset",
+                    "Strongest Candidate Subset",
+                    "Number of highest-scoring eligible candidates retained for deterministic weighted selection.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "candidateCellJitter",
+                    "Candidate Cell Jitter",
+                    "Normalized deterministic offset within each candidate grid cell. Zero samples cell centres.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "trailSeed",
+                    "Placement Seed",
+                    "Deterministic seed for candidate jitter, trail selection, and per-trail presentation variation.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "strengthScoreExponent",
+                    "Wind Strength Score Exponent",
+                    "Exponent applied to normalized wind strength during candidate scoring. Higher values favor the strongest locations more aggressively.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "spacingScoreExponent",
+                    "Separation Score Exponent",
+                    "Exponent applied to normalized separation during candidate scoring. Higher values favor isolated locations more aggressively.");
+            }
+        }
+
+        private void DrawPathConstruction()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showPathConstruction,
+                    "Advanced Path Construction",
+                    "Controls the authoritative Weather backbone, compatibility gates, and smooth render-curve density."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "maximumCentrelinePoints",
+                    "Maximum Backbone Points",
+                    "Maximum number of authoritative Weather integration points retained per trail.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "integrationStepMetres",
+                    "Backbone Step Length (m)",
+                    "World distance advanced per authoritative Weather integration step. Smaller values increase Weather samples and path construction cost.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "renderCurveSubdivisionsPerBackboneSection",
+                    "Render Subdivisions / Backbone Section",
+                    "Smooth render samples generated between authoritative Weather points. This improves presentation smoothness without increasing Weather integration frequency.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumPathWindStrength",
+                    "Minimum Path Wind Strength",
+                    "Minimum authoritative Weather strength required at each accepted backbone continuation.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumCompletedPathLengthMetres",
+                    "Minimum Completed Path Length (m)",
+                    "Minimum generated path length required before a candidate may become an active trail.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "maximumLocalWindDirectionMismatchDegrees",
+                    "Maximum Local Direction Mismatch (°)",
+                    "Maximum angular difference between the direction locked at birth and local authoritative wind sampled along the backbone.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "selfApproachDistanceMetres",
+                    "Self-Approach Rejection Distance (m)",
+                    "Minimum allowed distance between nonadjacent path sections before path construction rejects a self-approach.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "minimumSegmentWindAlignment",
+                    "Minimum Segment / Wind Alignment",
+                    "Minimum dot product between each generated segment and compatible local authoritative wind.");
+
+                WeatherInspectorGui.Help(
+                    "The dominant visible Weather direction is locked when a trail " +
+                    "spawns. Local samples validate strength and compatibility but cannot cumulatively steer the backbone into a large curve.");
+            }
+        }
+
+        private void DrawDebugDiagnostics()
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showDebugDiagnostics,
+                    "Debug & Diagnostics",
+                    "Controls editor-only candidate and path geometry in Scene view."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            using (new EditorGUI.DisabledScope(!Application.isPlaying))
+            {
+                EditorGUI.BeginChangeCheck();
+                showSceneDiagnostics = EditorGUILayout.ToggleLeft(
+                    new GUIContent(
+                        "Show Scene Candidate Diagnostics",
+                        "Displays the last candidate classifications and active generated paths while this component is selected in Play Mode."),
+                    showSceneDiagnostics);
+                if (EditorGUI.EndChangeCheck())
                 {
-                    DrawProperty("upwindSpawnBandDepth");
-                    DrawProperty("upwindEntryMarginViewport");
-                    DrawProperty("preferredVisibleRunwayMetres");
-                    DrawProperty("minimumAcceptedVisibleRunwayMetres");
-                    DrawProperty("cameraEntryPreference");
+                    SceneView.RepaintAll();
+                }
+            }
+
+            if (!Application.isPlaying)
+            {
+                WeatherInspectorGui.Help(
+                    "Candidate and path geometry is available only in Play Mode.");
+            }
+            else
+            {
+                WeatherInspectorGui.Help(
+                    "Grey = outside Weather field or camera-entry region; blue = below wind floor; orange = too close; purple = incompatible direction; pink = insufficient runway; green = eligible; yellow = selected; cyan line = active path.");
+            }
+        }
+
+        private void DrawActionsReports(
+            WeatherWindTrailRenderer trailRenderer)
+        {
+            if (!WeatherInspectorGui.Foldout(
+                    ref showActionsReports,
+                    "Actions & Reports",
+                    "Manual reset and copyable comprehensive diagnostic report."))
+            {
+                return;
+            }
+
+            using (new EditorGUI.IndentLevelScope())
+            {
+                using (new EditorGUI.DisabledScope(
+                    !Application.isPlaying || !trailRenderer.ResourcesReady))
+                {
+                    if (GUILayout.Button("Reset Wind Trail Simulation"))
+                    {
+                        trailRenderer.ResetTrailSimulation();
+                        Repaint();
+                        SceneView.RepaintAll();
+                    }
+                }
+
+                if (GUILayout.Button("Copy Comprehensive Trail Report"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        trailRenderer.BuildComprehensiveReport();
+                    Debug.Log(
+                        "[Weather Wind Trails V0.9] Report copied to clipboard.",
+                        trailRenderer);
                 }
             }
         }
 
-        private void DrawAdvancedGeneration()
+        private void DrawLiveStatus(
+            WeatherWindTrailRenderer trailRenderer)
         {
-            EditorGUILayout.Space();
-            showAdvancedGeneration = EditorGUILayout.Foldout(
-                showAdvancedGeneration,
-                "Advanced Generation",
-                true);
-            if (!showAdvancedGeneration)
+            if (!WeatherInspectorGui.Foldout(
+                    ref showLiveStatus,
+                    "Live Status",
+                    "Read-only runtime dependencies, population, candidate, and mesh-capacity state."))
             {
                 return;
             }
 
+            WeatherWindDomain statusDomain = trailRenderer.WeatherDomain != null
+                ? trailRenderer.WeatherDomain
+                : trailRenderer.GetComponent<WeatherWindDomain>();
+            Camera statusCamera = trailRenderer.TargetCamera != null
+                ? trailRenderer.TargetCamera
+                : statusDomain != null ? statusDomain.TargetCamera : null;
+
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.LabelField(
-                    "Candidate Selection",
-                    EditorStyles.boldLabel);
-                DrawProperty("candidateGridResolution");
-                DrawProperty("strongestCandidateSubset");
-                DrawProperty("candidateCellJitter");
-                DrawProperty("trailSeed");
-                DrawProperty("strengthScoreExponent");
-                DrawProperty("spacingScoreExponent");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Runtime State",
+                    !Application.isPlaying
+                        ? "Editor idle"
+                        : trailRenderer.RuntimeReady ? "Ready" : "Not ready");
+                WeatherInspectorGui.ReadOnlyObject(
+                    "Weather Domain",
+                    statusDomain);
+                WeatherInspectorGui.ReadOnlyObject(
+                    "Target Camera",
+                    statusCamera);
+                WeatherInspectorGui.ReadOnlyObject(
+                    "Trail Shader",
+                    trailRenderer.TrailShader);
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Active / Maximum Trails",
+                    $"{trailRenderer.ActiveTrailCount} / {trailRenderer.MaximumActiveTrails}");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Visible / Eligible Candidates",
+                    $"{trailRenderer.LastVisibleCandidateCount} / {trailRenderer.LastEligibleCandidateCount}");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Mesh Vertex / Index Capacity",
+                    $"{trailRenderer.MeshVertexCapacity} / {trailRenderer.MeshIndexCapacity}");
 
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
-                    "Streamline Construction",
-                    EditorStyles.boldLabel);
-                DrawProperty("maximumCentrelinePoints");
-                DrawProperty("integrationStepMetres");
-
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
-                    "Render Curve",
-                    EditorStyles.miniBoldLabel);
-                DrawProperty("renderCurveSubdivisionsPerBackboneSection");
-                EditorGUILayout.HelpBox(
-                    "The Weather backbone keeps its existing integration step. " +
-                    "Render subdivisions create a dense tangent-continuous curve " +
-                    "without increasing Weather-field sampling frequency.",
-                    MessageType.None);
-
-                DrawProperty("minimumPathWindStrength");
-                DrawProperty("minimumCompletedPathLengthMetres");
-
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField(
-                    "Direction-Locked Backbone",
-                    EditorStyles.miniBoldLabel);
-                DrawProperty("maximumLocalWindDirectionMismatchDegrees");
-                EditorGUILayout.HelpBox(
-                    "The dominant visible Weather direction is locked when a trail " +
-                    "spawns. Local Weather samples validate strength and compatibility " +
-                    "but cannot steer the backbone into a large curve.",
-                    MessageType.None);
-
-                DrawProperty("selfApproachDistanceMetres");
-                DrawProperty("minimumSegmentWindAlignment");
-
-            }
-        }
-
-        private void DrawMinMaxProperties(
-            string label,
-            string minimumPropertyName,
-            string maximumPropertyName)
-        {
-            EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
-            using (new EditorGUI.IndentLevelScope())
-            {
-                DrawProperty(minimumPropertyName);
-                DrawProperty(maximumPropertyName);
-            }
-        }
-
-        private void DrawProperty(string propertyName)
-        {
-            SerializedProperty property =
-                serializedObject.FindProperty(propertyName);
-            if (property != null)
-            {
-                EditorGUILayout.PropertyField(property, true);
+                if (!Application.isPlaying)
+                {
+                    WeatherInspectorGui.Info(
+                        "Editor idle. Wind-trail resources, spawning, paths, mesh uploads, and rendering run only in Play Mode.");
+                }
             }
         }
 
@@ -395,151 +687,6 @@ namespace ProgrammaticStylized3D.Weather.Editor
             serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(target);
             return true;
-        }
-
-        private void DrawRuntimeStatus(WeatherWindTrailRenderer trailRenderer)
-        {
-            WeatherWindDomain statusDomain = trailRenderer.WeatherDomain != null
-                ? trailRenderer.WeatherDomain
-                : trailRenderer.GetComponent<WeatherWindDomain>();
-            Camera statusCamera = trailRenderer.TargetCamera != null
-                ? trailRenderer.TargetCamera
-                : statusDomain != null ? statusDomain.TargetCamera : null;
-
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField(
-                "Weather Wind Trail Status",
-                EditorStyles.boldLabel);
-
-            EditorGUILayout.LabelField(
-                "Runtime State",
-                !Application.isPlaying
-                    ? "Editor idle"
-                    : trailRenderer.RuntimeReady ? "Ready" : "Not ready");
-            EditorGUILayout.LabelField(
-                "Weather Domain",
-                statusDomain != null ? statusDomain.name : "None");
-            EditorGUILayout.LabelField(
-                "Target Camera",
-                statusCamera != null ? statusCamera.name : "None");
-            EditorGUILayout.LabelField(
-                "Trail Shader",
-                trailRenderer.TrailShader != null
-                    ? trailRenderer.TrailShader.name
-                    : "None");
-            EditorGUILayout.LabelField(
-                "Active / Maximum Trails",
-                $"{trailRenderer.ActiveTrailCount} / " +
-                trailRenderer.MaximumActiveTrails);
-            EditorGUILayout.LabelField(
-                "Last Visible / Eligible Candidates",
-                $"{trailRenderer.LastVisibleCandidateCount} / " +
-                trailRenderer.LastEligibleCandidateCount);
-            EditorGUILayout.LabelField(
-                "Mesh Vertex / Index Capacity",
-                $"{trailRenderer.MeshVertexCapacity} / " +
-                trailRenderer.MeshIndexCapacity);
-
-            if (!Application.isPlaying)
-            {
-                EditorGUILayout.HelpBox(
-                    "Editor idle. Wind-trail resources, spawning, paths, mesh " +
-                    "uploads, and rendering run only in Play Mode.",
-                    MessageType.Info);
-            }
-            else if (!string.IsNullOrEmpty(trailRenderer.LastError))
-            {
-                EditorGUILayout.HelpBox(
-                    trailRenderer.LastError,
-                    MessageType.Error);
-            }
-        }
-
-        private void DrawActions(WeatherWindTrailRenderer trailRenderer)
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField(
-                "Weather Wind Trail Actions",
-                EditorStyles.boldLabel);
-
-            using (new EditorGUI.DisabledScope(
-                !Application.isPlaying || !trailRenderer.ResourcesReady))
-            {
-                if (GUILayout.Button("Reset Wind Trail Simulation"))
-                {
-                    trailRenderer.ResetTrailSimulation();
-                    Repaint();
-                    SceneView.RepaintAll();
-                }
-            }
-        }
-
-        private void DrawReport(WeatherWindTrailRenderer trailRenderer)
-        {
-            EditorGUILayout.Space();
-            showReport = EditorGUILayout.Foldout(
-                showReport,
-                "Weather Wind Trail Report",
-                true);
-            if (!showReport)
-            {
-                return;
-            }
-
-            string report = trailRenderer.BuildComprehensiveReport();
-            reportScrollPosition = EditorGUILayout.BeginScrollView(
-                reportScrollPosition,
-                GUILayout.MinHeight(220f),
-                GUILayout.MaxHeight(320f));
-
-            float availableWidth = Mathf.Max(
-                100f,
-                EditorGUIUtility.currentViewWidth - 44f);
-            float reportHeight = Mathf.Max(
-                220f,
-                EditorStyles.textArea.CalcHeight(
-                    new GUIContent(report),
-                    availableWidth));
-            EditorGUILayout.SelectableLabel(
-                report,
-                EditorStyles.textArea,
-                GUILayout.Height(reportHeight));
-            EditorGUILayout.EndScrollView();
-
-            if (GUILayout.Button("Copy Report"))
-            {
-                EditorGUIUtility.systemCopyBuffer = report;
-                Debug.Log(
-                    "[Weather Wind Trails V0.9] Report copied to clipboard.",
-                    trailRenderer);
-            }
-        }
-
-        private void DrawSceneDiagnosticControls()
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField(
-                "Scene Diagnostics",
-                EditorStyles.boldLabel);
-
-            using (new EditorGUI.DisabledScope(!Application.isPlaying))
-            {
-                EditorGUI.BeginChangeCheck();
-                showSceneDiagnostics = EditorGUILayout.ToggleLeft(
-                    "Show Scene Diagnostics",
-                    showSceneDiagnostics);
-                if (EditorGUI.EndChangeCheck())
-                {
-                    SceneView.RepaintAll();
-                }
-            }
-
-            if (!Application.isPlaying)
-            {
-                EditorGUILayout.HelpBox(
-                    "Candidate and path geometry is available only in Play Mode.",
-                    MessageType.None);
-            }
         }
 
         private void DuringSceneGui(SceneView sceneView)

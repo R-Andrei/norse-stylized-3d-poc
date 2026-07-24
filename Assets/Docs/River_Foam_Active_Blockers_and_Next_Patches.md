@@ -30,7 +30,32 @@
 
 `RG-METRIC-P13B` through `RG-METRIC-P13F` establish packet-rearmed automatic birth, one-shot Object packets, complete-vector contact retention, finite initial reinforcement, independent contact-maintenance cadence, a complete initial obstacle-contact ring, and recipe-complete later Arc/Semi-Arc contact strokes. The user reports that the final P13F result works as expected and is materially better than the former persistent-emitter implementation. Automatic spawning and Object spawning are accepted and frozen for the current milestone. Remaining River issues exist but are outside the active spawning scope.
 
-River Foam work is paused while a separate thread performs small shared River shader updates for Weather cloud shading. Those external edits are expected not to alter Foam behavior, but that expectation is unverified until the receiving River thread compares the post-Weather source against this frozen P13F/P13G baseline. Do not resume implementation from this plan until the external shader work is complete and current source is re-inventoried.
+Weather cloud shading is integrated and user-tested. The post-Weather source audit found the River change confined to the native URP `_LIGHT_COOKIES` ForwardLit variant; P13F/P13G spawning, Layer C, object retention, and Layer E contracts remain unchanged. Arc and Semi-Arc packets are accepted and remain frozen.
+
+`RIVER-MOTION-S3.1` through `RIVER-MOTION-S3.1E.3` are Unity-tested and accepted. The closed Stage 3 result includes shoreline-safe trough restoration, sign-independent full-surface detail authority, one analytical ordinary/overflow shoreline, adaptive hidden-band tessellation, a complete signed-brightness Shoreline Accent, opaque-scene edge blending, post-solve overflow variation, deterministic profile evolution, and independently authored shore-wave Length and Gap. The final accepted packet model is one positive zero-slope lobe across the complete authored Length plus one explicit nonnegative Gap; Gap `0` makes adjacent packets meet without Length adding hidden calm distance. `RIVER-MOTION-S3.1D.1` resolved the D3D11 reserved-token compile failure. S3.1E, S3.1E.1, and S3.1E.2 are rejected historical attempts and must not be restored.
+
+During the Length/Gap work, Play Mode Foam entered `PreparationRequired / GridDescriptorMismatch` because the assigned topology cache predated the current structural river domain. Explicit Edit Mode cache preparation rebuilt the exact current descriptor and restored normal Foam startup. Length, Gap, profile evolution, shoreline accent, and other live motion/render controls remain outside the immutable Foam grid descriptor and must not invalidate the topology cache.
+
+The next active River issue is now Layer E rendering visibility: Final Foam appears to hide materially more of the existing Layer C material than raw `Material Presence` and `Material Remaining Life` suggest. The next investigation must locate the loss between packed material truth and final composition before changing source amount, lifecycle, transport, or cache ownership.
+
+## Current active blocker — Final Foam hides more material than Layer C evidence implies
+
+The next patch is diagnostic-first. Do not assume that source amount, Remaining Life, Presence, transport, or the topology cache is wrong merely because Final Foam looks sparse. Compare the same frame through the existing ownership chain:
+
+```text
+Layer C Material Presence
+Layer C Material Remaining Life
+Layer C Material Pattern
+Foam Evaluated Shape / evaluated preview
+Foam Chip And Strand Probe
+Final Foam
+```
+
+The investigation must identify the first stage where expected visible support disappears. Candidate causes include Presence Footprint mapping, lifecycle visibility policy, patterned erosion/hardening, Layer D shape authority, Chipping, Strands, final opacity/colour composition, shoreline coverage blending, or another Layer E gate. The cache is implicated only if startup is not `Exact` with `hit:1/install:1`; the recent stale-grid miss was rebuilt successfully and is not an open defect.
+
+Do not retune automatic-source birth amount or lifetime until this render-path comparison proves that Layer C material itself is insufficient.
+
+The detailed patch records below preserve their original patch-time status and terminology for provenance. Where those historical records conflict with the Current status or Current active blocker above, the current sections govern.
 
 ### P12g reviewed evidence
 
@@ -358,7 +383,7 @@ P12:
 
 No compute shader, HLSL include, render shader, topology generator, source recipe, resource declaration, kernel, persistent texture/buffer, scene, prefab, material, or cache asset is changed by the source patch.
 
-## Active blocker
+## Historical blocker at the P12p decision point
 
 Unity evidence rejects both P12n Candidate Straddle and P12o Boundary-Anchored Strip. The low-frequency cache produces permission geometry unrelated to the required continuous rendered edge band and must be removed completely. The sole retained route is the original full-rate analytical Candidate Field multiplied by one rendered Eligibility band.
 
@@ -366,7 +391,7 @@ The remaining blocker is narrower: the visible pale exterior Foam fringe survive
 
 No new diagnostic view, texture, buffer, kernel, dispatch, serialized control, render pass, or candidate system is authorized. GPU timing is unmeasured.
 
-## Next patch after P12p evidence
+## Historical continuation rule after P12p evidence
 
 If the isolated rendered-fringe coordinate produces one coherent exterior Eligibility band and every Production pixel is black in `Foam Chip And Strand Probe`, continue from that route. If it still fails, stop derivative tuning and reassess the Layer E mask construction itself. P13 remains deferred until Chipping is accepted.
 
@@ -1964,3 +1989,696 @@ Post-change consistency result:
 - The 323-file Unity project inventory is unchanged.
 - Runtime and performance validation are not applicable to P13G because it contains no implementation or serialized-data changes.
 
+
+
+## RIVER-MOTION-S3.1 — Shoreline-Safe Trough Restoration and Variable Positive Overflow
+
+**Status: source implementation complete / static validation passed / Unity D3D11 import and Play Mode validation pending.**
+
+### Objective
+
+Correct the shared Stage 3 surface evaluator so increasing Macro Wave Height or Shore Wave Height does not reduce the river's effective visible width by lowering the water below the corridor at the normal shoreline. Preserve interior trough depth, preserve positive shore lapping, make positive overflow reach follow the current crest instead of remaining broad and mechanical, and decouple overall shore-wave height variation from reach variation. Reuse the existing serialized `additionalShorelineOverlap` geometry authority as an explicit `Positive Overflow Allowance (m)` control in `Surface Motion > Shore Wave Profile`; do not add duplicate serialized state.
+
+This same patch records successful Weather cloud integration and accepted Arc/Semi-Arc packets in the River Rendering Roadmap. It does not reopen spawning.
+
+### Reviewed source and evidence
+
+- Authoritative source: user-supplied `Assets-Code-Archive(17).zip`, SHA-256 `862adafc137d885207ffb0debdeaaba0b6fb18dc96744830af24831a4e19088a`, `353` safe entries, no `.git` metadata. Git branch, `HEAD`, status, diff, and history are unavailable; comparison authority is the unchanged extracted archive.
+- User screenshots show alternating apparent width loss along both banks, stronger at larger Wave Height, repeated exposed-bed troughs, and long mechanically uniform overflow spans.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl::RiverWaterEvaluateSurfaceHeight` multiplies the complete signed `blendedHeight` by one `bankMask`. `RiverWaterResolveMotionBankMask` retains `shoreMotion` at the normal visible shoreline, so negative displacement is retained there instead of returning to the static waterline.
+- `Assets/Game/Procedural/Rivers/StylizedRiverCorridorGeometry.cs::ResolveCorridorHeight` reaches `waterHeight` at the outer BedSlope boundary and begins HiddenCover from `waterHeight`; therefore negative water displacement at the normal shoreline is terrain-occluded and appears as reduced width.
+- `RiverWaterResolveShoreWaveProfiles` applies one `waveSize` to both `heightProfile` and `reachProfile`, coupling overall crest height and lateral reach. The scene values `shoreWaveSizeVariation: 0.068`, `shoreWaveProfileVariation: 0.016`, and `shoreWaveTransitionLength: 3` provide little visible variation.
+- `RiverWaterEvaluateSurfaceHeight` resolves hidden reach from `shoreWaveReach × reachProfile` without conditioning it on the current positive crest. Positive half-waves can therefore use a broad similar reach for much of their length.
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs` already owns `additionalShorelineOverlap`, clamps it to `0–8 m`, includes it in `ResolvedShorelineOverlap`, and builds `GeneratedSurfaceHalfWidth` from that result. `StylizedRiverEditor.Authoring.cs` currently exposes it under `Shoreline Safety`; moving the same property to the Shore Wave Profile avoids duplicate ownership and gives the requested positive-overflow control.
+- Direct consumers reviewed: `RiverWaterMotion.hlsl`, `RiverWaterRefraction.hlsl`, `SH_CleanStylizedRiver.shader`, `CS_RiverFoam.Topology.hlsl`, `StylizedRiverFoamRuntime.Topology.cs`, and `StylizedRiverCorridorGeometry.cs`. Foam topology already calls the shared surface evaluator and requires no signature or binding change.
+
+### Expected affected files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterRefraction.hlsl
+```
+
+Create/Delete/Move/Metadata/Serialized assets: none.
+
+### Invariants and non-goals
+
+1. The exact normal visible half-width is the minimum water edge. Negative Stage 3 displacement must be zero at and outside that edge.
+2. Negative displacement remains unchanged in the interior after a smooth restoration band using the existing `Shore Motion Width` metric distance.
+3. Positive displacement retains the existing `Shore Motion`, hidden bank-cover, and `Shore Wave Reach` ownership. Positive crests may use the complete generated overlap, including the authored extra allowance.
+4. Hidden positive reach is conditioned on the current positive shore crest. Troughs receive zero hidden reach; weak crest shoulders receive proportionally less; crest peaks may reach the authored maximum.
+5. Successive waves retain deterministic stable identities. Height and reach variation become partially correlated rather than identical; no runtime wave objects, births, lifetimes, textures, buffers, kernels, or CPU state are added.
+6. Surface geometry, finite-difference normals, refraction detail attenuation, instantaneous Stage 6 shoreline support, and Foam obstacle-waterline evaluation must consume the same final surface rule.
+7. Existing serialized values, shader properties, material ABI, compute resources, spawning, P13A material authority, P12t Layer E rendering, and Weather cookie integration remain unchanged.
+8. No scene, prefab, material, component, layer, tag, folder, or preset default change.
+
+### File-by-file implementation sequence
+
+1. `RiverWaterCommon.hlsl`: split signed surface displacement into crest and trough paths; add a shoreline trough-restoration mask; make hidden reach depend on the current positive shore crest; clamp hidden shore-wave evaluation to the normal shoreline; resolve partially independent deterministic height/reach sizes without changing public function signatures.
+2. `RiverWaterMotion.hlsl`: finite-difference the complete final shared surface height at every sample instead of multiplying unmasked blended heights by one centre bank mask.
+3. `RiverWaterRefraction.hlsl`: obtain its detail-motion bank mask from the same final shared surface evaluator, removing its independent pre-patch reach approximation.
+4. `StylizedRiverEditor.Authoring.cs`: remove `additionalShorelineOverlap` from the generic Shoreline Safety group; expose the same serialized property as `Positive Overflow Allowance (m)` under Shore Wave Profile; mark the change as structural regeneration without changing Motion preset ownership.
+5. `River_Rendering_Roadmap.md`: record successful Weather integration, accepted Arc/Semi-Arc spawning, the signed shoreline invariant, crest-conditioned overflow, independent height/reach variation, and the relocated overflow control.
+6. Run scope reconciliation, protected-contract searches, delimiter/preprocessor checks, deterministic numerical model checks, and source-level caller/consumer audit. Unity 6000.5.0f1 D3D11 import and Play Mode visual validation remain required from the user.
+
+### Performance and risks
+
+- No new texture, buffer, kernel, dispatch, render pass, draw call, simulation cadence, runtime component, or CPU update.
+- The profile evaluator adds one deterministic reach-size interpolation path. The surface evaluator reuses the already-resolved profile and applies bounded scalar `min/max/smoothstep/multiply` work.
+- Surface-normal finite differences evaluate the final shared height for four offsets. This removes the old central-mask approximation and keeps the profile-evaluation count comparable after eliminating the duplicate profile resolution formerly performed inside `RiverWaterEvaluateSurfaceHeight`.
+- Refraction replaces one profile-only bank-mask approximation with one exact shared surface evaluation. After the normal-path refactor, the complete refraction path retains ten macro-height evaluations and reduces profile resolutions from six to five relative to the captured pre-edit source. The patch adds bounded scalar masking/interpolation work but no new scaling factor or resource. Runtime cost remains unmeasured until Unity profiling.
+- Highest visual risk: a trough-restoration band that is too wide can flatten near-bank motion. The implementation must use the already-authored `Shore Motion Width`, preserve full troughs beyond that distance, and add no new tuning default.
+- Highest structural risk: moving the overflow field into a non-structural Inspector group without explicit regeneration tracking. The editor must set `structuralAuthoringChanged` only for that field.
+
+### Acceptance criteria
+
+1. Raising `Wave Height` no longer moves the exact normal shoreline inward during negative macro or shore-wave phases.
+2. At least one `Shore Motion Width` inside the bank, negative wave height is identical to the shared unprotected interior result within numerical tolerance.
+3. Positive shore crests still overtop the bank-cover profile and can reach farther when `Positive Overflow Allowance (m)` is increased and the river structurally regenerates.
+4. `Shore Wave Reach = 0` disables hidden overflow; `1` permits the complete generated allowance. Troughs never consume hidden reach.
+5. Positive overflow grows and recedes through each crest instead of forming a broad constant-reach plateau.
+6. Height and reach variation are deterministic, continuous, and not numerically identical when Size Variation is non-zero.
+7. Surface displacement, normals, refraction detail attenuation, Foam obstacle interval tests, and instantaneous Shore Support use the same evaluator.
+8. Weather cloud shading and P13B–P13F spawning source paths remain byte-identical.
+9. Exact six-file reconciliation passes. Unity compilation, D3D11 shader import, and visual validation are recorded as pending unless supplied by the user.
+
+### RIVER-MOTION-S3.1 implementation record
+
+Actually affected files:
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterRefraction.hlsl
+```
+
+Create/Delete/Move/Metadata/Serialized assets: none.
+
+Expected-versus-actual discrepancy: none.
+
+Implemented behavior:
+
+- `RiverWaterResolveShoreTroughMask` restores negative displacement smoothly over the authored `Shore Motion Width`, reaches exactly zero at the normal visible shoreline, and remains zero through hidden overlap. Full negative displacement is retained at least one authored restoration width inside the river.
+- `RiverWaterResolvePositiveShoreReach` gives hidden reach only to positive shore crests and scales it through a smooth normalized crest envelope before applying the existing zero-slope reach bounds.
+- Hidden shore-wave height evaluation clamps lateral phase input to the exact visible shoreline, so overflow continues the shoreline crest instead of changing waveform phase across generated overlap.
+- Shore-wave overall height and reach use separate deterministic salts with a `45% / 55%` correlated blend for reach. Zero Size Variation remains exactly compatible with the former `1.0` multiplier.
+- Surface normals finite-difference the complete final signed surface at all four samples. Refraction obtains its bank-detail attenuation from the same final evaluator. Existing Foam topology and instantaneous shore-support consumers already call that shared evaluator and required no source change.
+- The existing serialized `additionalShorelineOverlap` field is now exposed exactly once as `Surface Motion > Shore Wave Profile > Positive Overflow Allowance (m)`. It retains its existing `0–8 m` clamp and structural regeneration ownership; no duplicate field or serialized migration was introduced.
+- `River_Rendering_Roadmap.md` records successful Weather cloud integration, accepted/frozen Arc and Semi-Arc packet behavior, and the S3.1 signed shoreline/positive-overflow contract.
+
+Post-change consistency and compliance result:
+
+- Fresh authoritative archive comparison: `353 / 353` files preserved; exactly the six declared files differ; zero added or deleted files.
+- Markdown fence balance: pass for both modified canonical documents.
+- C#/HLSL delimiter and comment/string balance: pass for all four implementation files.
+- HLSL preprocessor balance and relevant function-call arity: pass.
+- Serialized/control ownership: pass; one existing field, one Inspector location, structural regeneration retained.
+- Resource/per-frame audit: pass; no new texture, buffer, sampler, kernel, dispatch, pass, draw call, runtime component, `Update`, `FixedUpdate`, `LateUpdate`, or `OnValidate` path.
+- Protected contract audit: `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.Injection.cs`, `StylizedRiverFoamRuntime.Obstacles.cs`, `CS_RiverFoam.compute`, `RiverWaterFoam.hlsl`, `RiverWaterFoamVelocity.hlsl`, and `SH_CleanStylizedRiver.shader` are byte-identical to the supplied post-Weather source.
+- Numerical contract checks: `800,000` randomized signed shoreline-mask cases pass; `100,000` crest-conditioned reach cases pass; `50,000` deterministic height/reach-size cases confirm non-identical correlated variation (`mean absolute delta 0.051722`, maximum `0.374715`); `10,000` zero-variation compatibility cases pass.
+- Analytical evaluation-count audit: the complete refraction path retains ten macro-height evaluations and reduces shore-profile resolutions from six to five relative to the captured source. Additional work is bounded scalar masking/interpolation. No measured runtime-performance result is claimed.
+- Unity `6000.5.0f1` D3D11 shader import, Play Mode visual acceptance, reverse-flow/freeze/refraction regression, and profiler evidence are pending because Unity is unavailable in the patch environment.
+
+## RIVER-MOTION-S3.1A — Surface-Detail Continuity and Shoreline-Aligned Overflow Mesh
+
+**Status: source implementation complete / static validation passed / Unity D3D11 import and Play Mode validation pending.**
+
+### Objective
+
+Correct the two Unity regressions introduced by `RIVER-MOTION-S3.1` without reverting its accepted shoreline-underflow protection or positive-overflow control:
+
+1. make trough restoration affect signed vertical displacement only, never the stable visible-water mask used by detail normals, current accents, or refraction;
+2. make the single generated water mesh place vertices exactly at both normal visible shorelines and distribute existing cross-river segments through the hidden overflow bands, so positive overflow transitions through dedicated geometry instead of exposing broad triangles that straddle the shoreline.
+
+No second water mesh exists or will be added.
+
+### Reviewed evidence and current constraints
+
+- Unity screenshots supplied after S3.1 show large calm-looking regions separated from detailed water by abrupt longitudinal boundaries. `RiverWaterCommon.hlsl::RiverWaterEvaluateSurfaceHeight` currently assigns `bankMask = blendedHeight < 0 ? troughMask : positiveBankMask`. `RiverWaterMotion.hlsl::RiverWaterEvaluateMotionFragment` multiplies detail-normal strength, detail-normal blending, and current accent by that output; `RiverWaterRefraction.hlsl::RiverWaterEvaluateRefraction` multiplies optical detail by the same output. The sign branch therefore changes shading authority whenever the macro height crosses zero.
+- `StylizedRiverGeometry.BuildSurfaceMesh` currently distributes all cross-river vertices uniformly from `-surfaceHalfWidth` to `+surfaceHalfWidth`. Increasing `additionalShorelineOverlap` increases the distance between those vertices and does not guarantee a vertex at either `±visibleHalfWidth`. Unity screenshots show the resulting stepped polygonal water/ground intersection in the positive-overflow band.
+- The existing surface is one generated mesh built by `StylizedRiverGeometry.BuildSurfaceMesh`; S3.1 added no mesh renderer, mesh object, pass, or draw call.
+- Direct consumers reviewed: `SH_CleanStylizedRiver.shader` vertex/fragment calls, `RiverWaterMotion.hlsl`, `RiverWaterRefraction.hlsl`, `CS_RiverFoam.Topology.hlsl`, `StylizedRiverCorridorGeometry.cs`, and `StylizedRiver.BuildSurface`. Public shader signatures and serialized authoring remain stable.
+- Comparison authority is the post-S3.1 reconstructed source: user-supplied `Assets-Code-Archive(17).zip` plus `RIVER-MOTION-S3.1_Shoreline_Safe_Troughs_Variable_Positive_Overflow_2026-07-23.zip`. No Git metadata exists.
+
+### Expected affected files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiverGeometry.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+Create/Delete/Move/Metadata/Serialized assets: none.
+
+### Invariants and non-goals
+
+1. Preserve S3.1 trough protection: negative displacement is zero at and outside the normal visible shoreline and full-strength in the interior after the authored restoration band.
+2. Preserve S3.1 positive crest reach, independent height/reach variation, overflow authoring, Weather cookie integration, and frozen Arc/Semi-Arc spawning.
+3. `bankMask` remains the compatibility output name but returns one sign-independent visible-water/detail mask. It must not branch on macro-height sign.
+4. Signed displacement is resolved as `positiveHeight × positiveBankMask + negativeHeight × troughMask`.
+5. Use one water mesh and the existing segment budget. Do not add a renderer, mesh, material, pass, draw call, texture, buffer, kernel, dispatch, or per-frame CPU work.
+6. Preserve the exact total cross-river segment count selected by `ResolveCrossSegments`. Redistribute those segments so both visible shoreline boundaries are explicit vertices and each hidden overflow band receives dedicated intervals.
+7. Preserve all shader function signatures, serialized fields, Inspector controls, scene data, prefabs, materials, components, layers, tags, and folders.
+
+### File-by-file implementation sequence
+
+1. `RiverWaterCommon.hlsl`: keep `positiveBankMask` as the stable output mask; split positive and negative displacement before applying their separate masks; remove the sign-switched output branch.
+2. `StylizedRiverGeometry.cs`: replace uniform full-width cross coordinates with one deterministic three-band mapping—left hidden overlap, visible channel, right hidden overlap. Allocate `1/2/3` hidden intervals per side for the current low/medium/high base segment ranges while preserving the supplied total segment count. Place vertices exactly at `-leftVisibleHalfWidth` and `+rightVisibleHalfWidth` for every longitudinal row.
+3. `River_Rendering_Roadmap.md`: mark S3.1 visual validation failed, record S3.1A ownership and pending Unity validation.
+4. Run exact-scope, one-mesh/resource, segment-count, shoreline-coordinate, signed-height, stable-detail-mask, caller/signature, delimiter/preprocessor, protected spawning/Weather, and fresh-package reproduction checks.
+
+### Performance and risks
+
+- Runtime shader cost decreases slightly by replacing a dynamic sign-selection assignment with two `min/max` height components and one addition; no new profile/noise evaluation exists.
+- Surface generation adds only dirty-time scalar coordinate mapping. Vertex count, triangle count, draw calls, materials, and render passes remain exactly unchanged because the total cross-river segment count is preserved.
+- The visible-channel receives fewer intervals than the former uniform distribution because dedicated hidden-band intervals are now explicit. Allocation is bounded: low uses `1 + 4 + 1`, medium `2 + 8 + 2`, high `3 + 14 + 3`; runtime-disturbance counts above 20 keep only three intervals per hidden side and retain all remaining intervals in the visible channel.
+- Risk: very large positive overflow allowance can still exceed the visual fidelity supported by a fixed segment budget. S3.1A targets the requested small authored increases and removes the current missing-shoreline-vertex defect; it does not authorize an unbounded vertex-density increase.
+
+### Acceptance criteria
+
+1. The entire normal visible river surface retains continuous detail normals, current accents, and refraction through positive/negative macro-wave sign changes.
+2. No abrupt calm/wave boundary remains at a zero crossing solely because displacement changed sign.
+3. S3.1 underflow protection remains exact at the normal shoreline.
+4. One generated water mesh remains; renderer, mesh, vertex-count, triangle-count, and draw-call ownership are unchanged.
+5. Every generated row contains explicit left and right normal-shoreline vertices plus dedicated hidden-overlap vertices.
+6. Positive overflow enters the hidden band through those shoreline-aligned vertices and no longer exposes the broad uniform triangle that crossed the normal shoreline.
+7. Exact four-file reconciliation passes. Unity 6000.5.0f1 D3D11 import and focused visual validation remain pending unless supplied by the user.
+
+### RIVER-MOTION-S3.1A implementation record
+
+Actually affected files:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiverGeometry.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+Create/Delete/Move/Metadata/Serialized assets: none. Expected-versus-actual discrepancy: none.
+
+Implemented behavior:
+
+- `RiverWaterEvaluateSurfaceHeight` now returns `positiveBankMask` through the existing `bankMask` output for all signed macro heights. Detail normals, current accents, and refraction therefore retain one sign-independent visible-water authority.
+- Signed vertical displacement is resolved independently: positive height uses the existing positive shore/overflow mask; negative height uses only the S3.1 trough-restoration mask. The S3.1 no-underflow invariant is preserved without attenuating unrelated surface detail.
+- `StylizedRiverGeometry.BuildSurfaceMesh` still creates one mesh with the exact existing `crossSegments + 1` vertices per row and the exact existing triangle count. Its cross coordinates now use three bands rather than one uniform full-width interpolation.
+- Segment allocation is `1 hidden + 4 visible + 1 hidden` for six segments, `2 + 8 + 2` for twelve, `3 + 14 + 3` for twenty, and a maximum of three hidden intervals per side for larger runtime-disturbance counts. Each row contains exact vertices at the left and right visible shorelines and at both generated outer edges.
+- No shader signature, serialized field, Inspector control, scene, prefab, material, renderer, mesh object, texture, buffer, kernel, dispatch, pass, draw call, runtime component, update method, Weather receiver, Foam source, or Layer E path changed.
+
+Post-change consistency and compliance result:
+
+- Exact post-S3.1 delta: four modified files, zero added or deleted files.
+- `24/24 PASS` static and numerical checks.
+- `800,000` randomized signed-displacement equivalence cases pass with zero numerical error relative to the intended piecewise crest/trough formula.
+- `200,000` sign-independence checks confirm the detail mask does not depend on positive or negative macro height.
+- `100,000` randomized asymmetric-width mesh-coordinate cases pass monotonicity, endpoint, exact-shoreline, and vertex-count checks.
+- Low/Medium/High/runtime segment allocations and unchanged vertex/triangle formulas pass.
+- C# and HLSL delimiter balance, HLSL preprocessor balance, Markdown fence balance, one-mesh/resource scans, stale-symbol scans, and shader caller counts pass.
+- `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.Injection.cs`, `StylizedRiverFoamRuntime.Obstacles.cs`, `CS_RiverFoam.compute`, `RiverWaterFoam.hlsl`, `RiverWaterFoamVelocity.hlsl`, `SH_CleanStylizedRiver.shader`, `RiverWaterMotion.hlsl`, and `RiverWaterRefraction.hlsl` remain byte-identical to the supplied post-S3.1 source.
+- Runtime cost remains unmeasured. Shader evaluation adds no noise/profile call or scaling resource. Mesh build uses the same vertex and triangle counts and adds only dirty-time coordinate mapping.
+- Unity `6000.5.0f1` C# compilation, D3D11 shader import, Play Mode confirmation of full-surface detail continuity, positive-overflow smoothness, reverse flow, freeze/thaw, refraction, Stage 6 shoreline support, and profiler evidence are pending because Unity is unavailable in the patch environment.
+
+## RIVER-MOTION-S3.1B — Authoritative Dynamic Shoreline and Stylized Shoreline Accent
+
+**Status:** source implementation and static validation complete; Unity validation pending.
+
+### Objective
+
+Replace the remaining faceted positive-overflow terrain-intersection contour with one shared dynamic shoreline boundary. The same boundary must own visible-water clipping and a new complete-shoreline accent so ordinary and overflow regions use identical edge logic. Increase hidden-overflow tessellation automatically as the generated allowance grows without reducing the existing visible-channel segment count. Add authored accent width, strength, colour, and signed brightness; negative brightness darkens and positive brightness brightens.
+
+### Reviewed evidence
+
+- Unity screenshots after S3.1A show the no-underflow and full-surface-detail corrections working, but positive overflow still advances through stair-like segments. The defect becomes more visible as `Positive Overflow Allowance (m)` increases.
+- `Assets/Game/Procedural/Rivers/StylizedRiverGeometry.cs::BuildSurfaceMesh` currently treats `ResolveCrossSegments()` as the total segment budget and assigns at most three intervals to each hidden band. Increasing hidden width therefore increases metres per hidden interval and exposes a faceted moving contact contour.
+- The existing implementation still uses one generated mesh, one `MeshRenderer`, one material, one Forward pass, and one draw call. S3.1A did not add a second surface.
+- `RiverWaterCommon.hlsl::RiverWaterEvaluateSurfaceHeight` already evaluates the same positive crest, resolved reach, hidden-bank attenuation, and S3.1 trough restoration used by visible displacement. `RiverWaterResolveHiddenBankCoverOffset` matches `StylizedRiverCorridorGeometry.ResolveCorridorHeight` HiddenCover ownership: `bankCover × smoothstep(hiddenT)` above static water level.
+- `RiverWaterResolveCurrentVisibleShoreHalfWidth` exists for Stage 6 but performs 24 full surface evaluations plus four refinements. That search is unsuitable for every render fragment. S3.1B will instead solve the now-monotonic hidden-band contact using the already-evaluated positive shore height, reach, Shore Motion, bank cover, and a bounded scalar bisection with no additional noise/profile evaluations.
+- `SH_CleanStylizedRiver.shader` has one Forward pass. Its fragment stage already owns final body composition before Foam. A shoreline accent can be applied there without a second mesh, pass, texture, depth edge detector, or rock/object outlining.
+- The current visible contact fringe is accidental and not authoritative. The user accepts its drawing-like quality and explicitly approved complete-shoreline controls for thickness, strength, colour, and brightness, with brightness required to support negative values.
+- Comparison authority is the post-S3.1A reconstructed source in `/mnt/data/current_river`. The supplied source has no Git metadata.
+
+### Approved files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/StylizedRiverGeometry.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+```
+
+Create/Delete/Move/Metadata/Scenes/Prefabs/Materials: none.
+
+### Invariants and non-goals
+
+1. Preserve one generated water mesh, one renderer, one material, one Forward pass, and one draw call.
+2. Preserve S3.1 trough restoration, S3.1A sign-independent detail/refraction authority, positive crest/reach variation, Weather cookie integration, and frozen P13F/P13G spawning.
+3. The dynamic shoreline minimum is the normal visible half-width. Negative waves never retreat it inward. Positive crests may extend it only through the generated hidden allowance.
+4. Dynamic overflow contact must use the same HiddenCover equation as the corridor: static water plus `bankCover × smoothstep(hiddenT)`.
+5. The render path must not call the historical 24-sample shoreline search per fragment. Use a bounded scalar solve over the monotonic hidden band and reuse already-evaluated Stage 3 values.
+6. Visible-channel cross-river segments remain exactly equal to `ResolveCrossSegments()`. Hidden-band segments are additional, automatic, spacing-derived, and capped; they are not stolen from the visible channel.
+7. The Shoreline Accent is lateral-shoreline-only. Do not use screen-depth edge detection and do not outline rocks, obstacles, Foam, or other scene silhouettes.
+8. Accent Width is world-space metres inward from the current shoreline. Strength zero disables it. Signed Brightness range `[-1, 1]` maps to multiplier `[0, 2]`; negative values darken and positive values brighten the authored colour.
+9. Do not add a texture, buffer, kernel, dispatch, render pass, draw call, runtime component, layer, tag, folder, or per-frame CPU rebuild.
+
+### File-by-file implementation sequence
+
+1. `River_Foam_Active_Blockers_and_Next_Patches.md`: record this plan before implementation.
+2. `StylizedRiver.cs`: add serialized Shoreline Accent colour/strength/width/signed-brightness state, shader IDs, public read-only properties, clamping, defaults, and MaterialPropertyBlock bindings; bind existing `shorelineBankCover` to the render shader.
+3. `StylizedRiverEditor.cs` and `StylizedRiverEditor.Authoring.cs`: add `Water Body > Shoreline Accent` and expose Colour, Strength, Width, and signed Brightness with exact ownership tooltips.
+4. `StylizedRiverGeometry.cs`: treat the existing cross-segment result as visible-channel intervals; derive additional left/right hidden intervals from maximum domain hidden width and visible-channel metric spacing; preserve exact normal-shore vertices and one mesh.
+5. `RiverWaterCommon.hlsl`: factor the current surface calculation so normal/refraction/Foam callers preserve their signature; add a render-only surface-and-shoreline overload that resolves the monotonic bank-cover intersection using already-evaluated shore values and bounded bisection.
+6. `RiverWaterMotion.hlsl`: carry `currentShoreHalfWidth` in `RiverWaterMotionResult` and use the new render-only evaluator without changing finite-difference normal calls.
+7. `SH_CleanStylizedRiver.shader`: add properties/uniforms, clip the Forward fragment against `currentShoreHalfWidth`, derive one anti-aliased world-space inward shoreline band, and blend the signed-brightness accent into body colour before Foam and fog.
+8. `River_Rendering_Roadmap.md`: record the authoritative shoreline/accent contract and pending Unity validation.
+9. Run exact-scope, serialized-state, shader ABI/caller, monotonic shoreline-solve, geometry spacing/cap, one-resource, delimiter/preprocessor, protected Weather/Foam, and fresh-package reproduction checks.
+
+### Performance and risks
+
+- Geometry: dirty-time generation adds hidden-band vertices and triangles proportional to actual hidden allowance. Visible-channel vertices remain unchanged. Hidden intervals use visible-channel metric spacing and are capped to the existing visible-segment count per bank.
+- Vertex/fragment shader: one render surface evaluation now returns the current shoreline. The shoreline solve uses ten scalar bisection iterations over monotonic smoothstep functions and performs no additional noise, profile, texture, depth, or full-surface evaluations. Finite-difference normal and Foam/compute callers keep the cheaper existing path.
+- Fragment composition adds one `clip`, `fwidth`, smooth band, and colour blend. No extra sample, pass, draw, or buffer exists.
+- Risk: the authoritative clip changes the final visible edge from incidental depth competition to the shared solved edge. Unity must confirm no gap or floating lip at extreme Bank Cover, Shore Motion, Reach, or Overflow Allowance values.
+- Risk: larger hidden tessellation increases vertex count. The cap prevents unbounded growth, but exact GPU/CPU cost remains unmeasured.
+
+### Acceptance criteria
+
+1. Positive overflow contact is a continuous curved contour without stair-step turns at the tested `0`, `0.15`, and `0.30 m` additional allowances.
+2. Ordinary and overflow shoreline regions use one continuous current-shore boundary with no join, double line, or colour discontinuity.
+3. Negative macro/shore waves never move the current shoreline inside the normal visible half-width.
+4. Full-surface detail, current accents, and refraction remain continuous through wave sign changes.
+5. Shoreline Accent Width, Strength, Colour, and signed Brightness affect both banks and both ordinary/overflow regions; negative Brightness darkens and positive Brightness brightens.
+6. Rocks and interior objects receive no shoreline accent from this feature.
+7. One mesh/renderer/material/pass/draw remains. Visible-channel segment count is unchanged; hidden segments are additional and bounded.
+8. Exact nine-file reconciliation passes. Unity 6000.5.0f1 D3D11 compile/import and focused Play Mode visual/profiler validation remain pending unless supplied by the user.
+
+### RIVER-MOTION-S3.1B implementation record
+
+Actually affected files:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/StylizedRiverGeometry.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+```
+
+Create/Delete/Move/Metadata/Scenes/Prefabs/Materials: none. Expected-versus-actual discrepancy: none.
+
+Implemented behavior:
+
+- `StylizedRiver` now owns `shorelineAccentColor`, `shorelineAccentStrength`, `shorelineAccentWidth`, and signed `shorelineAccentBrightness`, with MaterialPropertyBlock bindings and no preset ownership. Existing `shorelineBankCover` is also bound to the render shader so the rendered shoreline uses the same HiddenCover height contract as corridor generation.
+- `Water Body > Shoreline Accent` exposes `Colour`, `Strength`, `Width (m)`, and `Brightness`. Brightness is clamped to `[-1, 1]` and maps to colour multiplier `[0, 2]`; negative values darken and positive values brighten.
+- `BuildSurfaceMesh` preserves the complete `ResolveCrossSegments()` result as visible-channel intervals. Left/right hidden intervals are additional, derive from maximum domain hidden width divided by visible-channel metric spacing, and are capped to the visible interval count per bank. Exact normal-shore and outer-edge vertices remain present in every row.
+- `RiverWaterEvaluateSurfaceHeightCore` preserves the existing public `RiverWaterEvaluateSurfaceHeight` signature for finite-difference normals, refraction, Foam topology, and other consumers. The render-only `RiverWaterEvaluateSurfaceHeightAndShoreline` reuses already-evaluated shore height/reach and resolves current bank contact through ten bounded scalar bisection iterations against `bankCover × smoothstep(hiddenT)`.
+- `RiverWaterMotionResult.currentShoreHalfWidth` carries the resolved edge to the Forward fragment. The fragment clips the single water surface against that edge, derives an anti-aliased world-space inward accent band from the same edge, and blends the authored accent into body colour before Foam and fog.
+- Ordinary shoreline and positive-overflow shoreline therefore share one boundary and one accent calculation. Interior rocks and other scene silhouettes are not inputs to the accent.
+- One water mesh, one `MeshRenderer`, one material, one Forward pass, and one draw call remain. No texture, buffer, kernel, dispatch, runtime component, layer, tag, folder, or per-frame CPU rebuild was added.
+
+Post-change consistency and compliance result:
+
+- Exact post-S3.1A delta: nine modified files, zero added or deleted files.
+- `71/71 PASS` static, scope, contract, numerical, and protected-file checks.
+- `300,000` randomized shoreline cases confirm the resolved edge remains within `[visibleHalfWidth, surfaceHalfWidth]`; negative/zero crests never extend or retreat it. Ten-step bisection differs from a 64-step reference by at most `0.007585 m` across test cases with up to `8 m` hidden width.
+- `100,000` randomized asymmetric mesh cases pass monotonic coordinates, exact left/right outer edges, exact left/right normal shorelines, preserved visible interval count, and hidden-segment caps.
+- C#/HLSL/shader delimiter balance, HLSL preprocessor balance, shader property/ID/binding parity, caller counts, one-pass/resource scans, historical-search exclusion, signed-brightness mapping, and roadmap/plan consistency pass.
+- `StylizedRiverFoamRuntime.BirthEvents.cs`, `StylizedRiverFoamRuntime.Injection.cs`, `StylizedRiverFoamRuntime.Obstacles.cs`, `CS_RiverFoam.compute`, `CS_RiverFoam.Topology.hlsl`, `RiverWaterFoam.hlsl`, and `RiverWaterFoamVelocity.hlsl` remain byte-identical to the post-S3.1A baseline.
+- A nine-entry changed-file package applied over a fresh post-S3.1A baseline reproduces all `353/353` project files byte-identically; archive traversal-path inspection passes.
+- Runtime cost remains unmeasured. The render adds ten scalar bisection iterations, one fragment clip, one derivative-based anti-alias width, one smooth band, and one colour blend; no extra profile/noise evaluation or texture sample is added. Dirty-time mesh generation adds bounded hidden-band vertices/triangles while preserving visible-channel resolution.
+- Unity `6000.5.0f1` C# compilation, D3D11 shader import, Play Mode shoreline/accent visual acceptance, reverse-flow/freeze/refraction/Stage 6 regression, and profiler evidence are pending because Unity is unavailable in the patch environment.
+
+
+## RIVER-MOTION-S3.1C — Persistent Overflow Variation and Shoreline Coverage Blend
+
+**Status:** source implementation and offline validation complete; Unity validation pending.
+
+### Objective
+
+Preserve visible shore-wave size/profile variation after the S3.1B bank-cover contact solve, clarify that the existing shore-wave length scale is also the wave-spacing/frequency control, and replace the visibly pixel-stepped water/ground colour transition with a cheap world-space coverage blend. The complete shoreline accent must follow the same blend. Ordinary and positive-overflow shoreline regions retain one authoritative dynamic boundary.
+
+### Reviewed evidence
+
+- User screenshots after S3.1B show the authoritative shoreline and accent functioning, but a `0.33 m` Positive Overflow Allowance with Size Variation `0.67`, Side Asymmetry `0.67`, and Profile Variation `0.85` still produces similar visible overflow widths and long intervals without positive shore waves.
+- `RiverWaterCommon.hlsl::RiverWaterResolveShoreWaveProfiles` creates substantial pre-solve height/reach variation, but `RiverWaterResolveRenderedShoreHalfWidth` returns only the bank-cover intersection. Tall crests can therefore converge on similar final extensions even when their pre-solve profile values differ.
+- `RiverWaterResolveCurrentVisibleShoreHalfWidth` independently resolves Stage 6 shore support through the same shared profile functions. Any post-solve variation must be applied to both render and Stage 6 outputs from one deterministic helper.
+- `shoreWaveLengthScale` already changes the travelling wave coordinate wavelength. Lower values produce shorter spacing and more frequent shore waves; the current Inspector label/tooltip does not state this clearly. The user’s value `1.27` makes waves less frequent than the centre-river macro wavelength.
+- S3.1B clips the Forward fragment against the analytical shoreline, which fixes geometry-defined contact ownership but leaves the final water/ground silhouette binary. The accent band is smooth inside water; the outer contact remains pixel-stepped because the final fragment is either kept or discarded.
+- `Assets/Settings/PC_RPAsset.asset` serializes `m_MSAA: 1`, so alpha-to-coverage has no useful multisample coverage in the supplied PC configuration. A dither fallback would replace stairs with visible stipple. The current Forward shader already has the refracted opaque-scene colour used for body composition, so a narrow world-space blend back to that existing scene colour can provide the requested transparency-like visual transition without changing Blend, ZWrite, queue, pass count, samples, or sorting ownership.
+- Comparison authority is the complete post-S3.1B reconstructed source in `/mnt/data/s31c_base`. The supplied source has no Git metadata.
+
+### Approved files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+Create/Delete/Move/Metadata/Geometry/Scenes/Prefabs/Materials: none.
+
+### Invariants and non-goals
+
+1. Preserve one generated water mesh, one renderer, one material, one Forward pass, one draw call, existing Blend/ZWrite/queue state, and S3.1B adaptive hidden tessellation.
+2. Preserve S3.1 trough restoration, S3.1A sign-independent detail/refraction authority, S3.1B authoritative dynamic shoreline and signed accent brightness, Weather cookie integration, and frozen P13F/P13G spawning.
+3. Existing Size Variation and Profile Variation remain the only variation authoring controls. Add no duplicate frequency or variation slider.
+4. Zero Size Variation and zero Profile Variation must preserve the S3.1B shoreline extension exactly.
+5. Post-solve variation must only reduce a solved positive extension toward the normal shoreline. It must never exceed the solved bank-cover contact, extend past the generated allowance, or retreat below the normal visible half-width.
+6. Render and Stage 6 current-shore outputs must use the same deterministic post-solve usage function.
+7. Relabel the existing `shoreWaveLengthScale` display as length/spacing and state explicitly that lower values create more frequent waves.
+8. Shoreline Edge Blend Width is world-space metres inward from the current shoreline, independent of accent strength. Zero preserves the hard S3.1B contact.
+9. Edge blending uses the already-evaluated opaque-scene/refraction colour; do not add a texture sample, transparent blend state, alpha-to-coverage dependency, dither pattern, pass, or draw.
+10. Foam, geometry, refraction source, runtime components, scenes, prefabs, materials, layers, tags, buffers, textures, kernels, and dispatches remain unchanged.
+
+### File-by-file implementation sequence
+
+1. `River_Foam_Active_Blockers_and_Next_Patches.md`: record this plan before implementation.
+2. `RiverWaterCommon.hlsl`: add one deterministic overflow-usage profile derived from existing Size/Profile Variation; evaluate it only for the final render shoreline and final Stage 6 shore output rather than inside ordinary surface-height/normal/refraction evaluations; scale both solved extensions after bank-cover contact while preserving all public caller signatures.
+3. `StylizedRiver.cs`: add serialized Shoreline Edge Blend Width, shader ID, read-only property, clamp, default, and MaterialPropertyBlock binding; clarify `shoreWaveLengthScale` spacing/frequency tooltip.
+4. `StylizedRiverEditor.Authoring.cs`: relabel Shore Wave Length Scale as `Shore Wave Length / Spacing Scale`, explain lower/more-frequent behavior, and expose Shoreline Edge Blend Width under the existing Shoreline Accent group.
+5. `SH_CleanStylizedRiver.shader`: add the edge-blend property/uniform; preserve the authoritative clip; calculate a world-space coverage value from current-shore distance; fade the accent through it; blend the completed water/Foam/fog colour back to the existing scene colour only inside the authored edge band.
+6. `River_Rendering_Roadmap.md`: record the post-solve variation and visual coverage contract.
+7. Run exact-scope, serialization/shader-binding parity, zero-variation compatibility, post-solve bounds/variation, render/Stage 6 shared-helper, one-resource, protected-file, delimiter/preprocessor, and fresh-package reproduction checks.
+
+### Performance and risks
+
+- Shared motion adds deterministic scalar hash/profile arithmetic once for the final render shoreline and once for each final Stage 6 row output, plus one multiply/lerp after shoreline solving. Ordinary surface-height, finite-difference normal, refraction, and Foam topology evaluations do not pay this post-solve variation cost. No additional noise, texture, surface-height, or bank-cover solve is added.
+- Fragment composition adds one world-space smooth coverage calculation and one final colour lerp. It reuses `refraction.sceneColour`; there is no additional sample and no hardware blending-state change.
+- Risk: very large Edge Blend Width values can visually soften more of the shoreline accent and near-bank Foam than desired. The authored range is capped at `0.15 m`, with a small default.
+- Risk: the scene-colour blend is a visual contact treatment, not geometric transparency. It intentionally preserves the existing depth-writing architecture and will not reveal later transparent objects through the water edge.
+- Exact GPU cost remains unmeasured until Unity profiling.
+
+### Acceptance criteria
+
+1. Current high Size/Profile Variation values produce materially different final positive-overflow widths even when multiple crests can overtop the bank-cover solve.
+2. Zero Size/Profile Variation reproduces S3.1B final shoreline extension.
+3. Lower Shore Wave Length / Spacing Scale visibly creates more frequent waves; higher values create wider spacing.
+4. Render and Stage 6 shore support use the same deterministic post-solve usage profile.
+5. Edge Blend Width zero preserves the current hard boundary. Positive values create a smooth visual water-to-ground transition without changing the analytical shoreline, mesh, depth, blend state, or draw count.
+6. The Shoreline Accent fades with the same contact coverage and remains continuous through ordinary and overflow regions.
+7. S3.1/S3.1A/S3.1B behavior, Weather integration, Foam, reverse flow, and freeze contracts remain unchanged.
+8. Exact six-file reconciliation and offline validation pass. Unity 6000.5.0f1 D3D11 import, focused visual acceptance, and profiling remain pending unless supplied by the user.
+
+
+### RIVER-MOTION-S3.1C implementation record
+
+Actually affected files:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+No files were created, deleted, moved, renamed, or modified outside the approved six-file scope.
+
+Implemented behavior:
+
+- `RiverWaterResolveShoreOverflowUsageProfile` derives one deterministic post-solve usage value from the existing Size Variation, Profile Variation, Side Asymmetry, Transition Length, spacing, seed, side, and travelling wave coordinate. At zero Size/Profile Variation it returns exactly `1`; otherwise it remains within `[0,1]`.
+- The S3.1B bank-cover contact remains the maximum legal positive extension. Render and Stage 6 multiply only that solved extension by the shared usage value, so variation can pull a crest toward the normal shoreline but cannot extend past the solved contact or generated allowance.
+- The helper is evaluated only for the final render shoreline and final Stage 6 row output. Ordinary surface height, finite-difference normal, refraction, and Foam topology calls retain their previous cost and signatures.
+- `Shore Wave Length Scale` is displayed as `Shore Wave Length / Spacing Scale`; its tooltip states that lower values create shorter spacing and more frequent waves.
+- `Water Body > Shoreline Accent > Edge Blend Width (m)` is serialized with range `0..0.15 m` and default `0.04 m`. Zero preserves the S3.1B hard visual contact.
+- The Forward pass retains the analytical clip, `Blend One Zero`, `ZWrite On`, `Transparent-10` queue, one pass, and one draw. A positive Edge Blend Width smoothly blends the completed water/Foam/fog/accent colour back to the existing `refraction.sceneColour` inside the current shoreline. No new texture sample, hardware alpha blend, alpha-to-coverage, or dither exists.
+
+Offline validation:
+
+- Exact approved scope: six modified files, zero added/deleted/moved files.
+- Structural, preprocessor, serialized-field, shader-property, MaterialPropertyBlock, Inspector, shared-caller, one-pass, Blend/ZWrite/queue, sample-count, and protected-file checks: PASS.
+- `200,000` randomized zero-variation cases reproduced S3.1B usage `1.0` exactly.
+- `200,000` randomized usage/bounds and post-solve cases remained within the normal shoreline and solved contact.
+- Representative high-variation authoring produced post-solve usage `p10=0.4318`, `p90=0.7673`, spread `0.3355`, standard deviation `0.1314`, and maximum `1.0`.
+- `100,000` randomized edge-coverage cases remained bounded and monotonic; zero width preserved hard-edge compatibility.
+- Offline checks: `69/69 PASS`.
+- Six-entry package traversal inspection: PASS. Applying the package to a fresh post-S3.1B baseline reproduces all `353/353` project files byte-identically.
+
+Pending validation:
+
+- Unity `6000.5.0f1` C# compile and D3D11 shader import.
+- Play Mode comparison of the user’s current high-variation settings before/after S3.1C.
+- Frequency validation using lower and higher Length / Spacing Scale values.
+- Edge Blend Width visual validation at `0`, `0.02`, `0.04`, and `0.08 m`, including accent and Foam contact.
+- Reverse-flow, freeze/thaw, refraction, Stage 6 shore support, and CPU/GPU profiler validation.
+
+
+## RIVER-MOTION-S3.1D — Deterministic Shore-Wave Profile Evolution
+
+**Status:** source implementation and offline validation complete; Unity validation pending.
+
+### Objective
+
+Add low-cost deterministic profile evolution so each travelling shore-wave identity changes shape over authored time instead of carrying one fixed normalized crest/trough silhouette across the river. Preserve the S3.1C dynamic shoreline, overflow variation, edge coverage blend, complete Shoreline Accent, full-surface detail normals, refraction, Weather lighting/shadows, Stage 6 shore support, and frozen Foam spawning contracts.
+
+### Reviewed evidence
+
+- User acceptance after S3.1C identifies one remaining Stage 3 issue: height, reach, start/middle/end, and post-solve usage vary, but the underlying normalized shore-wave silhouette remains recognizably repeated along the river.
+- `RiverWaterCommon.hlsl::RiverWaterEvaluateMacroHeight` owns one signed normalized carrier and one steepness exponent. `RiverWaterEvaluateBlendedMacroHeightDetailed` changes shore amplitude and reach profiles but passes the same authored steepness and unmodified carrier shape into every shore evaluation.
+- `RiverWaterCommon.hlsl::RiverWaterResolveShoreWaveProfiles` already derives a stable travelling `waveCoordinate`; `floor(waveCoordinate)` is a stable identity for a wave moving at the authored flow speed. A deterministic time phase keyed by that identity can evolve without CPU objects, buffers, allocations, or live reseeding.
+- `RiverWaterMotion.hlsl` evaluates the same shared height for vertex displacement and four finite-difference normal samples. `RiverWaterRefraction.hlsl` independently evaluates the same height and normal contract. New evolution inputs must reach both paths or geometry, detail/refraction, and lighting normals will diverge.
+- `StylizedRiverFoamRuntime.Topology.cs`, `CS_RiverFoam.Topology.hlsl`, and `CS_RiverFoam.compute` pass the complete Stage 3 shore-wave contract into obstacle-waterline and current-shore evaluation. New evolution inputs must be bound there so Foam support follows the same animated shoreline; spawning scheduling and source geometry remain outside scope.
+- `SH_CleanStylizedRiver.shader` owns the authoritative dynamic shoreline clip, Shoreline Accent, edge coverage blend, Foam composition, URP `_LIGHT_COOKIES`, and final shadowed lighting. The patch must only add two scalar uniforms and pass them through existing shared motion/refraction calls; it must not change accent, Foam, shadow, cookie, blend, depth, queue, pass, or composition ownership.
+- Comparison authority is the complete post-S3.1C source in `/mnt/data/s31d_base`. The supplied source contains no Git metadata.
+
+### Approved files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterRefraction.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+Create/Delete/Move/Metadata/Geometry/Scenes/Prefabs/Materials: none.
+
+### Invariants and non-goals
+
+1. Preserve one water mesh, renderer, material, Forward pass, draw call, current Blend/ZWrite/queue state, adaptive hidden tessellation, and authoritative dynamic shoreline.
+2. Preserve S3.1 trough restoration, S3.1A sign-independent detail authority, S3.1B accent ownership, S3.1C post-solve variation and edge coverage blend, Weather `_LIGHT_COOKIES`, lighting/shadow composition, refraction architecture, and P13F/P13G Arc/Semi-Arc spawning.
+3. Add only `Profile Evolution Strength` and `Profile Evolution Duration (s)`. Strength defaults to `0` for exact compatibility. Duration defaults to `8 s` and has no effect at zero strength.
+4. Evolution is stateless, deterministic, shader-driven, stable per travelling wave identity, smoothly blended across adjacent wave boundaries, and offset between waves and banks according to the existing side-asymmetry contract.
+5. Evolution changes normalized shore-wave shape, not only amplitude or overflow reach. It may vary roundness/steepness and shoulder fullness while preserving zero crossings, sign, bounded amplitude, and the existing wave-height authority.
+6. Zero evolution strength must use the exact pre-S3.1D shape path. No evolution hash or shaping arithmetic may affect the output in compatibility mode.
+7. Visible displacement, finite-difference normals, refraction macro/detail attenuation, obstacle-waterline checks, rendered shoreline/accent, and Stage 6 current-shore support must consume the same evolution inputs and time.
+8. New profile coefficients must be resolved once and reused through the repeated hidden-shore search for each Stage 6 side. Do not multiply evolution hashing by the existing 24 coarse plus four refinement samples.
+9. Do not add GameObjects, runtime wave collections, per-wave CPU state, allocations, textures, buffers, kernels, dispatches, passes, samples, components, or draw calls.
+10. Do not change Foam source scheduling, Layer C packing, Layer E Foam rendering, shoreline accent formulas, edge coverage formulas, cloud-cookie plumbing, shadow controls, disturbance ownership, scene values, or serialized assets.
+
+### File-by-file implementation sequence
+
+1. `River_Foam_Active_Blockers_and_Next_Patches.md`: record this plan before implementation.
+2. `StylizedRiver.cs`: add serialized evolution strength/duration, public read-only properties, range clamps, compatibility defaults, shader IDs, and MaterialPropertyBlock bindings.
+3. `StylizedRiverEditor.Authoring.cs`: expose both controls under Shore Wave Profile with direct lifetime/compatibility tooltips.
+4. `RiverWaterCommon.hlsl`: add a stable per-wave temporal evolution resolver with boundary smoothing; add a shaped shore-only macro evaluator that preserves the current macro evaluator unchanged; thread strength/duration through shared surface and shoreline functions; resolve and reuse one coefficient set during Stage 6 hidden-shore search.
+5. `RiverWaterMotion.hlsl`: pass evolution inputs through vertex displacement, fragment motion, and finite-difference normals so surface geometry and lighting normals remain coherent.
+6. `RiverWaterRefraction.hlsl`: pass the same inputs through macro-height/bank-mask and finite-difference optical normal evaluation.
+7. `SH_CleanStylizedRiver.shader`: add property/CBUFFER parity and pass the inputs through existing motion and refraction calls without changing accent, Foam, lighting, shadows, cookie variants, edge blend, or final composition.
+8. `StylizedRiverFoamRuntime.Topology.cs`, `CS_RiverFoam.Resources.hlsl`, `CS_RiverFoam.Topology.hlsl`, and `CS_RiverFoam.compute`: bind and consume the same values for obstacle-waterline and current-shore support only; preserve source/event/spawning code.
+9. `River_Rendering_Roadmap.md`: record the accepted deterministic evolution architecture and protected cross-stage consumers.
+10. Run exact-scope, serialization/shader/compute binding parity, zero-strength compatibility, bounded-shape, identity continuity, per-wave offset, Stage 6 coefficient-reuse, shared-caller, accent/detail/Foam/shadow protection, delimiter/preprocessor, protected-file, and fresh-package reproduction checks.
+
+### Performance and risks
+
+- Recommended evolution uses one smoothed triangle-cycle scalar per travelling wave identity and lightweight polynomial shaping of the existing carrier. It adds no second trigonometric carrier and reuses the existing `pow` through an evolved effective steepness.
+- Render motion and refraction add deterministic scalar/hash arithmetic to existing Stage 3 evaluations. Stage 6 resolves the evolution coefficients once per side and reuses them through its repeated contact search. Exact GPU cost remains unmeasured until Unity profiling.
+- Risk: excessive evolution strength can make successive shapes visibly pulse. The default is zero; the authored control is clamped to `0..1`, and duration is clamped to a slow `1..30 s` range.
+- Risk: coefficient discontinuities at wave identity boundaries would create normal/accent/shoreline seams. The implementation must use the existing metric Transition Length boundary blend and validate value continuity.
+- Risk: render and Foam topology can diverge if time or properties are bound differently. Both use the current shared motion time and the same serialized properties; binding parity is mandatory.
+
+### Acceptance criteria
+
+1. Strength `0` reproduces the S3.1C normalized shore carrier, displacement, shoreline, normal, refraction, and Foam-support formulas exactly.
+2. Positive strength makes an individual travelling wave change roundness/shoulder shape over the authored duration while retaining its stable travelling identity.
+3. Adjacent waves have deterministic phase offsets and do not morph in lockstep; Transition Length keeps wave-boundary values continuous.
+4. Shape evolution preserves sign, zero crossings, maximum authored amplitude bounds, trough restoration, positive-overflow limits, and post-solve variation bounds.
+5. Shoreline Accent, edge coverage blend, detail normals/current accents, refraction, Foam obstacle-waterline/current-shore support, cloud-cookie lighting, and shadows remain coherent with the evolved geometry.
+6. No new resource, pass, draw, kernel, dispatch, component, scene/prefab/material edit, or spawning behavior exists.
+7. Exact twelve-file reconciliation and offline validation pass. Unity 6000.5.0f1 D3D11 import, focused visual acceptance, and profiling remain pending unless supplied by the user.
+
+### RIVER-MOTION-S3.1D implementation record
+
+Actually affected files:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Authoring.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterMotion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterRefraction.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Topology.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+No file was created, deleted, moved, or renamed. Geometry, scenes, prefabs, materials, render passes, draw calls, textures, buffers, kernels, dispatch topology, components, spawning schedulers, cloud-cookie lighting, shadow composition, Shoreline Accent formulas, edge-coverage formulas, and Layer E Foam rendering remain unchanged.
+
+Implemented behavior:
+
+- `Profile Evolution Strength` (`0..1`, default `0`) and `Profile Evolution Duration (s)` (`1..30`, default `8`) are authored under Shore Wave Profile and bound identically to render and Foam-topology consumers. Strength zero returns before evolution identity/hash work and preserves the S3.1C carrier path.
+- Each travelling shore-wave identity derives a stable seeded temporal phase from the existing moving wave coordinate. A smooth deterministic narrow-to-broad-to-narrow cycle evolves two bounded coefficients: existing steepness/roundness authority and a lightweight shoulder polynomial. No second wave carrier, additional sine, or additional power evaluation is introduced.
+- Adjacent identities blend through the existing metric Transition Length. Existing Shore Side Asymmetry controls whether the two banks share or independently offset the evolution state.
+- The shaped carrier preserves sign, zero crossings, and unit amplitude bounds. Existing trough restoration, bank-cover contact solve, positive-overflow reach, post-solve usage, authoritative shoreline clip, accent, edge blend, detail normals/current accents, refraction, lighting, shadows, and Foam support remain downstream owners.
+- Vertex displacement, longitudinal finite-difference normals, fragment motion, optical refraction normals, obstacle-waterline evaluation, and Stage 6 current-shore support use the same strength, duration, seed, and motion time. Stage 6 resolves one coefficient set per bank before its bounded hidden-contact search and reuses it for every coarse and refinement sample.
+
+Offline validation:
+
+- Exact approved scope: twelve modified files, zero added/deleted/moved files.
+- Structural, delimiter, preprocessor, serialized-property, shader-property/CBUFFER, MaterialPropertyBlock, Inspector, C#/compute binding, function-signature/call-site, one-pass, Blend/ZWrite/queue, `_LIGHT_COOKIES`, and protected-formula checks: PASS.
+- Zero-strength compatibility model: `200,000/200,000 PASS`.
+- Bounded shape/sign/amplitude model: `200,000/200,000 PASS`.
+- Wave-identity travelling, adjacent-phase-offset, full-duration evolution, and transition-boundary continuity models: PASS; maximum sampled identity-boundary jump `6.79164e-06`.
+- No additional `sin` or `pow` invocation exists relative to S3.1C. The repeated Stage 6 hidden-contact loop contains no evolution resolver.
+- Offline checks: `99/99 PASS`.
+
+Performance classification:
+
+- No CPU lifecycle, allocation, resource, dispatch, pass, sample, mesh, renderer, or draw-count change.
+- Positive evolution strength adds bounded scalar/hash/polynomial work to the existing shared Stage 3 render/refraction/topology evaluations. Stage 6 reuses one resolved coefficient set per side. Strength zero avoids evolution identity/hash work through an explicit compatibility return.
+- Exact GPU cost remains unmeasured until Unity profiling.
+
+Pending validation:
+
+- Unity `6000.5.0f1` C# compile and D3D11 shader import.
+- Strength-zero visual A/B against S3.1C.
+- Positive-strength observation of one travelling wave across a complete evolution duration and adjacent waves with independent phases.
+- Focused checks for Shoreline Accent/edge blend, full-surface detail/current accents, refraction, Weather cloud shade and shadows, Foam obstacle-waterline/current-shore support, reverse flow, and freeze/thaw.
+- CPU/GPU profiling at the accepted final settings.
+
+
+
+## RIVER-MOTION-S3.1D.1 — D3D11 Reserved-Token Compile Hotfix
+
+**Status:** source hotfix and offline validation complete; Unity D3D11 reimport pending.
+
+### Objective
+
+Restore D3D11 compilation after S3.1D by renaming the local evolution-cycle variable `triangle`, which D3D11 parses as an HLSL primitive keyword. Preserve the exact S3.1D arithmetic, shader interfaces, evolution behavior, shoreline accent, detail normals, Foam support, refraction, Weather lighting/shadows, and all serialized values.
+
+### Reviewed evidence
+
+- Unity reports `syntax error: unexpected token 'triangle'` at `RiverWaterCommon.hlsl:377-378` in the River Forward vertex program and every `CS_RiverFoam` kernel that includes the shared file.
+- `RiverWaterCommon.hlsl::RiverWaterResolveShoreEvolutionIdentityState` declares `float triangle` at line 377 and uses it twice on lines 378-379.
+- A complete search of `Assets/Game/Rendering/Water/Resources/PS3DRiver` finds no other standalone `triangle` identifier in active `.hlsl` or `.compute` source.
+- S3.1C-to-S3.1D comparison shows the failing declaration belongs only to the new deterministic profile-evolution resolver. Its direct consumers are `RiverWaterMotion.hlsl`, `RiverWaterRefraction.hlsl`, `SH_CleanStylizedRiver.shader`, `CS_RiverFoam.Topology.hlsl`, and `CS_RiverFoam.compute`; none require signature or behavior changes.
+- The supplied source contains no Git metadata. Comparison authority is the reconstructed complete post-S3.1D source in `/mnt/data/s31d1_base`.
+
+### Approved files
+
+Modify:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+Create/Delete/Move/Metadata/Scenes/Prefabs/Materials/Geometry: none.
+
+### Invariants and non-goals
+
+1. Rename only the local `triangle` identifier and its two references to a D3D11-safe descriptive identifier.
+2. Preserve the exact cycle, smoothing, return value, function signatures, call sites, uniforms, properties, compute bindings, and serialized controls.
+3. Do not modify Shoreline Accent, edge coverage, detail normals/current accent, Foam source or topology behavior, refraction, lighting, cloud cookies, shadows, mesh generation, passes, resources, kernels, dispatches, or draw calls.
+4. Do not address the unrelated `_FORWARD_PLUS` deprecation warning in this compile hotfix.
+
+### File-by-file implementation sequence
+
+1. Update this canonical plan with the failure evidence and exact two-file scope.
+2. In `RiverWaterCommon.hlsl`, rename `triangle` and its two uses without changing any operators, constants, control flow, or surrounding code.
+3. Run exact-diff, reserved-token, delimiter/preprocessor, numerical-equivalence, direct-consumer hash, package-safety, and fresh-package reproduction checks.
+4. Record the actual scope, evidence, remaining Unity validation, and compliance result here.
+
+### Acceptance criteria
+
+1. No standalone `triangle` token remains in active PS3DRiver HLSL/compute source.
+2. The hotfix diff changes exactly one local identifier at one declaration and two references.
+3. The evolution identity-state output is numerically identical for representative randomized inputs.
+4. Every direct consumer and all non-approved project files remain byte-identical to post-S3.1D.
+5. The two-file package applies cleanly over post-S3.1D and reproduces the audited hotfix tree exactly.
+6. Unity `6000.5.0f1` D3D11 import remains the final compilation authority.
+
+
+### RIVER-MOTION-S3.1D.1 implementation record
+
+Actually affected files:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterCommon.hlsl
+```
+
+No file was created, deleted, moved, or renamed.
+
+Implemented behavior:
+
+- Renamed the local `triangle` variable in `RiverWaterResolveShoreEvolutionIdentityState` to `triangleWave` and changed its two references.
+- Operators, constants, control flow, function signatures, call sites, uniforms, serialized values, runtime formulas, and all direct consumers remain unchanged.
+- The unrelated `_FORWARD_PLUS` deprecation warning remains outside this compile-only hotfix.
+
+Offline validation:
+
+- Exact approved scope: two modified files; zero added/deleted/moved files.
+- The code diff contains exactly one local declaration rename and two reference renames. Replacing `triangleWave` with `triangle` in the final include reproduces the post-S3.1D include byte-for-byte.
+- Standalone `triangle` tokens in active PS3DRiver `.hlsl` and `.compute` source: `0` after the hotfix.
+- Delimiter and preprocessor balance: PASS.
+- Numerical rename-equivalence model: `200,000/200,000 PASS`, maximum difference `0`.
+- `RiverWaterMotion.hlsl`, `RiverWaterRefraction.hlsl`, `SH_CleanStylizedRiver.shader`, `CS_RiverFoam.Topology.hlsl`, and `CS_RiverFoam.compute` remain byte-identical to post-S3.1D.
+- Two-file package traversal, application, and complete-project reproduction: PASS; all `353/353` files match the audited hotfix tree.
+
+Post-change consistency and compliance:
+
+- Final diff matches the recorded two-file scope and every plan item.
+- S3.1D evolution arithmetic and all protected accent, detail, Foam, refraction, Weather-lighting, shadow, geometry, pass, resource, kernel, and draw contracts remain unchanged.
+- Unity `6000.5.0f1` D3D11 import is unavailable in this environment and remains the final compile validation step.
+
+
+Historical rejected attempt: `RIVER-MOTION-S3.1E.1` tried to correct the incomplete S3.1E spacing split. Spacing now drives the actual shore-wave packet centres and visible repetition, while Length drives packet support width. The previous S3.1E implementation only moved deterministic wave identity and variation assignment, which left visible spacing largely unchanged.
+
+
+`RIVER-MOTION-S3.1E.2 — Independent Shore-Wave Length and Gap` is Unity-rejected. Although its period was `Length + Gap`, each packet still evaluated one complete signed `2π` cycle. The positive half appeared as overflow while the negative half appeared as additional calm space, so increasing Length also increased the visible gap. Its packet-edge fade, signed-height zero-crossing fade, and Length-normalized reach activation compounded that coupling.
+
+`RIVER-MOTION-S3.1E.3 — Positive-Lobe Length/Gap Decoupling` replaces the rejected signed cycle with one nonnegative zero-slope lobe spanning the complete authored Length. Gap is the only finite calm interval between packets; Gap zero makes adjacent lobes meet at a shared zero-slope point. Transition Length now shapes shoulders only inside the packet, and positive reach no longer normalizes against Length. The shared evaluator remains authoritative for displacement, normals/detail, refraction, rendered shoreline, Shoreline Accent, edge blending, and Foam shoreline support. Length and Gap remain dynamic motion inputs outside the immutable Foam grid descriptor. The stale Foam cache observed during S3.1E testing was explicitly rebuilt and restored normal Play Mode Foam startup.

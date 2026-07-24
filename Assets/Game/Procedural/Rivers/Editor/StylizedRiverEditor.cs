@@ -30,6 +30,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             WaterSurfaceState,
             WaterLiquidBody,
             WaterFrozenBody,
+            WaterShorelineAccent,
             WaterLightingResponse,
             WaterAdvancedMaterial,
             MotionGeneralFlow,

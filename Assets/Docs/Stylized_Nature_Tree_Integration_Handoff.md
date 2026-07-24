@@ -2,13 +2,13 @@
 
 ## Status
 
-**Asset isolation is complete and validated. `TREE-GALLERY.1` is implemented at source level: the standalone gallery component/editor foundation, explicit Ground reference, sibling/root creation utility, passive specimen metadata, complete twenty-FBX/twelve-texture audit, and clipboard report are delivered. Unity compilation, live source-vault audit, scene creation, and Play Mode validation remain pending in the user's complete project. The procedural generated-tree library remains blocked until the imported gallery baseline is accepted.**
+**Asset isolation, the simultaneous twenty-tree reference gallery, deterministic structural generation, and the corrected four-family bark vertical slice are implemented and live-validated. `TREE-GEN.2B` passed all twenty structures, all four bark meshes, deterministic repeatability, classified topology audits, family dependency suites, neutral bark colour, and exterior rendering. `TREE-GEN.2C` is now source-implemented as the approved compact trunk-grammar patch: the existing `Trunk Twist Degrees` control becomes visibly geometric through a non-circular trunk profile, two ridge controls define that profile, and three root-buttress controls create a lobed base that fades into the trunk. Structural generator/profile seed versions and existing twist ranges remain unchanged. Source consistency/compliance checks pass; Unity compilation, managed migration, topology, visual root/twist comparison, and Play Mode validation remain pending.**
 
 This document is the canonical plan, architecture ledger, implementation record, and continuation handoff for the Stylized Nature tree assets, the imported comparison gallery, and the generated tree library. Each later implementation patch still requires explicit approval and must follow the ordered gates recorded below.
 
 ## Objective
 
-Preserve the implementation-relevant Stylized Nature tree assets, establish a complete imported reference gallery as the first implementation baseline, and define a production-suitable procedural tree library that can reproduce the Common, Pine, Twisted, and Dead visual families with substantially greater controlled variation while consuming the existing Weather wind and cloud-shadow contracts.
+Preserve the implementation-relevant Stylized Nature tree assets, establish a complete imported reference gallery as the first implementation baseline, and define a production-suitable procedural tree library that can both reproduce the Common, Pine, Twisted, and Dead source families or individual reference silhouettes and deliberately exceed them through controlled crown volume, foliage density, branch count, trunk/branch curvature, colour palettes, damage, and seeded structural variation while consuming the existing Weather wind and cloud-shadow contracts.
 
 ## Acceptance criteria
 
@@ -33,6 +33,12 @@ Preserve the implementation-relevant Stylized Nature tree assets, establish a co
 - The initial generated library contains at least eight accepted variants for each of Common, Pine, Twisted, and Dead.
 - Production placement uses authored coverage, Ground suitability, deterministic minimum-distance acceptance, stable IDs, and chunk-aware rendering.
 - Future snow, wetness, seasons, damage, chopping, roots, and navigation systems can consume reserved contracts without blocking the gallery or generated-library implementation.
+- Family profiles, reference-calibration presets, variant recipes, instance overrides, and deterministic seed variation remain distinct authoring layers.
+- Foliage spatial volume and foliage geometry density are independently controllable; richer crowns must not require a proportional card-count increase.
+- Bark and foliage colours are palette/profile data and per-instance variation inputs, not unique material assets per tree.
+- Primary/secondary/tertiary branch counts, spawn distributions, trunk curvature, primary-branch curvature, droop, lean, torsion, and crown envelope are first-class authored controls.
+- Changing foliage-only controls does not regenerate trunk or branch structure; independent deterministic streams and dependency fingerprints enforce selective regeneration.
+- The twenty imported references may each have a calibration preset that targets their family grammar, dimensions, silhouette, branching rhythm, and crown shape without requiring topology-identical reconstruction.
 
 ## Approved scope
 
@@ -197,6 +203,7 @@ The current documentation-only update does not implement any of the planned runt
 | TREE-HANDOFF.6 | Update this handoff with final paths, asset inventory, integration direction, and continuation work. | Complete |
 | TREE-HANDOFF.7 | Run the post-change consistency, hash, metadata, source-removal, duplicate-GUID, documentation, repository-scope, and compliance audit. | Complete |
 | TREE-PLAN.1 | Formalize the imported-gallery-first implementation architecture, procedural generated-tree library, runtime rendering, placement direction, patch order, and validation gates in this canonical document. | Complete in the updated documentation artifact; implementation remains pending. |
+| TREE-PLAN.2 | Freeze the live-validated complete reference gallery and lock the generated-tree authoring/variation contract: reference presets, layered ownership, crown volume versus density, branch counts, separate curvature controls, palettes, seed isolation, and selective regeneration. | Complete in this documentation patch. |
 
 ## Risks and controls
 
@@ -312,7 +319,7 @@ The accepted implementation direction is a two-stage tree programme:
 1. establish an imported-tree reference gallery containing one instance of every retained source tree, with reserved side-by-side positions for procedural comparisons;
 2. build an editor-generated, profile-driven procedural tree library that reuses the retained bark textures, bark normal maps, and foliage textures while generating its own branch structure, mesh topology, vertex normals, tangents, UVs, wind metadata, LODs, shadow proxies, and runtime variant library.
 
-No procedural-tree implementation patch may begin before the imported gallery renders all twenty source trees correctly and the gallery baseline is frozen. This ordering is mandatory because the source trees are the visual calibration targets for scale, silhouette, crown density, material response, family identity, wind response, and camera readability.
+The imported gallery now satisfies the first-stage gate and is frozen as the visual calibration baseline. The generated system is explicitly required to support both **reference replication** and **authored expansion**. Reference calibration targets family identity, dimensions, silhouette, branching rhythm, and crown distribution; it does not require topology-identical reconstruction. Authored expansion includes richer crowns, larger foliage regions without mandatory density growth, independent foliage density, branch-count controls, separate trunk and branch curvature, colour palettes, damage, age, and controlled seed variation.
 
 The imported meshes are reference specimens and optional fallback assets. They are not the topology source for the procedural generator. The procedural generator must reproduce the recognizable visual grammar of Common, Pine, Twisted, and Dead families without attempting to recover an unavailable authored branch hierarchy from the finished FBXs.
 
@@ -509,11 +516,11 @@ Tree Reference Gallery
 
 Each pair owns one imported specimen and one reserved procedural comparison transform. The procedural slot must exist from the first gallery patch even though it is empty. Generated-tree authoring patches will populate those slots without changing the imported specimen placement.
 
-Family rows are separated along local Z. Variant pair cells are separated along local X. Cell size is calculated from audited combined source bounds rather than a hard-coded spacing that may overlap large crowns. Inside each cell, the imported and procedural positions are offset symmetrically from the pair centre.
+Family rows are separated along the assigned Ground's local Z axis, and variant pair cells are separated along Ground-local X. Cell size and legal placement are calculated from the audited combined source bounds and the actual Ground surface domain rather than from unchecked fixed offsets. Imported and procedural roots remain symmetric around their pair centre, but that centre may shift within the Ground domain to accommodate strongly asymmetric source silhouettes.
 
 #### Ground alignment
 
-The gallery builder must use the gallery's explicitly assigned `GeneratedGround` reference and call `GeneratedGround.TrySampleBaseSurface` for the pair centre. Both comparison roots are placed at the same sampled Ground height. Hierarchy proximity does not establish the sampling target.
+The gallery builder must use the gallery's explicitly assigned `GeneratedGround` reference. It resolves legal pair positions from `GeneratedGround.TryGetSurfaceDomain`, then calls `GeneratedGround.TrySampleBaseSurface` independently for the imported root and procedural comparison root. Each side therefore follows its own actual Ground height; hierarchy proximity does not establish the sampling target.
 
 The source pivot must be audited before an offset is applied. The report must record:
 
@@ -667,7 +674,10 @@ The initial production library target is a minimum of eight accepted variants pe
 
 ```text
 Assets/Game/Procedural/Trees/TreeFamilyProfile.cs
+Assets/Game/Procedural/Trees/TreeReferenceCalibrationPreset.cs
+Assets/Game/Procedural/Trees/TreeMaterialPalette.cs
 Assets/Game/Procedural/Trees/TreeGenerationRecipe.cs
+Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs
 Assets/Game/Procedural/Trees/TreeDefinition.cs
 Assets/Game/Procedural/Trees/TreeBranchDefinition.cs
 Assets/Game/Procedural/Trees/TreeFoliageClusterDefinition.cs
@@ -677,8 +687,9 @@ Assets/Game/Procedural/Trees/TreeMeshBuilder.cs
 Assets/Game/Procedural/Trees/TreeFoliageBuilder.cs
 Assets/Game/Procedural/Trees/TreeLodBuilder.cs
 Assets/Game/Procedural/Trees/TreeProxyBuilder.cs
-Assets/Game/Procedural/Trees/ProceduralTreeAuthoring.cs
-Assets/Game/Procedural/Trees/Editor/ProceduralTreeAuthoringEditor.cs
+Assets/Game/Procedural/Trees/ProceduralTreeInstance.cs
+Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs
+Assets/Game/Procedural/Trees/Editor/TreeGalleryGenerationCoordinator.cs
 Assets/Game/Procedural/Trees/GeneratedTreeLibrary.cs
 Assets/Game/Procedural/Trees/GeneratedTreeVariant.cs
 Assets/Game/Procedural/Trees/Editor/GeneratedTreeLibraryBaker.cs
@@ -690,7 +701,13 @@ The plan intentionally separates authoring/generation from runtime rendering. No
 #### Data flow
 
 ```text
-TreeFamilyProfile + TreeGenerationRecipe + seed
+TreeFamilyProfile
+    + optional TreeReferenceCalibrationPreset
+    + TreeGenerationRecipe
+    + TreeGenerationOverrides
+    + TreeMaterialPalette
+    + master seed / locked subsystem seeds
+    -> resolved parameter set + dependency fingerprint
     -> TreeDefinition
         -> branch graph
         -> foliage cluster graph
@@ -714,6 +731,378 @@ TreeFamilyProfile + TreeGenerationRecipe + seed
 
 The branch graph is the structural source of truth. Meshes are outputs and must never become the only representation available during generation or validation.
 
+#### Generated-tree authoring goals and layered control model
+
+The procedural system has two equally important goals:
+
+1. **reference calibration** — produce trees recognizably derived from the imported Common, Pine, Twisted, and Dead families, including optional presets targeting each of the twenty individual references;
+2. **authored expansion** — produce trees that deliberately exceed the reference pack through richer crowns, larger foliage regions, independent foliage density, more or fewer branches, stronger or weaker curvature, palette changes, age, damage, asymmetry, and environmental shaping.
+
+The generator must not reduce these goals to one enormous mutable profile. `TREE-PLAN.3` simplifies the public authoring model and supersedes the earlier five-layer description.
+
+The authoritative authoring chain is:
+
+```text
+TreeFamilyProfile
+    -> TreeGenerationRecipe
+        -> InstanceOverrides (optional)
+            -> deterministic SeedVariation
+```
+
+There is no separate “reference-match mode.” The twenty comparison recipes are ordinary named recipes whose defaults and ranges are calibrated against the imported references. Imported dimensions, source identity, and comparison tolerances are reference-target metadata used by the gallery and diagnostics; they are not a user-facing authoring mode.
+
+The existing serialized `TreeReferenceCalibrationPreset` type may remain temporarily as compatibility storage for imported target measurements while the implementation is migrated. It must not remain an independent public authoring layer, own colour-mode behavior, or duplicate recipe controls. New authoring UI and documentation must present family template, named recipe, optional instance overrides, and deterministic variation only.
+
+##### Layer 1 — family template
+
+A family profile is a reusable base template for Common, Pine, Twisted, or Dead. It owns:
+
+- legal and safety ranges;
+- structural budgets;
+- family-default parameter ranges;
+- default material palette and textures;
+- default branch grammar;
+- default foliage grammar;
+- environmental-response defaults.
+
+A family is not a rigid final tree. It supplies sensible starting behavior. For example:
+
+- Common defaults to a relatively straight, moderately thin, comparatively symmetrical trunk with a higher branch/crown start;
+- Pine defaults to a strong central leader, tiered attachments, and restrained radial symmetry;
+- Twisted defaults to stronger centerline displacement, optional spiral/twist, irregular branching, and broader asymmetry ranges;
+- Dead defaults to no living foliage, branch loss/breakage, exposed structure, and configurable symmetry rather than mandatory one-sidedness.
+
+##### Layer 2 — named ranged recipe
+
+A recipe begins from one family template and defines a named reusable tree concept. Examples:
+
+```text
+Short Pine
+Wide Old Pine
+Twisted Pine
+Common — Rich Crown
+Common — Bare Lower Trunk
+Dead — Strong Spiral
+Dead — Wind-Swept Left
+```
+
+Every recipe control may be:
+
+- inherited from the family;
+- an exact value;
+- a deterministic minimum/maximum range.
+
+The seed selects values inside recipe ranges. One recipe can therefore produce multiple related trees without becoming visually identical or escaping the intended style.
+
+The twenty gallery comparison variants are ordinary recipes named for their imported targets. They use exact or narrow ranges where necessary to reproduce the reference family grammar, dimensions, branch rhythm, and baseline appearance. They do not activate a special rendering or colour mode.
+
+##### Layer 3 — instance overrides
+
+Instance overrides are sparse exact changes for one generated specimen or comparison slot. Unset fields inherit from the recipe. They exist for deliberate exceptions, not as the ordinary way to author the library.
+
+Examples:
+
+```text
+Overall Crown Volume = 1.40
+Primary Branch Count = 12
+Trunk Spiral Strength = 0.65
+Lowest Primary Branch Height = 0.48
+Branch Arch Direction = +1.00
+Branch Arch Strength = 0.35
+Azimuth Symmetry = 0.85
+Directional Bias Strength = 0.10
+Bark Tint = authored value
+```
+
+The resolved report must identify whether every value came from the family, recipe, instance override, or seed-selected point inside a range.
+
+##### Layer 4 — deterministic seed variation
+
+Seed variation resolves remaining ranges and must never silently exceed family safety limits. The same complete input set and generator version must produce the same structural, foliage-intent, palette, and mesh fingerprints.
+
+Changing one subsystem must not randomize unrelated systems. In particular:
+
+- palette changes preserve geometry;
+- foliage volume/density changes preserve trunk and branches;
+- branch-shape changes preserve palette;
+- branch-start-height changes intentionally rebuild branch layout but not trunk shape;
+- trunk centerline/spiral changes intentionally invalidate descendants;
+- symmetry or directional-bias changes invalidate branch layout but not material palette.
+
+#### Foliage volume, crown fullness, and geometry density
+
+Foliage **volume** and foliage **density** are separate architectural controls.
+
+- **Volume** controls the spatial extent occupied by foliage regions.
+- **Density** controls how much foliage geometry is placed inside those regions.
+
+Richer Common-tree crowns must therefore be possible without a proportional increase in cards, triangles, or overdraw.
+
+Required volume controls:
+
+```text
+Overall Crown Volume
+Crown Width Scale
+Crown Height Scale
+Crown Length / branch-axis scale
+Crown Start Height
+Lower Crown Width
+Upper Crown Width
+Crown Roundness
+Crown Top Taper
+Crown Lobe Count
+Crown Lobe Radius
+Crown Lobe Irregularity
+Crown Fill / gap suppression
+Cluster Width Scale
+Cluster Height Scale
+Cluster Length Scale
+Cluster Radial Spread
+Card Size Scale
+```
+
+Required density controls:
+
+```text
+Foliage-eligible branch probability
+Foliage Cluster Count
+Clusters Per Eligible Branch
+Cards Per Cluster
+Cluster Occupancy
+Terminal Foliage Probability
+Card Retention Fraction
+```
+
+Changing only volume controls must preserve the trunk and branch graph and should preserve foliage cluster/card identities where feasible. Changing density may add or remove foliage records but must not regenerate the trunk or branch graph.
+
+Performance reports must distinguish:
+
+- crown spatial bounds;
+- foliage-cluster count;
+- card count;
+- foliage triangles;
+- estimated alpha-tested area/overdraw proxy.
+
+#### Crown-envelope and family-specific foliage controls
+
+Foliage placement is constrained by a family-owned crown envelope rather than random attachment alone.
+
+Common requires broad, potentially rich crowns with controllable lobes, internal gaps, top taper, and asymmetric fullness. Pine requires central-leader-relative tiers, branch-tip foliage length, tier thickness, cone profile, crown start, and lower-branch retention. Twisted requires sparse directional lobes, permanent exposure bias, and strong asymmetry. Dead normally suppresses living foliage but may support authored remnant/dead foliage later without changing the branch architecture.
+
+Generated foliage clusters must reference both their parent branch and the resolved crown envelope. Branch ownership controls wind attachment; the crown envelope controls family silhouette and spatial fullness.
+
+#### Branch count and branching-distribution controls
+
+Branch population is first-class authored data.
+
+Required controls include:
+
+```text
+Primary Branch Count or Count Range
+Secondary Branches Per Primary
+Tertiary Branches Per Secondary
+Maximum Branch Order
+Branch Spawn Probability by Order
+Branch Attachment Height Distribution
+Minimum Attachment Spacing
+Angular / yaw distribution
+Branch Side Bias
+Branch Tier Count
+Branches Per Tier
+Tier Irregularity
+Terminal Split Probability
+Lower Branch Retention
+Missing Branch Probability
+Dead Branch Probability
+Break Probability
+```
+
+Counts may be exact or ranged. Exact counts are useful for calibration and authored silhouettes. Ranges are useful for variant libraries. The resolved report must state requested, accepted, rejected, removed, dead, and broken counts by branch order.
+
+Family semantics differ:
+
+- Common uses distributed or clustered attachments around the trunk;
+- Pine uses tiers or semi-whorls around a central leader;
+- Twisted uses sparse asymmetric placement and directional bias;
+- Dead may generate from a living-family grammar and then apply removal/breakage, or use a dedicated dead grammar selected by the recipe.
+
+#### Trunk and branch curvature controls
+
+Curvature is not one generic slider. Trunk, primary branches, and higher-order branches own distinct controls.
+
+Required trunk controls:
+
+```text
+Trunk Curvature Strength
+Trunk Curve Frequency / Bend Count
+Trunk Directional Drift
+Permanent Lean Strength
+Permanent Lean Direction
+Trunk Torsion / Twist
+Trunk Irregularity
+Trunk Control-Point Count
+Trunk Fork Probability
+Trunk Fork Height
+```
+
+Required primary-branch controls:
+
+```text
+Primary Branch Curvature
+Primary Branch Droop
+Primary Branch Upward Bias
+Primary Branch Side Sweep
+Primary Branch Torsion
+Primary Branch Irregularity
+Primary Branch End Curl
+Gravity Bias
+Permanent Wind / exposure bias
+```
+
+Secondary and tertiary controls may inherit scaled versions of primary-branch values or expose explicit overrides where the family needs them.
+
+The architecture must support combinations such as:
+
+```text
+straight trunk + curved branches
+curved trunk + straighter branches
+strong trunk lean + wind-shaped crown
+irregular trunk + comparatively symmetrical crown
+```
+
+Curve generation must remain compatible with stable parallel-transport frames. Strong curvature or torsion may increase sample/ring counts according to the LOD budget but must not create frame flips, NaNs, zero-length segments, or detached branch junctions.
+
+#### Bark and foliage colour architecture
+
+Bark and foliage colours are data, not unique materials per generated tree.
+
+`TreeMaterialPalette` owns shared material identity and authored colour ranges. Initial foliage controls:
+
+```text
+Base Foliage Colour
+Foliage Highlight Colour
+Foliage Shadow Colour
+Hue Variation
+Saturation Variation
+Value Variation
+Cluster Colour Variation
+Top-to-Bottom Colour Gradient
+Seasonal / state colour input reserve
+```
+
+Initial bark controls:
+
+```text
+Base Bark Tint
+Bark Hue Shift
+Bark Saturation
+Bark Value
+Root Darkening
+Upper-Trunk Variation
+Branch-Order Variation
+Moss Tint reserve
+Wetness response reserve
+```
+
+The retained white/tintable foliage textures are the preferred generated-tree base when visual validation confirms their alpha and value structure. Coloured foliage textures remain available for imported-reference matching and optional calibrated palettes.
+
+Palette resolution occurs at family-template, recipe, and instance-override layers. Imported comparison target metadata does not add a palette mode. Runtime variation is supplied through property blocks or instance data. The system must not create one material asset per tree.
+
+Colour-only changes must not regenerate structural or mesh topology. They update palette/material fingerprints only.
+
+#### Deterministic stream isolation and selective regeneration
+
+One shared random sequence is prohibited. Required independent streams are:
+
+```text
+TrunkShape
+TrunkForks
+PrimaryBranchLayout
+SecondaryBranchLayout
+TertiaryBranchLayout
+BranchCurvature
+StructuralDamage
+FoliageClusterPlacement
+FoliageClusterShape
+FoliageCardPlacement
+FoliageCardShape
+MaterialVariation
+LODSelection
+ProxyGeneration
+```
+
+Each stream derives from:
+
+```text
+master seed
+family identity
+reference-calibration identity/version
+recipe identity/version
+generator version
+stream identifier
+optional locked stream seed
+```
+
+Dependency rules:
+
+- foliage colour changes invalidate no geometry;
+- bark colour changes invalidate no geometry;
+- foliage volume changes invalidate foliage bounds/mesh outputs but not trunk or branch structure;
+- foliage density changes invalidate foliage definitions/meshes but not trunk or branch structure;
+- branch-count or branch-curvature changes invalidate affected branch orders, attached foliage, LODs, and proxies but preserve unrelated palette state;
+- trunk shape changes invalidate the full descendant branch graph and all geometry/proxies;
+- proxy or LOD-budget changes do not alter LOD0 structural identity.
+
+Every generated artifact stores a dependency fingerprint. The authoring UI must clearly report which outputs are stale after a change.
+
+#### Generated metadata reserved for authoring and rendering
+
+The structural and mesh contracts must preserve enough metadata for later rendering and editing:
+
+```text
+normalized tree height
+normalized distance along current branch
+branch order
+stable branch ID
+parent branch ID
+branch stiffness
+branch phase
+foliage cluster ID
+foliage card ID
+cluster random value
+normalized crown height
+cluster/card pivot
+parent branch axis
+seasonal-retention threshold
+```
+
+Exact channel packing remains a later mesh-patch decision, but no generated foliage system may depend on imported object-space hash cells as its authoritative identity source.
+
+#### Authoring diagnostics and acceptance tests
+
+`TREE-GEN.1` structural diagnostics must report both resolved parameters and ownership:
+
+- family profile;
+- calibration preset, if any;
+- variant recipe;
+- non-default instance overrides;
+- every derived seed stream;
+- resolved branch-count and curvature values;
+- resolved crown-volume and foliage-density values;
+- resolved bark/foliage palette values;
+- dependency and structural fingerprints;
+- stale-output flags.
+
+Required determinism tests:
+
+1. same complete inputs regenerate the same structural fingerprint;
+2. foliage colour changes preserve structural and foliage-geometry fingerprints;
+3. foliage-volume changes preserve trunk and branch fingerprints;
+4. foliage-density changes preserve trunk and branch fingerprints;
+5. branch-count changes preserve trunk and palette fingerprints;
+6. trunk-curvature changes intentionally invalidate the descendant structure;
+7. locked subsystem seeds remain stable while an unlocked subsystem is randomized.
+
 #### `TreeFamilyProfile`
 
 One profile defines family grammar and family response, not an individual tree.
@@ -721,52 +1110,81 @@ One profile defines family grammar and family response, not an individual tree.
 Required categories:
 
 - identity and reference-family mapping;
-- overall height and crown aspect ranges;
-- trunk taper, lean, curvature, twist, flare, and ring-resolution ranges;
-- branch-order limits;
-- branch attachment-height ranges;
-- branch count, spacing, yaw distribution, elevation, length, taper, curvature, gravity bias, and wind bias;
-- family-specific crown-density envelope;
-- foliage eligibility by branch order and branch position;
-- foliage-cluster shape, card count, card size, spread, orientation, density, and tint ranges;
-- dead-branch and breakage probabilities;
+- hard safety ranges and author-facing default ranges;
+- overall height, crown aspect, crown start, crown envelope, lobe, fullness, asymmetry, and volume ranges;
+- foliage spatial-volume controls separate from foliage density/card-count controls;
+- trunk taper, lean, curvature, bend frequency, directional drift, twist, flare, fork, and ring-resolution ranges;
+- branch-order limits and exact/ranged count controls by order;
+- branch attachment-height, spacing, tier/whorl, yaw, side-bias, and angular-distribution rules;
+- primary/secondary/tertiary length, taper, curvature, droop, upward bias, side sweep, torsion, irregularity, gravity bias, and permanent wind/exposure bias;
+- foliage eligibility by branch order, branch position, terminal state, and crown envelope;
+- foliage-cluster width, height, length, radial spread, shape, count, card count, card size, orientation, occupancy, retention, and tint ranges;
+- dead-branch, missing-branch, breakage, and foliage-retention probabilities;
 - whole-tree, branch, and foliage wind response;
-- bark and foliage surface references;
+- default `TreeMaterialPalette` plus approved palette ranges;
 - LOD budgets;
 - shadow/collision proxy settings;
-- accepted world-footprint range.
+- accepted world-footprint range;
+- dependency declarations used for selective invalidation and stale-output reporting.
 
 Profiles must contain validation ranges and must reject impossible or zero-area configurations rather than relying on the mesh builder to recover silently.
 
 #### `TreeGenerationRecipe`
 
-A recipe defines one reproducible variant request:
+A recipe defines one reproducible authored variant request.
+
+Required contents:
 
 - family profile;
-- deterministic seed;
+- optional reference-calibration preset;
+- deterministic master seed;
+- generator version;
 - age/size class;
+- optional material palette override;
 - optional permanent lean direction and strength;
 - optional damage state;
 - optional foliage-retention state;
-- optional locked trunk seed;
-- optional locked branch seed;
-- optional locked foliage seed;
-- user-authored overrides inside profile-approved ranges.
+- exact or ranged branch-count overrides;
+- trunk and per-order branch curvature overrides;
+- crown-envelope, crown-volume, and crown-fill overrides;
+- foliage-density overrides independent from foliage-volume overrides;
+- optional locked subsystem seeds;
+- sparse `TreeGenerationOverrides` inside profile-approved ranges.
 
-Selective locking is required so the user can keep a successful trunk while regenerating branches or foliage. Each independent subsystem must use a derived deterministic random stream rather than consuming one shared random sequence whose order changes when unrelated code changes.
+Selective locking is required so the user can keep a successful trunk while regenerating branches or foliage. Each independent subsystem uses a derived deterministic random stream rather than consuming one shared random sequence whose order changes when unrelated code changes.
 
-Required seed streams:
+A recipe must expose a resolved-parameter report and ownership trace. Authors must be able to distinguish family defaults, calibration values, recipe changes, instance overrides, and seed-selected values.
 
-```text
-trunk
-primary branches
-secondary branches
-foliage clusters
-foliage cards
-surface variation
-LOD selection
-proxy generation
-```
+Required seed streams are defined in the deterministic stream-isolation contract above. The implementation may split streams further but may not merge unrelated structural and material streams into one order-dependent sequence.
+
+#### `TreeReferenceCalibrationPreset`
+
+A calibration preset is a reusable authored object that targets one imported reference or one recognizable source-derived silhouette class.
+
+Required contents:
+
+- source family and optional source FBX GUID/path for diagnostics;
+- target height, width, crown start, and main silhouette bounds;
+- target trunk lean, curvature, taper, fork, and torsion ranges;
+- primary-branch count and attachment rhythm;
+- major branch direction, elevation, droop, and length targets;
+- target crown envelope, lobe positions, fullness, and major gaps;
+- foliage-volume and density targets;
+- damage/dead-branch targets;
+- optional palette target used for reference matching;
+- calibration tolerance and comparison metrics.
+
+The preset is not a generated mesh cache and does not own runtime rendering.
+
+#### `TreeGenerationOverrides`
+
+Overrides are sparse, optional, serializable values applied after the profile, calibration preset, and recipe. They support exact author requests without duplicating entire profiles or recipes.
+
+Each override field records whether it is unset, exact, or ranged. Overrides participate in deterministic fingerprints and validation. Unsupported or out-of-range values fail explicitly rather than being silently clamped unless the specific field documents clamping as its authoring behaviour.
+
+#### `TreeMaterialPalette`
+
+A palette owns shared bark/foliage texture identity and authored colour ranges. It may reference the retained/calibrated source appearance or a generated tintable workflow. Palettes are reusable across many variants and instances; they are not created per tree.
 
 #### `TreeDefinition`
 
@@ -944,7 +1362,7 @@ The long-term architecture allows a dead/damage state to be applied to living-fa
 
 #### Procedural comparison workflow
 
-`ProceduralTreeAuthoring` is an Editor-facing specimen generator, not the production forest renderer.
+`ProceduralTreeInstance` is the Editor-facing owner of one generated gallery specimen. The `Tree Reference Gallery` coordinator is the sole normal authoring entry point; there is no parallel standalone tree-authoring component.
 
 Required actions:
 
@@ -1252,12 +1670,16 @@ No patch may skip its predecessor's acceptance gate unless this document is upda
 | ID | Scope | Required result | Status |
 | --- | --- | --- | --- |
 | TREE-PLAN.1 | Update this canonical document with the gallery-first and procedural-library architecture, exact sequencing, contracts, risks, and validation gates. | Persistent implementation plan exists before code changes. | Complete in documentation patch; Unity validation not required. |
-| TREE-GALLERY.1 | Complete Unity source audit for all twenty FBXs and twelve textures; add tree family enum, audit code, standalone gallery component/editor shell, sibling/root creation utility, explicit Ground reference, and clipboard report. Do not create final materials or procedural code. | Exact submesh/material mapping, bounds, geometry counts, vertex-colour evidence, texture dimensions, and importer state are known. | Source implementation complete; Unity compile, live audit, and Play Mode validation pending. |
-| TREE-GALLERY.2 | Correct the three bark normal imports; implement shared bark/foliage shaders and tree includes; consume Weather wind and the URP cloud cookie; add vertex/pivot debug modes. | One representative Common, Pine, Twisted, and Dead source tree renders with correct materials, cloud shading, and controlled wind. | Planned. |
-| TREE-GALLERY.3 | Implement the complete deterministic gallery builder, four family rows, twenty source specimens, twenty procedural slots, Ground alignment, Scene labels, remove/rebuild actions, and complete audit report. | All twenty imported trees are available for side-by-side comparison in the actual demo environment. | Planned. |
-| TREE-GALLERY.4 | Run source-scale, normalized-height, wind, cloud, Play Mode, material, pivot, and leak validation; record accepted reference screenshots/metrics and freeze the gallery baseline. | Imported reference baseline is accepted. Generator implementation is unblocked. | Planned. |
-| TREE-GEN.1 | Add family profile, generation recipe, branch/foliage definition types, deterministic seed-stream contract, generator versioning, and structural diagnostics without generating production meshes. | Deterministic tree definitions can be regenerated and compared by hash. | Planned. |
-| TREE-GEN.2 | Implement curve/frame transport and swept bark mesh construction using a Dead-family vertical slice; generate normals, tangents, bark UVs, metadata, bounds, and validation reports. | One generated leafless tree renders beside `DeadTree_1` and remains within LOD0 budgets. | Planned. |
+| TREE-GALLERY.1 | Complete Unity source audit for all twenty FBXs and twelve textures; add tree family enum, audit code, standalone gallery component/editor shell, sibling/root creation utility, explicit Ground reference, and clipboard report. Do not create final materials or procedural code. | Exact submesh/material mapping, bounds, geometry counts, vertex-colour evidence, texture dimensions, and importer state are known. | Complete. Unity 6000.5.0f1 source audit passed on 2026-07-23 with 20/20 models, 12/12 textures, zero failures, and three expected bark-normal warnings. |
+| TREE-GALLERY.2 | Correct the three bark normal imports; implement shared bark/foliage shaders and tree includes; consume Weather wind and the URP cloud cookie; add vertex/pivot debug modes; build a four-family imported vertical slice and reserve matching procedural slots. `TREE-GALLERY.2B` adds the reusable foliage readability/shadow contract. | One representative Common, Pine, Twisted, and Dead source tree renders with correct materials, cloud shading, controlled wind, Ground alignment, foliage-cast shadows, softened foliage shadow reception, diagnostics, and removable/rebuildable Editor ownership. | Complete and live-validated. |
+| TREE-GALLERY.3 / 3A | Implement the complete deterministic off-map gallery builder, twenty source specimens, twenty procedural slots, Scene labels, shadow receiver pads, remove/rebuild actions, and complete audit report. `3A` keeps all family blocks active simultaneously and spaces them progressively farther left rather than requiring family cycling. | All twenty imported trees and twenty generated comparison roots are continuously available for side-by-side inspection without consuming the playable Ground. | Complete and live-validated on 2026-07-24: 40 specimens/slots, 118,610 imported triangles, four active blocks, positive chunk clearance, Weather wind ready, cloud cookie ready. |
+| TREE-GALLERY.4 | Run source-scale, wind, cloud, material, pivot, rebuild/removal, and Play Mode validation; record accepted report metrics and freeze the gallery baseline. | Imported reference baseline is accepted. Generator implementation is unblocked. | Complete through the accepted TREE-GALLERY.2B and TREE-GALLERY.3A live reports plus TREE-GALLERY.FREEZE. |
+| TREE-GALLERY.FREEZE | Freeze the accepted simultaneous twenty-tree reference gallery, measured family ranges, accepted tree shaders/material defaults, Weather/cloud receiver contracts, and known source-card limitations. | Imported reference baseline is no longer an implementation target and remains available for generated comparisons. | Complete in this documentation patch after live TREE-GALLERY.3A PASS. |
+| TREE-GEN.1 / 1B / 1D / 1F | Implement the deterministic family/recipe library, unified gallery workflow, branch graph, transported frames, reference-bound structural calibration, curve constraints, collapsed-branch rejection, previews, and dependency diagnostics. | All twenty slots generate deterministic constrained structures through one gallery action. | Complete and live-validated: 20/20 structures, repeatability 20/20, four family dependency suites PASS. |
+| TREE-GEN.2A | Build the first Common/Pine/Twisted/Dead combined bark meshes from transported frames and reuse the accepted tree bark renderer. | Four visible generated bark representatives expose topology, junction, shading, and authoring gaps before all-slot expansion. | Live vertical slice complete but not accepted: exterior winding/culling, base closure, branch-root intersection artifacts, colour-baseline mismatch, and control gaps remain. |
+| TREE-PLAN.3 | Freeze the family-template/ranged-recipe model, baseline colour policy, full control schema, observed TREE-GEN.2A defects, and exact TREE-GEN.2B acceptance gate. | No architectural or visual finding from TREE-GEN.2A is lost before the next thread. | Complete in this documentation patch. |
+| TREE-GEN.2B | Correct bark mesh winding/closure/junctions and add the high-value branch arch, trunk spiral, branch-start-height, symmetry/directional-bias, and baseline colour controls. Keep the four-family vertical slice until accepted. | Four generated representatives render as outward-facing bark meshes with classified seams/embedded roots, acceptable branch junctions, matched imported-family colour baselines, deterministic geometry fingerprints, and independently proven controls. | Complete and live-validated on 2026-07-24: 20/20 structures and repeatability checks, 4/4 bark meshes, all topology gates, and all four family dependency suites PASS. Colour and exterior rendering accepted. |
+| TREE-GEN.2C | Add a compact non-circular trunk cross-section, visible axial twist, and root-buttress grammar while reusing existing twist/path controls. Keep the four-family vertical slice until accepted. | Common, Pine, Twisted, and Dead preserve corrected topology while generated bases become lobed/buttressed and Twisted/Dead show actual helical surface structure. | Source implementation and consistency/compliance audit complete; Unity compilation, migration, topology, visual comparison, and Play Mode validation pending. |
 | TREE-GEN.3 | Implement Common-family grammar and procedural foliage clusters/cards using retained textures and exact pivot metadata. | One generated Common tree renders beside `CommonTree_1` with accepted crown identity and wind. | Planned. |
 | TREE-GEN.4 | Implement Pine-family tier/leader grammar, branch-tip foliage, and Pine response profile. | One generated Pine renders beside `Pine_5` with accepted conifer identity. | Planned. |
 | TREE-GEN.5 | Implement Twisted-family curvature, torsion, asymmetry, permanent wind bias, sparse foliage, and damage controls; generalize branch break/removal state so Dead is not architecturally isolated. | One generated Twisted tree renders beside `TwistedTree_1`; damage controls remain reusable. | Planned. |
@@ -1286,7 +1708,42 @@ Tree-specific checks include:
 
 ### Current non-blocking defaults and approval checkpoints
 
-No blocking design question remains for beginning `TREE-GALLERY.1` after the user approves implementation.
+
+#### Locked next-patch Inspector cleanup
+
+`TREE-GEN.1` also simplifies the gallery Inspector so it presents current workflows instead of historical patch stages.
+
+Primary Actions:
+
+```text
+Rebuild Complete Reference Gallery
+Remove Complete Reference Gallery
+```
+
+`Rebuild Complete Reference Gallery` creates the gallery when absent, rebuilds it when present, repairs required audited source imports, refreshes shared materials, and rebuilds all twenty imported specimens plus twenty comparison slots.
+
+Collapsed Advanced Validation:
+
+```text
+Rebuild On-Map Four-Family Validation Slice
+Remove On-Map Validation Slice
+```
+
+Collapsed Maintenance:
+
+```text
+Repair Required Tree Source Imports
+```
+
+The maintenance action is enabled only when the source/import audit reports a defect. Separate Build/Rebuild buttons and the permanently visible manual normal-correction action are removed from the ordinary workflow.
+
+#### Locked `TREE-GEN.1` implementation boundary
+
+`TREE-GEN.1` creates deterministic structural data and diagnostics only. It may draw curve/branch previews through Editor gizmos or handles, but it does not create final bark meshes, foliage cards, production LODs, runtime renderer buffers, forest placement, or generated variant assets.
+
+The patch must prove the authoring contract before `TREE-GEN.2` begins mesh construction.
+
+No blocking design question remains for live-validating `TREE-GEN.1`; `TREE-GEN.2` remains blocked until the structural and determinism reports pass in Unity.
 
 The current proposed defaults are:
 
@@ -1519,8 +1976,1754 @@ STATIC_ERRORS=0
 
 The checks covered exact approved scope; LF-only content; no trailing whitespace; unique valid GUIDs for all new metadata; balanced C# braces, parentheses, brackets, strings, chars, and comments; exact representation of four model prefixes and twelve texture filenames; absence of `Update`, `LateUpdate`, `SaveAndReimport`, asset creation/deletion, `DestroyImmediate`, obsolete instance-ID access, and legacy object search; removal of superseded parent-owned gallery wording; and preservation of every unapproved baseline file.
 
+#### Subsequent live Unity validation
+
+The user applied `TREE-GALLERY.1` to Unity 6000.5.0f1. After one compile-only correction to the report indentation helper, the project compiled and the complete source audit passed on 2026-07-23 with `20 / 20` FBXs, `12 / 12` textures, zero failures, and only the three expected bark-normal import warnings. The audit confirmed the exact one-renderer material layouts, source bounds, required vertex attributes, texture dimensions/alpha, and source-vault availability. This closes the `TREE-GALLERY.1` Unity/source-contract gate and unblocks `TREE-GALLERY.2`.
+
+The supplied archive still has no `.git` directory, so repository status/history validation is not represented here. The live project remains authoritative for final diff and compile validation.
+
+
+## TREE-GALLERY.2 active implementation plan — four-family rendering vertical slice
+
+### Objective
+
+Establish the shared imported/generated tree rendering contract and build one imported specimen for each family beside an empty procedural comparison slot. The patch must correct only the three audited bark-normal import settings, consume the existing Weather wind and cloud-cookie producers without changing them, and remain an Editor-authored diagnostic path rather than a production forest renderer.
+
+### Live source-audit evidence
+
+The complete Unity 6000.5.0f1 audit generated on 2026-07-23 reported `PASS`, `20 / 20` models, `12 / 12` textures, zero failures, and three expected warnings.
+
+The audit proves:
+
+- Common variants use one `MeshRenderer`, one mesh, two submeshes, and materials `[Bark_NormalTree, Leaves_NormalTree]`;
+- Pine variants use one `MeshRenderer`, one mesh, two submeshes, and materials `[Bark_NormalTree, Leaves_Pine]`;
+- Twisted variants use one `MeshRenderer`, one mesh, two submeshes, and materials `[Bark_TwistedTree, Leaves_TwistedTree]`;
+- Dead variants use one `MeshRenderer`, one mesh, one submesh, and material `[Bark_DeadTree]`;
+- every model contains vertex colours, UV0, normals, and tangents, and contains no UV1/UV2/UV3;
+- all source FBXs remain non-readable and preserve `globalScale=1`, file units, imported normals, and calculated Mikk tangents;
+- the source root transforms are identity;
+- the representative bounds and lowest visible local Y values required for the vertical slice are known: Common 1 `-0.24277`, Pine 5 `-0.23509`, Twisted 1 `-0.20148`, and Dead 1 `-0.33555` metres;
+- `Bark_DeadTree_Normal.png`, `Bark_NormalTree_Normal.png`, and `Bark_TwistedTree_Normal.png` are 2048² default sRGB textures and require Normal Map classification;
+- coloured foliage textures contain alpha and remain the imported-reference inputs;
+- the previous bark/foliage vertex-colour statistics are whole-mesh statistics because living-family bark and foliage share one mesh. The initial accepted imported wind default is therefore `BoundsHeightFallback`; `VertexColourRed` remains an explicit diagnostic mode rather than an automatically selected mask.
+
+The supplied code archive has no `.git` directory and no local reference-vault assets. Live repository status/history comparison and Unity execution remain unavailable in this patch-construction environment; the user's audit is the authoritative source-contract evidence.
+
+### Approved affected scope
+
+Modify:
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/TreeFamily.cs
+Assets/Game/Procedural/Trees/TreeReferenceGallery.cs
+Assets/Game/Procedural/Trees/TreeReferenceSpecimen.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryEditor.cs
+Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowReceiverAudit.cs
+```
+
+Create:
+
+```text
+Assets/Game/Rendering/Trees.meta
+Assets/Game/Rendering/Trees/Includes.meta
+Assets/Game/Rendering/Trees/Includes/TreeCommon.hlsl
+Assets/Game/Rendering/Trees/Includes/TreeCommon.hlsl.meta
+Assets/Game/Rendering/Trees/Includes/TreeWindResponse.hlsl
+Assets/Game/Rendering/Trees/Includes/TreeWindResponse.hlsl.meta
+Assets/Game/Rendering/Trees/Includes/TreeLighting.hlsl
+Assets/Game/Rendering/Trees/Includes/TreeLighting.hlsl.meta
+Assets/Game/Rendering/Trees/Shaders.meta
+Assets/Game/Rendering/Trees/Shaders/SH_StylizedTreeBark.shader
+Assets/Game/Rendering/Trees/Shaders/SH_StylizedTreeBark.shader.meta
+Assets/Game/Rendering/Trees/Shaders/SH_StylizedTreeFoliage.shader
+Assets/Game/Rendering/Trees/Shaders/SH_StylizedTreeFoliage.shader.meta
+```
+
+The explicit Editor build action may create or update six shared gallery materials under:
+
+```text
+Assets/Game/Demo/Materials/Trees/
+```
+
+Those material assets are created through Unity `AssetDatabase`, not raw YAML editing. They may reference the ignored source-vault textures because the imported gallery is explicitly a local diagnostic system. Production generated-library textures remain deferred to `TREE-LIB.1`.
+
+The explicit build/import-normalization action may modify only the three retained bark-normal `.meta` files through `TextureImporter`. No FBX importer or other texture importer is authorized for mutation.
+
+No scene, prefab, package, ProjectSettings, layer, tag, Ground implementation, grass implementation, Weather producer, cloud producer, wind field include, River implementation, or source FBX is authorized for modification.
+
+### Architectural decisions
+
+- The gallery remains an independent sibling/root object with one explicit `GeneratedGround` reference.
+- The four-family slice uses `CommonTree_1`, `Pine_5`, `TwistedTree_1`, and `DeadTree_1`.
+- Family rows are packed inside the assigned Ground's actual local surface domain. The configured row spacing is treated as a preference and is compressed only as needed while preserving audited canopy clearance. Imported/procedural roots remain separated along Ground-local X, but the pair centre may shift laterally when an asymmetric imported crown would otherwise leave the Ground domain.
+- `pairColumnSpacing` is the minimum imported/procedural centre separation. `comparisonPairOffset` is additional canopy-clearance padding; the actual separation is the larger of the configured minimum and audited canopy width plus this padding.
+- Imported and procedural roots are sampled independently through the explicit Ground at their actual Ground-local positions. Each receives its own sampled height and normal; the builder never assumes that both sides of a comparison pair share one elevation.
+- The imported visual is lifted by `-lowestVisibleLocalY * sourceScale`; the shader receives the source-root contact in object space as `(0, lowestVisibleLocalY, 0)` and transforms it to world space in every vertex invocation. This keeps wind anchored at the Ground contact even if the standalone gallery is moved, without any per-frame C# update.
+- Initial imported macro deformation samples `SampleWeatherWindResponse` once at the root and applies a coherent root-anchored bend. No tree-owned wind texture, CPU simulation, or per-frame component update is introduced.
+- Foliage uses restrained height-weighted fallback flutter because source card pivots are unavailable. Generated foliage will replace this fallback with exact generated attachment metadata.
+- Shared tree materials are asset-backed and reused across specimens. No per-tree material instances are created.
+- Foliage shadow casting is controlled by enabling/disabling the foliage material's `ShadowCaster` pass; bark shadow casting remains enabled on the shared renderer.
+- Bark and foliage shaders use the three-argument URP `GetMainLight`/`UniversalFragmentPBR` path with `_LIGHT_COOKIES`, so the authoritative directional cookie is applied once. No custom cloud texture or duplicate cloud attenuation is added.
+- The Weather cloud receiver audit's mandatory shader list is extended with both tree shaders. No assessment logic or producer behavior changes.
+
+### Provisional diagnostic defaults
+
+These are validation starting points, not frozen production tuning:
+
+- imported wind mask: `BoundsHeightFallback`;
+- debug mode: final rendering;
+- foliage alpha cutoff: `0.50`;
+- Common response: stiffness `0.35`, macro `0.65`, flutter `0.040`;
+- Pine response: stiffness `0.65`, macro `0.45`, flutter `0.025`;
+- Twisted response: stiffness `0.45`, macro `0.55`, flutter `0.030`;
+- Dead response: stiffness `0.85`, macro `0.15`, flutter `0.000`;
+- foliage shadow casting: off.
+
+All values are exposed through material or gallery data and must be validated visually before they become production defaults.
+
+### File-by-file implementation sequence
+
+| Item | File | Work | Status |
+| --- | --- | --- | --- |
+| TG2-PLAN | Tree handoff | Record live audit evidence, exact scope, architecture, provisional defaults, risks, and validation before implementation. | Complete. |
+| TG2-A | `TreeFamily.cs` | Add explicit imported wind-mask and tree debug-mode enums shared by the gallery and shaders. | Complete at source level. |
+| TG2-B | `TreeReferenceGallery.cs` | Add mask/debug/cutoff settings plus vertical-slice revision, pass state, timestamp, report, and accessors. | Complete at source level. |
+| TG2-C | `TreeReferenceSpecimen.cs` | Record Ground correction, object-space comparison-root contact, assigned material/shader summary, and source metrics for labels/audits. | Complete at source level. |
+| TG2-D | `TreeCommon.hlsl` | Add shared hash, axis rotation, mask resolution, and debug-colour helpers. | Complete at source level. |
+| TG2-E | `TreeWindResponse.hlsl` | Consume `WeatherWindField.hlsl`, apply root-sampled coherent bend and restrained imported foliage fallback flutter, and return mask/debug data. | Complete at source level. |
+| TG2-F | `TreeLighting.hlsl` | Build URP `InputData`, apply normal orientation, and provide cookie-aware PBR tree lighting helpers. | Complete at source level. |
+| TG2-G | Bark shader | Add opaque albedo/normal rendering, wind deformation in forward/shadow/depth passes, debug modes, fog, main-light shadows, local lights, and `_LIGHT_COOKIES`. | Complete at source level. |
+| TG2-H | Foliage shader | Add two-sided alpha-clipped rendering, restrained flutter, front/back normal policy, wind deformation in forward/shadow/depth passes, debug modes, fog, and `_LIGHT_COOKIES`. | Complete at source level. |
+| TG2-I | Gallery builder | Add explicit normal-import correction, shared material creation/update, four-family build/rebuild/remove, adaptive Ground-domain layout, independent root sampling, source-layout validation, property blocks, and clipboard report. | Complete at source level; `TREE-GALLERY.2A` correction applied after the first live build exposed an out-of-domain fixed-spacing assumption. |
+| TG2-J | Gallery editor | Expose build/rebuild/remove/import-normalization/copy actions, rendering settings, status, and Scene-view specimen labels. | Complete at source level. |
+| TG2-K | Cloud receiver audit | Add both tree shader names to mandatory authored receivers without changing assessment logic. | Complete at source level. |
+| TG2-VERIFY | All approved files | Complete static scope/source checks and record unavailable Unity/Git validation and exact next actions. | Static validation complete; Unity/Git validation pending. |
+
+### Risks and controls
+
+| Risk | Control |
+| --- | --- |
+| Imported source root is lifted above Ground, causing wind to pivot above the trunk base or become stale after gallery movement. | Pass the source-root contact in object space through a material property block and transform it in the shader. |
+| Foliage shadow toggle disables bark because both submeshes share one renderer. | Keep renderer shadow casting enabled and toggle only the foliage material `ShadowCaster` pass. |
+| Shared material assets create duplicates on rebuild. | Use fixed approved asset paths and update existing materials in place. |
+| Import normalization changes unrelated settings. | Change only `textureType` and `sRGBTexture` on the three audited bark-normal importers. |
+| Source material ordering differs from the audit. | Revalidate material names before replacement and fail the build rather than guessing. |
+| Foliage cards tear under pivot-free flutter. | Use low-amplitude fallback motion and make the fallback phase visible through a debug mode. |
+| Tree shaders receive cloud attenuation twice. | Use only URP cookie-aware lighting and extend the mandatory receiver audit; do not include custom cloud sampling. |
+| Tree wind changes the Weather producer. | Include the existing read-only Weather field contract only; no Weather source file or global is modified. |
+| Gallery build partially succeeds. | Validate all assets/shaders/material mappings before hierarchy creation and delete the builder-owned root on build failure. |
+| Generated material folder is absent. | Create the exact tracked path through `AssetDatabase.CreateFolder` from the explicit action. |
+
+### Acceptance criteria
+
+- The three bark normal importers are normalized through an explicit action and no other importer changes.
+- Six shared material assets exist at deterministic paths and use the correct source textures and tree shaders.
+- One Common, Pine, Twisted, and Dead reference renders under a builder-owned vertical-slice root.
+- Every family has one empty procedural comparison slot whose root is sampled independently from the imported reference on the assigned Ground.
+- Imported visuals use audited source scale and lowest-visible-Y correction.
+- Bark normal mapping, foliage alpha clipping, and two-sided foliage lighting compile and render.
+- Weather wind affects intended vertices while the comparison root remains fixed.
+- Both tree shaders are mandatory supported cloud receivers.
+- Build, rebuild, and remove affect only the builder-owned vertical-slice root and create no duplicate materials.
+- A complete build report is stored and copyable.
+- Play Mode does not rebuild, duplicate, or allocate gallery resources through per-frame component logic.
+
+### Validation plan
+
+1. Compile all changed C# and both tree shaders in Unity 6000.5.0f1.
+2. Run `Hierarchy > Tree Reference Gallery > Inspector > Actions > Build Four-Family Vertical Slice`, then copy the complete build report.
+3. Inspect bark normals, foliage clipping/two-sided lighting, root placement, and family scale from the gameplay camera.
+4. Validate Weather motion with roots fixed and validate the same cloud boundary across Ground, bark, and foliage using the existing cloud diagnostic overlay.
+5. Run the Weather cloud-shadow receiver audit and require both tree shaders to report `SUPPORTED`.
+6. Rebuild, remove, enter/exit Play Mode, and confirm no duplicate children, material duplicates, source-FBX changes, or persistent allocations.
+
+### TREE-GALLERY.2 post-implementation consistency and compliance result
+
+#### Actual affected scope
+
+The source patch changes exactly twenty approved files relative to the accepted `TREE-GALLERY.1` baseline: this canonical handoff; five tree runtime/editor files; the existing cloud-receiver audit; two new rendering folders and their metadata; three new shared tree includes and metadata; and two new tree shaders and metadata. No baseline file is removed.
+
+The patch does not ship generated material YAML. The explicit gallery build action creates or updates the six approved shared material assets at deterministic paths under `Assets/Game/Demo/Materials/Trees/` through Unity `AssetDatabase`. The action may normalize only the three audited bark-normal importers by changing `textureType` to `NormalMap` and disabling sRGB. No FBX importer or unrelated texture importer is touched.
+
+#### Material implementation differences
+
+- The shared bark shader uses retained bark albedo/normal textures, imported tangents, opaque PBR lighting, root-sampled Weather deformation, normal-map shading, forward/shadow/depth deformation parity, fog, and `_LIGHT_COOKIES`.
+- The shared foliage shader uses the coloured source foliage variants, two-sided alpha-clipped PBR lighting, explicit front/back normal orientation, restrained fallback flutter, forward/shadow/depth alpha/deformation parity, fog, and `_LIGHT_COOKIES`.
+- Tree deformation consumes `SampleWeatherWindResponse` at the source-root contact. The root is stored in source object space and transformed in shader, so moving the standalone gallery does not stale the pivot and no per-frame C# update is required.
+- Bounds-height weighting is the imported default because the source audit did not isolate vertex colours per submesh. Vertex-colour red remains an explicit debug/diagnostic option.
+- Four source specimens (`CommonTree_1`, `Pine_5`, `TwistedTree_1`, and `DeadTree_1`) are paired with empty procedural comparison roots under one builder-owned vertical-slice hierarchy.
+- The builder revalidates accepted source material names before assigning deterministic shared materials and fails rather than guessing when source contracts differ.
+- Foliage shadow casting is controlled through the foliage material's `ShadowCaster` pass while the shared renderer remains shadow-capable for bark.
+- Both tree shaders are added to the existing Weather cloud-shadow receiver audit's mandatory list. Assessment logic and both Weather producers remain unchanged.
+
+#### Preserved contracts
+
+- The gallery remains a separate sibling/root object with an explicit Ground reference; it is rejected if parented under the assigned Ground.
+- Existing grass mesh, renderer, placement, coverage, interaction, trample, and shader contracts are byte-preserved.
+- `WeatherWindDomain`, `WeatherWindField.hlsl`, `WeatherCloudShadowController`, cloud-cookie ownership, and shader globals are not modified.
+- No runtime mesh generation, procedural branch graph, tree LOD, indirect renderer, collision, placement layer, scene, prefab, package, ProjectSettings, layer, tag, or source FBX change is introduced.
+- No gallery component implements `Update`, `LateUpdate`, or `FixedUpdate`; hierarchy/material generation occurs only through explicit Editor actions.
+
+#### Static validation evidence
+
+The final filesystem/source validator reported:
+
+```text
+CHANGED_FILES=20
+REMOVED_FILES=0
+NEW_GUIDS=8
+STATIC_ERRORS=0
+```
+
+The validation covered exact approved scope; preservation of every unapproved baseline file; LF-only content; no trailing whitespace; unique valid project-wide metadata GUIDs; balanced C#/HLSL/ShaderLab delimiters and lexical states; resolved local include paths; absence of duplicate ShaderLab pass declarations; no per-frame gallery methods; no `ModelImporter` mutation; explicit three-normal `TextureImporter` correction; deterministic material paths; root-space Weather sampling; foliage alpha/two-sided contracts; PBR/cloud-cookie include closure; mandatory cloud-receiver registration; and absence of pre-generated material assets in the delivered patch.
+
+`git diff --no-index --check` emitted no whitespace diagnostics. The supplied archive has no `.git` directory, so branch/status/history validation remains pending in the complete repository.
+
 #### Unavailable validation and required next action
 
-Unity 6000.5.0f1 and the local `Assets/References/Trees/` source vault are not present in the supplied archive, so C# compilation, `AssetDatabase` execution, imported-material identity validation, MeshData inspection, texture-alpha validation, editor menu execution, Undo/scene behavior, and Play Mode behavior are not represented as passed. The supplied archive also has no `.git` directory, so live status/history/diff validation remains pending.
+Unity is not available in the supplied archive, and the ignored `Assets/References/Trees/` source vault is not included. C# compilation, ShaderLab/HLSL compilation, texture reimport, shared material creation, prefab instantiation, Ground sampling, Undo behavior, source-material revalidation, Weather motion, cloud-cookie appearance, shadow/depth behavior, Play Mode stability, and final scene/repository diff are therefore not represented as passed.
 
-The next action is to apply this patch to the complete Unity project, create the standalone gallery beside the intended Ground, run `Hierarchy > Tree Reference Gallery > Inspector > Diagnostics > Run Complete Tree Source Audit`, and provide the complete copied report. `TREE-GALLERY.2` remains blocked until the project compiles and that audit has no `FAIL` entries.
+The next live gate is to apply the patch, allow Unity 6000.5.0f1 to compile, build the four-family vertical slice from the standalone gallery Inspector, and provide the complete copied vertical-slice report together with any compiler or shader errors. `TREE-GALLERY.3` remains blocked until the four-family visual, Weather, cloud, rebuild/remove, and Play Mode validation passes.
+
+
+
+### TREE-GALLERY.2A adaptive Ground-domain layout correction
+
+#### Live failure evidence
+
+The first Unity build on 2026-07-24 compiled and completed importer/material/environment setup, but failed before creating specimens because the configured four-row layout placed the Common pair centre at world `(0, 0, -27)`, outside the assigned Ground's sampleable domain. Unity also reported four obsolete API warnings from the deprecated `FindObjectsByType` overload that accepts `FindObjectsSortMode`.
+
+This was a gallery-layout defect, not a tree-source, material, Weather-wind, or cloud-cookie failure. The live report confirmed:
+
+- all three bark normal corrections passed;
+- all six shared material dependencies and both tree shaders resolved;
+- Weather wind resources were ready;
+- the Weather cloud cookie was ready;
+- specimen creation had not begun when the fixed-spacing Ground sample failed.
+
+#### Corrected architecture
+
+- The builder now queries `GeneratedGround.TryGetSurfaceDomain` before creating hierarchy content.
+- Audited source bounds determine each family's Ground-local row radius and imported-tree horizontal footprint.
+- Four family rows are packed within the real domain. `familyRowSpacing` remains a preferred centre spacing, but it is adaptively reduced when the Ground cannot support the configured `18 m` spacing.
+- Adjacent rows retain a minimum canopy gap and the complete layout fails before hierarchy mutation when even the minimum packed arrangement cannot fit.
+- Each comparison pair receives a Ground-local X centre chosen from the valid interval that keeps both pair roots and the asymmetric imported source bounds inside the domain. Pair centres are not required to remain at X zero.
+- The imported and procedural root positions are transformed from Ground-local coordinates and sampled independently with `TrySampleBaseSurface`. Uneven terrain no longer forces both specimens to use one pair-centre height.
+- The pair root is positioned between the two independently sampled contacts, while imported/source-base correction remains separate.
+- Both deprecated `FindObjectsByType<T>(FindObjectsInactive, FindObjectsSortMode)` calls are replaced with the Unity 6.5 overload `FindObjectsByType<T>(FindObjectsInactive)`. No sort order is requested or relied upon.
+
+#### Corrected affected scope
+
+Modify only:
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryBuilder.cs
+```
+
+No shader, material, importer, scene, prefab, Ground implementation, Weather implementation, cloud implementation, source tree, or other gallery file is changed by this correction.
+
+#### Validation gate
+
+1. Apply `TREE-GALLERY.2A` and allow Unity to compile.
+2. Confirm the previous `FindObjectsSortMode` warnings are absent.
+3. Run `Hierarchy > Tree Reference Gallery > Inspector > Actions > Build Four-Family Vertical Slice`.
+4. Require `[Gallery Layout]` to report a valid Ground domain, one row offset and pair-centre X for every family, followed by successful independent root samples.
+5. Continue with the original `TREE-GALLERY.2` visual, Weather, cloud, rebuild/remove, and Play Mode validation only after all eight specimens/slots are created.
+
+### TREE-GALLERY.2A1 definite-assignment compile correction
+
+The adaptive-layout correction initially used a short-circuit expression in which `sourceAsset == null` could bypass the call assigning the `failure` out variable. Unity correctly reported CS0165. The builder now handles a missing source asset first, then calls `TryInspectSourceAsset` in a separate branch and reads `failure` only after assignment. No runtime, shader, material, importer, scene, or layout behaviour changed.
+
+### TREE-GALLERY.2B foliage readability and shadow foundation
+
+#### Live visual evidence and decision
+
+The four-family reference slice exposed two reusable rendering defects rather than source-import failures:
+
+- overlapping imported foliage cards collapsed into broad, low-contrast canopy masses, especially for `Pine_5` from the gameplay camera and top-down views;
+- the foliage material's `ShadowCaster` pass was disabled, so Ground shadows were trunk/branch-only, while ordinary realtime trunk shadows received by foliage appeared too harsh and card-like.
+
+This patch intentionally addresses only contracts that carry into generated trees. It does not attempt to disguise every structural limitation of the imported card layouts.
+
+#### Rendering ownership and data flow
+
+- Weather remains the only wind producer. Existing root-sampled tree deformation is unchanged.
+- The Weather directional cookie remains the only cloud-shadow source. The foliage shader continues to use the three-argument `GetMainLight` path with `_LIGHT_COOKIES`; no custom cloud texture or duplicate cloud evaluation is added.
+- Foliage shadow **casting** and foliage realtime shadow **reception** are separate controls. Casting uses the existing alpha-clipped `ShadowCaster` pass. Reception modifies only `Light.shadowAttenuation`, so the cloud cookie carried by `Light.color` is not weakened.
+- Imported references use stable object-space cell hashing as a temporary cluster-variation fallback. Generated foliage must later provide explicit stable cluster/card metadata rather than depending on this fallback.
+
+#### New reusable foliage controls
+
+`TreeReferenceGallery` now owns conservative reference defaults that are copied into the three deterministic shared foliage materials when the slice is built or rebuilt:
+
+- `Foliage Shadow Casting` defaults to enabled;
+- canopy-depth strength and power;
+- direct-light orientation contrast;
+- low-amplitude orientation readability under even lighting;
+- two-sided underside darkening;
+- stable cluster-variation strength and object-space cell scale;
+- diffuse wrap;
+- realtime shadow receive strength and minimum shadow floor;
+- a foliage-only diagnostic selector independent from the existing tree wind/geometry diagnostic selector.
+
+The default values are deliberately restrained: they create value separation without attempting to replace missing branch-tier spacing or card-cluster structure.
+
+#### Foliage lighting contract
+
+A new shared include, `TreeFoliageLighting.hlsl`, owns the reusable foliage receiver path:
+
+1. evaluate SH ambient against the resolved two-sided foliage normal;
+2. obtain the cookie- and shadow-aware main light through `GetMainLight(shadowCoord, positionWS, shadowMask)`;
+3. preserve the main-light cookie in `Light.color`;
+4. soften only realtime shadow attenuation through configurable receive strength and floor;
+5. evaluate wrapped two-sided diffuse and restrained foliage specular;
+6. evaluate additional URP lights through the existing Forward+/light-loop contracts;
+7. multiply the resolved lighting by conservative canopy, orientation, underside, and cluster readability factors;
+8. apply fog once after final colour resolution.
+
+The source foliage alpha texture remains authoritative for forward, depth, and shadow clipping.
+
+#### Diagnostics
+
+The foliage shader now exposes:
+
+- Final Rendering;
+- Source Albedo;
+- Alpha Mask;
+- Front / Back Face;
+- Canopy Height;
+- Cluster Variation;
+- Orientation Factor;
+- Realtime Shadow;
+- Cloud Cookie;
+- Direct Light Response;
+- Combined Lighting.
+
+The Cloud Cookie view estimates cookie attenuation by comparing the cookie-modulated main-light colour returned by URP against `_MainLightColor`. Realtime Shadow remains separate and displays raw shadow-map attenuation before the configurable foliage reception softening.
+
+#### Generated-tree metadata implication
+
+The generated tree mesh contract must reserve stable foliage metadata sufficient to replace imported fallbacks. At minimum, future generated foliage needs stable cluster/card variation plus normalized canopy/branch information. Exact channel packing remains a `TREE-GEN` implementation decision, but generated trees must not depend on object-space hash cells as their authoritative variation source.
+
+#### Affected scope
+
+Modify:
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/TreeFamily.cs
+Assets/Game/Procedural/Trees/TreeReferenceGallery.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryEditor.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryBuilder.cs
+Assets/Game/Rendering/Trees/Shaders/SH_StylizedTreeFoliage.shader
+```
+
+Create:
+
+```text
+Assets/Game/Rendering/Trees/Includes/TreeFoliageLighting.hlsl
+Assets/Game/Rendering/Trees/Includes/TreeFoliageLighting.hlsl.meta
+```
+
+No bark shader, Ground, grass, Weather producer, cloud producer, River, source FBX, source texture, scene, prefab, package, ProjectSettings, layer, or tag change is approved.
+
+#### Validation gate
+
+1. Compile C# and the foliage shader in Unity 6000.5.0f1.
+2. Select `Hierarchy > Tree Reference Gallery > Inspector > Reference Rendering` and leave both tree and foliage debug selectors on Final Rendering.
+3. Run `Hierarchy > Tree Reference Gallery > Inspector > Actions > Rebuild Four-Family Vertical Slice` so all three shared foliage materials receive the new defaults and the `ShadowCaster` pass is enabled.
+4. Require the copied report to show `Foliage ShadowCaster pass: Enabled` and list every readability/shadow parameter.
+5. Confirm foliage now contributes alpha-shaped Ground shadows.
+6. Confirm trunk/card shadows received by foliage remain visible but no longer collapse into near-black rectangular patches.
+7. Compare even light, direct sun, and Weather cloud-shadow views from the gameplay camera and from above.
+8. Step through the foliage diagnostics to identify any remaining source-albedo, card-normal, alpha, cookie, or shadow-map defects.
+9. Run the existing Weather cloud-shadow receiver audit and require both tree shaders to remain supported.
+10. Rebuild, remove, rebuild, and enter/exit Play Mode without duplicate hierarchy content, material duplication, or persistent errors.
+
+`TREE-GALLERY.3` remains blocked only on this final four-family visual/runtime gate. Structural card overlap that cannot be corrected without changing generated foliage placement is recorded as a source-reference limitation rather than a reason for further imported-asset shader escalation.
+
+### TREE-GALLERY.3 / 3A complete imported reference gallery
+
+#### Accepted placement and visibility correction
+
+The complete twenty-tree gallery must not consume the playable 40 by 40 metre Ground chunk. The four-family vertical slice may remain on the production Ground because it contains only four references and four reserved slots, but the complete library is built in a separate off-map zone to the **left** of the assigned `GeneratedGround` domain.
+
+`TREE-GALLERY.3A` supersedes the initial switchable-page design. All twenty imported specimens and all twenty generated comparison slots must remain active simultaneously so every reference is immediately available after a rebuild. There is no active-family state and no family-cycling workflow.
+
+The assigned Ground is used only to determine:
+
+- the playable chunk's left boundary;
+- the gallery's world orientation;
+- a provable clearance between the chunk and the nearest complete-gallery content.
+
+Complete-gallery trees do not sample or require the Ground surface. Their visible bases are aligned to flat builder-owned shadow receiver pads using the audited lowest-visible-Y correction.
+
+#### Simultaneous family-block architecture
+
+`Build Complete Imported Gallery` creates:
+
+```text
+Tree Reference Gallery
+└── Complete Imported Gallery
+    ├── Common Page
+    │   ├── Shadow Receiver Pad
+    │   ├── Common_1_Pair
+    │   │   ├── REF_CommonTree_1
+    │   │   └── PROC_CommonTree_1_SLOT
+    │   └── Common_2...5_Pair
+    ├── Pine Page
+    ├── Twisted Page
+    └── Dead Page
+```
+
+The four family roots remain active. Within each family block, five imported/generated pairs form audited non-overlapping rows. The family blocks share the Ground's forward orientation but are placed progressively farther left:
+
+1. Common is nearest to the playable Ground at the configured left clearance;
+2. Pine begins beyond Common's full padded width plus the configured family gap;
+3. Twisted begins beyond Pine's full padded width plus the family gap;
+4. Dead begins beyond Twisted's full padded width plus the family gap.
+
+This produces one persistent off-map inspection strip. All twenty imported references and all twenty reserved generated roots can be inspected without hierarchy toggles or regeneration.
+
+The Inspector exposes:
+
+- `Build Complete Imported Gallery`;
+- `Rebuild Complete Imported Gallery`;
+- `Remove Complete Imported Gallery`;
+- `Copy Last Complete Gallery Report`.
+
+#### Adaptive block layout
+
+Each family block is resolved independently from all five audited source bounds:
+
+1. calculate the imported/reference separation required by the source canopy width plus the configured comparison clearance;
+2. reserve the same audited bounds around the procedural comparison root;
+3. pack five rows along the block Z axis using each source's actual Z extent and the configured minimum row gap;
+4. calculate the complete block footprint;
+5. expand that footprint by the configured pad margin;
+6. position the block so its pad's right edge has the current required left clearance from the preceding boundary;
+7. advance the next block's right-edge clearance by the current padded width plus `Complete Gallery Family Gap`.
+
+This arrangement supports the highly asymmetric and much larger Twisted family while keeping all complete-gallery content outside the playable chunk and non-overlapping.
+
+#### Shadow receiver pads
+
+Each family block owns one lightweight flattened cube named `Shadow Receiver Pad`:
+
+- it uses a deterministic shared `MAT_TreeGallery_ShadowPad` material based on `Universal Render Pipeline/Lit`;
+- it receives realtime foliage/trunk shadows and the normal URP main-light cookie;
+- it does not cast shadows;
+- it has no collider;
+- it is sized from the measured family-block footprint plus the configured margin;
+- it does not duplicate or reference the production Ground mesh.
+
+Separate pads remain preferable to one enormous combined mesh because each pad is already measured from its family footprint, preserves clear family grouping, and avoids filling unused space between blocks.
+
+#### Rendering and metadata
+
+Every imported specimen reuses the accepted TREE-GALLERY.2B contracts unchanged:
+
+- corrected bark normal maps;
+- shared bark/foliage materials;
+- Weather-owned root-sampled wind;
+- authoritative cloud-cookie shading;
+- foliage readability controls;
+- alpha-clipped foliage shadows;
+- family response defaults and stable per-variant phase;
+- original imported source scale.
+
+Every reserved procedural slot records the matching family, source variant, source GUID, target audited bounds, height, width, triangle count, material layout, and comparison root. Future generated trees can populate these slots without rediscovering their reference target.
+
+#### Diagnostics and report
+
+The complete-gallery report records:
+
+- source and Ground prerequisites;
+- normal-map and shared-material status;
+- the deterministic shadow-pad material;
+- playable Ground domain, initial left clearance, and family gap;
+- block and pad dimensions for every family;
+- right-edge and proved chunk clearance for every family;
+- total leftward extent of the simultaneous gallery strip;
+- per-family height, width, and triangle ranges;
+- every imported/reference pair position, separation, base correction, and triangle count;
+- Weather wind and cloud-cookie readiness;
+- confirmation that all four family blocks are active;
+- forty total specimens/slots and the aggregate source triangle count.
+
+Scene labels are shown for all active specimens. The full reference library therefore remains continuously inspectable after any complete-gallery rebuild.
+
+#### Affected scope
+
+Modify only:
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/TreeReferenceGallery.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryEditor.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryBuilder.cs
+```
+
+The gallery action may create or update this deterministic material asset in Unity:
+
+```text
+Assets/Game/Demo/Materials/Trees/MAT_TreeGallery_ShadowPad.mat
+```
+
+No Ground mesh, Ground material, scene-owned gameplay object, grass, Weather producer, cloud producer, tree shader, source FBX, source texture, prefab, package, ProjectSettings, layer, or tag change is part of TREE-GALLERY.3A.
+
+#### Validation gate
+
+1. Compile TREE-GALLERY.3A in Unity 6000.5.0f1.
+2. Run `Hierarchy > Tree Reference Gallery > Inspector > Actions > Rebuild Complete Imported Gallery` when the former switchable gallery already exists.
+3. Require the report to show `Status: PASS`, forty specimens/slots, five variants per family, positive proved chunk clearance for every block, and confirmation that all family blocks are active simultaneously.
+4. Confirm `Complete Imported Gallery` is outside the playable chunk to its left.
+5. Confirm Common, Pine, Twisted, and Dead all remain visible without changing an active-family selector.
+6. Confirm every family block contains five imported trees, five reserved procedural slots, and one correctly sized pad.
+7. Confirm no family pads, trees, or comparison footprints overlap neighbouring blocks.
+8. Confirm imported bases meet their pad surface and neither roots nor pads overlap the playable Ground.
+9. Confirm pads receive trunk and alpha-clipped foliage shadows while casting none of their own.
+10. Confirm Weather wind and cloud-cookie shading remain functional across the full off-map strip.
+11. Rebuild, remove, rebuild, then enter and exit Play Mode without duplicates, missing materials, hierarchy mutation, or persistent errors.
+12. **Satisfied:** the live TREE-GALLERY.3A report passed and `TREE-GALLERY.FREEZE` is recorded by TREE-PLAN.2. The generated-tree implementation is unblocked.
+
+## TREE-PLAN.2 generated-tree authoring-contract documentation record
+
+### Decision frozen
+
+The accepted complete reference gallery is frozen after the live `TREE-GALLERY.3A` report passed with:
+
+- twenty imported source trees;
+- twenty reserved generated comparison slots;
+- all four family blocks active simultaneously;
+- 118,610 imported triangles;
+- positive playable-chunk clearance for every family block;
+- Weather wind resources ready;
+- cloud cookie ready;
+- accepted bark/foliage materials, foliage readability, and alpha-clipped foliage shadows.
+
+### New locked requirements
+
+This documentation patch adds and locks:
+
+- reference-calibration presets distinct from family profiles;
+- family profile, calibration preset, variant recipe, instance override, and seed-variation authoring layers;
+- independent foliage volume and foliage density;
+- crown-envelope, lobe, fullness, cluster-size, and card-size controls;
+- exact/ranged branch counts and branching-distribution controls;
+- separate trunk, primary-branch, secondary-branch, and tertiary-branch curvature semantics;
+- reusable bark and foliage palette data with no material-per-tree architecture;
+- independent deterministic random streams;
+- dependency fingerprints and selective regeneration;
+- generated foliage/branch metadata reservations;
+- explicit determinism and invalidation tests;
+- the next-patch Inspector action cleanup;
+- `TREE-GEN.1` as the next implementation patch.
+
+### Scope
+
+This patch changes only the canonical Markdown document. It does not modify C#, shaders, materials, scenes, importers, profiles, source assets, packages, ProjectSettings, layers, or tags.
+
+### Validation
+
+The updated document is required to retain one H1, balanced fenced blocks, LF line endings, no trailing whitespace, and a complete ordered roadmap. The generated-tree implementation remains pending explicit execution of `TREE-GEN.1`.
+
+
+
+## TREE-GEN.1 deterministic structural-foundation implementation record
+
+### Objective
+
+Implement the generated-tree authoring and structural source-of-truth layer without creating final bark meshes, foliage cards, LOD assets, proxies, runtime renderer buffers, or forest placement.
+
+### Implemented authoring assets and layers
+
+The patch adds the approved reusable asset/data types:
+
+```text
+TreeFamilyProfile
+TreeReferenceCalibrationPreset
+TreeMaterialPalette
+TreeGenerationRecipe
+TreeGenerationOverrides
+```
+
+`TreeFamilyProfile` owns family-safe ranges for overall form, crown volume/fullness, trunk form, branch counts/distributions, per-order curvature, foliage volume, foliage density, damage, and structural budgets. It provides explicit starter grammars for Common, Pine, Twisted, and Dead.
+
+`TreeReferenceCalibrationPreset` stores an optional imported FBX path/GUID, target dimensions, comparison tolerance, palette override, and sparse parameter overrides. The type is twenty-capable without embedding source mesh topology.
+
+`TreeMaterialPalette` stores shared texture identity and bark/foliage colour ranges. Palette-only changes are fingerprinted separately and do not regenerate structural topology.
+
+`TreeGenerationRecipe` resolves the family profile, optional calibration preset, optional palette override, authored recipe overrides, master seed, age class, and optional locked subsystem seeds.
+
+`TreeGenerationOverrides` distinguishes inherited, exact, and ranged authored values. It exposes independent controls for crown volume versus foliage density, branch counts, trunk/branch curvature, damage, and bark/foliage colours.
+
+### Deterministic streams and fingerprints
+
+The implementation derives independent deterministic seeds for:
+
+```text
+TrunkShape
+TrunkForks
+PrimaryBranchLayout
+SecondaryBranchLayout
+TertiaryBranchLayout
+BranchCurvature
+StructuralDamage
+FoliageClusterPlacement
+FoliageClusterShape
+FoliageCardPlacement
+FoliageCardShape
+MaterialVariation
+LODSelection
+ProxyGeneration
+```
+
+Every stream derives from the master seed, family/profile identity and version, recipe identity/version, optional imported-target identity used by a comparison recipe, generator version, and stream identifier unless an explicit locked seed replaces that derivation.
+
+The generated definition records separate dependency, trunk, branch, foliage-geometry-intent, palette, and structural fingerprints. Structural fingerprints include trunk and branch topology/frames only; palette and not-yet-built foliage geometry remain separately invalidatable.
+
+### Structural generation
+
+`TreeGenerator` creates:
+
+- a sampled tapered trunk curve;
+- data-driven primary branch attachment, local transported-frame yaw, tier/semi-whorl placement, azimuth symmetry, and directional bias;
+- deterministic secondary and tertiary branches;
+- optional trunk fork output;
+- deterministic missing, dead, and broken branch states;
+- stable branch IDs and backward-only parent indices;
+- branch-local foliage eligibility intervals;
+- conservative structural bounds and footprint metadata.
+
+All centreline curves use stable transported frames. The implementation carries tangent, normal, binormal, radius, and normalized distance per curve sample and validates orthogonality, finiteness, length, radius, attachments, parent order, and unique stable IDs.
+
+No final mesh vertices, triangles, materials, foliage cards, generated assets, or runtime buffers are created by the generator.
+
+### Authoring component and diagnostics
+
+`ProceduralTreeInstance` is attached only to managed procedural gallery slots. It owns the selected managed recipe, sparse instance overrides, structural definition, preview state, generated bark output, fingerprints, and last reports. It performs no generation from `Update`, `OnValidate`, hierarchy callbacks, scene load, domain reload, or ordinary Play Mode entry.
+
+The `Tree Reference Gallery` Inspector provides the sole normal one-action rebuild, removal, source audit/repair, and report-copy workflows. The selected slot Inspector may expose focused recipe/override inspection and explicit regeneration for diagnostics, but it does not create separate starter profiles, palettes, or recipes outside the managed library.
+
+The Scene preview draws the trunk and branch graph directly with Handles, optional transported frames, attachment markers, and structural bounds. It does not create one GameObject per branch.
+
+The complete generation report includes authoring inputs, every independent seed, resolved parameter values and ownership trace, branch counts by order, rejected/dead/broken/foliage-eligible counts, control/sample counts, total length, radius range, generation time, bounds, footprint, fingerprints, warnings, and validation status.
+
+The deterministic validation suite tests:
+
+1. identical complete inputs reproduce the structural fingerprint;
+2. foliage colour changes preserve trunk, branch, and foliage-geometry fingerprints while changing the palette fingerprint;
+3. foliage-volume changes preserve trunk and branch fingerprints while changing foliage intent;
+4. foliage-density changes preserve trunk and branch fingerprints while changing foliage intent where the family permits density variation;
+5. primary-branch count changes preserve trunk and palette fingerprints while changing branch topology;
+6. trunk-curvature changes invalidate trunk and descendant branch fingerprints;
+7. any locked subsystem seed remains stable while an unlocked stream changes with the master seed.
+
+### Gallery Inspector cleanup
+
+The gallery's ordinary Actions section now exposes only:
+
+```text
+Rebuild Complete Reference Gallery
+Remove Complete Reference Gallery
+```
+
+The on-map four-family slice is retained inside collapsed `Advanced Validation`, and source-import repair is retained inside collapsed `Maintenance`. Repair is disabled when all three audited bark-normal importers are already correct. Historical separate Build/Rebuild buttons are removed from the ordinary workflow.
+
+### Actual affected scope
+
+New runtime/source files:
+
+```text
+Assets/Game/Procedural/Trees/TreeAuthoringPrimitives.cs
+Assets/Game/Procedural/Trees/TreeFamilyProfile.cs
+Assets/Game/Procedural/Trees/TreeReferenceCalibrationPreset.cs
+Assets/Game/Procedural/Trees/TreeMaterialPalette.cs
+Assets/Game/Procedural/Trees/TreeGenerationRecipe.cs
+Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs
+Assets/Game/Procedural/Trees/TreeGenerationParameters.cs
+Assets/Game/Procedural/Trees/TreeBranchDefinition.cs
+Assets/Game/Procedural/Trees/TreeFoliageClusterDefinition.cs
+Assets/Game/Procedural/Trees/TreeGenerationMetrics.cs
+Assets/Game/Procedural/Trees/TreeDefinition.cs
+Assets/Game/Procedural/Trees/TreeGenerator.cs
+Assets/Game/Procedural/Trees/ProceduralTreeAuthoring.cs — historical TREE-GEN.1 harness, removed by the TREE-GEN.2B cleanup
+```
+
+Historical Editor files later removed by the TREE-GEN.2B cleanup:
+
+```text
+Assets/Game/Procedural/Trees/Editor/TreeAuthoringAssetFactory.cs
+Assets/Game/Procedural/Trees/Editor/ProceduralTreeAuthoringEditor.cs
+```
+
+Modified existing files:
+
+```text
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryEditor.cs
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+```
+
+Every new C# file has a unique metadata GUID. No scene, prefab, material, texture, FBX, shader, compute shader, Ground, grass, Weather producer, cloud producer, River, package, ProjectSettings, layer, or tag file is included.
+
+### Static validation and pending live gate
+
+Source-level validation checks balanced delimiters and lexical states, LF-only content, trailing whitespace, metadata uniqueness, exact changed-file scope, no per-frame authoring generation, no obsolete object-sort API, no material-per-tree creation, and preservation of the accepted imported-gallery rendering contracts.
+
+The supplied archive contains no Unity Editor, so authoritative C# compilation, serialization, Scene Handles rendering, starter-asset creation, generation reports, deterministic suite, four-family previews, and Play Mode stability remain pending in Unity 6000.5.0f1.
+
+`TREE-GEN.2` may not begin until at least one Common, Pine, Twisted, and Dead recipe has produced a passing structural report and the determinism/dependency suite passes for each family.
+
+## TREE-GEN.1B unified gallery-authoring workflow implementation record
+
+### Correction to the TREE-GEN.1 workflow
+
+The former low-level standalone authoring harness was not the authoritative production workflow. Its manual starter-asset creation path exposed generator diagnostics as ordinary authoring and created unnecessary setup work. `TREE-GEN.1B` superseded that workflow, and the later TREE-GEN.2B cleanup removes the stale harness and starter assets completely.
+
+The authoritative generated-tree path is now:
+
+```text
+Tree Reference Gallery
+    -> one managed TreeGenerationLibrary asset
+        -> four family profiles
+        -> four material palettes
+        -> twenty imported-reference calibration presets
+        -> twenty generation recipes
+    -> twenty existing PROC_*_SLOT objects
+        -> one ProceduralTreeInstance per slot
+            -> deterministic TreeGenerator output
+            -> structural preview now
+            -> bark mesh in TREE-GEN.2
+            -> foliage mesh in TREE-GEN.3
+```
+
+There is one generator, one managed authoring library, one gallery coordinator, and one generated-tree instance component per procedural comparison slot. Isolated debugging uses the selected `ProceduralTreeInstance`; no second standalone authoring object or starter-asset workflow remains.
+
+### Normal one-button workflow
+
+The ordinary `Tree Reference Gallery` Inspector exposes:
+
+```text
+Rebuild Complete Tree Comparison Gallery
+Remove Generated Tree Outputs
+```
+
+`Rebuild Complete Tree Comparison Gallery` performs the complete operation without a save dialog or manually created authoring objects:
+
+1. finds or confirms the explicit reference Ground;
+2. runs the complete source audit;
+3. applies required source-import corrections through the existing gallery builder;
+4. rebuilds all twenty imported references and twenty procedural slots outside the playable chunk;
+5. creates or repairs `Assets/Game/Demo/Profiles/Trees/TreeGenerationLibrary.asset`;
+6. creates missing family profiles, palettes, calibration presets, and recipes as sub-assets of that one library;
+7. preserves existing managed profile/recipe authoring instead of recreating valid sub-assets;
+8. binds every existing `PROC_*_SLOT` to its matching recipe;
+9. generates all twenty deterministic structural definitions in those slots;
+10. draws all twenty structural previews at their final comparison positions;
+11. performs a repeat-fingerprint check for every slot;
+12. runs the complete determinism/dependency suite once per family;
+13. copies one aggregate report to the clipboard.
+
+`Remove Generated Tree Outputs` removes generated instance components/previews while retaining the imported references, procedural slot GameObjects, managed library, profiles, palettes, calibration presets, and authored recipes.
+
+### Managed library contract
+
+`TreeGenerationLibrary.asset` is automatically saved at the deterministic project path:
+
+```text
+Assets/Game/Demo/Profiles/Trees/TreeGenerationLibrary.asset
+```
+
+Its profiles, palettes, calibrations, and recipes are sub-assets. Rebuilding repairs missing references and missing sub-assets but does not reset valid edited profiles, palettes, recipes, seeds, or instance-independent authoring.
+
+Each calibration preset records its imported FBX path/GUID and audited dimensions. Initial managed calibration sets exact target height and a conservative primary-branch length ratio derived from the imported width/height relationship. The imported source remains a visual target rather than copied topology.
+
+### Procedural slot contract
+
+Every complete-gallery procedural slot receives `ProceduralTreeInstance`, which owns:
+
+- managed library reference;
+- selected generation recipe;
+- seed;
+- sparse per-instance overrides;
+- generated structural definition;
+- generation report and fingerprint;
+- structural-preview visibility.
+
+Selecting one slot permits switching to any recipe in the same library, changing its seed/overrides, regenerating only that tree, resetting its overrides, or copying its report. A complete gallery rebuild restores each slot to its matching imported-reference recipe.
+
+The structural preview is intentionally a Scene-view branch graph until `TREE-GEN.2`; no bark or foliage render meshes are implied by `TREE-GEN.1B`.
+
+### Gallery Inspector cleanup
+
+The ordinary workflow no longer exposes separate source-import, Build, Rebuild, family-cycling, starter-asset, or per-family setup buttons. On-map four-family validation remains collapsed under `Advanced Validation`. Source repair and complete-gallery removal remain collapsed under `Maintenance`. Report-only operations remain collapsed under `Diagnostics And Reports`.
+
+### Validation gate
+
+`TREE-GEN.2` remains blocked until Unity validation confirms:
+
+- the patch compiles;
+- one click creates or repairs the managed library;
+- the complete gallery still contains twenty imported references and twenty procedural slots;
+- all twenty slots contain passing `ProceduralTreeInstance` definitions;
+- all twenty structural previews appear at the off-map slot positions with Gizmos enabled;
+- all twenty repeat fingerprints pass;
+- Common, Pine, Twisted, and Dead dependency suites pass;
+- selecting a procedural slot exposes recipe switching and per-tree regeneration;
+- rebuilding is idempotent and produces no duplicate library sub-assets or slot components;
+- Play Mode entry/exit causes no automatic regeneration or hierarchy mutation.
+
+
+## TREE-GEN.1D structural grammar and reference-calibration correction
+
+### Why this patch exists
+
+Unity validation accepted the `TREE-GEN.1B` orchestration and determinism foundation:
+
+- the managed generation library remained singular;
+- all twenty procedural slots generated;
+- deterministic repeat checks passed `20 / 20`;
+- Common, Pine, Twisted, and Dead dependency suites passed;
+- rebuild, removal, restoration, and Play Mode entry/exit were stable.
+
+The Scene-view skeletons nevertheless exposed structure that should not be converted into bark meshes yet: uncontrolled spline curling, excessive higher-order branching, oversized Twisted/Dead/Pine bounds, and an all-trees-at-once preview that obscured direct imported/generated comparison.
+
+`TREE-GEN.1D` is therefore the final structure-only correction gate before `TREE-GEN.2`.
+
+### Managed profile upgrade
+
+Managed `TreeFamilyProfile` assets upgrade from profile version `1` to version `2` during the ordinary gallery rebuild. The upgrade is deterministic and occurs only for managed profiles whose serialized version predates the current grammar.
+
+Version `2` tightens family grammar:
+
+- **Common:** moderate rounded branching, reduced higher-order curvature, two-to-three secondaries per primary, and zero-to-one tertiary per secondary;
+- **Pine:** central-leader/tier grammar, one-to-two secondaries, zero-to-one tertiary, reduced branch sweep/curl, and shorter higher orders;
+- **Twisted:** readable asymmetric trunk/primary masses with bounded irregularity rather than repeated loops;
+- **Dead:** sparse exposed structure, one-to-two secondaries, no tertiary order in the managed default, and stronger branch-loss survival filtering.
+
+Maximum managed branch budgets are reduced to family-appropriate ceilings rather than relying on the former generic `384`-branch limit.
+
+### Structural constraint contract
+
+Each family profile now owns explicit structural constraints:
+
+```text
+maximum trunk horizontal displacement
+maximum trunk turn per control segment
+maximum branch turn per control segment
+maximum accumulated primary turn
+maximum accumulated higher-order turn
+maximum primary arc/chord ratio
+maximum higher-order arc/chord ratio
+minimum forward progress
+maximum radial return toward the attachment
+secondary survival probability
+tertiary survival probability
+allowed crown-envelope overshoot
+```
+
+Generation constrains control-point progression before transported frames and fingerprints are calculated.
+
+The constraints do not erase family identity:
+
+- Common and Pine are deliberately tighter;
+- Twisted permits more accumulated turn and displacement;
+- Dead permits irregular silhouette but not unconstrained spline coils.
+
+Higher-order branches inherit a controlled fraction of the parent tangent, become progressively shorter, and use lower curvature, sweep, irregularity, curl, and twist amplitudes than primary branches.
+
+### Imported-reference dimension calibration
+
+`TreeReferenceCalibrationPreset` upgrades to calibration version `2` and stores:
+
+```text
+target visible height
+target visible X width
+target visible Z depth
+target crown start
+dimension tolerance
+```
+
+The library builder refreshes these values from each procedural slot's audited imported bounds.
+
+Reference-calibrated recipes continue to set exact target height. Their primary length ratio is now derived conservatively from imported width/height using a `0.5` factor rather than the previous `0.7` factor.
+
+Generated trunk and branch control points are constrained inside the imported target height and X/Z envelope before spline sampling. After structure creation, a bounded deterministic X/Z fit adjusts non-trunk geometry around the sampled trunk centreline until the generated width and depth approach the imported target. The trunk geometry is never scaled by that fit, and shared parent/child attachment positions receive the same centreline-relative transform. This preserves subsystem isolation: changing branch count may refit descendants but does not rescale or regenerate the trunk.
+
+Reference-fit metrics record:
+
+```text
+generated/reference height ratio
+generated/reference X-width ratio
+generated/reference Z-depth ratio
+dimension-tolerance result
+```
+
+The default managed tolerance is `±15%`.
+
+### Structural diagnostics
+
+`TreeGenerationMetrics` now records:
+
+```text
+maximum per-sample turn
+maximum accumulated branch turn
+maximum arc/chord ratio
+backward-progress violation count
+foliage-eligible crown-envelope violation count
+maximum crown-envelope overshoot
+reference height/width/depth ratios
+reference-calibration tolerance status
+```
+
+The individual generation report and the unified twenty-tree report expose these values.
+
+A reference-calibrated tree that exceeds its dimension tolerance fails structural generation before bark mesh work begins.
+
+### Preview scope
+
+The complete imported gallery remains visible at all times. Generated structural previews default to:
+
+```text
+Preview Scope: Selected Tree
+Trunk: On
+Primary Branches: On
+Higher-Order Branches: On
+Attachment Points: Off
+Bounds: On
+Transported Frames: Off
+```
+
+Available scope choices are:
+
+```text
+Selected Tree
+Selected Family
+All Trees
+```
+
+The settings live on `Tree Reference Gallery > Generated Tree Library` and are propagated to all managed `ProceduralTreeInstance` components.
+
+Selecting a `PROC_*_SLOT` is therefore the normal direct-comparison workflow. `All Trees` remains an explicit diagnostic mode rather than the default.
+
+### TREE-GEN.2 gate
+
+`TREE-GEN.2` remains blocked until Unity validation confirms:
+
+- all twenty calibrated structures generate;
+- all twenty reference dimension checks pass;
+- repeat fingerprints remain `20 / 20`;
+- all four dependency suites remain passing;
+- selected-tree preview scope behaves correctly;
+- Common, Pine, Twisted, and Dead skeletons no longer show obvious loops, repeated trunk crossings, or oversized higher-order branches;
+- rebuilding upgrades the managed profiles/calibrations once without creating duplicate sub-assets.
+
+---
+
+## TREE-GEN.2A four-family bark-mesh vertical slice
+
+### Status
+
+Live-validated as a useful vertical slice but **not accepted**. The four generated representatives render and expose the correct structural data path, but bark geometry correctness and missing authoring controls block expansion to all twenty slots.
+
+`TREE-GEN.2A` is the first visible generated-tree geometry patch. It deliberately meshes only the first managed variant from each family:
+
+```text
+Common 1
+Pine 1
+Twisted 1
+Dead 1
+```
+
+The other sixteen procedural slots retain their calibrated structural previews until the shared bark path is accepted.
+
+### Authoritative output ownership
+
+The existing `ProceduralTreeInstance` remains the single owner of generated output for its gallery slot. The patch does not create a second tree system.
+
+Each representative slot owns one builder-created child:
+
+```text
+PROC_<Family>_1_SLOT
+└── Generated Bark Mesh
+    ├── MeshFilter
+    └── MeshRenderer
+```
+
+One combined mesh contains the trunk and every accepted branch in the structural definition. Persistent managed `Mesh` sub-assets are stored inside the existing `TreeGenerationLibrary.asset` and are updated in place on rebuild; no loose per-tree mesh files or unique material assets are created.
+
+### Bark geometry contract
+
+`TreeBarkMeshGenerator` consumes the transported frames already frozen by `TREE-GEN.1` and builds swept tapered tubes with:
+
+- branch-order-dependent radial resolution;
+- one UV seam per branch;
+- cylindrical bark UVs measured in metres along each branch;
+- generated radial normals and circumferential tangents;
+- closed trunk base and closed branch tips;
+- overlapping branch roots at parent centreline attachments to avoid visible gaps;
+- one combined submesh and one shared bark material per generated tree;
+- vertex-colour metadata carrying wind mask, branch order, branch stiffness, and deterministic phase.
+
+Default radial segments are intentionally conservative:
+
+```text
+Common:  10 / 8 / 6 / 5
+Pine:    10 / 7 / 5 / 4
+Twisted: 12 / 9 / 7 / 5
+Dead:    10 / 8 / 6 / 5
+          trunk / primary / secondary / tertiary
+```
+
+### Rendering integration
+
+Generated bark reuses the accepted shared materials and `PS3D/Trees/Stylized Tree Bark` shader. Per-instance bark tint comes from the resolved `TreeMaterialPalette` through a `MaterialPropertyBlock`; the system does not instantiate materials per tree.
+
+The generated renderer supplies:
+
+```text
+_TreeWindMaskMode = Vertex Colour Red
+_TreeBoundsMinY / _TreeBoundsHeight
+_TreeRootPositionOS
+family stiffness and macro wind strength
+instance phase
+current tree debug mode
+```
+
+The existing Weather wind field and URP main-light cloud cookie remain authoritative. Generated bark uses the same Forward, ShadowCaster, and DepthOnly shader passes as imported bark.
+
+### Dead-family targeted correction
+
+Managed family profiles upgrade to version `3` in this patch. The Dead profile receives a narrow correction before meshing:
+
+- more primary opportunities;
+- one-to-three shorter secondary branches;
+- shorter maximum primary length ratios;
+- lower missing-branch probability;
+- stronger dead-state probability without deleting the silhouette;
+- no tertiary branch order.
+
+This is not a broad structural rewrite. It only gives leafless Dead trees enough visible terminal structure while preventing a few long branches from dominating the entire silhouette.
+
+### Foliage diagnostic warning correction
+
+The foliage shader diagnostic property now uses the enum type directly:
+
+```text
+[Enum(ProgrammaticStylized3D.Trees.TreeFoliageDebugMode)]
+```
+
+This replaces the eleven inline label/value arguments that Unity 6.5 failed to instantiate as a material drawer. The runtime diagnostic values and shader behavior are unchanged.
+
+### Rebuild and removal behavior
+
+`Tree Reference Gallery > Rebuild Complete Tree Comparison Gallery` remains the sole normal build action. It now:
+
+1. rebuilds all twenty imported references and slots;
+2. upgrades/repairs the managed generation library;
+3. generates all twenty calibrated structural definitions;
+4. builds or updates the four representative bark meshes;
+5. runs repeatability and family dependency validation;
+6. copies one aggregate report.
+
+`Remove Generated Tree Outputs` removes the scene `Generated Bark Mesh` children together with `ProceduralTreeInstance` components while retaining the managed library, recipes, and reusable mesh sub-assets.
+
+### TREE-GEN.2A acceptance gate
+
+The vertical slice is accepted only when Unity confirms:
+
+- all twenty structural definitions still pass;
+- repeatability remains `20 / 20`;
+- all four dependency suites pass;
+- exactly four generated bark meshes are reported;
+- each mesh has finite vertices, normals, tangents, UVs, colours, and indices;
+- no visible open tips or trunk bottoms;
+- branch roots do not show obvious gaps;
+- Common, Pine, Twisted, and Dead bark render beside their imported references;
+- generated bark receives light, shadows, cloud-cookie shading, and Weather wind;
+- the foliage material-drawer warning no longer appears.
+
+After acceptance, the same mesh path expands to all twenty slots before foliage generation begins.
+
+## TREE-PLAN.3 family templates, ranged recipes, and TREE-GEN.2B plan
+
+### Status
+
+Approved and implemented as the documentation-first portion of `TREE-GEN.2B`. This section remains the authoritative implementation and acceptance contract. Source changes are prepared, but Unity compile, aggregate diagnostic execution, and live four-family visual acceptance are still required before the patch may be frozen.
+
+### Decisions frozen
+
+1. **No reference-match mode.** Development comparison recipes simply use baseline values calibrated to the imported references.
+2. **Family profiles are templates.** They provide defaults, allowed ranges, budgets, and grammar—not rigid final tree identities.
+3. **Recipes are named ranged configurations.** A recipe inherits a family and may set every supported control to inherited, exact, or min/max range.
+4. **Seeds vary recipes deterministically.** Multiple trees from one recipe may vary inside its authored ranges while retaining the recipe identity.
+5. **Instance overrides remain sparse exact exceptions.** They are not a competing authoring system.
+6. **Imported reference metadata is diagnostic.** Source bounds, identity, and tolerance may remain in compatibility assets, but must not create a public authoring or rendering mode.
+7. **Reference gallery colours are the baseline.** Generated comparison trees must use the same family texture/material path and neutral/default tint required to match the imported tree as closely as practical.
+8. **Creative colour variation remains supported.** It is used by future recipes, not by introducing a comparison-mode switch.
+
+### Authoritative full control schema
+
+#### Overall form and trunk
+
+```text
+Tree Height
+Trunk Base Radius / Thickness
+Trunk Taper
+Trunk Control-Point Count
+Trunk Centerline Curvature
+Trunk Bend Count / Frequency
+Trunk Lateral Displacement
+Trunk Directional Drift
+Trunk Lean Strength
+Trunk Lean Direction
+Trunk Spiral Strength
+Trunk Spiral Turns / Frequency
+Trunk Spiral Direction
+Trunk Surface Torsion / Ring Rotation
+Trunk Irregularity
+Trunk Fork Probability
+Trunk Fork Height
+```
+
+`Trunk Spiral Strength` changes the centerline silhouette. `Trunk Surface Torsion` only rotates the transported/ring frame and texture orientation. They must not be conflated.
+
+#### Branch population and placement
+
+```text
+Primary Branch Count / Range
+Secondary Branches Per Primary / Range
+Tertiary Branches Per Secondary / Range
+Maximum Branch Order
+Lowest Primary Branch Height
+Highest Primary Branch Height
+Crown Start Height
+Attachment-Height Distribution
+Minimum Vertical Attachment Spacing
+Tier Count
+Branches Per Tier
+Tier Irregularity
+Azimuth Symmetry
+Directional Bias Angle
+Directional Bias Strength
+One-Sidedness / Exposure Bias
+Lower Branch Retention / Pruning
+Missing Branch Probability
+Dead Branch Probability
+Break Probability
+```
+
+`Azimuth Symmetry` controls how evenly branches fill the circumference. `Directional Bias Strength` controls deliberate lopsidedness toward an authored direction. A tree may therefore be symmetrical, mildly biased, or strongly one-sided without changing family.
+
+#### Branch launch and shape
+
+```text
+Initial Branch Elevation / Launch Angle
+Branch Arch Direction (-down / +up)
+Branch Arch Strength
+Late Gravity Sag / Droop
+Primary Branch Curvature
+Primary Branch Side Sweep
+Primary Branch Torsion
+Primary Branch Irregularity
+Primary Branch End Curl
+Primary Branch Length
+Primary Branch Radius / Taper
+Parent-Direction Inheritance
+Higher-Order Curvature Scale
+Higher-Order Length Scale
+Higher-Order Radius Scale
+```
+
+Initial elevation, arch direction, arch strength, and late sag are distinct responsibilities. The generator must not make one control silently alter all four.
+
+#### Crown and foliage
+
+The previously frozen independent crown-volume and foliage-density controls remain authoritative, including crown start, width/height, lobe count/size, fill, cluster dimensions, radial spread, card size, cluster count, cards per cluster, occupancy, terminal probability, and retention.
+
+#### Appearance
+
+```text
+Bark Texture Family
+Neutral Baseline Bark Tint
+Authored Bark Tint / Hue / Saturation / Value
+Root Darkening
+Upper-Trunk Variation
+Branch-Order Variation
+Foliage Base / Highlight / Shadow Colours
+Foliage Hue / Saturation / Value Variation
+Cluster Colour Variation
+Top-to-Bottom Gradient
+```
+
+For the twenty reference-comparison recipes, the baseline bark tint must be neutral unless the imported material itself has a non-white tint. Generated bark must use the same shared family material and texture as the imported reference. The aggregate report must list material asset, base texture, material base colour, resolved recipe tint, and final property-block tint.
+
+### Family-template intent
+
+The initial family templates should configure the common controls rather than require unique code paths:
+
+| Family | Template defaults |
+| --- | --- |
+| Common | Relatively straight and moderately thin trunk; little/no centerline spiral; higher branch start; broad balanced azimuth distribution; moderate upward or neutral arch; rich-crown-capable foliage ranges. |
+| Pine | Strong central leader; tier/semi-whorl placement; comparatively symmetrical azimuth; branch arch commonly neutral/downward but fully configurable; height-dependent tier length. |
+| Twisted | Wider centerline-curvature and spiral ranges; stronger lateral displacement; broader symmetry/directional-bias ranges; sparse directional crown by default, not mandatory. |
+| Dead | No living foliage; exposed readable structure; configurable low/high branch start; configurable spiral; break/removal ranges; default balance sufficient for reference matching while allowing lopsided recipes. |
+
+Named recipes may cross family stereotypes—for example `Twisted Pine`—by changing ranges without introducing a new generator system.
+
+### Future recipe creator
+
+A later authoring patch should add a clear library action such as `Create Recipe From Family`, ask for a recipe name, duplicate the family defaults into inherited/ranged fields, and save it as a managed sub-asset of `TreeGenerationLibrary.asset`. It must support editing exact values and ranges and previewing deterministic variants. This tool is desirable but is not a prerequisite for correcting `TREE-GEN.2B` bark geometry.
+
+### TREE-GEN.2A live findings
+
+The first visible meshes are useful and structurally promising, but the vertical slice is not accepted.
+
+#### Blocking mesh defects
+
+1. **Exterior faces are not consistently observable.** From several angles the viewer sees the hollow interior while expected exterior faces disappear. This indicates side/cap winding and/or normal orientation is inconsistent with Unity front-face culling.
+2. **Trunk bottoms appear open.** The base cap exists in source intent but does not render as a reliable outward-facing closure.
+3. **Branch roots visibly clip through trunks.** Child tubes currently begin from parent centerline attachment data and can pass through or emerge from the opposite side.
+4. **Branch-root geometry forms hard stepped wedges/spikes.** Independent tubes overlap without a controlled root transition or collar.
+5. **Normals/tangents cannot be trusted until winding is corrected.** Geometry validation must prove face orientation rather than relying only on stored radial normals.
+
+#### Useful control gaps revealed by the vertical slice
+
+1. Signed branch arch direction and independent arch strength.
+2. Distinct initial launch angle and late gravity sag.
+3. Actual trunk centerline spiral strength/frequency, separate from frame/surface torsion.
+4. Lowest branch height, highest branch height, crown start, and pruning controls.
+5. Azimuth symmetry and explicit directional-bias angle/strength.
+6. Neutral baseline bark colour matching for imported/generated comparisons.
+7. Family defaults expressed through the same controls rather than hard-coded family-only behavior.
+
+### TREE-GEN.2B implementation plan
+
+`TREE-GEN.2B` remains a four-family vertical slice. Do not expand bark generation to all twenty slots and do not begin foliage until this acceptance gate passes.
+
+#### First-patch code-audit corrections
+
+The source audit performed before implementation adds the following binding decisions to the plan:
+
+1. Side-wall winding is confirmed inward under the transported-frame convention and must be reversed in geometry. Existing cap winding is retained unless the geometric cap audit proves a failure; the trunk-base tangent handedness is corrected independently.
+2. Primary-branch and trunk-fork azimuth must be resolved in the transported parent `Normal/Binormal` frame, not global XZ. Curved and leaned trunks otherwise produce internally inconsistent branch roots and symmetry controls.
+3. Existing `TrunkTwistDegrees` data is preserved as surface torsion. New spiral controls alter trunk centreline control points before frame transport.
+4. Managed profile upgrades are fieldwise. Bumping a schema version must never call a whole-profile reset on an existing matching-family profile. Managed recipe binding repair and serialized-content migration are separate operations.
+5. Branch root centreline correction precedes bark collar construction. A decorative collar around a centreline that still crosses the parent is not acceptable.
+6. The bark input/settings fingerprint and emitted geometry-content fingerprint are separate. The latter hashes vertex attributes and indices, and every representative is rebuilt into a temporary verification mesh to prove repeatability.
+7. A failed topology or repeatability build clears the managed mesh and removes the stale scene child so an older passing mesh cannot masquerade as the current result.
+8. Family identity supplies defaults only. Tiering, symmetry, directional bias, launch, arch, and sag are resolved data-driven controls rather than family-only generator branches.
+9. Reference width/depth calibration may move generated branches after their initial construction. Child branches are therefore re-anchored parent-before-child after calibration fitting, and their local attachment axes are refreshed before validation and meshing.
+
+#### Phase 1 — deterministic bark topology audit
+
+Add mesh-build diagnostics that report at minimum:
+
+```text
+finite vertex/normal/tangent/UV/index checks
+degenerate triangle count
+raw boundary-edge count
+position-welded UV/hard-normal seam count
+expected embedded child-root loop count
+unexpected exposed/open boundary-loop count
+non-manifold edge count after seam classification
+outward-facing side triangle count
+inward-facing side triangle count
+cap orientation failures
+zero-area ring segments
+branch-root opposite-side emergence count
+branch-root loop outside-parent count
+```
+
+Raw index-boundary count is diagnostic only. Cylindrical UV seams duplicate the first/last ring vertex, hard-normal caps duplicate their ring vertices, and each deliberately uncapped child branch contributes one hidden root loop. The passing contract is therefore zero **unexpected or visibly exposed** boundary loops after position-based seam classification, exactly one expected hidden root loop per child branch, zero non-manifold classified edges, and every expected root loop fully contained inside its parent. An audit failure must fail the bark build rather than merely log a warning.
+
+#### Phase 2 — winding, normals, tangents, and closure
+
+Correct `TreeBarkMeshGenerator.AppendBranchTube` and `AppendCap` so:
+
+- all side faces are front-facing from outside under normal backface culling;
+- all radial normals point outward;
+- trunk-base cap faces outward/downward;
+- branch-tip caps face outward along the terminal tangent;
+- tangent handedness is consistent after winding changes;
+- there are no exposed interiors at any camera angle;
+- UV seams and duplicated hard-normal cap seams are position-coincident;
+- only the classified, hidden embedded child-root loops remain open;
+- there are no unexpected exposed boundary loops or degenerate cap triangles.
+
+The validator should determine orientation geometrically using face-normal dot expected radial/cap direction. Do not “fix” this with `Cull Off`, inverted culling, or a two-sided bark material.
+
+#### Phase 3 — branch-root junction construction
+
+The current centerline-overlap approach must be replaced by a bounded deterministic junction treatment.
+
+Minimum acceptable vertical-slice strategy:
+
+1. Locate the parent curve sample/frame at the child attachment parameter.
+2. Resolve the child launch direction in the parent frame.
+3. Compute the parent surface intersection in that radial direction using the parent radius.
+4. Start the child root slightly inside that parent surface, not at the parent centerline.
+5. Build two or more transition rings over a configurable blend length.
+6. Apply a root-radius scale and optional parent-conforming elliptical collar.
+7. Keep the child root uncapped.
+8. Prevent the child tube from crossing the parent and emerging from its opposite side.
+9. Preserve stable IDs, UV continuity along the child, metadata, and deterministic fingerprints.
+
+Initial reusable bark settings should include named fields equivalent to:
+
+```text
+Branch Root Inset
+Branch Root Blend Length
+Branch Root Radius Scale
+Branch Root Collar Strength
+Branch Root Transition Ring Count
+```
+
+A true boolean union or fully welded manifold branch junction is not required for this patch if the collar/embedded-root solution has no visible holes, spikes, opposite-side emergence, or severe shading discontinuity. Boolean/welded junctions remain an optional later quality tier.
+
+#### Phase 4 — add the missing authoring controls
+
+Add the authoritative fields to family profiles, recipe/ranged overrides, resolved parameters, fingerprints, reports, and tests:
+
+```text
+Trunk Spiral Strength
+Trunk Spiral Turns / Frequency
+Trunk Spiral Direction
+Primary Branch Start Height
+Primary Branch End Height
+Initial Branch Elevation
+Branch Arch Direction
+Branch Arch Strength
+Late Branch Sag
+Azimuth Symmetry
+Directional Bias Angle
+Directional Bias Strength
+```
+
+Existing ambiguous `Droop`, `UpwardBias`, `SideBias`, or `TwistDegrees` fields may be migrated or retained internally for serialization, but the resolved public responsibilities must be unambiguous. No single control may simultaneously change launch angle, arch direction, arch strength, and sag.
+
+Update dependency fingerprints and selective-regeneration tests:
+
+- bark/palette changes preserve structure;
+- branch arch changes rebuild branch curves but preserve trunk and palette;
+- branch start-height changes rebuild branch layout but preserve trunk and palette;
+- symmetry/bias changes rebuild branch layout but preserve trunk and palette;
+- trunk spiral changes rebuild trunk and descendants but preserve palette;
+- the same seed and recipe remain deterministic.
+
+#### Phase 5 — family and comparison-recipe calibration
+
+Upgrade the managed library version without resetting valid unrelated user-authored values.
+
+Configure baseline comparison recipes so:
+
+- Common 1 uses higher branch start, balanced azimuth, little/no spiral, and reference-like arch;
+- Pine 1 uses central-leader tiers and reference-like branch arch direction;
+- Twisted 1 receives enough centerline spiral/lateral displacement to read as twisted while remaining within imported H/W/D tolerance;
+- Dead 1 receives reference-like branch start, balance, spiral, and colour while retaining recipe ranges that permit future lopsided variants.
+
+The twenty comparison recipes should receive neutral bark tint and the same family material path as their imported counterparts. Creative tint ranges belong to future named recipes.
+
+#### Phase 6 — reports and concise validation
+
+The aggregate report must add:
+
+```text
+bark topology audit per representative
+boundary / non-manifold / degenerate counts
+outward / inward face counts
+junction settings and root failures
+resolved branch start-height range
+resolved arch direction / strength / sag
+resolved trunk spiral strength / turns
+resolved symmetry / directional bias
+imported and generated material/tint comparison
+mesh fingerprint
+```
+
+### TREE-GEN.2B acceptance gate
+
+The patch passes only when all of the following are true:
+
+- Unity compiles with zero red errors;
+- all twenty structural definitions still pass;
+- structural repeatability remains 20/20;
+- all four bark representatives reproduce the same geometry-content fingerprint on an immediate verification rebuild;
+- managed profile/recipe migration preserves pre-existing unrelated authored values and reports upgraded fields;
+- all four dependency suites pass;
+- exactly four representative bark meshes build;
+- zero non-finite vertices/normals/tangents/UVs/indices;
+- zero degenerate triangles;
+- raw boundary edges are fully explained by position-coincident UV/cap seams and the exact expected embedded child-root loops;
+- zero unexpected exposed/open boundary loops after seam classification;
+- zero inward-facing side/cap triangles according to the topology audit;
+- exterior bark is visible and interiors are hidden from every ordinary view;
+- trunk bottoms and branch tips are visibly closed;
+- no branch tube emerges from the opposite side of its parent;
+- branch roots no longer show the current stepped wedge/spike artifacts at normal inspection distances;
+- generated comparison bark colour is as close as practical to the corresponding imported family material baseline;
+- branch arch can be demonstrated upward and downward with independent strength;
+- trunk centerline can be demonstrated straight and strongly spiraled;
+- branch start can be demonstrated low and high;
+- azimuth layout can be demonstrated symmetrical and deliberately one-sided;
+- Common 1, Pine 1, Twisted 1, and Dead 1 remain inside the accepted imported H/W/D tolerance;
+- Weather wind, cloud-cookie shading, shadows, and depth behavior remain functional.
+
+Only after this gate passes should the bark path expand to all twenty slots. Foliage remains `TREE-GEN.3` work.
+
+
+## TREE-GEN.2B first source-patch implementation record
+
+### Patch status
+
+The approved documentation-first source patch is implemented in code. It is **not frozen as live-accepted** until Unity imports and compiles the files, the complete comparison-gallery action runs, and the four generated representatives pass visual inspection against the acceptance gate above.
+
+No scene, material, shader, texture, FBX, Ground, grass, Weather, cloud, package, layer, or tag asset is modified by this source patch. `TreeGenerationLibrary.asset` remains untouched in the delivered patch; its managed sub-assets migrate through the explicit Unity gallery/library rebuild action.
+
+### Implemented source changes
+
+- `TreeFamilyProfile`, `TreeGenerationRecipe`, and `TreeGenerationLibrary` advance their managed schema versions.
+- Existing matching-family profiles migrate fieldwise. Legacy attachment endpoints remain the limits of editable start/end ranges, and existing managed comparison recipes receive exact endpoint overrides so their pre-patch branch interval is preserved. Launch/droop intent, torsion data, seeds, palette bindings, and unrelated authored values are preserved rather than replaced by a family reset.
+- New primary-only controls live in `TreePrimaryBranchSettings`; secondary and tertiary settings do not expose irrelevant symmetry, directional-bias, branch-start, or arch controls.
+- Recipe, calibration, and instance override layers migrate legacy launch/droop values before generation. `TreeGenerator` consumes resolved current-schema inputs without mutating authoring assets.
+- `TrunkTwistDegrees` serialized data is retained through `FormerlySerializedAs` and now has the explicit responsibility `TrunkSurfaceTorsionDegrees`.
+- Actual trunk centerline spiral strength, turn count, and handedness are applied to trunk control points before structural constraints and transported-frame construction.
+- Primary branches and trunk forks resolve azimuth in the transported parent frame. Tiering, symmetry, bias, launch elevation, arch, and late sag are data-driven rather than selected by family-only branches.
+- Child structural centerlines begin at a bounded embedded parent-surface intersection instead of the parent centerline.
+- Reference width/depth fitting is followed by a parent-before-child re-anchor pass so calibration cannot invalidate branch-root placement.
+- Bark side-wall winding is corrected for the established `Normal × Binormal = Tangent` convention. Existing geometrically correct cap winding is retained, and trunk-base tangent handedness is corrected separately.
+- Child bark roots use configurable inset, blend length, radius scale, collar strength, and transition-ring count. Transported frames are rebuilt after render-root adjustment.
+- The topology audit validates finite streams, indices, degenerates, ring collapse, side/cap orientation, tangent basis, raw boundaries, position-welded seams, non-manifold edges, opposite-side emergence, and parent containment.
+- Closed position-welded boundary components are matched spatially to their specific child-root records. A passing mesh requires every expected embedded root loop to match once, no unclassified closed loop, and no open boundary component.
+- Input/settings and emitted-geometry fingerprints are separate. Immediate temporary-mesh regeneration must reproduce geometry content, counts, and branch totals.
+- A topology or repeatability failure clears the managed mesh and removes the stale generated scene child.
+- The twenty managed comparison recipes receive exact white bark tint only when bark tint was inherited. Existing explicit bark-tint authoring is preserved and reported.
+- Aggregate diagnostics now include migration counts, material/texture/tint identity, root-transition settings, classified topology results, and bark repeatability.
+
+### First live validation and topology-weld hotfix
+
+The first Unity rebuild compiled and passed source audit, gallery reconstruction, managed profile/recipe migration, and all twenty calibrated structural generations. `Common 1` then failed the bark topology gate with `27/27` expected embedded roots matched, `28` welded boundary loops, and exactly one unexpected loop. All orientation, finite-data, degeneracy, non-manifold, opposite-side-root, and parent-containment checks were zero.
+
+The failure was a classifier defect rather than an approved relaxation: `BuildWeldedVertexIds` assigned a position to one rounded quantization cell only. Two vertices within the declared weld tolerance could therefore land in adjacent cells and remain falsely separate. The hotfix uses floor-based spatial buckets, searches all neighbouring cells, and reuses a welded ID only when the actual squared Euclidean distance is within `PositionWeldTolerance`. Expected-loop counts and the zero-unexpected-loop acceptance requirement remain unchanged. If a real unmatched loop remains, the audit now reports its welded vertex count, centroid, and average radius rather than returning only a total.
+
+### Added source files
+
+```text
+Assets/Game/Procedural/Trees/TreeBarkMeshTopologyAudit.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshTopologyAudit.cs.meta
+```
+
+### Modified source files
+
+```text
+Assets/Game/Procedural/Trees/TreeBranchDefinition.cs
+Assets/Game/Procedural/Trees/TreeFamilyProfile.cs
+Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs
+Assets/Game/Procedural/Trees/TreeGenerationParameters.cs
+Assets/Game/Procedural/Trees/TreeGenerationRecipe.cs
+Assets/Game/Procedural/Trees/TreeGenerationLibrary.cs
+Assets/Game/Procedural/Trees/TreeReferenceCalibrationPreset.cs
+Assets/Game/Procedural/Trees/ProceduralTreeInstance.cs
+Assets/Game/Procedural/Trees/TreeGenerator.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshSettings.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs
+Assets/Game/Procedural/Trees/Editor/TreeGenerationLibraryBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeBarkMeshAssetBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeGalleryGenerationCoordinator.cs
+```
+
+### Source-only validation completed outside Unity
+
+- changed-file whitespace/error-marker scan;
+- balanced delimiter scan across the complete tree C# source folder;
+- resolved-parameter and override property-reference scan;
+- changed-file duplicate control-flow scan;
+- critical method-call argument-count checks;
+- analytical confirmation of side/cap winding under the transported-frame convention;
+- simulated seam/cap/root-loop edge classification for capped and embedded-root tubes;
+- exact changed-file inventory comparison against the supplied archive.
+
+No Unity executable or C# compiler is available in the patch environment. Unity compilation, serialized migration execution, aggregate diagnostics, rendered topology, shadow/depth behavior, Weather wind, cloud-cookie reception, and visual reference matching remain explicitly pending.
+
+## TREE-GEN.2B stale-module cleanup and Twisted tube correction
+
+### Live evidence
+
+The second Unity rebuild passed source audit, complete gallery reconstruction, all twenty calibrated structural generations, and the Common/Pine bark representatives. Common reported `27/27` embedded roots, zero unexpected loops, zero inward triangles, and deterministic bark geometry `072F6C3C167488C6`. Pine reported `32/32` embedded roots, zero unexpected loops, zero inward triangles, and deterministic bark geometry `E8E0CF194DEDD597`.
+
+`Twisted 1` then failed with exactly four inward side triangles while all finite-data, index, degeneracy, cap, tangent, boundary-loop, non-manifold, opposite-side-root, and parent-containment checks remained zero. Dead was not attempted because the four-family action correctly stops on the first bark failure.
+
+### Stale-module audit and removal decision
+
+The standalone `ProceduralTreeAuthoring` path is now conclusively stale. It is referenced only by its own custom Inspector and `TreeAuthoringAssetFactory`; neither participates in the managed gallery/library/slot architecture. Its three starter assets duplicate the managed Common profile, palette, and recipe stored inside `Assets/Game/Demo/Profiles/Trees/TreeGenerationLibrary.asset`, and no scene, prefab, or other asset in the supplied project archive contains their serialized fields, names, or stable starter-recipe identity.
+
+The cleanup removes:
+
+```text
+Assets/Game/Procedural/Trees/ProceduralTreeAuthoring.cs
+Assets/Game/Procedural/Trees/Editor/ProceduralTreeAuthoringEditor.cs
+Assets/Game/Procedural/Trees/Editor/TreeAuthoringAssetFactory.cs
+Assets/Game/Procedural/Trees/Authoring/TFP_Common.asset
+Assets/Game/Procedural/Trees/Authoring/TMP_Common.asset
+Assets/Game/Procedural/Trees/Authoring/TR_Common_Starter.asset
+```
+
+Their same-named `.meta` files must be removed with them. The `Authoring` folder and its folder metadata may be removed when empty.
+
+The following similarly named modules are **not** stale and remain authoritative:
+
+- `ProceduralTreeInstance` and its Editor are the current per-slot generated-output owner and focused diagnostics UI;
+- `TreeReferenceCalibrationPreset` remains required by all twenty managed comparison variants;
+- `TreeFoliageClusterDefinition` and `TreeGenerationMetrics` are current structural outputs and future foliage inputs;
+- all four tree HLSL includes are referenced by the bark or foliage shaders;
+- `TreeGalleryGenerationCoordinator`, `TreeGenerationLibraryBuilder`, `TreeBarkMeshAssetBuilder`, the reference gallery modules, generator, profiles, recipes, palettes, definitions, and bark modules are active.
+
+The duplicate `TreeBarkMeshBuildResult.MeshFingerprint` alias is removed; `GeometryFingerprint` is the sole bark geometry-content fingerprint.
+
+### Twisted correction
+
+The fixed diagonal used by an ordinary tube quad is correct for a straight or mildly curved transported tube. On strongly skewed Twisted transitions, however, the two topologically valid diagonals can produce materially different triangle orientation. Four triangles crossed the radial-normal orientation plane even though the underlying rings, frames, caps, and boundaries were valid.
+
+Each generated tube quad now evaluates both outward-wound diagonals and deterministically selects the diagonal with the stronger worst-triangle agreement against the generated radial normals. This does not reverse individual triangles, alter ring vertices, weaken the topology gate, or suppress audit failures. If neither diagonal produces outward geometry, the unchanged zero-inward-triangle gate still fails.
+
+The topology report also records branch stable ID, branch order, ring, radial side, triangle half, and signed orientation for every remaining inward triangle. This turns any further failure into an exact geometric location rather than another family-level count.
+
+### Acceptance remains pending
+
+The cleanup and diagonal correction are source-complete only. Unity must still prove zero compiler errors, four passing bark representatives, deterministic repeatability, no unexpected loops, and correct rendered junctions/wind/cloud/shadow behaviour before `TREE-GEN.2B` is accepted.
+
+
+### Complete four-family failure reporting
+
+The unified gallery action no longer stops at the first bark-representative failure. It attempts Common, Pine, Twisted, and Dead in deterministic family order, records every passing or failing bark report, then runs all four family dependency suites and returns one aggregate final status. This does not allow partial success to pass: `Generated bark meshes` must still be `4 / 4`, every topology audit must pass, and the final status remains `FAIL` when any representative or dependency suite fails. The change exists only to avoid losing Dead diagnostics when Twisted fails first.
+
+## TREE-GEN.2B transported-ring and dependency-test correction
+
+### Third live validation evidence
+
+The complete rebuild again passed the source audit, complete 40-object gallery, all twenty calibrated structural definitions, and all twenty immediate structural repeatability checks. Common 1 and Pine 1 bark meshes passed every topology category. Twisted 1 retained four inward triangles on one order-2 branch at ring `14/22`; Dead 1 retained six inward triangles across two order-1 branches at ring `10/18`. In both families every finite-data, index, degenerate, cap, tangent, boundary-loop, embedded-root, non-manifold, opposite-side-root, and parent-containment check passed.
+
+The exact failures clustered around adjacent radial sides, including the circumference seam. This proves the remaining problem is not global winding, caps, root classification, or an unclassified hole. The two neighbouring transported rings use a valid circular cross-section but their discrete circumference correspondence can rotate far enough that both diagonals of several same-index quads fold inward.
+
+The Pine dependency suite also exposed a test-harness defect. Its `+1` primary-count candidate happened to add a deterministically rejected branch request, so the accepted branch graph and branch fingerprint correctly remained unchanged. A selective-regeneration test must search for a valid alternate resolved count that actually changes the accepted graph rather than assuming the nearest higher request always does.
+
+### Render-ring correction
+
+The bark mesher now assigns a deterministic integer circumference phase to every render ring. For each ring after the first it evaluates every cyclic correspondence against the previous emitted ring, scores both outward-wound quad diagonals, and selects the phase whose weakest resulting triangle has the strongest agreement with the authored radial normals. Geometry, normal, tangent, and unwrapped bark-U generation all use the selected phase, so the correction changes discrete ring correspondence rather than reversing individual triangles or hiding the audit failure.
+
+A second safety layer bounds rendered radius at locally sharp centreline turns. It estimates a conservative local curvature radius, reduces only radii that exceed the safe fraction, and spreads that safety limit to neighbouring rings without allowing the natural small tip radius to collapse the whole branch. The report records phase-aligned ring count and curvature-radius clamp count. The zero-inward-triangle acceptance gate remains unchanged.
+
+`TreeBarkMeshSettings.CurrentSettingsVersion` advances so the bark input fingerprint records the changed meshing algorithm. Geometry-content repeatability remains mandatory.
+
+### Dependency-test correction
+
+Primary-branch-count isolation now searches deterministic lower and higher candidates across the profile-approved range, preferring removal candidates because deterministic damage may reject an added request. It passes only when the resolved count differs, trunk and palette fingerprints remain unchanged, and the accepted branch fingerprint changes. The report now records baseline count and fingerprints together with the requested/resolved alternate count and resulting fingerprints.
+
+### Stale-module follow-up
+
+The previous stale-module removal remains correct. No additional tree module is currently safe to delete: every remaining runtime/editor C# module is referenced by the managed gallery/library/slot architecture or produces structural data reserved by the next approved foliage phase. The active `TFP_Common` and `TMP_Common` names inside `TreeGenerationLibrary.asset` are managed library sub-assets, not the removed standalone starter assets.
+
+### Acceptance remains pending
+
+Unity must still prove all four bark meshes pass with `inward=0`, all four dependency suites pass, repeatability remains deterministic, and visual bark/wind/cloud/shadow behaviour is correct before `TREE-GEN.2B` is accepted.
+
+## TREE-GEN.2C trunk cross-section, buttress, and visible axial-twist patch
+
+### Status
+
+Approved for implementation after `TREE-GEN.2B` live validation passed all twenty structural definitions, all four bark representatives, deterministic repeatability, topology audits, and family dependency suites. Colour parity and the exterior-rendering defect are accepted. The remaining blockers are visual grammar defects: generated trunks begin as circular tubes without reference-like buttressed roots, and existing surface torsion is visually ineffective because a circular cross-section is rotationally invariant.
+
+### Objective
+
+Add a compact shared trunk-cross-section grammar that produces reference-like root buttresses and visible axial twist without expanding public authoring into many micro-controls. Preserve the existing centerline spiral controls as path-shape controls, reuse the existing surface-torsion value as the principal visible twist control, add no more than two twist-shape controls, and add no more than four root-buttress controls.
+
+### Approved public control contract
+
+#### Trunk path spiral — existing controls, renamed only for clarity
+
+```text
+Trunk Path Spiral Strength
+Trunk Path Spiral Turns
+Trunk Path Spiral Direction
+```
+
+These controls continue to move the trunk centerline through space. They do not represent surface twisting.
+
+#### Visible trunk twist — existing control plus two new controls
+
+```text
+Trunk Twist Degrees          — existing serialized surface torsion; principal twist amount and signed direction
+Trunk Twist Ridge Count      — new; number of non-circular longitudinal ridges
+Trunk Twist Ridge Depth      — new; ridge/valley amplitude
+```
+
+No additional public twist controls are approved. The signed `Trunk Twist Degrees` value supplies direction; ridge phase, falloff, and local irregularity remain deterministic implementation details derived from existing seed/irregularity data.
+
+#### Root buttress — three controls
+
+```text
+Root Buttress Strength
+Root Buttress Height
+Root Flare Scale
+```
+
+No separate buttress-count control is added. Root buttresses reuse `Trunk Twist Ridge Count`, so the root star/flute structure transitions continuously into the upper trunk rather than becoming an unrelated radial pattern. Root asymmetry is derived deterministically from existing trunk irregularity and seed data.
+
+### Reviewed code evidence
+
+- `Assets/Game/Procedural/Trees/TreeGenerator.cs` already resolves `TrunkSurfaceTorsionDegrees`, `TrunkSpiralStrength`, `TrunkSpiralTurns`, and `TrunkSpiralDirection`. `CreateTrunk` applies path spiral to centerline control points, while `BuildCurveSamples` applies surface torsion to transported frames.
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs` currently emits every bark ring as `sample.Position + radial * sample.Radius`. The radius is scalar and angle-independent, so every trunk ring is circular and frame torsion cannot change visible geometry.
+- `TreeBarkMeshGenerator.ResolveBestRingPhase` currently changes the emitted physical ring phase. That is harmless for circular rings but would rotate a non-circular authored profile. `TREE-GEN.2C` must prevent topology correspondence repair from cancelling authored trunk twist.
+- `TreeBarkMeshGenerator` currently assigns radial normals. A fluted/lobed trunk requires normals and tangents derived from the actual cross-section derivative.
+- `TreeBarkMeshSettings` owns radial segment budgets. Trunk resolution must increase automatically when ridge count requires it; no additional public authoring control is approved.
+- `TreeFamilyProfile.UpgradeManagedDefaults` already performs fieldwise migration for matching families. `TREE-GEN.2C` must preserve that policy and initialize only the five newly introduced profile ranges. Existing `Trunk Twist Degrees` ranges are renamed in Inspector presentation only and remain numerically untouched.
+- `TreeGenerator.BuildSeedSet` derives every subsystem seed from both `TreeFamilyProfile.ProfileVersion` and `TreeGenerator.CurrentGeneratorVersion`. Increasing either version for a bark-only schema patch would reseed trunk, branch, foliage-intent, damage, and material streams even when the authored structural inputs are unchanged.
+- A deeper implementation review confirmed that `TrunkSurfaceTorsionDegrees` is not merely cosmetic in `TREE-GEN.2B`: the torsioned transported trunk frame is consumed by primary-branch and fork orientation. Removing torsion from structural frame construction would alter accepted branch graphs for unchanged recipes. The existing structural use is therefore retained, and the new non-circular profile is fixed in that already-torsioned frame rather than applying the angle a second time.
+
+### Structural-seed preservation decision
+
+`TREE-GEN.2C` is a bark-geometry extension, not a structural-generator revision. Therefore:
+
+- `TreeGenerator.CurrentGeneratorVersion` remains `3`;
+- `TreeFamilyProfile.CurrentProfileVersion` remains `4`;
+- a hidden serialized bark-grammar migration version is added to `TreeFamilyProfile`;
+- the hidden bark-grammar version initializes only the five new profile ranges, preserves the existing twist range exactly, and does not participate in structural seed derivation;
+- `TreeGenerationLibrary` may advance its own library-schema version because that value is not part of tree seed derivation.
+
+This keeps all existing structural seeds and unchanged structural fingerprints stable while still allowing explicit, one-time migration of the new bark authoring data.
+
+### Invariants
+
+- Existing branch graphs, trunk centerlines, foliage intent, palettes, Weather wind, cloud-cookie reception, and tree shaders remain unchanged by buttress/ridge-only edits.
+- `Trunk Path Spiral` remains structurally owned and continues to invalidate the trunk and descendant branch graph.
+- `Trunk Twist Ridge Count`, `Trunk Twist Ridge Depth`, `Root Buttress Strength`, `Root Buttress Height`, and `Root Flare Scale` are bark-geometry-only controls. Changing them must preserve trunk-centerline and branch fingerprints while invalidating the bark input/geometry fingerprint and bark bounds.
+- `Trunk Twist Degrees` retains its existing structural-frame semantics: it rotates transported trunk frames and therefore may rotate branch attachment frames as it already did in `TREE-GEN.2B`. `TREE-GEN.2C` additionally makes that same rotation visible by applying a non-circular cross-section. Unchanged twist values must preserve the accepted `TREE-GEN.2B` branch graph; the patch must not silently reinterpret or remove the existing structural effect.
+- The trunk base cap and trunk tip cap use the same resolved non-circular profile as the connected side ring.
+- Branch tubes remain circular in this patch. Only branch order zero consumes the new cross-section grammar.
+- The zero-inward-triangle, zero-unexpected-loop, finite-data, tangent-basis, and repeatability gates remain mandatory.
+- No new component, scene object, material, shader, layer, tag, package, or raw serialized asset edit is approved.
+
+### File scope
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/TreeFamilyProfile.cs
+Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs
+Assets/Game/Procedural/Trees/TreeGenerationParameters.cs
+Assets/Game/Procedural/Trees/TreeGenerationRecipe.cs
+Assets/Game/Procedural/Trees/TreeGenerationLibrary.cs
+Assets/Game/Procedural/Trees/TreeGenerator.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshSettings.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs
+Assets/Game/Procedural/Trees/Editor/TreeGenerationLibraryBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeBarkMeshAssetBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeGalleryGenerationCoordinator.cs
+```
+
+### Implementation sequence
+
+| Step | Work | Status |
+| --- | --- | --- |
+| TREE-GEN.2C.1 | Record the compact control contract, reviewed evidence, dependencies, file scope, and acceptance gate in this canonical document before code edits. | Complete. |
+| TREE-GEN.2C.2 | Add fieldwise hidden bark-grammar migration, resolved parameters, sparse overrides, ownership traces, validation, and family defaults for two ridge controls and three buttress controls. Preserve structural generator/profile seed versions and all existing twist values; rename Inspector presentation without breaking serialization. | Complete in source; Unity migration pending. |
+| TREE-GEN.2C.3 | Generate a deterministic non-circular trunk profile. Existing transported-frame torsion rotates that profile to produce visible axial twist; root buttress and flare envelopes fade smoothly into the upper trunk. | Complete in source; visual acceptance pending. |
+| TREE-GEN.2C.4 | Preserve authored physical trunk phase by disabling physical ring-phase reassignment for branch order zero; retain the existing correspondence repair for circular branch tubes. | Complete in source; topology validation pending. |
+| TREE-GEN.2C.5 | Derive trunk normals/tangents from the actual circumference derivative and longitudinal tangent; make caps use matching profile geometry. | Complete in source; shader/render validation pending. |
+| TREE-GEN.2C.6 | Resolve trunk radial segments automatically from ridge count, update bark fingerprints/reporting, and add dependency tests proving bark-only controls preserve structural fingerprints. | Complete in source; aggregate diagnostic execution pending. |
+| TREE-GEN.2C.7 | Complete source consistency/compliance audit and package changed files. Unity compilation, generated-asset migration, topology, and visual reference comparison remain pending until live validation. | Source audit and artifact apply-test complete; Unity validation pending. |
+
+### Family-default intent
+
+- Common: moderate five-to-seven ridges, visible root buttress/flare, low twist degrees.
+- Pine: restrained four-to-six ridges, shallow short buttress, near-zero twist by default.
+- Twisted: strong five-to-eight ridges, persistent depth, strong signed twist, prominent buttress/flare.
+- Dead: uneven four-to-seven ridges, medium/strong twist, prominent but less regular buttress/flare.
+
+These remain profile defaults, not family-only generator branches. Any recipe may override the controls within approved profile ranges.
+
+### Acceptance criteria
+
+1. All twenty structures retain deterministic structural fingerprints for unchanged inputs; all four bark representatives build with `repeat=PASS`, `inward=0`, and `exposedLoops=0`.
+2. Changing only ridge or buttress controls preserves trunk-centerline, branch, foliage-intent, and palette fingerprints while changing bark input/geometry fingerprints. Changing `Trunk Twist Degrees` changes bark input and retains its pre-existing deterministic structural-frame/branch-layout response.
+3. Common, Twisted, and Dead generated bases visibly transition from lobed/buttressed roots into the trunk without an abrupt ring or ground-level circular cylinder.
+4. Twisted and Dead display helical longitudinal ridges driven primarily by `Trunk Twist Degrees`; changing its sign reverses twist handedness.
+5. `Trunk Path Spiral` continues to alter the centerline independently of visible surface twist.
+6. Generated normals/tangents remain finite and coherent with the bark normal map; topology and cap audits remain clean.
+7. The aggregate report records the five new resolved values, effective trunk radial segments, maximum cross-section multiplier, generated root width/depth, and bark-only dependency validation.
+
+
+## TREE-GEN.2C source implementation record
+
+### Implemented control surface
+
+The public authoring surface remains compact:
+
+```text
+Existing visible-twist control:
+- Trunk Twist Degrees
+
+New twist-shape controls:
+- Trunk Twist Ridge Count
+- Trunk Twist Ridge Depth
+
+New root-buttress controls:
+- Root Buttress Strength
+- Root Buttress Height
+- Root Flare Scale
+```
+
+No additional twist, flute, phase, asymmetry, root-count, root-width, or twist-envelope control was introduced. Buttress count reuses ridge count; root asymmetry derives deterministically from existing trunk irregularity and phase.
+
+### Implemented data and migration contract
+
+- `TreeFamilyProfile` retains structural profile version `4` and adds hidden bark-grammar version `1`.
+- `TreeGenerator` retains structural generator version `3`.
+- Existing `Trunk Twist Degrees` ranges are unchanged; only Inspector presentation is renamed.
+- The hidden migration initializes only the two new ridge ranges and three new root ranges.
+- `TreeGenerationLibrary` advances to version `3`; `TreeBarkMeshSettings` advances to version `4`. Neither value participates in structural seed derivation.
+- New fields propagate through family profile, sparse recipe/instance overrides, resolved parameters, ownership traces, validation, dependency reporting, and bark input fingerprints.
+
+### Implemented bark geometry
+
+- Branch order zero uses a deterministic star-shaped radial profile; higher-order branch tubes remain circular.
+- The existing torsioned transported trunk frame rotates the non-circular profile, making `Trunk Twist Degrees` visible without applying the angle twice.
+- Root flare and buttress envelopes are strongest at the base and fade smoothly over normalized trunk height.
+- The physical ring-phase correction remains enabled for circular branch tubes and disabled for the authored non-circular trunk.
+- Trunk circumference resolution resolves to at least three vertices per ridge, clamped to twenty-four segments.
+- Trunk normals and tangents derive from numerical circumference and longitudinal surface derivatives; trunk caps use the same non-circular boundary profile.
+- Curvature-radius safety accounts for the maximum expanded cross-section multiplier before emitting rings.
+- Reports add effective trunk segments, resolved twist/ridge/root values, maximum cross-section multiplier, and generated root width/depth.
+
+### Changed files
+
+```text
+Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md
+Assets/Game/Procedural/Trees/TreeFamilyProfile.cs
+Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs
+Assets/Game/Procedural/Trees/TreeGenerationParameters.cs
+Assets/Game/Procedural/Trees/TreeGenerationLibrary.cs
+Assets/Game/Procedural/Trees/TreeGenerator.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshSettings.cs
+Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs
+Assets/Game/Procedural/Trees/Editor/TreeGenerationLibraryBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeBarkMeshAssetBuilder.cs
+Assets/Game/Procedural/Trees/Editor/TreeGalleryGenerationCoordinator.cs
+```
+
+`TreeGenerationRecipe.cs` was reviewed but required no edit because its serialized `TreeGenerationOverrides` payload automatically carries the new sparse fields. No scene, prefab, material, shader, texture, FBX, Weather, cloud, Ground, vegetation, layer, tag, package, or project-setting file changed.
+
+### Source consistency and compliance result
+
+- Changed-file comparison against the accepted post-`TREE-GEN.2B` archive found exactly the eleven approved modified files above.
+- Lexical delimiter validation passed across all twenty-seven tree C# files.
+- Whitespace, final-newline, and merge-marker scans passed.
+- `BuildSeedSet`, `CreateTrunk`, `CreateForkBranch`, and all four existing family configuration methods remain byte-equivalent to the accepted source; unchanged inputs therefore retain the existing structural seed and branch-generation algorithms.
+- New-control propagation checks passed from family profile through overrides, resolved parameters, generator validation/reporting, and bark generation.
+- Synthetic maximum-range profile checks retained strictly positive radii with the approved three-samples-per-ridge rule.
+- The unified patch applies cleanly to a pristine copy of the accepted post-`TREE-GEN.2B` source baseline, and all eleven applied files byte-match the prepared `TREE-GEN.2C` source tree.
+- Unity compilation, serialized migration execution, topology audit, generated visual comparison, Weather/cloud/shadow behavior, and Play Mode remain unverified and are mandatory before acceptance.

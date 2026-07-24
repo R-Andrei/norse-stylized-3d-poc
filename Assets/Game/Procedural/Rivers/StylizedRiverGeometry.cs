@@ -583,7 +583,17 @@ namespace ProgrammaticStylized3D.Rivers
             int rowCount = Mathf.Max(
                 2,
                 Mathf.CeilToInt(domain.LocalLength / resolvedSpacing) + 1);
-            int acrossVertexCount = Mathf.Max(2, crossSegments + 1);
+            int visibleSegments = Mathf.Max(2, crossSegments);
+            ResolveSurfaceCrossBandSegments(
+                domain,
+                visibleSegments,
+                out int leftHiddenSegments,
+                out int rightHiddenSegments);
+            int resolvedCrossSegments =
+                leftHiddenSegments +
+                visibleSegments +
+                rightHiddenSegments;
+            int acrossVertexCount = resolvedCrossSegments + 1;
             int vertexCount = rowCount * acrossVertexCount;
             int triangleIndexCount =
                 (rowCount - 1) *
@@ -625,11 +635,19 @@ namespace ProgrammaticStylized3D.Rivers
                         acrossIndex /
                         (float)(acrossVertexCount - 1);
 
-                    float acrossSigned = across01 * 2f - 1f;
+                    // Keep one mesh while preserving the complete visible-
+                    // channel segment budget. Additional hidden-band intervals
+                    // follow the same metric spacing so larger positive-
+                    // overflow allowances do not stretch a few coarse triangles
+                    // across the moving shoreline contact.
+                    float acrossMetres = ResolveSurfaceAcrossMetres(
+                        sample,
+                        acrossIndex,
+                        leftHiddenSegments,
+                        visibleSegments,
+                        rightHiddenSegments);
                     float localSurfaceHalfWidth =
-                        sample.GetSurfaceHalfWidth(acrossSigned);
-                    float acrossMetres =
-                        acrossSigned * localSurfaceHalfWidth;
+                        sample.GetSurfaceHalfWidth(acrossMetres);
 
                     Vector3 worldPosition =
                         sample.SurfacePoint +
@@ -669,7 +687,7 @@ namespace ProgrammaticStylized3D.Rivers
                             localSurfaceHalfWidth));
 
                     float localVisibleHalfWidth =
-                        sample.GetVisibleHalfWidth(acrossSigned);
+                        sample.GetVisibleHalfWidth(acrossMetres);
 
                     // Stage 3 motion contract:
                     // x visible half-width, y generated surface half-width,
@@ -741,6 +759,102 @@ namespace ProgrammaticStylized3D.Rivers
                         0f));
                 mesh.bounds = expanded;
             }
+        }
+
+
+        private static void ResolveSurfaceCrossBandSegments(
+            RiverDomainSnapshot domain,
+            int visibleSegments,
+            out int leftHiddenSegments,
+            out int rightHiddenSegments)
+        {
+            int safeVisibleSegments = Mathf.Max(2, visibleSegments);
+            float maximumVisibleWidth = 0f;
+            float maximumLeftHiddenWidth = 0f;
+            float maximumRightHiddenWidth = 0f;
+
+            IReadOnlyList<StylizedRiverSplineSample> samples = domain.Samples;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                StylizedRiverSplineSample sample = samples[index];
+                maximumVisibleWidth = Mathf.Max(
+                    maximumVisibleWidth,
+                    sample.LeftHalfWidth + sample.RightHalfWidth);
+                maximumLeftHiddenWidth = Mathf.Max(
+                    maximumLeftHiddenWidth,
+                    sample.LeftSurfaceHalfWidth - sample.LeftHalfWidth);
+                maximumRightHiddenWidth = Mathf.Max(
+                    maximumRightHiddenWidth,
+                    sample.RightSurfaceHalfWidth - sample.RightHalfWidth);
+            }
+
+            float visibleMetricSpacing = Mathf.Max(
+                0.08f,
+                maximumVisibleWidth / safeVisibleSegments);
+            int maximumHiddenSegmentsPerSide = safeVisibleSegments;
+
+            leftHiddenSegments = ResolveHiddenBandSegments(
+                maximumLeftHiddenWidth,
+                visibleMetricSpacing,
+                maximumHiddenSegmentsPerSide);
+            rightHiddenSegments = ResolveHiddenBandSegments(
+                maximumRightHiddenWidth,
+                visibleMetricSpacing,
+                maximumHiddenSegmentsPerSide);
+        }
+
+        private static int ResolveHiddenBandSegments(
+            float hiddenWidth,
+            float targetSpacing,
+            int maximumSegments)
+        {
+            if (hiddenWidth <= 0.0001f)
+            {
+                return 0;
+            }
+
+            return Mathf.Clamp(
+                Mathf.CeilToInt(hiddenWidth / Mathf.Max(0.08f, targetSpacing)),
+                1,
+                Mathf.Max(1, maximumSegments));
+        }
+
+        private static float ResolveSurfaceAcrossMetres(
+            StylizedRiverSplineSample sample,
+            int acrossIndex,
+            int leftHiddenSegments,
+            int visibleSegments,
+            int rightHiddenSegments)
+        {
+            float leftVisible = Mathf.Max(0.001f, sample.LeftHalfWidth);
+            float rightVisible = Mathf.Max(0.001f, sample.RightHalfWidth);
+            float leftSurface = Mathf.Max(
+                leftVisible,
+                sample.LeftSurfaceHalfWidth);
+            float rightSurface = Mathf.Max(
+                rightVisible,
+                sample.RightSurfaceHalfWidth);
+
+            if (leftHiddenSegments > 0 &&
+                acrossIndex <= leftHiddenSegments)
+            {
+                float hiddenT =
+                    acrossIndex / (float)leftHiddenSegments;
+                return Mathf.Lerp(-leftSurface, -leftVisible, hiddenT);
+            }
+
+            int visibleIndex = acrossIndex - leftHiddenSegments;
+            if (visibleIndex <= visibleSegments)
+            {
+                float visibleT =
+                    visibleIndex / (float)Mathf.Max(1, visibleSegments);
+                return Mathf.Lerp(-leftVisible, rightVisible, visibleT);
+            }
+
+            int rightIndex = visibleIndex - visibleSegments;
+            float rightT =
+                rightIndex / (float)Mathf.Max(1, rightHiddenSegments);
+            return Mathf.Lerp(rightVisible, rightSurface, rightT);
         }
 
         public static bool TryProjectPoint(

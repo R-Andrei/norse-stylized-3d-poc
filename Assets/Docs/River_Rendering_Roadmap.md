@@ -1,13 +1,13 @@
 # Current River Rendering Roadmap
 
 
-## Weather cloud-shadow receiver contract — source implemented; Unity validation pending
+## Weather cloud-shadow receiver contract — integrated and user-validated
 
-River is a mandatory receiver of the Weather-owned cloud-shadow illumination field. Liquid water, frozen water, foam, shore-facing sun response, and other visible River lighting must remain spatially coherent with adjacent Ground, Vegetation, Generated Mass, actors, and buildings.
+River is a mandatory receiver of the Weather-owned cloud-shadow illumination field. Liquid water, frozen water, foam, shore-facing sun response, and other visible River lighting remain spatially coherent with adjacent Ground, Vegetation, Generated Mass, actors, and buildings.
 
-V0 uses the authoritative sun's URP directional-light cookie. `SH_CleanStylizedRiver.shader` now compiles `_LIGHT_COOKIES`; its existing three-argument `GetMainLight` path in `RiverWaterLighting.hlsl` already applies the cookie to River water, ice, foam, and shore-lighting sun response. Unity import and visual validation remain pending. River must consume the cookie through that path exactly once; no River-specific vertex field, custom cloud texture sample, or simulation input is permitted. Cloud integration belongs only to the final visible lighting path. It must not change River geometry, corridor ownership, hydrology, motion, disturbance, refraction, reflection inputs, depth, foam spawning, transport, lifecycle, topology, chipping, cache data, compute kernels, runtime allocations, or simulation cadence. Cloud transmission must remain separate from ordinary URP geometric shadow attenuation so existing liquid/ice shadow-response controls preserve their meaning. Ambient and local-light response must not be indiscriminately darkened.
+V0 uses the authoritative sun's URP directional-light cookie. `SH_CleanStylizedRiver.shader` compiles `_LIGHT_COOKIES`; its existing three-argument `GetMainLight` path in `RiverWaterLighting.hlsl` applies the cookie to River water, ice, foam, and shore-lighting sun response. The user has tested the integrated result and accepted it. The post-Weather source audit found no change to River geometry, corridor ownership, hydrology, motion, disturbance, refraction, reflection inputs, depth, Foam spawning, transport, lifecycle, topology, Chipping, cache data, compute kernels, runtime allocations, or simulation cadence. River consumes the cookie through the native lighting path exactly once; no River-specific vertex field, custom cloud texture sample, or simulation input exists. Cloud transmission remains separate from ordinary URP geometric shadow attenuation so existing liquid/ice shadow-response controls preserve their meaning. Ambient and local-light response are not indiscriminately darkened.
 
-Current River Foam work remains paused while shared Weather shading integration is performed. After integration, the newest River source must be diffed against the frozen P13G state, compiled, and visually checked with matched cloud state before River development resumes. Exact representation and files are governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`.
+The former Weather-integration pause is closed. P13F/P13G Arc and Semi-Arc packet behavior was regression-tested by the user and remains accepted and frozen. River work resumes with `RIVER-MOTION-S3.1` below.
 
 ---
 
@@ -593,19 +593,45 @@ The visible corridor render mesh exposes a **River Corridor Material Masks** str
 
 **Shared shoreline output — implemented and validated:** The macro-wave, river-space noise, shore-wave profile, and shore attenuation primitives now live in the shared water-motion contract rather than only in the render pass. Stage 6 uses those exact functions to resolve one instantaneous left/right visible shoreline edge per longitudinal topology row by intersecting current positive shore-wave displacement with the corridor's mandatory hidden bank-cover profile. Consumers must not recreate an approximate shoreline rhythm independently.
 
-**Intermediate shore-wave profile controls — implemented and validated:** The accepted repeating Stage 3 carrier remains in place, but the bank-reaching component can now diverge from the centre-river macro wave through seven controls:
+**Shore-wave profile controls — Unity-validated through `RIVER-MOTION-S3.1E.3`:** The bank-reaching component diverges from the centre-river macro wave through independently owned controls:
 
-- `Shore Wave Height Scale` independently scales vertical bank-wave amplitude;
-- `Shore Wave Length Scale` independently scales longitudinal bank-wave length;
-- `Shore Wave Reach` limits the fraction of generated hidden shoreline allowance that can be wetted;
-- `Shore Wave Transition Length` defines the world-space smoothing span for the within-wave profile and for blends between neighbouring waves with different overall sizes;
+- `Shore Wave Height Scale` scales vertical bank-wave amplitude;
+- `Shore Wave Length Scale` controls the complete longitudinal width of one positive shore-wave packet;
+- `Shore Wave Gap Scale` controls only the nonnegative calm distance between successive packets; `0` makes packets meet at a shared zero-slope point;
+- `Shore Wave Reach` limits the fraction of generated hidden shoreline allowance that a positive crest may wet;
+- `Positive Overflow Allowance (m)` adds authored hidden water width per bank beyond the automatic overlap and structurally regenerates the river domain/corridor;
+- `Shore Wave Transition Length` shapes shoulders inside a packet without changing its Length or Gap;
 - `Shore Wave Size Variation` gives successive travelling waves stable deterministic differences in overall height and lateral reach;
-- `Shore Side Asymmetry` blends from shared left/right size and profile values to independent bank values;
-- `Shore Wave Profile Variation` creates deterministic variation inside each wave between its start, middle, and end.
+- `Shore Side Asymmetry` blends from shared left/right values to independent bank values;
+- `Shore Wave Profile Variation` varies the profile within and between packets;
+- `Profile Evolution Strength` controls deterministic runtime evolution of packet roundness and shoulders;
+- `Profile Evolution Duration (s)` controls the evolution cycle duration.
 
-Within-wave profile knots use a slope-continuous cubic curve that blends toward a smoother B-spline response as Transition Length increases. Successive wave-size values also blend across that configured metric span. A final zero-slope activation envelope is now applied to the signed shore-wave height near zero crossings and to lateral reach near both the normal shoreline and the maximum hidden-water allowance. This prevents the visible shore from leaving or rejoining either hard bound with a tangent discontinuity instead of merely smoothing the earlier profile values. Size identities are deterministic and travel with the existing carrier; they do not reseed or fluctuate independently at runtime. Left and right profiles are identical when Side Asymmetry is zero and become increasingly independent as it rises. Neutral size/profile variation values preserve the previous wave identities, while Transition Length still controls the new final shoreline onset/exit smoothing. Water displacement, surface normals, liquid refraction motion, instantaneous shoreline resolution, and Stage 6 Shore Support all consume the same shared evaluator. This is an intermediate extension of the existing carrier, not the later explicit travelling-wave-packet redesign; individual packet speeds, lifetimes, births, and independent length evolution remain deferred.
+`RIVER-MOTION-S3.1` establishes a signed shoreline invariant. Positive displacement retains the existing Shore Motion and hidden-overlap path. Negative displacement is restored smoothly to the static waterline over the existing Shore Motion Width and is exactly zero at and beyond the normal visible shoreline. Interior trough depth remains unchanged beyond that restoration band, so Wave Height no longer reduces apparent river width by putting the shoreline below the corridor.
 
-**Validated:** Complete and accepted. The original calm-through-furious motion contract and the seven shore-specific controls passed focused Unity validation, including reverse flow, freeze/thaw, asymmetric banks, transition smoothing, and hidden-allowance limits. Presets retain neutral-compatible behavior. Detached particle effects are not required by the current Stage 3 contract.
+Positive hidden reach is now multiplied by a smooth envelope from the current positive shore crest. Troughs receive no hidden reach, crest shoulders use only part of the allowance, and crest peaks may use the complete authored `Shore Wave Reach × generated overlap`. The existing serialized `additionalShorelineOverlap` authority is exposed under Shore Wave Profile as `Positive Overflow Allowance (m)` rather than duplicated. Successive waves retain deterministic identities, but overall height size and reach size now use partially independent stable variation instead of one identical size multiplier. This removes the mechanical rule that every tall wave must have the same proportional lateral reach.
+
+Unity visual validation rejected the first S3.1 implementation detail. Its shared `bankMask` switched between the positive-overflow mask and trough-restoration mask according to macro-height sign. Detail normals, current accents, and refraction consumed that same output, so zero crossings created abrupt calm/wave shading regions. The generated water mesh also distributed all cross-river vertices uniformly over the complete hidden width; increasing overflow allowance did not guarantee vertices at the normal shoreline and exposed stepped triangles through the bank.
+
+`RIVER-MOTION-S3.1A` keeps trough restoration but makes it displacement-only: positive and negative height components use separate masks while the compatibility `bankMask` remains one sign-independent visible-water/detail authority. The same single water mesh places exact vertices at both normal shorelines plus dedicated hidden-band intervals. Unity validation confirms the underflow and detail-continuity corrections, but larger positive-overflow allowances still expose a faceted terrain-intersection contour because hidden-band metric spacing remains too coarse and the visible edge is not one render-authoritative boundary.
+
+`RIVER-MOTION-S3.1B` establishes that boundary. The render path reuses the already-evaluated positive shore height and reach, solves the monotonic intersection with the corridor's `bankCover × smoothstep(hiddenT)` HiddenCover profile through ten bounded scalar bisection steps, and clips the single Forward surface against the resulting current shoreline. Negative waves keep the normal visible half-width as a hard minimum; positive crests alone extend the boundary through the generated allowance. The existing visible-channel segment count is preserved, while additional left/right hidden intervals are generated automatically from metric spacing and capped per bank. No second mesh, renderer, material, pass, texture, buffer, kernel, or draw call is added.
+
+A new `Water Body > Shoreline Accent` group uses the same current shoreline for ordinary and overflow regions. `Colour`, `Strength`, and world-space `Width (m)` author the water-side line. Signed `Brightness` spans `-1..1`: negative values darken toward black, zero preserves the authored colour, and positive values brighten up to twice the authored colour. The accent is lateral-shoreline-only and does not outline rocks, obstacles, Foam, or other scene silhouettes.
+
+`RIVER-MOTION-S3.1C` preserves more authored variation after the bank-cover contact solve. Existing Size Variation and Profile Variation also resolve one deterministic post-solve overflow-usage profile. That profile may reduce a valid positive extension toward the normal shoreline but cannot exceed the solved contact or generated allowance. Zero variation remains exactly compatible with S3.1B. The render boundary and Stage 6 current-shore support apply the same shared profile. S3.1C still used one combined Length/Spacing control; that authoring limitation is superseded by the accepted S3.1E.3 Length/Gap model below.
+
+S3.1C also adds `Water Body > Shoreline Accent > Edge Blend Width (m)`. The analytical shoreline, clip, depth write, opaque Blend state, queue, mesh, and draw count remain unchanged. Inside the authored world-space edge band, the completed water, Foam, fog, and accent colour blends back to the already-evaluated opaque-scene/refraction colour. This provides a transparency-like visual ground contact without alpha blending, alpha-to-coverage, dither, another texture sample, or transparent sorting. The accent follows the same coverage value. Zero width preserves the hard S3.1B edge.
+
+`RIVER-MOTION-S3.1D` adds deterministic stateless shore-profile evolution. Each travelling shore-wave identity receives a stable seeded temporal phase and evolves through a predictable narrow-to-broad-to-narrow cycle over `Profile Evolution Duration (s)`. `Profile Evolution Strength` controls the authority and defaults to zero for exact S3.1C compatibility. The evolved coefficients change the existing shore-only steepness exponent and shoulder fullness without a second wave carrier, while preserving sign, zero crossings, authored amplitude bounds, trough restoration, positive-overflow limits, and post-solve usage bounds. Adjacent identities blend through the existing metric Transition Length and left/right independence follows Shore Side Asymmetry.
+
+Visible displacement, longitudinal/lateral finite-difference normals, optical refraction normals, obstacle-waterline evaluation, the authoritative rendered shoreline/accent, and Stage 6 current-shore support receive the same strength, duration, seed, and motion time. The Stage 6 hidden-contact search resolves one evolution coefficient set per side and reuses it across all coarse/refinement samples. The patch adds no wave objects, CPU lifecycle state, allocation, texture, buffer, kernel, dispatch, mesh, pass, sample, renderer, or draw call, and does not change Foam source scheduling, cloud-cookie lighting, shadow composition, shoreline accent, or edge-coverage formulas.
+
+Within-wave profile knots retain the slope-continuous cubic/B-spline blend and metric Transition Length. The final signed surface evaluator remains shared by visible displacement, finite-difference surface normals, refraction detail attenuation, Foam obstacle-waterline evaluation, instantaneous shoreline resolution, and Stage 6 Shore Support. No travelling-wave objects, textures, buffers, kernels, or CPU wave state are added.
+
+`RIVER-MOTION-S3.1D.1` is the compile-only D3D11 hotfix that renames the reserved local identifier `triangle`; it changes no runtime formula. `RIVER-MOTION-S3.1E`, S3.1E.1, and S3.1E.2 are rejected: they respectively changed only wave identity, coupled the carrier wavelength to spacing, and encoded a complete signed cycle whose negative half became hidden apparent gap. `RIVER-MOTION-S3.1E.3` is the accepted correction. Each packet is one positive zero-slope lobe spanning the complete authored Length, followed only by the explicit nonnegative Gap. Transition Length shapes the packet interior without changing support, and Length no longer normalizes lateral-reach activation.
+
+**Validation:** Unity confirms the S3.1E.3 Length/Gap controls are decoupled and the complete S3.1 through S3.1E.3 shoreline-motion result works as intended. Shoreline underflow protection, surface detail, refraction, analytical clipping, Shoreline Accent, edge blending, cloud lighting/shadows, and Foam shoreline support remain coherent. The only remaining Stage 3 work is optional profiling/tuning; there is no open correctness patch in this motion sequence.
 
 ## 4. Refraction and Optical Distortion
 
@@ -812,6 +838,8 @@ Shorelines will progressively absorb most incoming amplitude and return only a w
 ### Current status after `4.11C.5.16E.2`
 
 The accepted state is restored to `5.16E`: both Final Foam visibility policies remain, support aging may reach `0.05`, and Layer C/Layer D ownership is unchanged.
+
+The current next investigation is newer than that historical status: Final Foam appears to hide more material than the same-frame Layer C `Material Presence` and `Material Remaining Life` views imply. This is a Layer E/render-path audit until proven otherwise. The first task is to identify the earliest divergence among Material Presence, Remaining Life, Material Pattern, evaluated shape/preview, `Foam Chip And Strand Probe`, and Final Foam. Do not retune source amount, transport, lifecycle, or cache ownership before that divergence is located.
 
 `5.16E.1` face-consistent residual gating and released object/shore source formation failed Unity validation. Source disabling did not stop constrained foam stutter, and the released sources produced an unwanted grey-interior/white-fringe result. The failure confirms that conservative redistribution beside blocked faces cannot be reconstructed by a single point-velocity render offset.
 
@@ -1477,9 +1505,9 @@ P13F refines the accepted P13E Object Foam scheduler without reopening transport
 
 Initial and later strokes resolve separate durations from their own path lengths at the same requested Reveal Speed. The existing event ABI is unchanged; one reserved lane now carries contact-stroke path length. The ring uses eight neighbour reads from the existing obstacle-exclusion texture only inside the bounded source dispatch. No new full-field dispatch, resource, kernel, final-render sample, pass, or draw call is added.
 
-Status: source implementation complete; offline validation and exact package reproduction recorded in the P13F delivery report. Unity compilation, Play Mode proof of complete-ring ownership, Arc/Semi-Arc reinforcement distinction, nearby-obstacle isolation, and profiler evidence remain pending.
+Status: source implementation complete and user-accepted. Complete-ring ownership, first-stroke-only wakes, complete Arc reinforcement, and selected-half Semi-Arc reinforcement work as expected and are frozen for the current milestone. Profiler evidence remains deferred.
 
-## RG-METRIC-P13G — Object Spawning Acceptance Freeze and Weather Integration Pause
+## RG-METRIC-P13G — Object Spawning Acceptance Freeze and Completed Weather Integration
 
 The user has accepted the post-P13F automatic-spawning and Object-spawning result for the current milestone. P13F works as expected and is materially better than the former continuous object-emitter implementation. Spawning generally, and Object spawning specifically, are marked done for now.
 
@@ -1494,7 +1522,12 @@ Frozen result:
 - full-vector object-contact slowdown;
 - unchanged P13A material/transport/visibility, P12u Reveal Speed and P12t Layer E Chipping.
 
-There are additional River issues, but none is selected or authorized as the next River patch. River Foam work is paused while a different thread performs small Weather cloud-shading changes in shared River shader files. After that integration, the newest supplied source must be diffed against the post-P13F/P13G baseline and compiled before River work resumes.
+The Weather cloud-shading integration and focused Arc/Semi-Arc regression are complete and accepted. The spawning freeze remains in force. The later shoreline-motion sequence is also closed through accepted `RIVER-MOTION-S3.1E.3`; it preserves the frozen spawning result and the shared Foam shoreline-support contract.
 
-P13G changes documentation only. It adds no runtime work, resource, allocation, dispatch, shader sample, pass or draw call. Unity validation is not required for the freeze patch itself; post-Weather compilation and spawning regression are mandatory.
+The next River work is unrelated to spawning or shore-wave motion: diagnose why Final Foam visually hides more material than the underlying same-frame Presence and Remaining Life evidence suggests. This must begin as a Layer E composition/debug-path audit rather than a source or lifecycle retune.
 
+P13G itself remains documentation-only and adds no runtime work, resource, allocation, dispatch, shader sample, pass, or draw call.
+
+### Shore-wave motion freeze after P13G
+
+S3.1E and S3.1E.1 are rejected incomplete decoupling attempts. S3.1E.2 is rejected because one signed cycle made Length contribute a hidden negative-half gap. S3.1E.3 is user-validated and accepted: one positive zero-slope lobe owns the complete Length, Gap is the only calm interval, and Gap `0` permits adjacent packets to meet. The shared result remains authoritative for displacement, normals/detail, refraction, analytical shoreline clipping, Shoreline Accent, edge coverage, and Foam shoreline support.

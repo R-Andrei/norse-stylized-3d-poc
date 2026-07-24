@@ -270,11 +270,14 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     float shoreMotionWidth,
     float shoreWaveHeightScale,
     float shoreWaveLengthScale,
+    float shoreWaveSpacingScale,
     float shoreWaveReach,
     float shoreWaveTransitionLength,
     float shoreWaveSizeVariation,
     float shoreWaveSideAsymmetry,
-    float shoreWaveProfileVariation)
+    float shoreWaveProfileVariation,
+    float shoreWaveProfileEvolutionStrength,
+    float shoreWaveProfileEvolutionDuration)
 {
     RiverWaterRefractionResult result;
 
@@ -313,28 +316,48 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
     float shoreLength = max(
         0.25,
         waveLength * max(0.25, shoreWaveLengthScale));
-    float heightProfile;
-    float reachProfile;
-    RiverWaterResolveShoreWaveProfiles(
+    float shoreGap =
+        waveLength * max(0.0, shoreWaveSpacingScale);
+    float sideSign = input.lateralMetres < 0.0 ? -1.0 : 1.0;
+    float2 shoreProfileEvolution =
+        RiverWaterResolveShoreProfileEvolution(
+            input.globalDistance,
+            motionTime,
+            flowSpeed,
+            shoreLength,
+            shoreGap,
+            sideSign,
+            shoreWaveTransitionLength,
+            shoreWaveSideAsymmetry,
+            shoreWaveProfileEvolutionStrength,
+            shoreWaveProfileEvolutionDuration,
+            seed);
+    float motionBankMask;
+    RiverWaterEvaluateSurfaceHeightWithEvolution(
         input.globalDistance,
+        input.lateralMetres,
+        input.visibleHalfWidth,
+        input.surfaceHalfWidth,
         motionTime,
         flowSpeed,
-        shoreLength,
-        input.lateralMetres < 0.0 ? -1.0 : 1.0,
+        waveHeight,
+        waveLength,
+        waveSteepness,
+        turbulence,
+        shoreMotion,
+        shoreMotionWidth,
+        shoreWaveHeightScale,
+        shoreWaveLengthScale,
+        shoreWaveSpacingScale,
+        shoreWaveReach,
         shoreWaveTransitionLength,
         shoreWaveSizeVariation,
         shoreWaveSideAsymmetry,
         shoreWaveProfileVariation,
+        shoreProfileEvolution,
+        liquidFactor,
         seed,
-        heightProfile,
-        reachProfile);
-    float motionBankMask = RiverWaterResolveMotionBankMask(
-        input.lateralMetres,
-        input.visibleHalfWidth,
-        input.surfaceHalfWidth,
-        shoreMotion,
-        shoreMotionWidth,
-        saturate(shoreWaveReach * reachProfile));
+        motionBankMask);
 
     float3 macroNormalWS = RiverWaterEvaluateSurfaceNormal(
         opticalMotionInputs,
@@ -347,11 +370,15 @@ RiverWaterRefractionResult RiverWaterEvaluateRefraction(
         shoreMotionWidth,
         shoreWaveHeightScale,
         shoreWaveLengthScale,
+        shoreWaveSpacingScale,
         shoreWaveReach,
         shoreWaveTransitionLength,
         shoreWaveSizeVariation,
         shoreWaveSideAsymmetry,
         shoreWaveProfileVariation,
+        shoreWaveProfileEvolutionStrength,
+        shoreWaveProfileEvolutionDuration,
+        shoreProfileEvolution,
         seed);
 
     float3 detailNormalWS = RiverWaterEvaluateDetailNormal(

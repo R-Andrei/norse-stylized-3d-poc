@@ -119,6 +119,27 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         }
 
         [ThreadStatic]
+        private static CornerDamagePreflightReplayCache
+            cornerDamagePreflightReplayCache;
+
+        private readonly struct CornerDamagePreflightReplayScope : IDisposable
+        {
+            private readonly CornerDamagePreflightReplayCache previous;
+
+            public CornerDamagePreflightReplayScope(
+                CornerDamagePreflightReplayCache cache)
+            {
+                previous = cornerDamagePreflightReplayCache;
+                cornerDamagePreflightReplayCache = cache;
+            }
+
+            public void Dispose()
+            {
+                cornerDamagePreflightReplayCache = previous;
+            }
+        }
+
+        [ThreadStatic]
         private static CornerDamageIntegrationPlan
             cornerDamageIntegrationPlanOverride;
 
@@ -671,6 +692,123 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int PlanMaterializationBuildCount;
             public int PlanMaterializationMismatchCount;
             public int DeadlineAbortCount;
+            public int EndpointConflictGuardAttemptCount;
+            public int EndpointConflictGuardPassCount;
+            public int EndpointConflictGuardRejectCount;
+            public int EndpointConflictGuardFalseNegativeCount;
+            public int EndpointConflictGuardTestedRailCount;
+            public double EndpointConflictGuardMilliseconds;
+            public int EndpointPatchRecoveryAttemptCount;
+            public int EndpointPatchRecoveryPreparedCount;
+            public int EndpointPatchRecoveryRejectCount;
+            public int EndpointPatchRecoveryAppliedCount;
+            public int EndpointPatchRecoveryFalsePositiveCount;
+            public int EndpointPatchRecoveryUnsupportedStarCount;
+            public int EndpointPatchRecoveryPatchExtractionCount;
+            public int EndpointPatchRecoveryDisconnectedPatchCount;
+            public int EndpointPatchRecoveryBoundaryLoopCount;
+            public int EndpointPatchRecoveryBoundaryCrossingCount;
+            public int EndpointPatchRecoveryNoLocalRemovalCount;
+            public int EndpointPatchRecoveryCapCreationCount;
+            public int EndpointPatchRecoveryIncidentBandJoinCount;
+            public int EndpointPatchRecoveryStitchTopologyCount;
+            public int EndpointPatchRecoveryLocalityCount;
+            public int EndpointPatchRecoveryBandIntegrityCount;
+            public int EndpointPatchRecoveryPreparedMinimumParityCount;
+            public int EndpointPatchRecoveryMaterializationSignatureCount;
+            public float EndpointPatchRecoveryMaximumRemovedVertexRadius;
+            public float EndpointPatchRecoveryMaximumIntersectionRadius;
+            public float EndpointPatchRecoveryMaximumReplacementVertexRadius;
+            public int EndpointPatchRecoveryRetainedOutsideRadiusCount;
+            public int EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+            public int EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+            public int EndpointPatchRecoveryLocalSupportSampleCount;
+            public int EndpointPatchRecoveryMinimumSamplesPerIncident;
+            public float EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta;
+            public float EndpointPatchRecoveryMaximumControllingSupportRadius;
+            public float EndpointPatchRecoveryMaximumAxialInfluence;
+            public float EndpointPatchRecoveryMinimumAllowedAxialInfluence;
+            public int EndpointPatchRecoveryFacesSubdivided;
+            public int EndpointPatchRecoveryLocalFragmentCount;
+            public int EndpointPatchRecoveryRemoteRemainderCount;
+            public int EndpointPatchRecoverySyntheticIncidentFragmentCount;
+            public int EndpointPatchRecoveryMaximumCellVertexCount;
+            public int EndpointPatchRecoveryMaximumCellFaceCount;
+            public double EndpointPatchRecoveryMilliseconds;
+            public int PreflightFoundationBuildCount;
+            public int PreflightFoundationReuseCount;
+            public int IsolatedReplayAttemptCount;
+            public int IsolatedReplayHitCount;
+            public int IsolatedReplayMissCount;
+            public int IsolatedFullEvaluationCount;
+            public bool EndpointConflictGuardAttempted;
+            public bool EndpointConflictGuardPassed;
+            public int EndpointConflictGuardConflictCount;
+            public int EndpointConflictGuardVictimEdgeIndex = -1;
+            public int EndpointConflictGuardForeignEdgeIndex = -1;
+            public float EndpointConflictGuardAxialParameter;
+            public float EndpointConflictGuardEndpointAllowance;
+            public float EndpointConflictGuardVictimMinimumScale;
+            public float EndpointConflictGuardForeignMinimumScale;
+            public float EndpointConflictGuardVictimRetreatCapacity;
+            public float EndpointConflictGuardForeignRetreatCapacity;
+            public int[] EndpointConflictGuardClusterEdges = Array.Empty<int>();
+            public bool EndpointConflictGuardFalseNegative;
+            public string EndpointConflictGuardDiagnostic = string.Empty;
+            public bool EndpointPatchRecoveryAttempted;
+            public bool EndpointPatchRecoveryPrepared;
+            public bool EndpointPatchRecoveryApplied;
+            public bool EndpointPatchRecoveryFalsePositive;
+            public int EndpointPatchRecoveryLocalAttemptCount;
+            public int EndpointPatchRecoveryVertexIndex = -1;
+            public int EndpointPatchRecoveryVictimEdgeIndex = -1;
+            public int EndpointPatchRecoveryForeignEdgeIndex = -1;
+            public int EndpointPatchRecoveryIncidentBandCount;
+            public int EndpointPatchRecoveryNormalRank = -1;
+            public int EndpointPatchRecoveryCapVertexCount;
+            public float EndpointPatchRecoveryCutDepth;
+            public float EndpointPatchRecoveryCompactness;
+            public float EndpointPatchRecoveryAspectRatio;
+            public double EndpointPatchRecoveryLocalMilliseconds;
+            public string EndpointPatchRecoveryRejection = string.Empty;
+            public int EndpointPatchRecoverySelectedFaceCount;
+            public int EndpointPatchRecoveryBoundaryVertexCount;
+            public string EndpointPatchRecoveryBoundarySignature = string.Empty;
+            public float EndpointPatchRecoveryLocalMaximumRemovedVertexRadius;
+            public float EndpointPatchRecoveryLocalMaximumIntersectionRadius;
+            public float EndpointPatchRecoveryLocalMaximumReplacementVertexRadius;
+            public int EndpointPatchRecoveryLocalRetainedOutsideRadiusCount;
+            public int EndpointPatchRecoveryLocalSelectedFaceCountBeforeLocalFilter;
+            public int EndpointPatchRecoveryLocalSelectedFaceCountAfterLocalFilter;
+            public string EndpointPatchRecoveryLocalityFailureSource = string.Empty;
+            public int EndpointPatchRecoveryAttemptSupportSampleCount;
+            public int EndpointPatchRecoveryAttemptMinimumSamplesPerIncident;
+            public string EndpointPatchRecoverySamplesPerIncident = string.Empty;
+            public float EndpointPatchRecoveryLocalSupportRadius;
+            public float EndpointPatchRecoveryLocalSupportProjection;
+            public float EndpointPatchRecoveryGlobalSupportProjection;
+            public float EndpointPatchRecoveryGlobalMinusLocalSupportDelta;
+            public int EndpointPatchRecoveryControllingSupportEdgeIndex = -1;
+            public float EndpointPatchRecoveryControllingSupportRadius;
+            public string EndpointPatchRecoverySupportFailureSource = string.Empty;
+            public float EndpointPatchRecoveryAttemptMaximumAxialInfluence;
+            public float EndpointPatchRecoveryAttemptMinimumAllowedAxialInfluence;
+            public int EndpointPatchRecoveryAxialRejectedEdgeIndex = -1;
+            public int EndpointPatchRecoveryAxialRejectedEndpointVertexIndex = -1;
+            public string EndpointPatchRecoveryAxialInfluenceSignature = string.Empty;
+            public string EndpointPatchRecoveryCellLimitSignature = string.Empty;
+            public int EndpointPatchRecoveryAttemptFacesSubdivided;
+            public int EndpointPatchRecoveryAttemptLocalFragmentCount;
+            public int EndpointPatchRecoveryAttemptRemoteRemainderCount;
+            public int EndpointPatchRecoveryAttemptSyntheticIncidentFragmentCount;
+            public string EndpointPatchRecoverySyntheticIncidentIdentities = string.Empty;
+            public int EndpointPatchRecoveryAttemptCellVertexCount;
+            public int EndpointPatchRecoveryAttemptCellFaceCount;
+            public string EndpointPatchRecoveryCellSplitSignature = string.Empty;
+            public string EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
+            public string EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
+            public string EndpointPatchRecoveryCellFailureSource = string.Empty;
+            public string EndpointPatchRecoveryDiagnostic = string.Empty;
             public int PreflightCandidateCount;
             public int PreflightSelectedCount;
             public int PreflightSelectedGraphEdgeCount;
@@ -1269,6 +1407,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             CornerDamageSearchTelemetry telemetry =
                 new CornerDamageSearchTelemetry();
+            CornerDamagePreflightReplayCache replayCache =
+                new CornerDamagePreflightReplayCache();
+            using CornerDamagePreflightReplayScope replayScope =
+                new CornerDamagePreflightReplayScope(replayCache);
             using CornerDamageSearchDeadlineScope deadlineScope =
                 new CornerDamageSearchDeadlineScope(hardBudgetMilliseconds);
             System.Diagnostics.Stopwatch searchStopwatch =
@@ -1438,6 +1580,132 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             preparationMilliseconds;
                         telemetry.AuthoritativeSolveMilliseconds +=
                             preparationMilliseconds;
+                        if (candidatePlan != null &&
+                            candidatePlan.EndpointConflictGuardAttempted)
+                        {
+                            telemetry.EndpointConflictGuardAttemptCount++;
+                            telemetry.EndpointConflictGuardTestedRailCount +=
+                                candidatePlan.EndpointConflictGuardTestedRailCount;
+                            telemetry.EndpointConflictGuardMilliseconds +=
+                                candidatePlan.EndpointConflictGuardMilliseconds;
+                            if (candidatePlan.EndpointConflictGuardPassed)
+                            {
+                                telemetry.EndpointConflictGuardPassCount++;
+                            }
+                            else if (candidatePlan.EndpointConflictGuardConflictCount > 0)
+                            {
+                                telemetry.EndpointConflictGuardRejectCount++;
+                            }
+                        }
+                        if (candidatePlan != null &&
+                            candidatePlan.EndpointPatchRecoveryAttempted)
+                        {
+                            telemetry.EndpointPatchRecoveryAttemptCount +=
+                                candidatePlan.EndpointPatchRecoveryAttemptCount;
+                            telemetry.EndpointPatchRecoveryMilliseconds +=
+                                candidatePlan.EndpointPatchRecoveryMilliseconds;
+                            telemetry.EndpointPatchRecoveryUnsupportedStarCount +=
+                                candidatePlan.EndpointPatchRecoveryUnsupportedStarCount;
+                            telemetry.EndpointPatchRecoveryPatchExtractionCount +=
+                                candidatePlan.EndpointPatchRecoveryPatchExtractionCount;
+                            telemetry.EndpointPatchRecoveryDisconnectedPatchCount +=
+                                candidatePlan.EndpointPatchRecoveryDisconnectedPatchCount;
+                            telemetry.EndpointPatchRecoveryBoundaryLoopCount +=
+                                candidatePlan.EndpointPatchRecoveryBoundaryLoopCount;
+                            telemetry.EndpointPatchRecoveryBoundaryCrossingCount +=
+                                candidatePlan.EndpointPatchRecoveryBoundaryCrossingCount;
+                            telemetry.EndpointPatchRecoveryNoLocalRemovalCount +=
+                                candidatePlan.EndpointPatchRecoveryNoLocalRemovalCount;
+                            telemetry.EndpointPatchRecoveryCapCreationCount +=
+                                candidatePlan.EndpointPatchRecoveryCapCreationCount;
+                            telemetry.EndpointPatchRecoveryIncidentBandJoinCount +=
+                                candidatePlan.EndpointPatchRecoveryIncidentBandJoinCount;
+                            telemetry.EndpointPatchRecoveryStitchTopologyCount +=
+                                candidatePlan.EndpointPatchRecoveryStitchTopologyCount;
+                            telemetry.EndpointPatchRecoveryLocalityCount +=
+                                candidatePlan.EndpointPatchRecoveryLocalityCount;
+                            telemetry.EndpointPatchRecoveryBandIntegrityCount +=
+                                candidatePlan.EndpointPatchRecoveryBandIntegrityCount;
+                            telemetry.EndpointPatchRecoveryPreparedMinimumParityCount +=
+                                candidatePlan.EndpointPatchRecoveryPreparedMinimumParityCount;
+                            telemetry.EndpointPatchRecoveryMaterializationSignatureCount +=
+                                candidatePlan.EndpointPatchRecoveryMaterializationSignatureCount;
+                            telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius,
+                                    candidatePlan.EndpointPatchRecoveryMaximumRemovedVertexRadius);
+                            telemetry.EndpointPatchRecoveryMaximumIntersectionRadius =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumIntersectionRadius,
+                                    candidatePlan.EndpointPatchRecoveryMaximumIntersectionRadius);
+                            telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius,
+                                    candidatePlan.EndpointPatchRecoveryMaximumReplacementVertexRadius);
+                            telemetry.EndpointPatchRecoveryRetainedOutsideRadiusCount +=
+                                candidatePlan.EndpointPatchRecoveryRetainedOutsideRadiusCount;
+                            telemetry.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter +=
+                                candidatePlan.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+                            telemetry.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter +=
+                                candidatePlan.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+                            telemetry.EndpointPatchRecoveryLocalSupportSampleCount +=
+                                candidatePlan.EndpointPatchRecoveryLocalSupportSampleCount;
+                            if (candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident > 0)
+                            {
+                                telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident =
+                                    telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident == 0
+                                        ? candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident
+                                        : Mathf.Min(
+                                            telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident,
+                                            candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident);
+                            }
+                            telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta,
+                                    candidatePlan.EndpointPatchRecoveryGlobalMinusLocalSupportDelta);
+                            telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius,
+                                    candidatePlan.EndpointPatchRecoveryControllingSupportRadius);
+                            telemetry.EndpointPatchRecoveryMaximumAxialInfluence =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumAxialInfluence,
+                                    candidatePlan.EndpointPatchRecoveryMaximumAxialInfluence);
+                            if (candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence > 0f)
+                            {
+                                telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence =
+                                    float.IsInfinity(
+                                        telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence)
+                                        ? candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence
+                                        : Mathf.Min(
+                                            telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence,
+                                            candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence);
+                            }
+                            telemetry.EndpointPatchRecoveryFacesSubdivided +=
+                                candidatePlan.EndpointPatchRecoveryFacesSubdivided;
+                            telemetry.EndpointPatchRecoveryLocalFragmentCount +=
+                                candidatePlan.EndpointPatchRecoveryLocalFragmentCount;
+                            telemetry.EndpointPatchRecoveryRemoteRemainderCount +=
+                                candidatePlan.EndpointPatchRecoveryRemoteRemainderCount;
+                            telemetry.EndpointPatchRecoverySyntheticIncidentFragmentCount +=
+                                candidatePlan.EndpointPatchRecoverySyntheticIncidentFragmentCount;
+                            telemetry.EndpointPatchRecoveryMaximumCellVertexCount =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumCellVertexCount,
+                                    candidatePlan.EndpointPatchRecoveryCellVertexCount);
+                            telemetry.EndpointPatchRecoveryMaximumCellFaceCount =
+                                Mathf.Max(
+                                    telemetry.EndpointPatchRecoveryMaximumCellFaceCount,
+                                    candidatePlan.EndpointPatchRecoveryCellFaceCount);
+                            if (candidatePlan.EndpointPatchRecoveryPrepared)
+                            {
+                                telemetry.EndpointPatchRecoveryPreparedCount++;
+                            }
+                            else
+                            {
+                                telemetry.EndpointPatchRecoveryRejectCount++;
+                            }
+                        }
                         if (preparationBuilt && candidatePlan != null &&
                             candidatePlan.Valid)
                         {
@@ -1469,15 +1737,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ApplyCornerDamageIntegrationPlanEvidence(
                             preflightStatus,
                             candidatePlan);
+                        string preparationFailureStage =
+                            candidatePlan != null &&
+                            candidatePlan.EndpointConflictGuardAttempted &&
+                            !candidatePlan.EndpointConflictGuardPassed &&
+                            candidatePlan.EndpointConflictGuardConflictCount > 0
+                                ? "endpoint-conflict-guard"
+                                : "candidate-preparation";
                         AppendCornerDamageSearchAttempt(
                             searchAttempts,
                             candidateRank,
                             preflight.ResolvedUniformScale,
-                            "candidate-preparation",
+                            preparationFailureStage,
                             preflightStatus);
                         RetainCornerDamageSearchFailure(
                             preflightStatus,
-                            "candidate-preparation",
+                            preparationFailureStage,
                             ref bestFailure,
                             ref bestFailurePriority,
                             ref bestFailureStage,
@@ -1580,6 +1855,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 completeBuildMilliseconds;
             telemetry.IntegrationMilliseconds =
                 completeBuildMilliseconds;
+            if (acceptedPlan.EndpointConflictGuardFalseNegative)
+            {
+                telemetry.EndpointConflictGuardFalseNegativeCount++;
+            }
+            if (acceptedPlan.EndpointPatchRecoveryPrepared)
+            {
+                if (completed &&
+                    acceptedPlan.EndpointPatchRecoveryApplied)
+                {
+                    telemetry.EndpointPatchRecoveryAppliedCount++;
+                }
+                else if (!completed)
+                {
+                    acceptedPlan.EndpointPatchRecoveryFalsePositive = true;
+                    telemetry.EndpointPatchRecoveryFalsePositiveCount++;
+                    telemetry.EndpointPatchRecoveryMaterializationSignatureCount +=
+                        acceptedPlan.EndpointPatchRecoveryMaterializationSignatureCount;
+                }
+            }
             if (!completed)
             {
                 bool deadlineExceeded =
@@ -1752,6 +2046,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 finalStatus,
                 out previewStatus,
                 out unifiedStatus);
+        }
+
+        private static CornerDamagePreflightReplayCache
+            ResolveCornerDamagePreflightReplayCache()
+        {
+            return cornerDamagePreflightReplayCache;
+        }
+
+        private static void CaptureCornerDamagePreflightReplayTelemetry(
+            CornerDamageSearchTelemetry telemetry)
+        {
+            if (telemetry == null)
+            {
+                return;
+            }
+
+            CornerDamagePreflightReplayCache cache =
+                ResolveCornerDamagePreflightReplayCache();
+            if (cache == null)
+            {
+                return;
+            }
+
+            telemetry.PreflightFoundationBuildCount =
+                cache.NormalizedFoundationBuildCount;
+            telemetry.PreflightFoundationReuseCount =
+                cache.NormalizedFoundationReuseCount;
+            telemetry.IsolatedReplayAttemptCount =
+                cache.IsolatedReplayAttemptCount;
+            telemetry.IsolatedReplayHitCount =
+                cache.IsolatedReplayHitCount;
+            telemetry.IsolatedReplayMissCount =
+                cache.IsolatedReplayMissCount;
+            telemetry.IsolatedFullEvaluationCount =
+                cache.IsolatedFullEvaluationCount;
         }
 
         private static CornerDamageBaselineBundle
@@ -2031,6 +2360,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         "candidate preparation predicts unrelated baseline bevel loss";
                     return false;
                 }
+                ResetCornerDamageEndpointPatchSupportAndAxialEvidence(
+                    plan);
+                if (!TryPassCornerDamageEndpointConflictGuard(plan))
+                {
+                    plan.Diagnostic = string.IsNullOrEmpty(
+                            plan.EndpointConflictGuardDiagnostic)
+                        ? "minimum-width foreign-plane endpoint-conflict guard rejected the candidate"
+                        : plan.EndpointConflictGuardDiagnostic;
+                    return false;
+                }
 
                 plan.Valid = true;
                 plan.Diagnostic =
@@ -2086,6 +2425,586 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int[] result = new int[identities.Count];
             identities.CopyTo(result);
             return result;
+        }
+
+        private static void
+            ResetCornerDamageEndpointPatchSupportAndAxialEvidence(
+                CornerDamageIntegrationPlan plan)
+        {
+            if (plan == null)
+            {
+                return;
+            }
+            plan.EndpointPatchRecoveryLocalSupportSampleCount = 0;
+            plan.EndpointPatchRecoveryMinimumSamplesPerIncident = 0;
+            plan.EndpointPatchRecoverySamplesPerIncident = string.Empty;
+            plan.EndpointPatchRecoveryLocalSupportRadius = 0f;
+            plan.EndpointPatchRecoveryLocalSupportProjection = 0f;
+            plan.EndpointPatchRecoveryGlobalSupportProjection = 0f;
+            plan.EndpointPatchRecoveryGlobalMinusLocalSupportDelta = 0f;
+            plan.EndpointPatchRecoveryControllingSupportEdgeIndex = -1;
+            plan.EndpointPatchRecoveryControllingSupportRadius = 0f;
+            plan.EndpointPatchRecoverySupportFailureSource = string.Empty;
+            plan.EndpointPatchRecoveryMaximumAxialInfluence = 0f;
+            plan.EndpointPatchRecoveryMinimumAllowedAxialInfluence = 0f;
+            plan.EndpointPatchRecoveryAxialRejectedEdgeIndex = -1;
+            plan.EndpointPatchRecoveryAxialRejectedEndpointVertexIndex = -1;
+            plan.EndpointPatchRecoveryAxialInfluenceSignature = string.Empty;
+            plan.EndpointPatchRecoveryCellLimitSignature = string.Empty;
+            plan.EndpointPatchRecoveryFacesSubdivided = 0;
+            plan.EndpointPatchRecoveryLocalFragmentCount = 0;
+            plan.EndpointPatchRecoveryRemoteRemainderCount = 0;
+            plan.EndpointPatchRecoverySyntheticIncidentFragmentCount = 0;
+            plan.EndpointPatchRecoverySyntheticIncidentIdentities = string.Empty;
+            plan.EndpointPatchRecoveryCellVertexCount = 0;
+            plan.EndpointPatchRecoveryCellFaceCount = 0;
+            plan.EndpointPatchRecoveryCellSplitSignature = string.Empty;
+            plan.EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
+            plan.EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
+            plan.EndpointPatchRecoveryCellFailureSource = string.Empty;
+        }
+
+        private static bool TryPassCornerDamageEndpointConflictGuard(
+            CornerDamageIntegrationPlan plan)
+        {
+            if (plan == null)
+            {
+                return true;
+            }
+
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            plan.EndpointConflictGuardAttempted = true;
+            plan.EndpointConflictGuardPassed = true;
+            plan.EndpointConflictGuardTestedRailCount = 0;
+            plan.EndpointConflictGuardConflictCount = 0;
+            plan.EndpointConflictGuardVictimEdgeIndex = -1;
+            plan.EndpointConflictGuardForeignEdgeIndex = -1;
+            plan.EndpointConflictGuardAxialParameter = 0f;
+            plan.EndpointConflictGuardEndpointAllowance = 0f;
+            plan.EndpointConflictGuardVictimMinimumScale = 0f;
+            plan.EndpointConflictGuardForeignMinimumScale = 0f;
+            plan.EndpointConflictGuardVictimRetreatCapacity = 0f;
+            plan.EndpointConflictGuardForeignRetreatCapacity = 0f;
+            plan.EndpointConflictGuardClusterEdges = Array.Empty<int>();
+            plan.EndpointConflictGuardFalseNegative = false;
+            plan.EndpointConflictGuardDiagnostic = string.Empty;
+            plan.EndpointPatchRecoveryAttempted = false;
+            plan.EndpointPatchRecoveryPrepared = false;
+            plan.EndpointPatchRecoveryApplied = false;
+            plan.EndpointPatchRecoveryFalsePositive = false;
+            plan.EndpointPatchRecoveryAttemptCount = 0;
+            plan.EndpointPatchRecoveryTrialCount = 0;
+            plan.EndpointPatchRecoveryVertexIndex = -1;
+            plan.EndpointPatchRecoveryVictimEdgeIndex = -1;
+            plan.EndpointPatchRecoveryForeignEdgeIndex = -1;
+            plan.EndpointPatchRecoveryIncidentBandCount = 0;
+            plan.EndpointPatchRecoveryNormalRank = -1;
+            plan.EndpointPatchRecoveryCapVertexCount = 0;
+            plan.EndpointPatchRecoveryCutDepth = 0f;
+            plan.EndpointPatchRecoveryCompactness = 0f;
+            plan.EndpointPatchRecoveryAspectRatio = 0f;
+            plan.EndpointPatchRecoveryMilliseconds = 0d;
+            plan.EndpointPatchRecoveryRejection =
+                PlaneCutEndpointPatchRejectionKind.None;
+            plan.EndpointPatchRecoverySelectedFaceCount = 0;
+            plan.EndpointPatchRecoveryBoundaryVertexCount = 0;
+            plan.EndpointPatchRecoveryBoundarySignature = string.Empty;
+            plan.EndpointPatchRecoveryMaximumRemovedVertexRadius = 0f;
+            plan.EndpointPatchRecoveryMaximumIntersectionRadius = 0f;
+            plan.EndpointPatchRecoveryMaximumReplacementVertexRadius = 0f;
+            plan.EndpointPatchRecoveryRetainedOutsideRadiusCount = 0;
+            plan.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter = 0;
+            plan.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter = 0;
+            plan.EndpointPatchRecoveryLocalityFailureSource = string.Empty;
+            plan.EndpointPatchRecoveryDiagnostic = string.Empty;
+            if (plan.SolvedPlan != null)
+            {
+                plan.SolvedPlan.PreparedEndpointPatch = null;
+                if (plan.SolvedPlan.PreparedJunctions != null)
+                {
+                    plan.SolvedPlan.PreparedJunctions.Clear();
+                }
+            }
+
+            try
+            {
+                PlaneCutBevelSolvedPlan solvedPlan = plan.SolvedPlan;
+                if (solvedPlan == null || !solvedPlan.SolveValid ||
+                    solvedPlan.Context == null ||
+                    solvedPlan.Context.Graph == null ||
+                    solvedPlan.SourceFaces == null ||
+                    solvedPlan.RetainedCandidates == null ||
+                    solvedPlan.RetainedCandidates.Count < 2)
+                {
+                    plan.EndpointConflictGuardDiagnostic =
+                        "endpoint-conflict guard was inconclusive because prepared plane state was unavailable; authoritative build required";
+                    return true;
+                }
+
+                List<PlaneCutBevelCandidate> orderedCandidates =
+                    new List<PlaneCutBevelCandidate>(
+                        solvedPlan.RetainedCandidates);
+                orderedCandidates.Sort((left, right) =>
+                    left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+                ChamferTopologyContext context = solvedPlan.Context;
+                EdgeWearTopologyGraph graph = context.Graph;
+                float pointTolerance = Mathf.Max(
+                    PointMergeDistance * 4f,
+                    solvedPlan.MinimumStableEdgeLength * 0.01f);
+                float strictInteriorClearance = Mathf.Max(
+                    pointTolerance * 2f,
+                    solvedPlan.MinimumStableEdgeLength * 0.02f);
+
+                for (int victimIndex = 0;
+                     victimIndex < orderedCandidates.Count;
+                     victimIndex++)
+                {
+                    PlaneCutBevelCandidate victim =
+                        orderedCandidates[victimIndex];
+                    if (victim.SourceEdgeIndex < 0 ||
+                        victim.SourceEdgeIndex >= graph.Edges.Count)
+                    {
+                        continue;
+                    }
+                    EdgeWearGraphEdge victimGraphEdge =
+                        graph.Edges[victim.SourceEdgeIndex];
+                    if (victimGraphEdge.FaceA < 0 ||
+                        victimGraphEdge.FaceB < 0 ||
+                        victimGraphEdge.FaceA >= graph.Faces.Count ||
+                        victimGraphEdge.FaceB >= graph.Faces.Count ||
+                        victimGraphEdge.FaceA == victimGraphEdge.FaceB)
+                    {
+                        continue;
+                    }
+                    if (victimGraphEdge.VertexA < 0 ||
+                        victimGraphEdge.VertexB < 0 ||
+                        victimGraphEdge.VertexA >= graph.Vertices.Count ||
+                        victimGraphEdge.VertexB >= graph.Vertices.Count)
+                    {
+                        continue;
+                    }
+                    Vector3 sourceA =
+                        graph.Vertices[victimGraphEdge.VertexA].Position;
+                    Vector3 sourceB =
+                        graph.Vertices[victimGraphEdge.VertexB].Position;
+                    Vector3 sourceAxis = sourceB - sourceA;
+                    float sourceLength = sourceAxis.magnitude;
+                    if (sourceLength <= pointTolerance)
+                    {
+                        continue;
+                    }
+                    sourceAxis /= sourceLength;
+
+                    for (int foreignIndex = 0;
+                         foreignIndex < orderedCandidates.Count;
+                         foreignIndex++)
+                    {
+                        PlaneCutBevelCandidate foreign =
+                            orderedCandidates[foreignIndex];
+                        if (foreign.SourceEdgeIndex ==
+                            victim.SourceEdgeIndex)
+                        {
+                            continue;
+                        }
+
+                        int[] clusterEdges =
+                            BuildCornerDamageEndpointConflictCluster(
+                                orderedCandidates,
+                                victim,
+                                foreign);
+                        if (clusterEdges.Length == 0)
+                        {
+                            continue;
+                        }
+                        HashSet<int> clusterSet = new HashSet<int>(
+                            clusterEdges);
+                        Dictionary<int, float> scaleByEdge =
+                            new Dictionary<int, float>(
+                                orderedCandidates.Count);
+                        for (int candidateIndex = 0;
+                             candidateIndex < orderedCandidates.Count;
+                             candidateIndex++)
+                        {
+                            PlaneCutBevelCandidate candidate =
+                                orderedCandidates[candidateIndex];
+                            scaleByEdge[candidate.SourceEdgeIndex] =
+                                clusterSet.Contains(
+                                    candidate.SourceEdgeIndex)
+                                    ? ResolvePlaneCutCandidateMinimumScale(
+                                        candidate,
+                                        solvedPlan.MinimumStableEdgeLength)
+                                    : 1f;
+                        }
+                        List<PlaneCutBevelCandidate> scaledCandidates =
+                            BuildScaledPlaneCutCandidates(
+                                orderedCandidates,
+                                context,
+                                scaleByEdge,
+                                solvedPlan.MinimumStableEdgeLength);
+                        if (!TryFindPlaneCutCandidateBySourceEdge(
+                                scaledCandidates,
+                                victim.SourceEdgeIndex,
+                                out PlaneCutBevelCandidate scaledVictim) ||
+                            !TryFindPlaneCutCandidateBySourceEdge(
+                                scaledCandidates,
+                                foreign.SourceEdgeIndex,
+                                out PlaneCutBevelCandidate scaledForeign))
+                        {
+                            continue;
+                        }
+
+                        PolygonFace ownerFaceA = graph.Faces[
+                            victimGraphEdge.FaceA].SourceFace;
+                        PolygonFace ownerFaceB = graph.Faces[
+                            victimGraphEdge.FaceB].SourceFace;
+                        if (!TryResolveCornerDamageFacePlane(
+                                ownerFaceA,
+                                out CutPlane ownerPlaneA) ||
+                            !TryResolveCornerDamageFacePlane(
+                                ownerFaceB,
+                                out CutPlane ownerPlaneB) ||
+                            !TryIntersectCornerDamagePlanes(
+                                scaledVictim.Plane,
+                                scaledForeign.Plane,
+                                ownerPlaneA,
+                                out Vector3 segmentStart) ||
+                            !TryIntersectCornerDamagePlanes(
+                                scaledVictim.Plane,
+                                scaledForeign.Plane,
+                                ownerPlaneB,
+                                out Vector3 segmentEnd))
+                        {
+                            continue;
+                        }
+                        if (!TryClipCornerDamageEndpointConflictSegmentToShell(
+                                ref segmentStart,
+                                ref segmentEnd,
+                                solvedPlan.SourceFaces,
+                                scaledCandidates,
+                                scaledVictim.SourceEdgeIndex,
+                                scaledForeign.SourceEdgeIndex,
+                                pointTolerance,
+                                strictInteriorClearance))
+                        {
+                            continue;
+                        }
+
+                        Vector3 segmentMidpoint =
+                            (segmentStart + segmentEnd) * 0.5f;
+                        plan.EndpointConflictGuardTestedRailCount++;
+                        float startParameter = Vector3.Dot(
+                            segmentStart - sourceA,
+                            sourceAxis) / sourceLength;
+                        float endParameter = Vector3.Dot(
+                            segmentEnd - sourceA,
+                            sourceAxis) / sourceLength;
+                        float midpointParameter =
+                            (startParameter + endParameter) * 0.5f;
+                        float endpointAllowance = Mathf.Clamp(
+                            Mathf.Max(
+                                scaledVictim.Width * 4f,
+                                solvedPlan.MinimumStableEdgeLength * 0.5f) /
+                                sourceLength,
+                            0.03f,
+                            0.25f);
+                        float axialTolerance = Mathf.Max(
+                            0.0001f,
+                            pointTolerance / sourceLength);
+                        if (midpointParameter <=
+                                endpointAllowance + axialTolerance ||
+                            midpointParameter >=
+                                1f - endpointAllowance - axialTolerance)
+                        {
+                            continue;
+                        }
+
+                        float victimMinimumScale = scaleByEdge[
+                            victim.SourceEdgeIndex];
+                        float foreignMinimumScale = scaleByEdge[
+                            foreign.SourceEdgeIndex];
+                        plan.EndpointConflictGuardConflictCount = 1;
+                        plan.EndpointConflictGuardVictimEdgeIndex =
+                            victim.SourceEdgeIndex;
+                        plan.EndpointConflictGuardForeignEdgeIndex =
+                            foreign.SourceEdgeIndex;
+                        plan.EndpointConflictGuardAxialParameter =
+                            midpointParameter;
+                        plan.EndpointConflictGuardEndpointAllowance =
+                            endpointAllowance;
+                        plan.EndpointConflictGuardVictimMinimumScale =
+                            victimMinimumScale;
+                        plan.EndpointConflictGuardForeignMinimumScale =
+                            foreignMinimumScale;
+                        plan.EndpointConflictGuardVictimRetreatCapacity =
+                            Mathf.Clamp01(1f - victimMinimumScale);
+                        plan.EndpointConflictGuardForeignRetreatCapacity =
+                            Mathf.Clamp01(1f - foreignMinimumScale);
+                        plan.EndpointConflictGuardClusterEdges = clusterEdges;
+                        int conflictVertexIndex = midpointParameter < 0.5f
+                            ? victimGraphEdge.VertexA
+                            : victimGraphEdge.VertexB;
+                        if (TryPrepareCornerDamageEndpointPatchRecovery(
+                                plan,
+                                orderedCandidates,
+                                scaledCandidates,
+                                victim,
+                                foreign,
+                                conflictVertexIndex))
+                        {
+                            plan.EndpointConflictGuardPassed = true;
+                            plan.EndpointConflictGuardDiagnostic =
+                                "minimum-width endpoint conflict recovered by a bounded local endpoint face patch";
+                            return true;
+                        }
+
+                        plan.EndpointConflictGuardPassed = false;
+                        plan.EndpointConflictGuardDiagnostic =
+                            "minimum-width endpoint-conflict guard proved that foreign generated plane EdgeBevelPlane:" +
+                            foreign.SourceEdgeIndex +
+                            " still splits bevel-band edge " +
+                            victim.SourceEdgeIndex +
+                            " at axial parameter " +
+                            midpointParameter.ToString("G6") +
+                            " beyond endpoint allowance " +
+                            endpointAllowance.ToString("G6") +
+                            "; local conflict cluster exhausted legal retreat; bounded endpoint-patch recovery: " +
+                            plan.EndpointPatchRecoveryDiagnostic;
+                        return false;
+                    }
+                }
+
+                plan.EndpointConflictGuardDiagnostic =
+                    "minimum-width foreign-plane endpoint-conflict guard passed";
+                return true;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                plan.EndpointConflictGuardMilliseconds =
+                    stopwatch.Elapsed.TotalMilliseconds;
+            }
+        }
+
+        private static int[] BuildCornerDamageEndpointConflictCluster(
+            List<PlaneCutBevelCandidate> candidates,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign)
+        {
+            HashSet<int> clusterVertices = new HashSet<int>
+            {
+                victim.VertexA,
+                victim.VertexB,
+                foreign.VertexA,
+                foreign.VertexB
+            };
+            SortedSet<int> clusterEdges = new SortedSet<int>
+            {
+                victim.SourceEdgeIndex,
+                foreign.SourceEdgeIndex
+            };
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate =
+                    candidates[candidateIndex];
+                if (clusterVertices.Contains(candidate.VertexA) ||
+                    clusterVertices.Contains(candidate.VertexB))
+                {
+                    clusterEdges.Add(candidate.SourceEdgeIndex);
+                }
+            }
+            int[] result = new int[clusterEdges.Count];
+            clusterEdges.CopyTo(result);
+            return result;
+        }
+
+        private static bool TryResolveCornerDamageFacePlane(
+            PolygonFace face,
+            out CutPlane plane)
+        {
+            plane = default;
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count == 0 ||
+                !IsFiniteCornerDamageVector(face.Normal) ||
+                face.Normal.sqrMagnitude <= 0.000001f)
+            {
+                return false;
+            }
+            Vector3 normal = face.Normal.normalized;
+            plane = new CutPlane(
+                normal,
+                Vector3.Dot(normal, face.Vertices[0]));
+            return true;
+        }
+
+        private static bool TryIntersectCornerDamagePlanes(
+            CutPlane first,
+            CutPlane second,
+            CutPlane third,
+            out Vector3 intersection)
+        {
+            intersection = Vector3.zero;
+            Vector3 secondCrossThird = Vector3.Cross(
+                second.Normal,
+                third.Normal);
+            float denominator = Vector3.Dot(
+                first.Normal,
+                secondCrossThird);
+            if (Mathf.Abs(denominator) <= 0.000001f)
+            {
+                return false;
+            }
+            intersection =
+                (secondCrossThird * first.Distance +
+                 Vector3.Cross(third.Normal, first.Normal) *
+                    second.Distance +
+                 Vector3.Cross(first.Normal, second.Normal) *
+                    third.Distance) /
+                denominator;
+            return IsFiniteCornerDamageVector(intersection);
+        }
+
+        private static bool TryClipCornerDamageEndpointConflictSegmentToShell(
+            ref Vector3 segmentStart,
+            ref Vector3 segmentEnd,
+            List<PolygonFace> sourceFaces,
+            List<PlaneCutBevelCandidate> candidates,
+            int victimEdgeIndex,
+            int foreignEdgeIndex,
+            float tolerance,
+            float strictInteriorClearance)
+        {
+            if (!IsFiniteCornerDamageVector(segmentStart) ||
+                !IsFiniteCornerDamageVector(segmentEnd) ||
+                sourceFaces == null || candidates == null)
+            {
+                return false;
+            }
+
+            Vector3 originalStart = segmentStart;
+            Vector3 direction = segmentEnd - segmentStart;
+            if (direction.sqrMagnitude <= tolerance * tolerance)
+            {
+                return false;
+            }
+            float minimumParameter = 0f;
+            float maximumParameter = 1f;
+            for (int faceIndex = 0;
+                 faceIndex < sourceFaces.Count;
+                 faceIndex++)
+            {
+                if (!TryResolveCornerDamageFacePlane(
+                        sourceFaces[faceIndex],
+                        out CutPlane facePlane) ||
+                    !TryClipCornerDamageEndpointConflictParameterRange(
+                        facePlane,
+                        originalStart,
+                        direction,
+                        tolerance,
+                        ref minimumParameter,
+                        ref maximumParameter))
+                {
+                    return false;
+                }
+            }
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[candidateIndex];
+                if (candidate.SourceEdgeIndex == victimEdgeIndex ||
+                    candidate.SourceEdgeIndex == foreignEdgeIndex)
+                {
+                    continue;
+                }
+                if (!TryClipCornerDamageEndpointConflictParameterRange(
+                        candidate.Plane,
+                        originalStart,
+                        direction,
+                        tolerance,
+                        ref minimumParameter,
+                        ref maximumParameter))
+                {
+                    return false;
+                }
+            }
+            if (maximumParameter - minimumParameter <= 0.000001f)
+            {
+                return false;
+            }
+
+            segmentStart = originalStart + direction * minimumParameter;
+            segmentEnd = originalStart + direction * maximumParameter;
+            if ((segmentEnd - segmentStart).sqrMagnitude <=
+                tolerance * tolerance)
+            {
+                return false;
+            }
+
+            Vector3 midpoint = (segmentStart + segmentEnd) * 0.5f;
+            for (int candidateIndex = 0;
+                 candidateIndex < candidates.Count;
+                 candidateIndex++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[candidateIndex];
+                if (candidate.SourceEdgeIndex == victimEdgeIndex ||
+                    candidate.SourceEdgeIndex == foreignEdgeIndex)
+                {
+                    continue;
+                }
+                if (candidate.Plane.SignedDistance(midpoint) >
+                    -strictInteriorClearance)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryClipCornerDamageEndpointConflictParameterRange(
+            CutPlane plane,
+            Vector3 origin,
+            Vector3 direction,
+            float tolerance,
+            ref float minimumParameter,
+            ref float maximumParameter)
+        {
+            float originDistance = plane.SignedDistance(origin);
+            float directionDistance = Vector3.Dot(
+                plane.Normal,
+                direction);
+            if (Mathf.Abs(directionDistance) <= 0.000001f)
+            {
+                return originDistance <= tolerance;
+            }
+
+            float intersectionParameter =
+                (tolerance - originDistance) / directionDistance;
+            if (directionDistance > 0f)
+            {
+                maximumParameter = Mathf.Min(
+                    maximumParameter,
+                    intersectionParameter);
+            }
+            else
+            {
+                minimumParameter = Mathf.Max(
+                    minimumParameter,
+                    intersectionParameter);
+            }
+            return minimumParameter <= maximumParameter + 0.000001f;
+        }
+
+        private static bool IsFiniteCornerDamageVector(Vector3 value)
+        {
+            return !float.IsNaN(value.x) &&
+                !float.IsInfinity(value.x) &&
+                !float.IsNaN(value.y) &&
+                !float.IsInfinity(value.y) &&
+                !float.IsNaN(value.z) &&
+                !float.IsInfinity(value.z);
         }
 
         private static bool TryCompleteCornerDamageIntegrationPlan(
@@ -2202,6 +3121,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 plan.UnrelatedRetainedCount = unrelatedRetainedCount;
                 plan.CollateralLostCount = lost.Count;
                 plan.CollateralLostIdentities = lost.ToArray();
+                plan.EndpointPatchRecoveryApplied =
+                    previewApplied &&
+                    plan.EndpointPatchRecoveryPrepared &&
+                    plan.SolvedPlan.PreparedEndpointPatch != null &&
+                    plan.SolvedPlan.PreparedJunctions != null &&
+                    plan.SolvedPlan.PreparedJunctions.Count == 1;
+
+                bool endpointConflictFloorFailure =
+                    audit.EdgeConflictWidthReductions != null &&
+                    audit.EdgeConflictWidthReductions.Count > 0 &&
+                    string.Equals(
+                        audit.EdgeConflictWidthReductions[
+                            audit.EdgeConflictWidthReductions.Count - 1].Result,
+                        "unresolved-geometric-floor",
+                        StringComparison.Ordinal);
+                if (!previewApplied &&
+                    plan.EndpointConflictGuardAttempted &&
+                    plan.EndpointConflictGuardPassed &&
+                    endpointConflictFloorFailure &&
+                    audit.EdgeConflictUnresolvedCount > 0 &&
+                    audit.EdgeConflictVictimEdgeIndex >= 0 &&
+                    audit.EdgeConflictForeignEdgeIndex >= 0)
+                {
+                    plan.EndpointConflictGuardFalseNegative = true;
+                    plan.EndpointConflictGuardVictimEdgeIndex =
+                        audit.EdgeConflictVictimEdgeIndex;
+                    plan.EndpointConflictGuardForeignEdgeIndex =
+                        audit.EdgeConflictForeignEdgeIndex;
+                    plan.EndpointConflictGuardAxialParameter =
+                        audit.EdgeConflictForeignAxialParameter;
+                    plan.EndpointConflictGuardDiagnostic =
+                        "endpoint-conflict guard false negative: " +
+                        audit.Diagnostic;
+                }
+
+                if (!previewApplied &&
+                    plan.EndpointPatchRecoveryPrepared)
+                {
+                    plan.EndpointPatchRecoveryFalsePositive = true;
+                    plan.EndpointPatchRecoveryRejection =
+                        PlaneCutEndpointPatchRejectionKind.MaterializationSignature;
+                    plan.EndpointPatchRecoveryMaterializationSignatureCount++;
+                    plan.EndpointPatchRecoveryDiagnostic =
+                        "prepared bounded endpoint patch failed authoritative materialization: " +
+                        (audit.Diagnostic ?? string.Empty);
+                }
 
                 if (!previewApplied)
                 {
@@ -2411,6 +3376,146 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 plan.MissingPlannedMandatory ?? Array.Empty<int>();
             status.UnexpectedFinalMandatory =
                 plan.UnexpectedFinalMandatory ?? Array.Empty<int>();
+            status.EndpointConflictGuardAttempted =
+                plan.EndpointConflictGuardAttempted;
+            status.EndpointConflictGuardPassed =
+                plan.EndpointConflictGuardPassed;
+            status.EndpointConflictGuardTestedRailCount =
+                plan.EndpointConflictGuardTestedRailCount;
+            status.EndpointConflictGuardConflictCount =
+                plan.EndpointConflictGuardConflictCount;
+            status.EndpointConflictGuardVictimEdgeIndex =
+                plan.EndpointConflictGuardVictimEdgeIndex;
+            status.EndpointConflictGuardForeignEdgeIndex =
+                plan.EndpointConflictGuardForeignEdgeIndex;
+            status.EndpointConflictGuardAxialParameter =
+                plan.EndpointConflictGuardAxialParameter;
+            status.EndpointConflictGuardEndpointAllowance =
+                plan.EndpointConflictGuardEndpointAllowance;
+            status.EndpointConflictGuardVictimMinimumScale =
+                plan.EndpointConflictGuardVictimMinimumScale;
+            status.EndpointConflictGuardForeignMinimumScale =
+                plan.EndpointConflictGuardForeignMinimumScale;
+            status.EndpointConflictGuardVictimRetreatCapacity =
+                plan.EndpointConflictGuardVictimRetreatCapacity;
+            status.EndpointConflictGuardForeignRetreatCapacity =
+                plan.EndpointConflictGuardForeignRetreatCapacity;
+            status.EndpointConflictGuardClusterEdges =
+                plan.EndpointConflictGuardClusterEdges ?? Array.Empty<int>();
+            status.EndpointConflictGuardMilliseconds =
+                plan.EndpointConflictGuardMilliseconds;
+            status.EndpointConflictGuardFalseNegative =
+                plan.EndpointConflictGuardFalseNegative;
+            status.EndpointConflictGuardDiagnostic =
+                plan.EndpointConflictGuardDiagnostic ?? string.Empty;
+            status.EndpointPatchRecoveryAttempted =
+                plan.EndpointPatchRecoveryAttempted;
+            status.EndpointPatchRecoveryPrepared =
+                plan.EndpointPatchRecoveryPrepared;
+            status.EndpointPatchRecoveryApplied =
+                plan.EndpointPatchRecoveryApplied;
+            status.EndpointPatchRecoveryFalsePositive =
+                plan.EndpointPatchRecoveryFalsePositive;
+            status.EndpointPatchRecoveryLocalAttemptCount =
+                plan.EndpointPatchRecoveryTrialCount;
+            status.EndpointPatchRecoveryVertexIndex =
+                plan.EndpointPatchRecoveryVertexIndex;
+            status.EndpointPatchRecoveryVictimEdgeIndex =
+                plan.EndpointPatchRecoveryVictimEdgeIndex;
+            status.EndpointPatchRecoveryForeignEdgeIndex =
+                plan.EndpointPatchRecoveryForeignEdgeIndex;
+            status.EndpointPatchRecoveryIncidentBandCount =
+                plan.EndpointPatchRecoveryIncidentBandCount;
+            status.EndpointPatchRecoveryNormalRank =
+                plan.EndpointPatchRecoveryNormalRank;
+            status.EndpointPatchRecoveryCapVertexCount =
+                plan.EndpointPatchRecoveryCapVertexCount;
+            status.EndpointPatchRecoveryCutDepth =
+                plan.EndpointPatchRecoveryCutDepth;
+            status.EndpointPatchRecoveryCompactness =
+                plan.EndpointPatchRecoveryCompactness;
+            status.EndpointPatchRecoveryAspectRatio =
+                plan.EndpointPatchRecoveryAspectRatio;
+            status.EndpointPatchRecoveryLocalMilliseconds =
+                plan.EndpointPatchRecoveryMilliseconds;
+            status.EndpointPatchRecoveryRejection =
+                plan.EndpointPatchRecoveryRejection.ToString();
+            status.EndpointPatchRecoverySelectedFaceCount =
+                plan.EndpointPatchRecoverySelectedFaceCount;
+            status.EndpointPatchRecoveryBoundaryVertexCount =
+                plan.EndpointPatchRecoveryBoundaryVertexCount;
+            status.EndpointPatchRecoveryBoundarySignature =
+                plan.EndpointPatchRecoveryBoundarySignature ?? string.Empty;
+            status.EndpointPatchRecoveryLocalMaximumRemovedVertexRadius =
+                plan.EndpointPatchRecoveryMaximumRemovedVertexRadius;
+            status.EndpointPatchRecoveryLocalMaximumIntersectionRadius =
+                plan.EndpointPatchRecoveryMaximumIntersectionRadius;
+            status.EndpointPatchRecoveryLocalMaximumReplacementVertexRadius =
+                plan.EndpointPatchRecoveryMaximumReplacementVertexRadius;
+            status.EndpointPatchRecoveryLocalRetainedOutsideRadiusCount =
+                plan.EndpointPatchRecoveryRetainedOutsideRadiusCount;
+            status.EndpointPatchRecoveryLocalSelectedFaceCountBeforeLocalFilter =
+                plan.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+            status.EndpointPatchRecoveryLocalSelectedFaceCountAfterLocalFilter =
+                plan.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+            status.EndpointPatchRecoveryLocalityFailureSource =
+                plan.EndpointPatchRecoveryLocalityFailureSource ?? string.Empty;
+            status.EndpointPatchRecoveryAttemptSupportSampleCount =
+                plan.EndpointPatchRecoveryLocalSupportSampleCount;
+            status.EndpointPatchRecoveryAttemptMinimumSamplesPerIncident =
+                plan.EndpointPatchRecoveryMinimumSamplesPerIncident;
+            status.EndpointPatchRecoverySamplesPerIncident =
+                plan.EndpointPatchRecoverySamplesPerIncident ?? string.Empty;
+            status.EndpointPatchRecoveryLocalSupportRadius =
+                plan.EndpointPatchRecoveryLocalSupportRadius;
+            status.EndpointPatchRecoveryLocalSupportProjection =
+                plan.EndpointPatchRecoveryLocalSupportProjection;
+            status.EndpointPatchRecoveryGlobalSupportProjection =
+                plan.EndpointPatchRecoveryGlobalSupportProjection;
+            status.EndpointPatchRecoveryGlobalMinusLocalSupportDelta =
+                plan.EndpointPatchRecoveryGlobalMinusLocalSupportDelta;
+            status.EndpointPatchRecoveryControllingSupportEdgeIndex =
+                plan.EndpointPatchRecoveryControllingSupportEdgeIndex;
+            status.EndpointPatchRecoveryControllingSupportRadius =
+                plan.EndpointPatchRecoveryControllingSupportRadius;
+            status.EndpointPatchRecoverySupportFailureSource =
+                plan.EndpointPatchRecoverySupportFailureSource ?? string.Empty;
+            status.EndpointPatchRecoveryAttemptMaximumAxialInfluence =
+                plan.EndpointPatchRecoveryMaximumAxialInfluence;
+            status.EndpointPatchRecoveryAttemptMinimumAllowedAxialInfluence =
+                plan.EndpointPatchRecoveryMinimumAllowedAxialInfluence;
+            status.EndpointPatchRecoveryAxialRejectedEdgeIndex =
+                plan.EndpointPatchRecoveryAxialRejectedEdgeIndex;
+            status.EndpointPatchRecoveryAxialRejectedEndpointVertexIndex =
+                plan.EndpointPatchRecoveryAxialRejectedEndpointVertexIndex;
+            status.EndpointPatchRecoveryAxialInfluenceSignature =
+                plan.EndpointPatchRecoveryAxialInfluenceSignature ?? string.Empty;
+            status.EndpointPatchRecoveryCellLimitSignature =
+                plan.EndpointPatchRecoveryCellLimitSignature ?? string.Empty;
+            status.EndpointPatchRecoveryAttemptFacesSubdivided =
+                plan.EndpointPatchRecoveryFacesSubdivided;
+            status.EndpointPatchRecoveryAttemptLocalFragmentCount =
+                plan.EndpointPatchRecoveryLocalFragmentCount;
+            status.EndpointPatchRecoveryAttemptRemoteRemainderCount =
+                plan.EndpointPatchRecoveryRemoteRemainderCount;
+            status.EndpointPatchRecoveryAttemptSyntheticIncidentFragmentCount =
+                plan.EndpointPatchRecoverySyntheticIncidentFragmentCount;
+            status.EndpointPatchRecoverySyntheticIncidentIdentities =
+                plan.EndpointPatchRecoverySyntheticIncidentIdentities ?? string.Empty;
+            status.EndpointPatchRecoveryAttemptCellVertexCount =
+                plan.EndpointPatchRecoveryCellVertexCount;
+            status.EndpointPatchRecoveryAttemptCellFaceCount =
+                plan.EndpointPatchRecoveryCellFaceCount;
+            status.EndpointPatchRecoveryCellSplitSignature =
+                plan.EndpointPatchRecoveryCellSplitSignature ?? string.Empty;
+            status.EndpointPatchRecoveryLocalFragmentSignature =
+                plan.EndpointPatchRecoveryLocalFragmentSignature ?? string.Empty;
+            status.EndpointPatchRecoveryRemoteRemainderSignature =
+                plan.EndpointPatchRecoveryRemoteRemainderSignature ?? string.Empty;
+            status.EndpointPatchRecoveryCellFailureSource =
+                plan.EndpointPatchRecoveryCellFailureSource ?? string.Empty;
+            status.EndpointPatchRecoveryDiagnostic =
+                plan.EndpointPatchRecoveryDiagnostic ?? string.Empty;
         }
 
         private static bool TryValidateCornerDamageIntegrationPlanEmission(
@@ -2750,6 +3855,165 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 DeadlineAbortCount = status == null
                     ? 0
                     : status.DeadlineAbortCount,
+                EndpointConflictGuardAttemptCount = status == null
+                    ? 0
+                    : status.EndpointConflictGuardAttemptCount,
+                EndpointConflictGuardPassCount = status == null
+                    ? 0
+                    : status.EndpointConflictGuardPassCount,
+                EndpointConflictGuardRejectCount = status == null
+                    ? 0
+                    : status.EndpointConflictGuardRejectCount,
+                EndpointConflictGuardFalseNegativeCount = status == null
+                    ? 0
+                    : status.EndpointConflictGuardFalseNegativeCount,
+                EndpointConflictGuardTestedRailCount = status == null
+                    ? 0
+                    : status.EndpointConflictGuardTestedRailCount,
+                EndpointConflictGuardMilliseconds = status == null
+                    ? 0d
+                    : status.EndpointConflictGuardMilliseconds,
+                EndpointPatchRecoveryAttemptCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryAttemptCount,
+                EndpointPatchRecoveryPreparedCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryPreparedCount,
+                EndpointPatchRecoveryRejectCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryRejectCount,
+                EndpointPatchRecoveryAppliedCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryAppliedCount,
+                EndpointPatchRecoveryFalsePositiveCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryFalsePositiveCount,
+                EndpointPatchRecoveryUnsupportedStarCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryUnsupportedStarCount,
+                EndpointPatchRecoveryPatchExtractionCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryPatchExtractionCount,
+                EndpointPatchRecoveryDisconnectedPatchCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryDisconnectedPatchCount,
+                EndpointPatchRecoveryBoundaryLoopCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryBoundaryLoopCount,
+                EndpointPatchRecoveryBoundaryCrossingCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryBoundaryCrossingCount,
+                EndpointPatchRecoveryNoLocalRemovalCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryNoLocalRemovalCount,
+                EndpointPatchRecoveryCapCreationCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryCapCreationCount,
+                EndpointPatchRecoveryIncidentBandJoinCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryIncidentBandJoinCount,
+                EndpointPatchRecoveryStitchTopologyCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryStitchTopologyCount,
+                EndpointPatchRecoveryLocalityCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryLocalityCount,
+                EndpointPatchRecoveryBandIntegrityCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryBandIntegrityCount,
+                EndpointPatchRecoveryPreparedMinimumParityCount =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoveryPreparedMinimumParityCount,
+                EndpointPatchRecoveryMaterializationSignatureCount =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoveryMaterializationSignatureCount,
+                EndpointPatchRecoveryMaximumRemovedVertexRadius =
+                    status == null
+                        ? 0f
+                        : status.EndpointPatchRecoveryMaximumRemovedVertexRadius,
+                EndpointPatchRecoveryMaximumIntersectionRadius =
+                    status == null
+                        ? 0f
+                        : status.EndpointPatchRecoveryMaximumIntersectionRadius,
+                EndpointPatchRecoveryMaximumReplacementVertexRadius =
+                    status == null
+                        ? 0f
+                        : status.EndpointPatchRecoveryMaximumReplacementVertexRadius,
+                EndpointPatchRecoveryRetainedOutsideRadiusCount =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoveryRetainedOutsideRadiusCount,
+                EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter,
+                EndpointPatchRecoverySelectedFaceCountAfterLocalFilter =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter,
+                EndpointPatchRecoveryLocalSupportSampleCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryLocalSupportSampleCount,
+                EndpointPatchRecoveryMinimumSamplesPerIncident = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryMinimumSamplesPerIncident,
+                EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta =
+                    status == null
+                        ? 0f
+                        : status.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta,
+                EndpointPatchRecoveryMaximumControllingSupportRadius =
+                    status == null
+                        ? 0f
+                        : status.EndpointPatchRecoveryMaximumControllingSupportRadius,
+                EndpointPatchRecoveryMaximumAxialInfluence = status == null
+                    ? 0f
+                    : status.EndpointPatchRecoveryMaximumAxialInfluence,
+                EndpointPatchRecoveryMinimumAllowedAxialInfluence =
+                    status == null
+                        ? float.PositiveInfinity
+                        : status.EndpointPatchRecoveryMinimumAllowedAxialInfluence,
+                EndpointPatchRecoveryFacesSubdivided = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryFacesSubdivided,
+                EndpointPatchRecoveryLocalFragmentCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryLocalFragmentCount,
+                EndpointPatchRecoveryRemoteRemainderCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryRemoteRemainderCount,
+                EndpointPatchRecoverySyntheticIncidentFragmentCount =
+                    status == null
+                        ? 0
+                        : status.EndpointPatchRecoverySyntheticIncidentFragmentCount,
+                EndpointPatchRecoveryMaximumCellVertexCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryMaximumCellVertexCount,
+                EndpointPatchRecoveryMaximumCellFaceCount = status == null
+                    ? 0
+                    : status.EndpointPatchRecoveryMaximumCellFaceCount,
+                EndpointPatchRecoveryMilliseconds = status == null
+                    ? 0d
+                    : status.EndpointPatchRecoveryMilliseconds,
+                PreflightFoundationBuildCount = status == null
+                    ? 0
+                    : status.PreflightFoundationBuildCount,
+                PreflightFoundationReuseCount = status == null
+                    ? 0
+                    : status.PreflightFoundationReuseCount,
+                IsolatedReplayAttemptCount = status == null
+                    ? 0
+                    : status.IsolatedReplayAttemptCount,
+                IsolatedReplayHitCount = status == null
+                    ? 0
+                    : status.IsolatedReplayHitCount,
+                IsolatedReplayMissCount = status == null
+                    ? 0
+                    : status.IsolatedReplayMissCount,
+                IsolatedFullEvaluationCount = status == null
+                    ? 0
+                    : status.IsolatedFullEvaluationCount,
                 CandidateRankingMilliseconds = status == null
                     ? 0d
                     : status.CandidateRankingMilliseconds,
@@ -2821,6 +4085,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 "complete-build-retention" => 9,
                 "complete-build-mandatory" => 9,
                 "complete-authoritative-build" => 8,
+                "endpoint-conflict-guard" => 8,
                 "candidate-preparation" => 7,
                 "integration-plan" => 7,
                 "integration-preflight-mismatch" => 7,

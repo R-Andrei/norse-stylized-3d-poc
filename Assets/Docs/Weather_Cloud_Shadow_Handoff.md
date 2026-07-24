@@ -35,7 +35,7 @@ The **selected first complete implementation is a URP main directional-light coo
 
 The performance acceptance gate is complete for the current V0 stress view. The final corrected 2560 × 1440 suite measured `+0.016 ms` mean paired GPU median delta for a static cookie and `+0.011 ms` for the normal moving cookie, with unchanged SetPass count and restoration `PASS`. These deltas are below ordinary run-to-run variation and do not justify a hybrid receiver system. The hybrid shared-mask design remains a deferred contingency only if later Player-build or low-end-hardware evidence demonstrates a material regression.
 
-The field remains Weather-owned and moves with authoritative Weather wind direction or a deterministic bounded angular offset. No visible cloud mesh, cloud plane, volumetric system, projector, decal, fullscreen pass, per-object cloud state, or custom vertex cloud field is part of the frozen cloud-shadow V0. A future godrays system is adjacent but separate: it may consume the same sun and cloud-clearance information, but it has no approved representation, rendering path, ownership details, or performance budget yet.
+The field remains Weather-owned and moves with authoritative Weather wind direction or a deterministic bounded angular offset. No visible cloud mesh, cloud plane, volumetric system, projector, decal, fullscreen pass, per-object cloud state, or custom vertex cloud field is part of the frozen cloud-shadow V0. The adjacent feature is now the approved Weather LightRay V1 architecture in `Assets/Docs/Weather_Light_Ray_Architecture.md`: it may query the same cloud transmission and evolution state, but it remains a separate hybrid presentation and gameplay-zone subsystem and does not modify the frozen receiver-cookie path.
 
 The accepted visual starting points remain:
 
@@ -745,9 +745,46 @@ Decision:
 
 ### `WEATHER-CLOUD-SHADOW-HANDOFF-V0.5` — godrays exploration handoff
 
-**Status:** complete as a separate concise Markdown handoff delivered with V0.4.
+**Status:** complete and superseded as the active LightRay design authority.
 
-The next discussion concerns a separate, undefined godrays system: sunshine visible through clearances in the existing cloud field. The handoff points the receiving chat at the Weather cloud controller/generator, Time of Day sun ownership, Weather wind ownership, receiver integrations, diagnostic shader, benchmark tooling, and frozen decisions. It does not select a godrays representation or authorize implementation.
+The concise handoff initiated the architecture discussion and remains useful as historical cloud-system orientation. Its “undefined godrays” status is superseded by `Assets/Docs/Weather_Light_Ray_Architecture.md`.
+
+### `WEATHER-CLOUD-SHADOW-HANDOFF-V0.6` — LightRay architecture cross-reference
+
+**Status:** complete on 2026-07-24 as part of `WEATHER-LIGHT-RAY-DOC-V0.1`.
+
+The adjacent feature is renamed Weather LightRay and now has an approved V1 architecture and implementation plan. The new canonical document records:
+
+- shared Sun/Moon source abstraction with mutually exclusive day/night source groups;
+- mandatory hybrid world-space plus screen-space rendering from the first visible implementation;
+- cloud-respecting and cloud-ignoring policies;
+- graceful transition suspension for cloud-respecting rays and continued operation for ignore-cloud rays;
+- timed, permanent, and externally controlled lifetimes;
+- authored and gameplay-requested divine overrides;
+- analytical gameplay influence independent of rendering;
+- Unity 6 URP Render Graph passes, quality budgets, diagnostics, implementation sequence, and validation gates.
+
+The cloud-shadow implementation remains frozen. `WEATHER-LIGHT-RAY-V1.0` adds the approved minimal source-neutral cloud-transmission query to `WeatherCloudShadowController`. The query projects controlled world positions into the existing directional-cookie plane and samples the retained readable `R8` cookie with bilinear repeat filtering. It does not alter the installed cookie, receiver integration, generation, movement, evolution cadence, restoration, benchmark state, or cloud visual baseline.
+
+### `WEATHER-CLOUD-SHADOW-HANDOFF-V0.7` — LightRay CPU query contract
+
+**Status:** source changes prepared; Unity compilation and Scene-view projection comparison pending.
+
+Changed cloud source:
+
+```text
+Assets/Game/Procedural/Weather/WeatherCloudShadowController.cs
+```
+
+Added public query contracts:
+
+```text
+TrySampleCloudTransmission(worldPosition, directionalLight, out sample)
+TryProjectCloudCookieUv(worldPosition, directionalLight, out uv, out offset, out error)
+ShadedTransmission
+```
+
+The query returns explicit clear-sky, stable, evolution-unstable, unavailable, or error status. It samples `GeneratedCookie.GetPixelBilinear`; it does not execute `WeatherCloudShadowCookieGenerator`, allocate another cloud field, or read back the GPU. When the queried source is the active captured Sun, the computed source offset is required to match `CurrentCookieOffset` while the Sun gate is active. The LightRay Scene-view diagnostic overlays controlled CPU sample markers on the existing shader-sampled Cloud / Opening Map for live projection validation.
 
 ## M. Exact implementation scope and sequence
 
@@ -1027,15 +1064,17 @@ The editor receiver audit must later provide a scene-specific material/shader li
 | Low-frequency cookie evolution | `WEATHER-CLOUD-SHADOW-V0.3D` | Five modified files | Exact match | Idle `O(1)` check; dirty `O(R²)` generation; bounded `O(R²)` blend/upload only during transition; receiver GPU unchanged | Complete | User confirmed the evolution works exactly as planned | Retain |
 | Automated runtime benchmark suite | `WEATHER-CLOUD-SHADOW-V0.3E` + `V0.3E1` + `V0.3E2` | Original seven-file suite plus two two-file corrections | Complete and live validated | No idle cost; transient hidden runner only while suite runs; preallocated timed-window storage; optional profiler counters; one forced evolution; scalar execution metadata only | Final 2560 × 1440 report completed with actual alternating order and restoration `PASS` | Static `+0.016 ms`; moving `+0.011 ms` mean paired GPU median deltas | Retain for future Player/hardware checks |
 | Performance retain/reopen decision | `WEATHER-CLOUD-SHADOW-V0.4` | Two Weather documents | Exact docs-only freeze scope | Documentation only | Complete and frozen | Final corrected benchmark evidence recorded | Native cookie retained; hybrid fallback deferred | No current cloud implementation work |
-| Godrays exploration handoff | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.5` | Separate concise Markdown handoff | Delivered with V0.4 | Documentation only | Complete | Points to relevant source and frozen decisions without selecting an implementation | Godrays remains undefined | Begin architecture discussion in a new chat |
+| Godrays exploration handoff | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.5` | Separate concise Markdown handoff | Delivered with V0.4 | Documentation only | Complete, historical | Points to relevant source and frozen decisions | Superseded by LightRay canonical architecture | Retain as historical orientation |
+| LightRay architecture cross-reference | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.6` | Three Weather Markdown documents | Exact docs-only scope | Documentation only | Complete | Confirms LightRay consumes cloud state without modifying receiver-cookie V0.4 | LightRay runtime not started | Follow `Weather_Light_Ray_Architecture.md` |
+| LightRay CPU cloud-query contract | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.7` | Cloud controller plus LightRay source/docs | Query-only cloud modification | No cloud steady-state work; samples occur only when called | Source prepared; Unity pending | Query samples retained cookie and exposes evolution stability | Cloud V0.4 generation/receiver path unchanged | Validate CPU markers against shader overlay |
 
 ## T. Receiving-model startup checklist
 
 1. Treat `WEATHER-CLOUD-SHADOW-V0.4` as the frozen cloud-shadow baseline; do not redesign or optimize it without a concrete defect or new benchmark evidence.
-2. Read the separate `Weather_Godrays_Exploration_Handoff_2026-07-23.md` before discussing godrays.
-3. Read the current cloud controller, cookie generator, Time of Day sun owner, Weather wind owner, custom Inspector, debug overlay shader, receiver audit, and benchmark runner named in that handoff.
-4. Define the godrays visual target, camera behavior, occlusion source, relationship to cloud clearances, quality tiers, and performance budget before selecting a rendering technique.
-5. Keep godrays separate from the frozen receiver-cookie contract unless a reviewed plan proves that a shared extension is necessary.
+2. Read `Assets/Docs/Weather_Light_Ray_Architecture.md` as the canonical adjacent-system plan.
+3. Read the current cloud controller, cookie generator, Time of Day sun owner, Weather wind owner, PC Renderer/RP assets, custom Inspector, debug overlay shader, receiver audit, and benchmark runner identified by the LightRay review evidence.
+4. Preserve the mandatory hybrid LightRay target, source exclusivity, cloud policies, transition suspension, permanence, and analytical gameplay-query contracts.
+5. Add only the minimal reviewed cloud-transmission query required by LightRay; keep the installed cookie, receiver contract, generation, movement, and V0.4 tuning unchanged.
 
 ## V0.4 freeze compliance note
 
@@ -1072,4 +1111,4 @@ The source patch implements the approved cookie architecture and all mandatory c
 - V0.3E1 changes only the canonical handoff and benchmark source, removes the illegal iterator form, preserves case ordering and single restoration/finalization behavior, and passes exact-scope, lexical/delimiter, UTF-8/NUL, and nested-driver contract checks. It compiled and completed two live Editor Play Mode suites with restoration PASS.
 - Live-source inspection confirmed that persistent execution already alternated correctly; only the creation-order detailed report was misleading. V0.3E2 changes exactly the handoff and benchmark source, records actual execution indices/start offsets/elapsed times, prints pair order and actual detailed order, versions the report as V0.3E2, and leaves all measurement and cloud behavior unchanged.
 - Hybrid optimization remains deferred behind measured Player or low-end-hardware failure.
-- The concise godrays exploration handoff is delivered separately with the V0.4 freeze and does not authorize an implementation.
+- The concise godrays exploration handoff remains historical orientation. `Assets/Docs/Weather_Light_Ray_Architecture.md` is now the authoritative adjacent-system plan and still does not authorize runtime edits without a separately approved patch.

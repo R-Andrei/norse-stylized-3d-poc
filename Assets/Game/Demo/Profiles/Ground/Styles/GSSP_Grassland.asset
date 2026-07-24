@@ -41,9 +41,9 @@ MonoBehaviour:
       immediateBankExposure: 0.398
       waterlineMaterialStrength: 0.307
       bankTransitionSoftness: 0.207
-      outerBankExtension: 0.74
+      outerBankExtension: 0.67
       outerBankStrength: 1
-      outerBankFade: 0.5
+      outerBankFade: 0.67
       bankDetailScaleMultiplier: 1
       bankAuthoredColorStrengthMultiplier: 1
       bankAuthoredColorLightingMultiplier: 1

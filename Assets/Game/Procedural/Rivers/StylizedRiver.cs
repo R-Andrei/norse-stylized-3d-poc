@@ -602,6 +602,29 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float surfacePresence = 0.46f;
 
+        [Header("Shoreline Accent")]
+        [Tooltip("Authored colour of the stylized line drawn inward from the complete current shoreline, including positive overflow regions.")]
+        [ColorUsage(false, true)]
+        [SerializeField]
+        private Color shorelineAccentColor =
+            new Color(0.58f, 0.72f, 0.76f, 1f);
+
+        [Tooltip("Overall blend strength of the complete shoreline accent. Zero disables it without changing shoreline geometry.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shorelineAccentStrength = 0.45f;
+
+        [Tooltip("World-space thickness of the shoreline accent measured inward from the current water edge, in metres.")]
+        [Range(0.005f, 0.5f)]
+        [SerializeField] private float shorelineAccentWidth = 0.08f;
+
+        [Tooltip("World-space width over which the final shoreline colour blends back to the already-rendered opaque scene. Zero preserves a hard contact edge. This is independent of Shoreline Accent strength.")]
+        [Range(0f, 0.15f)]
+        [SerializeField] private float shorelineEdgeBlendWidth = 0.04f;
+
+        [Tooltip("Signed brightness adjustment for the shoreline accent. Negative values darken it; positive values brighten it.")]
+        [Range(-1f, 1f)]
+        [SerializeField] private float shorelineAccentBrightness;
+
         [Header("Surface State")]
         [SerializeField]
         private StylizedRiverSurfaceState surfaceState =
@@ -734,15 +757,20 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 2.5f)]
         [SerializeField] private float shoreWaveHeightScale = 1f;
 
-        [Tooltip("Longitudinal shore-wave length relative to the centre-river macro wave. A value of 1 preserves the existing wavelength.")]
+        [Tooltip("Longitudinal size of each individual shore wave relative to the centre-river macro wave. Lower values create shorter, tighter waves; higher values create broader waves that occupy more shoreline length.")]
         [Range(0.25f, 4f)]
-        [SerializeField] private float shoreWaveLengthScale = 1f;
+        [SerializeField] private float shoreWaveShapeLengthScale = 1f;
+
+        [Tooltip("Clear longitudinal gap between successive shore-wave packets relative to the centre-river macro wave. Zero makes adjacent packets touch; higher values insert wider calm shoreline gaps without changing individual wave length.")]
+        [Range(0f, 4f)]
+        [FormerlySerializedAs("shoreWaveLengthScale")]
+        [SerializeField] private float shoreWaveSpacingScale = 1f;
 
         [Tooltip("Maximum fraction of the hidden shoreline allowance that shore waves may reach. A value of 1 preserves the complete generated allowance.")]
         [Range(0f, 1f)]
         [SerializeField] private float shoreWaveReach = 1f;
 
-        [Tooltip("World-space smoothing distance for the shore-wave profile and for transitions between neighbouring waves with different sizes. Larger values produce broader, rounder shoreline transitions.")]
+        [Tooltip("World-space shoulder-shaping distance inside each shore-wave packet. Larger values produce broader, rounder wave shoulders without changing the authored packet length or inter-packet gap.")]
         [Range(0.25f, 3f)]
         [SerializeField] private float shoreWaveTransitionLength = 1f;
 
@@ -757,6 +785,14 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Per-wave start, middle, and end variation for shore-wave height and lateral reach. Zero preserves the former uniform repeating wave.")]
         [Range(0f, 1f)]
         [SerializeField] private float shoreWaveProfileVariation;
+
+        [Tooltip("How strongly each travelling shore wave changes its normalized roundness and shoulder shape over time. Zero preserves the exact current profile.")]
+        [Range(0f, 1f)]
+        [SerializeField] private float shoreWaveProfileEvolutionStrength;
+
+        [Tooltip("Seconds for one shore wave to complete a predictable narrow-to-broad-to-narrow profile evolution cycle. Neighbouring waves use deterministic phase offsets.")]
+        [Range(1f, 30f)]
+        [SerializeField] private float shoreWaveProfileEvolutionDuration = 8f;
 
         [SerializeField]
         private StylizedRiverMotionDebugView motionDebugView =
@@ -2050,6 +2086,18 @@ namespace ProgrammaticStylized3D.Rivers
         private static readonly int BodyDepthContrastId = Shader.PropertyToID("_BodyDepthContrast");
         private static readonly int WaterTintStrengthId = Shader.PropertyToID("_WaterTintStrength");
         private static readonly int SurfacePresenceId = Shader.PropertyToID("_SurfacePresence");
+        private static readonly int ShorelineAccentColorId =
+            Shader.PropertyToID("_ShorelineAccentColor");
+        private static readonly int ShorelineAccentStrengthId =
+            Shader.PropertyToID("_ShorelineAccentStrength");
+        private static readonly int ShorelineAccentWidthId =
+            Shader.PropertyToID("_ShorelineAccentWidth");
+        private static readonly int ShorelineEdgeBlendWidthId =
+            Shader.PropertyToID("_ShorelineEdgeBlendWidth");
+        private static readonly int ShorelineAccentBrightnessId =
+            Shader.PropertyToID("_ShorelineAccentBrightness");
+        private static readonly int ShorelineBankCoverId =
+            Shader.PropertyToID("_ShorelineBankCover");
 
         private static readonly int FreezeAmountId = Shader.PropertyToID("_FreezeAmount");
         private static readonly int IceColorId = Shader.PropertyToID("_IceColor");
@@ -2088,6 +2136,8 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_ShoreWaveHeightScale");
         private static readonly int ShoreWaveLengthScaleId =
             Shader.PropertyToID("_ShoreWaveLengthScale");
+        private static readonly int ShoreWaveSpacingScaleId =
+            Shader.PropertyToID("_ShoreWaveSpacingScale");
         private static readonly int ShoreWaveReachId =
             Shader.PropertyToID("_ShoreWaveReach");
         private static readonly int ShoreWaveTransitionLengthId =
@@ -2098,6 +2148,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_ShoreWaveSideAsymmetry");
         private static readonly int ShoreWaveProfileVariationId =
             Shader.PropertyToID("_ShoreWaveProfileVariation");
+        private static readonly int ShoreWaveProfileEvolutionStrengthId =
+            Shader.PropertyToID("_ShoreWaveProfileEvolutionStrength");
+        private static readonly int ShoreWaveProfileEvolutionDurationId =
+            Shader.PropertyToID("_ShoreWaveProfileEvolutionDuration");
         private static readonly int MotionDebugViewId = Shader.PropertyToID("_MotionDebugView");
         private static readonly int MotionTimeId = Shader.PropertyToID("_MotionTime");
         private static readonly int MotionSeedId = Shader.PropertyToID("_MotionSeed");
@@ -2243,6 +2297,11 @@ namespace ProgrammaticStylized3D.Rivers
         public float BodyDepthContrast => bodyDepthContrast;
         public float WaterTintStrength => waterTintStrength;
         public float SurfacePresence => surfacePresence;
+        public Color ShorelineAccentColor => shorelineAccentColor;
+        public float ShorelineAccentStrength => shorelineAccentStrength;
+        public float ShorelineAccentWidth => shorelineAccentWidth;
+        public float ShorelineEdgeBlendWidth => shorelineEdgeBlendWidth;
+        public float ShorelineAccentBrightness => shorelineAccentBrightness;
         public StylizedRiverSurfaceState SurfaceState => surfaceState;
         public StylizedRiverIceBodyPreset IceBodyPreset => iceBodyPreset;
         public float FreezeAmount => ResolveFreezeAmount();
@@ -2258,12 +2317,17 @@ namespace ProgrammaticStylized3D.Rivers
         public float ShoreMotion => shoreMotion;
         public float ShoreMotionWidth => shoreMotionWidth;
         public float ShoreWaveHeightScale => shoreWaveHeightScale;
-        public float ShoreWaveLengthScale => shoreWaveLengthScale;
+        public float ShoreWaveLengthScale => shoreWaveShapeLengthScale;
+        public float ShoreWaveSpacingScale => shoreWaveSpacingScale;
         public float ShoreWaveReach => shoreWaveReach;
         public float ShoreWaveTransitionLength => shoreWaveTransitionLength;
         public float ShoreWaveSizeVariation => shoreWaveSizeVariation;
         public float ShoreWaveSideAsymmetry => shoreWaveSideAsymmetry;
         public float ShoreWaveProfileVariation => shoreWaveProfileVariation;
+        public float ShoreWaveProfileEvolutionStrength =>
+            shoreWaveProfileEvolutionStrength;
+        public float ShoreWaveProfileEvolutionDuration =>
+            shoreWaveProfileEvolutionDuration;
         public bool RuntimeDisturbancesEnabled => runtimeDisturbances;
         public StylizedRiverDisturbancePreset DisturbancePreset =>
             disturbancePreset;
@@ -4152,12 +4216,15 @@ namespace ProgrammaticStylized3D.Rivers
         private void ResetShoreWaveProfileControls()
         {
             shoreWaveHeightScale = 1f;
-            shoreWaveLengthScale = 1f;
+            shoreWaveShapeLengthScale = 1f;
+            shoreWaveSpacingScale = 1f;
             shoreWaveReach = 1f;
             shoreWaveTransitionLength = 1f;
             shoreWaveSizeVariation = 0f;
             shoreWaveSideAsymmetry = 0f;
             shoreWaveProfileVariation = 0f;
+            shoreWaveProfileEvolutionStrength = 0f;
+            shoreWaveProfileEvolutionDuration = 8f;
         }
 
         public void ApplyDisturbancePreset()
@@ -4998,6 +5065,20 @@ namespace ProgrammaticStylized3D.Rivers
             bodyDepthContrast = Mathf.Clamp01(bodyDepthContrast);
             waterTintStrength = Mathf.Clamp01(waterTintStrength);
             surfacePresence = Mathf.Clamp01(surfacePresence);
+            shorelineAccentStrength = Mathf.Clamp01(
+                shorelineAccentStrength);
+            shorelineAccentWidth = Mathf.Clamp(
+                shorelineAccentWidth,
+                0.005f,
+                0.5f);
+            shorelineEdgeBlendWidth = Mathf.Clamp(
+                shorelineEdgeBlendWidth,
+                0f,
+                0.15f);
+            shorelineAccentBrightness = Mathf.Clamp(
+                shorelineAccentBrightness,
+                -1f,
+                1f);
 
             customFreezeAmount = Mathf.Clamp01(customFreezeAmount);
             iceTransmission = Mathf.Clamp01(iceTransmission);
@@ -5035,9 +5116,13 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreWaveHeightScale,
                 0f,
                 2.5f);
-            shoreWaveLengthScale = Mathf.Clamp(
-                shoreWaveLengthScale,
+            shoreWaveShapeLengthScale = Mathf.Clamp(
+                shoreWaveShapeLengthScale,
                 0.25f,
+                4f);
+            shoreWaveSpacingScale = Mathf.Clamp(
+                shoreWaveSpacingScale,
+                0f,
                 4f);
             shoreWaveReach = Mathf.Clamp01(shoreWaveReach);
             shoreWaveTransitionLength = Mathf.Clamp(
@@ -5050,6 +5135,12 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreWaveSideAsymmetry);
             shoreWaveProfileVariation = Mathf.Clamp01(
                 shoreWaveProfileVariation);
+            shoreWaveProfileEvolutionStrength = Mathf.Clamp01(
+                shoreWaveProfileEvolutionStrength);
+            shoreWaveProfileEvolutionDuration = Mathf.Clamp(
+                shoreWaveProfileEvolutionDuration,
+                1f,
+                30f);
 
             liquidRefractionStrength =
                 Mathf.Clamp(liquidRefractionStrength, 0f, 0.02f);
@@ -6117,6 +6208,24 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(BodyDepthContrastId, bodyDepthContrast);
             bodyProperties.SetFloat(WaterTintStrengthId, waterTintStrength);
             bodyProperties.SetFloat(SurfacePresenceId, surfacePresence);
+            bodyProperties.SetColor(
+                ShorelineAccentColorId,
+                shorelineAccentColor);
+            bodyProperties.SetFloat(
+                ShorelineAccentStrengthId,
+                shorelineAccentStrength);
+            bodyProperties.SetFloat(
+                ShorelineAccentWidthId,
+                shorelineAccentWidth);
+            bodyProperties.SetFloat(
+                ShorelineEdgeBlendWidthId,
+                shorelineEdgeBlendWidth);
+            bodyProperties.SetFloat(
+                ShorelineAccentBrightnessId,
+                shorelineAccentBrightness);
+            bodyProperties.SetFloat(
+                ShorelineBankCoverId,
+                shorelineBankCover);
 
             bodyProperties.SetFloat(FreezeAmountId, ResolveFreezeAmount());
             bodyProperties.SetColor(IceColorId, iceColor);
@@ -6168,7 +6277,10 @@ namespace ProgrammaticStylized3D.Rivers
                 shoreWaveHeightScale);
             bodyProperties.SetFloat(
                 ShoreWaveLengthScaleId,
-                shoreWaveLengthScale);
+                shoreWaveShapeLengthScale);
+            bodyProperties.SetFloat(
+                ShoreWaveSpacingScaleId,
+                shoreWaveSpacingScale);
             bodyProperties.SetFloat(ShoreWaveReachId, shoreWaveReach);
             bodyProperties.SetFloat(
                 ShoreWaveTransitionLengthId,
@@ -6182,6 +6294,12 @@ namespace ProgrammaticStylized3D.Rivers
             bodyProperties.SetFloat(
                 ShoreWaveProfileVariationId,
                 shoreWaveProfileVariation);
+            bodyProperties.SetFloat(
+                ShoreWaveProfileEvolutionStrengthId,
+                shoreWaveProfileEvolutionStrength);
+            bodyProperties.SetFloat(
+                ShoreWaveProfileEvolutionDurationId,
+                shoreWaveProfileEvolutionDuration);
             bodyProperties.SetFloat(MotionDebugViewId, (float)motionDebugView);
             bodyProperties.SetFloat(MotionTimeId, riverTime);
             bodyProperties.SetFloat(MotionSeedId, visualSeed);

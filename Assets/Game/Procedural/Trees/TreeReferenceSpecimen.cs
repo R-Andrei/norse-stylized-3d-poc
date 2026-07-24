@@ -38,6 +38,12 @@ namespace ProgrammaticStylized3D.Trees
         private float canopyWidth;
 
         [SerializeField]
+        private float appliedGroundCorrection;
+
+        [SerializeField]
+        private Vector3 comparisonRootLocalPosition;
+
+        [SerializeField]
         [Min(0)]
         private int rendererCount;
 
@@ -57,6 +63,10 @@ namespace ProgrammaticStylized3D.Trees
         [TextArea(2, 6)]
         private string materialLayout = string.Empty;
 
+        [SerializeField]
+        [TextArea(2, 6)]
+        private string assignedRendering = string.Empty;
+
         public TreeFamily Family => family;
         public int SourceVariantIndex => sourceVariantIndex;
         public TreeReferenceRole Role => role;
@@ -67,11 +77,21 @@ namespace ProgrammaticStylized3D.Trees
         public float LowestVisibleLocalY => lowestVisibleLocalY;
         public float VisibleHeight => visibleHeight;
         public float CanopyWidth => canopyWidth;
+        public float AppliedGroundCorrection => appliedGroundCorrection;
+        public Vector3 ComparisonRootLocalPosition =>
+            comparisonRootLocalPosition;
+
+        public Vector3 ResolveComparisonRootWorldPosition()
+        {
+            return transform.TransformPoint(comparisonRootLocalPosition);
+        }
+
         public int RendererCount => rendererCount;
         public int SubmeshCount => submeshCount;
         public int VertexCount => vertexCount;
         public int TriangleCount => triangleCount;
         public string MaterialLayout => materialLayout;
+        public string AssignedRendering => assignedRendering;
 
         public void Configure(
             TreeFamily treeFamily,
@@ -81,11 +101,14 @@ namespace ProgrammaticStylized3D.Trees
             string assetGuid,
             Bounds bounds,
             float lowestLocalY,
+            float groundCorrection,
+            Vector3 rootLocalPosition,
             int auditedRendererCount,
             int auditedSubmeshCount,
             int auditedVertexCount,
             int auditedTriangleCount,
-            string auditedMaterialLayout)
+            string auditedMaterialLayout,
+            string renderingSummary)
         {
             family = treeFamily;
             sourceVariantIndex = Mathf.Clamp(variantIndex, 1, 5);
@@ -97,11 +120,14 @@ namespace ProgrammaticStylized3D.Trees
             lowestVisibleLocalY = lowestLocalY;
             visibleHeight = Mathf.Max(0f, bounds.size.y);
             canopyWidth = Mathf.Max(bounds.size.x, bounds.size.z);
+            appliedGroundCorrection = groundCorrection;
+            comparisonRootLocalPosition = rootLocalPosition;
             rendererCount = Mathf.Max(0, auditedRendererCount);
             submeshCount = Mathf.Max(0, auditedSubmeshCount);
             vertexCount = Mathf.Max(0, auditedVertexCount);
             triangleCount = Mathf.Max(0, auditedTriangleCount);
             materialLayout = auditedMaterialLayout ?? string.Empty;
+            assignedRendering = renderingSummary ?? string.Empty;
         }
     }
 }

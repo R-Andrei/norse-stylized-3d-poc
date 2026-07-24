@@ -2251,6 +2251,47 @@ private readonly struct EdgeWearTopologyStats
                 new List<CornerDamageTrialRecord>();
         }
 
+        private sealed class CornerDamagePreflightReplayRecord
+        {
+            public int OriginalSourceEdgeIndex = -1;
+            public Vector3 Start;
+            public Vector3 End;
+            public Vector3 OwnerNormalA;
+            public Vector3 OwnerNormalB;
+            public float Length;
+            public float DihedralDegrees;
+            public float RequestedWidth;
+            public float LocalityRetainPlaneFloor;
+            public float LocalityRemovalPlaneCeiling;
+            public float LocalityFeasibleMargin;
+            public float LocalityGuardMargin;
+            public float LocalityMinimumRemoval;
+            public Vector3 LocalityLimitingPosition;
+            public float LocalityLimitingProjection;
+            public EdgeWearEdgeViabilityRecord Viability;
+            public bool ArtisticEligible;
+            public bool GeometricEligible;
+            public bool CoexistenceEligible;
+            public EdgeWearViabilityState ViabilityState;
+            public string CoexistenceFailureReason = string.Empty;
+            public string FinalReason = string.Empty;
+        }
+
+        private sealed class CornerDamagePreflightReplayCache
+        {
+            public EdgeWearMicroTopologyNormalizationResult
+                NormalizedFoundation;
+            public readonly Dictionary<int, CornerDamagePreflightReplayRecord>
+                IsolatedByOriginalIdentity =
+                    new Dictionary<int, CornerDamagePreflightReplayRecord>();
+            public int NormalizedFoundationBuildCount;
+            public int NormalizedFoundationReuseCount;
+            public int IsolatedReplayAttemptCount;
+            public int IsolatedReplayHitCount;
+            public int IsolatedReplayMissCount;
+            public int IsolatedFullEvaluationCount;
+        }
+
         private sealed class CornerDamageIntegrationPreflightRecord
         {
             public CornerDamageTransactionAuditResult Transaction;
@@ -2294,11 +2335,168 @@ private readonly struct EdgeWearTopologyStats
             public string Diagnostic = string.Empty;
         }
 
+        private enum PlaneCutEndpointPatchRejectionKind
+        {
+            None,
+            UnsupportedStar,
+            PatchExtraction,
+            DisconnectedPatch,
+            BoundaryLoop,
+            BoundaryCrossing,
+            NoLocalRemoval,
+            CapCreation,
+            IncidentBandJoin,
+            StitchTopology,
+            Locality,
+            BandIntegrity,
+            PreparedMinimumParity,
+            MaterializationSignature
+        }
+
+        private sealed class PlaneCutEndpointPatchLocalityEvidence
+        {
+            public float MaximumRemovedVertexRadius;
+            public float MaximumIntersectionRadius;
+            public float MaximumReplacementVertexRadius;
+            public int RetainedOutsideRadiusCount;
+            public int SelectedFaceCountBeforeLocalFilter;
+            public int SelectedFaceCountAfterLocalFilter;
+            public string FailureSource = string.Empty;
+        }
+
+        private sealed class PlaneCutEndpointPatchSupportEvidence
+        {
+            public int TotalSampleCount;
+            public int MinimumSamplesPerIncident;
+            public string SamplesPerIncident = string.Empty;
+            public float LocalSupportRadius;
+            public float LocalSupportProjection;
+            public float GlobalSupportProjection;
+            public float GlobalMinusLocalSupportDelta;
+            public int ControllingSourceEdgeIndex = -1;
+            public float ControllingSupportRadius;
+            public string FailureSource = string.Empty;
+        }
+
+        private sealed class PlaneCutEndpointPatchAxialEvidence
+        {
+            public float MaximumInfluence;
+            public float MinimumAllowedInfluence = float.PositiveInfinity;
+            public int RejectedSourceEdgeIndex = -1;
+            public int RejectedEndpointVertexIndex = -1;
+            public string InfluenceSignature = string.Empty;
+        }
+
+        private readonly struct PlaneCutEndpointCellLimit
+        {
+            public readonly int SourceEdgeIndex;
+            public readonly int OtherVertexIndex;
+            public readonly CutPlane Plane;
+            public readonly float AxialLimit;
+            public readonly float SourceLength;
+
+            public PlaneCutEndpointCellLimit(
+                int sourceEdgeIndex,
+                int otherVertexIndex,
+                CutPlane plane,
+                float axialLimit,
+                float sourceLength)
+            {
+                SourceEdgeIndex = sourceEdgeIndex;
+                OtherVertexIndex = otherVertexIndex;
+                Plane = plane;
+                AxialLimit = axialLimit;
+                SourceLength = sourceLength;
+            }
+        }
+
+        private sealed class PlaneCutEndpointCellEvidence
+        {
+            public string CellLimitSignature = string.Empty;
+            public int FacesSubdivided;
+            public int LocalFragmentCount;
+            public int RemoteRemainderCount;
+            public int SyntheticIncidentFragmentCount;
+            public string SyntheticIncidentIdentities = string.Empty;
+            public int CellVertexCount;
+            public int CellFaceCount;
+            public string CellSplitSignature = string.Empty;
+            public string LocalFragmentSignature = string.Empty;
+            public string RemoteRemainderSignature = string.Empty;
+            public string FailureSource = string.Empty;
+        }
+
+        private sealed class PlaneCutEndpointCellFacePartition
+        {
+            public bool Changed;
+            public readonly List<PolygonFace> RemoteRemainders =
+                new List<PolygonFace>();
+            public readonly List<PolygonFace> LocalFragments =
+                new List<PolygonFace>();
+            public readonly List<Vector3> JunctionCapPoints =
+                new List<Vector3>();
+            public readonly List<Vector3> CellSplitPoints =
+                new List<Vector3>();
+            public readonly List<Vector3> LocalInfluencePoints =
+                new List<Vector3>();
+            public float MaximumRemovedVertexRadius;
+        }
+
+        private sealed class PlaneCutEndpointPatchReplacement
+        {
+            public int VertexIndex = -1;
+            public CutPlane Plane;
+            public float Strength;
+            public float PlaneTolerance;
+            public float ClipEpsilon;
+            public float LocalRadius;
+            public float CutDepth;
+            public int NormalRank = -1;
+            public Vector3 SourceVertexPosition;
+            public int[] IncidentSourceEdgeIndices = Array.Empty<int>();
+            public string[] SelectedFaceSignatures = Array.Empty<string>();
+            public string SelectedProvenanceSignature = string.Empty;
+            public string BoundaryTopologySignature = string.Empty;
+            public string BoundaryPositionSignature = string.Empty;
+            public Vector3[] BoundaryLoop = Array.Empty<Vector3>();
+            public List<PolygonFace> ReplacementFaces;
+            public int SelectedFaceCount;
+            public int BoundaryVertexCount;
+            public int CapVertexCount;
+            public float Compactness;
+            public float AspectRatio;
+            public float MaximumRemovedVertexRadius;
+            public float MaximumIntersectionRadius;
+            public float MaximumReplacementVertexRadius;
+            public int RetainedOutsideRadiusCount;
+            public int SelectedFaceCountBeforeLocalFilter;
+            public int SelectedFaceCountAfterLocalFilter;
+            public float MaximumAxialInfluence;
+            public float MinimumAllowedAxialInfluence;
+            public string AxialInfluenceSignature = string.Empty;
+            public PlaneCutEndpointCellLimit[] CellLimits =
+                Array.Empty<PlaneCutEndpointCellLimit>();
+            public string CellLimitSignature = string.Empty;
+            public string LocalFragmentSignature = string.Empty;
+            public string RemoteRemainderSignature = string.Empty;
+            public string CellSplitSignature = string.Empty;
+            public int FacesSubdivided;
+            public int LocalFragmentCount;
+            public int RemoteRemainderCount;
+            public int SyntheticIncidentFragmentCount;
+            public int[] SyntheticIncidentSourceEdgeIndices =
+                Array.Empty<int>();
+            public int CellVertexCount;
+            public int CellFaceCount;
+        }
+
         private sealed class PlaneCutBevelSolvedPlan
         {
             public List<PolygonFace> SourceFaces;
             public List<PolygonFace> PreparedFaces;
             public List<PlaneCutBevelCandidate> RetainedCandidates;
+            public List<PlaneCutVertexJunctionCandidate> PreparedJunctions;
+            public PlaneCutEndpointPatchReplacement PreparedEndpointPatch;
             public List<int> ActiveEdgeIndices;
             public ChamferTopologyContext Context;
             public EdgeWearCoverageAudit CoverageAudit;
@@ -2344,6 +2542,90 @@ private readonly struct EdgeWearTopologyStats
             public int UnrelatedRetainedCount;
             public int CollateralLostCount;
             public int[] CollateralLostIdentities = Array.Empty<int>();
+            public bool EndpointConflictGuardAttempted;
+            public bool EndpointConflictGuardPassed;
+            public int EndpointConflictGuardTestedRailCount;
+            public int EndpointConflictGuardConflictCount;
+            public int EndpointConflictGuardVictimEdgeIndex = -1;
+            public int EndpointConflictGuardForeignEdgeIndex = -1;
+            public float EndpointConflictGuardAxialParameter;
+            public float EndpointConflictGuardEndpointAllowance;
+            public float EndpointConflictGuardVictimMinimumScale;
+            public float EndpointConflictGuardForeignMinimumScale;
+            public float EndpointConflictGuardVictimRetreatCapacity;
+            public float EndpointConflictGuardForeignRetreatCapacity;
+            public int[] EndpointConflictGuardClusterEdges = Array.Empty<int>();
+            public double EndpointConflictGuardMilliseconds;
+            public bool EndpointConflictGuardFalseNegative;
+            public string EndpointConflictGuardDiagnostic = string.Empty;
+            public bool EndpointPatchRecoveryAttempted;
+            public bool EndpointPatchRecoveryPrepared;
+            public bool EndpointPatchRecoveryApplied;
+            public bool EndpointPatchRecoveryFalsePositive;
+            public int EndpointPatchRecoveryAttemptCount;
+            public int EndpointPatchRecoveryTrialCount;
+            public int EndpointPatchRecoveryVertexIndex = -1;
+            public int EndpointPatchRecoveryVictimEdgeIndex = -1;
+            public int EndpointPatchRecoveryForeignEdgeIndex = -1;
+            public int EndpointPatchRecoveryIncidentBandCount;
+            public int EndpointPatchRecoveryNormalRank = -1;
+            public int EndpointPatchRecoveryCapVertexCount;
+            public float EndpointPatchRecoveryCutDepth;
+            public float EndpointPatchRecoveryCompactness;
+            public float EndpointPatchRecoveryAspectRatio;
+            public double EndpointPatchRecoveryMilliseconds;
+            public PlaneCutEndpointPatchRejectionKind EndpointPatchRecoveryRejection;
+            public int EndpointPatchRecoveryUnsupportedStarCount;
+            public int EndpointPatchRecoveryPatchExtractionCount;
+            public int EndpointPatchRecoveryDisconnectedPatchCount;
+            public int EndpointPatchRecoveryBoundaryLoopCount;
+            public int EndpointPatchRecoveryBoundaryCrossingCount;
+            public int EndpointPatchRecoveryNoLocalRemovalCount;
+            public int EndpointPatchRecoveryCapCreationCount;
+            public int EndpointPatchRecoveryIncidentBandJoinCount;
+            public int EndpointPatchRecoveryStitchTopologyCount;
+            public int EndpointPatchRecoveryLocalityCount;
+            public int EndpointPatchRecoveryBandIntegrityCount;
+            public int EndpointPatchRecoveryPreparedMinimumParityCount;
+            public int EndpointPatchRecoveryMaterializationSignatureCount;
+            public int EndpointPatchRecoverySelectedFaceCount;
+            public int EndpointPatchRecoveryBoundaryVertexCount;
+            public string EndpointPatchRecoveryBoundarySignature = string.Empty;
+            public float EndpointPatchRecoveryMaximumRemovedVertexRadius;
+            public float EndpointPatchRecoveryMaximumIntersectionRadius;
+            public float EndpointPatchRecoveryMaximumReplacementVertexRadius;
+            public int EndpointPatchRecoveryRetainedOutsideRadiusCount;
+            public int EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+            public int EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+            public string EndpointPatchRecoveryLocalityFailureSource = string.Empty;
+            public int EndpointPatchRecoveryLocalSupportSampleCount;
+            public int EndpointPatchRecoveryMinimumSamplesPerIncident;
+            public string EndpointPatchRecoverySamplesPerIncident = string.Empty;
+            public float EndpointPatchRecoveryLocalSupportRadius;
+            public float EndpointPatchRecoveryLocalSupportProjection;
+            public float EndpointPatchRecoveryGlobalSupportProjection;
+            public float EndpointPatchRecoveryGlobalMinusLocalSupportDelta;
+            public int EndpointPatchRecoveryControllingSupportEdgeIndex = -1;
+            public float EndpointPatchRecoveryControllingSupportRadius;
+            public string EndpointPatchRecoverySupportFailureSource = string.Empty;
+            public float EndpointPatchRecoveryMaximumAxialInfluence;
+            public float EndpointPatchRecoveryMinimumAllowedAxialInfluence;
+            public int EndpointPatchRecoveryAxialRejectedEdgeIndex = -1;
+            public int EndpointPatchRecoveryAxialRejectedEndpointVertexIndex = -1;
+            public string EndpointPatchRecoveryAxialInfluenceSignature = string.Empty;
+            public string EndpointPatchRecoveryCellLimitSignature = string.Empty;
+            public int EndpointPatchRecoveryFacesSubdivided;
+            public int EndpointPatchRecoveryLocalFragmentCount;
+            public int EndpointPatchRecoveryRemoteRemainderCount;
+            public int EndpointPatchRecoverySyntheticIncidentFragmentCount;
+            public string EndpointPatchRecoverySyntheticIncidentIdentities = string.Empty;
+            public int EndpointPatchRecoveryCellVertexCount;
+            public int EndpointPatchRecoveryCellFaceCount;
+            public string EndpointPatchRecoveryCellSplitSignature = string.Empty;
+            public string EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
+            public string EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
+            public string EndpointPatchRecoveryCellFailureSource = string.Empty;
+            public string EndpointPatchRecoveryDiagnostic = string.Empty;
             public bool Valid;
             public string Diagnostic = string.Empty;
         }
@@ -2365,6 +2647,55 @@ private readonly struct EdgeWearTopologyStats
             public int PlanMaterializationBuildCount;
             public int PlanMaterializationMismatchCount;
             public int DeadlineAbortCount;
+            public int EndpointConflictGuardAttemptCount;
+            public int EndpointConflictGuardPassCount;
+            public int EndpointConflictGuardRejectCount;
+            public int EndpointConflictGuardFalseNegativeCount;
+            public int EndpointConflictGuardTestedRailCount;
+            public double EndpointConflictGuardMilliseconds;
+            public int EndpointPatchRecoveryAttemptCount;
+            public int EndpointPatchRecoveryPreparedCount;
+            public int EndpointPatchRecoveryRejectCount;
+            public int EndpointPatchRecoveryAppliedCount;
+            public int EndpointPatchRecoveryFalsePositiveCount;
+            public int EndpointPatchRecoveryUnsupportedStarCount;
+            public int EndpointPatchRecoveryPatchExtractionCount;
+            public int EndpointPatchRecoveryDisconnectedPatchCount;
+            public int EndpointPatchRecoveryBoundaryLoopCount;
+            public int EndpointPatchRecoveryBoundaryCrossingCount;
+            public int EndpointPatchRecoveryNoLocalRemovalCount;
+            public int EndpointPatchRecoveryCapCreationCount;
+            public int EndpointPatchRecoveryIncidentBandJoinCount;
+            public int EndpointPatchRecoveryStitchTopologyCount;
+            public int EndpointPatchRecoveryLocalityCount;
+            public int EndpointPatchRecoveryBandIntegrityCount;
+            public int EndpointPatchRecoveryPreparedMinimumParityCount;
+            public int EndpointPatchRecoveryMaterializationSignatureCount;
+            public float EndpointPatchRecoveryMaximumRemovedVertexRadius;
+            public float EndpointPatchRecoveryMaximumIntersectionRadius;
+            public float EndpointPatchRecoveryMaximumReplacementVertexRadius;
+            public int EndpointPatchRecoveryRetainedOutsideRadiusCount;
+            public int EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+            public int EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+            public int EndpointPatchRecoveryLocalSupportSampleCount;
+            public int EndpointPatchRecoveryMinimumSamplesPerIncident;
+            public float EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta;
+            public float EndpointPatchRecoveryMaximumControllingSupportRadius;
+            public float EndpointPatchRecoveryMaximumAxialInfluence;
+            public float EndpointPatchRecoveryMinimumAllowedAxialInfluence = float.PositiveInfinity;
+            public int EndpointPatchRecoveryFacesSubdivided;
+            public int EndpointPatchRecoveryLocalFragmentCount;
+            public int EndpointPatchRecoveryRemoteRemainderCount;
+            public int EndpointPatchRecoverySyntheticIncidentFragmentCount;
+            public int EndpointPatchRecoveryMaximumCellVertexCount;
+            public int EndpointPatchRecoveryMaximumCellFaceCount;
+            public double EndpointPatchRecoveryMilliseconds;
+            public int PreflightFoundationBuildCount;
+            public int PreflightFoundationReuseCount;
+            public int IsolatedReplayAttemptCount;
+            public int IsolatedReplayHitCount;
+            public int IsolatedReplayMissCount;
+            public int IsolatedFullEvaluationCount;
             public double CandidateRankingMilliseconds;
             public double TransactionMilliseconds;
             public double IntegrationPreflightMilliseconds;

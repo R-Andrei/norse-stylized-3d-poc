@@ -1,4 +1,4 @@
-# Current accepted Chipping baseline — `4.11C.5.17D.1C`
+# River Foam Stage 6 Architecture — Current Accepted Baseline
 
 ## Fixed-metric River Foam coordinate status — P12
 
@@ -24,7 +24,7 @@ Actions → Foam Cache & Validation
 
 The first P12 Medium fixed candidate passed runtime/cache/transport evidence. P12a restored ordinary previous/current interpolation. P12b corrected the broad dead-edge Layer C back-and-forth flicker, added one parity-safe previous-committed packed-state texture, and added effective lateral face/flux evidence. Unity then exposed that P12b had incorrectly applied deposit-once ownership to Object Contact Arc/Semi-Arc and therefore silenced their authored Hold and Release phases.
 
-P12c restores the accepted hybrid automatic-source contract. Nonpersistent Shore, Wash, Fleck, and Free-Water sources retain P12b current-minus-previous advancing-frontier deposition. Object Contact Arc/Semi-Arc again resolve Build/Hold/Release phases and rasterize their current phase-shaped emitter every active material tick: Build grows the open-C path, Hold continuously emits from the complete path, Release progressively retracts it, and Rest submits no event. P12b committed-state ownership, even-substep correctness, source-event ABI, lateral metrics, and clipboard actions remain unchanged. The extracted warning-producing source-contribution helper is removed; source evaluator selection is inline as in the warning-free pre-P12b shader structure. P12c is Unity-accepted. P12d then passed the complete 12-case runtime sweep, and visual review selected `0.15 m` after rejecting `0.20 m`. P13 still owns overall Foam amount, final tier/cache freeze, and Stage 1 closure. No new Debug View is introduced.
+P12c restored the then-required hybrid source contract; later P13C–P13F superseded its persistent Object-emitter lifecycle. The accepted current result is finite automatic packets, a complete initial obstacle-contact ring, first-stroke-only Arc/Semi-Arc wakes, recipe-complete finite contact reinforcement, optional finite independent contact maintenance, and no Hold/Release/Rest material-cadence Object emitter. P12d passed the complete 12-case runtime sweep and selected `0.15 m` after rejecting `0.20 m`. P13F/P13G source ownership is accepted and frozen. No new Debug View is introduced.
 
 
 ### Complete fixed-spacing/lateral-response sweep — P12d
@@ -90,7 +90,7 @@ P12j clean-silhouette ownership is rejected because the signal is produced befor
 Current is a protected compatibility path and must remain arithmetic-identical. Presence-Amplitude remains `baseMask = min(baseMask, presence)` with no compression or threshold retuning. Both modes retain the existing candidate field, identity, lifecycle, source system, transport, Film, Shape, resources, kernels, and controls; Current retains Interior Access while Presence-Amplitude disables it. Mechanical validation must confirm Current equivalence, exact pre-Chip rendered-mask ownership, the per-fragment invariant `production <= eligibility`, exact visible-removal reporting, retirement of clean-silhouette plumbing, protected resources/properties, and warning-free changed-function parsing; Unity visual validation remains pending.
 
 
-### Current automatic-source ownership — P12c
+### Historical automatic-source ownership at P12c
 
 ```text
 Nonpersistent sources
@@ -3556,6 +3556,8 @@ Final Foam consumes an ordinary fixed-step temporal blend of the previous/curren
 
 `4.11C.5.16E.2` remains the accepted no-backtrace architecture. P12a adds only ordinary interpolation between the two already committed Layer C states so the 8/12/16 Hz material cadence is not exposed as hard edge changes; it does not reconstruct velocity or move the sample coordinate. Final Foam keeps both reversible visibility policies, the supported-aging minimum is `0.05`, and lifecycle aging is quantized once per complete material tick rather than once per CFL substep. `_FoamShapeMask` remains diagnostic-only.
 
+The current unresolved issue is a visibility discrepancy, not an ownership rewrite: Final Foam appears to hide more support than same-frame Layer C `Material Presence` and `Material Remaining Life` suggest. The next work must compare the complete existing Layer C → Layer D → Layer E chain and identify the first diverging mask. Until then, source amount, lifecycle, transport, and cache ownership remain protected from speculative retuning.
+
 The accepted R1–R5 Inspector redesign is the current Layer F tooling contract. `4.11C.5.16E.3 — Transport Presence Capacity-Loss Attribution Audit` is Unity-validated and accepted. It uses `Runtime Diagnostics > Foam > Layer C — Material & Lifecycle > Transport Accounting` and changes no transport, lifecycle, source, Layer D, or rendering behavior.
 
 ## `4.11C.5.16E.3` transport Presence attribution contract
@@ -4557,9 +4559,26 @@ P13G does not reopen:
 - P12u Reveal Speed;
 - P12t Candidate, Eligibility, soft-mask Chipping reconstruction, or Strands.
 
-### External Weather shader integration
+### External Weather shader integration — complete
 
-A separate thread will make small Weather cloud-shading updates in shared River shader files. Cloud shading is outside River Foam source ownership, but shared shader edits can accidentally change include order, uniforms, lighting composition, opacity, or Foam calls. The resumed River thread must compare the exact post-Weather source against this frozen baseline and run a focused regression before treating the architecture as unchanged.
+Weather cloud shading is integrated through the native URP directional-light cookie path and the focused Arc/Semi-Arc/Foam regression is accepted. The integration did not change Foam source scheduling, Layer C state, topology, cache data, opacity ownership, Chipping, Strands, or simulation cadence.
+
+The later accepted S3.1E.3 shore-wave result also preserves this architecture. Its Length, Gap, profile evolution, analytical shoreline, accent, and edge-blend values are live shared motion/render inputs and do not participate in the immutable Foam grid descriptor.
 
 P13G is documentation-only and has no runtime performance effect. No `PERFORMANCE EXCEPTION` applies.
+
+## Current unresolved rendering investigation
+
+Final Foam appears to hide more material than the underlying same-frame Presence and Remaining Life evidence suggests. Diagnose this with existing views in ownership order:
+
+```text
+Material Presence
+Material Remaining Life
+Material Pattern
+Foam Evaluated Shape / evaluated preview
+Foam Chip And Strand Probe
+Final Foam
+```
+
+The first divergent stage owns the next patch. Likely review points are Final Visibility, Presence Footprint, lifecycle gating, patterned erosion/hardening, Layer D shape use, Chipping, Strands, opacity/colour composition, and shoreline edge coverage. Do not increase births or lifetime merely to compensate for a later render mask.
 

@@ -279,6 +279,7 @@ namespace ProgrammaticStylized3D.Weather
         public Vector2 ResolvedWindDirection => resolvedWindDirection;
         public Vector2 CurrentCookieOffset => appliedCookieOffset;
         public float CookieWorldSizeMetres => cookieWorldSizeMetres;
+        public float ShadedTransmission => shadedTransmission;
         public int CookieResolution => cookieResolution;
         public long EstimatedCookieTexelBytes =>
             (long)cookieResolution * cookieResolution;
@@ -349,6 +350,14 @@ namespace ProgrammaticStylized3D.Weather
             resolvedDebugFocusSource;
         public Vector3 ResolvedDebugFocusPosition =>
             resolvedDebugFocusPosition;
+        public Transform EffectiveDebugOverlayFocus =>
+            debugFollowResolvedFocus
+                ? resolvedDebugFocus
+                : debugOverlayAnchor != null
+                    ? debugOverlayAnchor
+                    : transform;
+        public Vector3 EffectiveDebugOverlayCentre =>
+            ResolveDebugOverlayCentre();
         public string LastDebugError => lastDebugError;
         public string LastError =>
             !string.IsNullOrEmpty(lastSunError)
@@ -525,6 +534,109 @@ namespace ProgrammaticStylized3D.Weather
         public void RefreshNow()
         {
             TickController(true);
+        }
+
+        public bool TrySampleCloudTransmission(
+            Vector3 worldPosition,
+            Light celestialSource,
+            out WeatherCloudTransmissionSample sample)
+        {
+            if (!cloudShadowsEnabled)
+            {
+                sample = WeatherCloudTransmissionSample.ClearSky();
+                return true;
+            }
+
+            if (!isActiveAndEnabled || !IsPublished)
+            {
+                sample = WeatherCloudTransmissionSample.Unavailable(
+                    "The Weather cloud controller is not the active published controller.");
+                return false;
+            }
+
+            if (generatedCookie == null)
+            {
+                string error = !string.IsNullOrEmpty(lastGenerationError)
+                    ? lastGenerationError
+                    : "The Weather cloud transmission texture is not ready.";
+                sample = WeatherCloudTransmissionSample.Failure(error);
+                return false;
+            }
+
+            if (!TryProjectCloudCookieUv(
+                    worldPosition,
+                    celestialSource,
+                    out Vector2 cookieUv,
+                    out Vector2 cookieOffset,
+                    out string projectionError))
+            {
+                sample = WeatherCloudTransmissionSample.Failure(
+                    projectionError);
+                return false;
+            }
+
+            float transmission;
+            try
+            {
+                transmission = generatedCookie.GetPixelBilinear(
+                    cookieUv.x,
+                    cookieUv.y).r;
+            }
+            catch (Exception exception)
+            {
+                sample = WeatherCloudTransmissionSample.Failure(
+                    exception.ToString());
+                return false;
+            }
+
+            WeatherCloudTransmissionStatus status = EvolutionInProgress
+                ? WeatherCloudTransmissionStatus.EvolutionUnstable
+                : WeatherCloudTransmissionStatus.Stable;
+            sample = new WeatherCloudTransmissionSample(
+                status,
+                transmission,
+                cookieUv,
+                cookieOffset,
+                true,
+                string.Empty);
+            return true;
+        }
+
+        public bool TryProjectCloudCookieUv(
+            Vector3 worldPosition,
+            Light celestialSource,
+            out Vector2 cookieUv,
+            out Vector2 cookieOffset,
+            out string error)
+        {
+            cookieUv = Vector2.zero;
+            cookieOffset = Vector2.zero;
+            error = string.Empty;
+
+            if (celestialSource == null)
+            {
+                error = "A celestial directional light is required for cloud projection.";
+                return false;
+            }
+
+            if (celestialSource.type != LightType.Directional)
+            {
+                error = "Cloud transmission projection requires a directional light.";
+                return false;
+            }
+
+            float worldPeriod = Mathf.Max(0.001f, cookieWorldSizeMetres);
+            Vector3 sourceLocalPosition =
+                celestialSource.transform.InverseTransformPoint(
+                    worldPosition);
+            cookieOffset = ResolveCookieOffsetForSource(
+                celestialSource);
+            cookieUv = new Vector2(
+                (sourceLocalPosition.x - cookieOffset.x) / worldPeriod + 0.5f,
+                (sourceLocalPosition.y - cookieOffset.y) / worldPeriod + 0.5f);
+            cookieUv.x = Mathf.Repeat(cookieUv.x, 1f);
+            cookieUv.y = Mathf.Repeat(cookieUv.y, 1f);
+            return true;
         }
 
         public void SetDebugFocusOverride(
@@ -828,6 +940,35 @@ namespace ProgrammaticStylized3D.Weather
                 .AppendLine(worldPhaseXZ.ToString("F3"));
             builder.Append("Applied URP cookie offset: ")
                 .AppendLine(appliedCookieOffset.ToString("F3"));
+            builder.Append("LightRay CPU cloud-query contract: ")
+                .AppendLine("Available (directional source, retained readable cookie, bilinear repeat sample)");
+            string projectionError = string.Empty;
+            if (sun != null &&
+                TryProjectCloudCookieUv(
+                    resolvedDebugFocusPosition,
+                    sun,
+                    out Vector2 reportUv,
+                    out Vector2 reportOffset,
+                    out projectionError))
+            {
+                builder.Append("LightRay projection sample UV / source offset: ")
+                    .Append(reportUv.ToString("F4"))
+                    .Append(" / ")
+                    .AppendLine(reportOffset.ToString("F3"));
+                if (sunGateActive)
+                {
+                    builder.Append("Projection offset delta versus installed cookie: ")
+                        .AppendLine(
+                            (reportOffset - appliedCookieOffset)
+                                .magnitude
+                                .ToString("0.######"));
+                }
+            }
+            else if (!string.IsNullOrEmpty(projectionError))
+            {
+                builder.Append("LightRay projection query: ")
+                    .AppendLine(projectionError);
+            }
             builder.Append("Debug visualization: ")
                 .AppendLine(debugVisualization.ToString());
             builder.Append("Debug follows resolved focus / matches cookie period: ")
@@ -1579,6 +1720,30 @@ namespace ProgrammaticStylized3D.Weather
                 hash = hash * 31 + shadedTransmission.GetHashCode();
                 return hash;
             }
+        }
+
+        private Vector2 ResolveCookieOffsetForSource(
+            Light celestialSource)
+        {
+            Vector2 baseOffset =
+                celestialSource == capturedSun && originalSunStateCaptured
+                    ? originalCookieOffset
+                    : Vector2.zero;
+            Vector3 displacementWorld = new Vector3(
+                worldPhaseXZ.x,
+                0f,
+                worldPhaseXZ.y);
+            Vector3 displacementSourceLocal =
+                celestialSource.transform.InverseTransformVector(
+                    displacementWorld);
+            Vector2 phaseOffset = new Vector2(
+                WrapSigned(
+                    displacementSourceLocal.x,
+                    cookieWorldSizeMetres),
+                WrapSigned(
+                    displacementSourceLocal.y,
+                    cookieWorldSizeMetres));
+            return baseOffset + phaseOffset;
         }
 
         private static float WrapSigned(float value, float period)

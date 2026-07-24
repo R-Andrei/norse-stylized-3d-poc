@@ -133,12 +133,42 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     committedPlan.PreviewSoup);
             }
 #endif
+#if UNITY_EDITOR
+            EdgeWearMicroTopologyNormalizationResult
+                microTopologyNormalization;
+            CornerDamagePreflightReplayCache replayCache =
+                runCornerDamageIntegrationPreflight
+                    ? ResolveCornerDamagePreflightReplayCache()
+                    : null;
+            if (replayCache != null &&
+                replayCache.NormalizedFoundation != null)
+            {
+                microTopologyNormalization =
+                    replayCache.NormalizedFoundation;
+                replayCache.NormalizedFoundationReuseCount++;
+            }
+            else
+            {
+                microTopologyNormalization =
+                    NormalizeEdgeWearMicroTopology(
+                        faces,
+                        maximumDimension,
+                        minimumStyleWidth);
+                if (replayCache != null)
+                {
+                    replayCache.NormalizedFoundation =
+                        microTopologyNormalization;
+                    replayCache.NormalizedFoundationBuildCount++;
+                }
+            }
+#else
             EdgeWearMicroTopologyNormalizationResult
                 microTopologyNormalization =
                     NormalizeEdgeWearMicroTopology(
                         faces,
                         maximumDimension,
                         minimumStyleWidth);
+#endif
             List<PolygonFace> edgeWearFaces =
                 microTopologyNormalization.Faces ?? faces;
             Bounds edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
