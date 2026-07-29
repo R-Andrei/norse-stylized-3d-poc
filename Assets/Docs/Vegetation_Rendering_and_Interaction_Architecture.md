@@ -7857,3 +7857,208 @@ This update executes only at documentation authoring/import time. It adds no act
 
 **Unity validation:** no Unity validation is required for this documentation-only closure because no Unity-imported implementation or serialized asset changed. The user-provided runtime acceptance is preserved as evidence and is not reclassified as automated or profiler validation.
 
+## VEG-V1C.10 — Weather LightRay punctual-edge direction override
+
+**Status:** source-implemented and statically audited; Unity visual and GPU proof pending.
+
+### Objective
+
+Preserve the accepted `VEG-V1C.9` punctual-light body, attenuation, activation, stability, colour, and edge-radiance contracts. Add one narrow exception: a uniquely tagged Weather LightRay Spot may use the horizontal LightRay/source direction for the blade-edge side selector while retaining the real Spot direction for ordinary body lighting.
+
+### Mathematical contract
+
+For the tagged Spot only:
+
+```text
+sourceDirection = -normalize(LightRay travel direction)
+horizontal = sourceDirection - Up * dot(sourceDirection, Up)
+edgeDirection = normalize(horizontal), when horizontal length² > 1e-6
+```
+
+All ordinary point/spot lights continue to use `Light.direction`. The LightRay Spot's body diffuse also continues to use `Light.direction`.
+
+### Identification and layer correctness
+
+- runtime identity bit: `1 << 30`;
+- LightRay Spot mask: `Default | identity`;
+- no Rendering Layer-name or renderer-mask asset edit;
+- production shader compiles `_LIGHT_LAYERS`;
+- both additional-light loops apply `IsMatchingLightLayer(light.layerMask, GetMeshRenderingLayer())` before evaluating a light;
+- only a matching light carrying the identity bit may select the global LightRay accent direction.
+
+### Approved scope
+
+```text
+Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md
+Assets/Docs/Stylized_Vegetation_Architecture.md
+Assets/Game/Rendering/Vegetation/Includes/VegetationLighting.hlsl
+Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader
+```
+
+The Weather controller changes that publish and tag the light are governed by `WEATHER-LIGHT-RAY-V1.1D-AF5`. Vegetation materials, renderers, placement, geometry, wind, interaction, trample, coverage, instance buffers, and authoring controls remain frozen.
+
+### Implementation sequence
+
+1. Add the LightRay global direction and identity-bit helper to `VegetationLighting.hlsl`.
+2. Resolve a separate edge direction only for eligible tagged punctual lights.
+3. Leave body diffuse and every attenuation/activation calculation on the real `Light` unchanged.
+4. Add `_LIGHT_LAYERS` and proper matching to both additional-light loops.
+5. Update the concise production architecture summary.
+6. Audit compiled paths, ordinary-light preservation, and exact scope.
+
+### Performance and acceptance
+
+AF5 adds no additional light evaluation or texture read. It adds a light-layer test and branch/select inside the already-running punctual loop plus a shader variant keyword. The proof passes only when the LightRay Spot creates coherent stylized blade accents without changing `Hut_Warm_Point`, sun/directional ownership, local body lighting, or existing edge stability.
+
+### VEG-V1C.10 implementation and audit result
+
+Implemented in the declared vegetation scope.
+
+- `_LIGHT_LAYERS` is compiled for the production Forward fragment pass.
+- Both additional-light loops query the mesh Rendering Layer and skip nonmatching lights with the standard URP layer test.
+- The runtime-only LightRay identity bit is `1u << 30` in HLSL and matches the controller's `1 << 30` constant.
+- Only eligible punctual lights call the edge-direction resolver. Ordinary lights return `Light.direction`; a tagged LightRay Spot with an active global returns the published horizontal source direction.
+- `VegetationTwoSidedWrappedDiffuse` and all attenuation, colour, activation, gain, and stability equations remain unchanged.
+- `GetAdditionalLight` count remains two source calls: clustered-directional and regular punctual loops.
+- No vegetation material property, authoring control, texture sample, instance record, field, geometry, interaction, trample, wind, coverage, draw, or allocation changed.
+
+Static audit passed exact four-file vegetation scope, balanced source/preprocessor structure, both layer-match sites, CPU/HLSL bit equality, unchanged light-fetch count, unchanged body-light direction, no new texture sampling, and ordinary-light fallback. The complete cross-subsystem AF5 audit reports `70 / 70` checks passed. Unity compilation and visual/performance acceptance remain pending.
+
+
+
+## VEG-V1C.11 — Geometric Weather LightRay Spot match
+
+AF5A runtime evidence rejected the `VEG-V1C.10` high Rendering Layer identity bit: the Spot reached vegetation, but the GPU additional-light structure did not expose bit 30. The vegetation shader must not use unregistered Rendering Layer bits as custom light identity.
+
+The replacement publishes one runtime Spot position/range and identifies that Spot by comparing the evaluated additional light's fragment-to-light direction against `normalize(publishedSpotPosition - positionWS)`. A match requires the fragment to be inside the published range and directional agreement of at least `0.999`.
+
+Only the matched Spot's blade-edge selector uses the published horizontal LightRay/source direction. Body lighting, attenuation, colour, activation, stability, and every ordinary point/spot light remain unchanged. The normal URP Rendering Layer match still filters receivers but no longer identifies the Weather light.
+
+The consolidated Weather-controller diagnostic suite remains the only visual diagnostic surface. Orange means no geometric match; green blade-edge strips prove actual matched-Spot edge radiance.
+
+
+## VEG-V1C.12 — Shared Weather LightRay accent-line master
+
+The Weather LightRay Controller now owns one normalized `Accent Line Intensity`. Vegetation consumes it only after the AF5B geometric Spot match has selected the LightRay-specific horizontal edge direction.
+
+```text
+receiver base gain = 4 × vegetation accent response
+LightRay multiplier = 2 × controller Accent Line Intensity
+final gain = min(4, receiver base gain × LightRay multiplier)
+```
+
+Therefore `0` disables only the LightRay-specific blade accent, `0.5` preserves the AF5B baseline, and `1` allows up to twice that baseline without exceeding the established vegetation gain cap. The Spot's normal body lighting and every ordinary point/spot light remain unchanged. No vegetation material property or recipe control is added.
+
+
+### VEG-V1C.13 — Expanded Weather LightRay accent master
+
+AF5C's controller range was visually underpowered. The matched LightRay vegetation multiplier is now `12 × controller Accent Line Intensity`, still bounded by the established vegetation-local edge-gain cap. Approximately `0.083` preserves AF5B, approximately `0.167` reproduces the former AF5C maximum, and `1` provides up to `12x` AF5B before the local cap. The control continues to affect only the geometrically matched LightRay Spot accent; body illumination and ordinary punctual lights are unchanged.
+
+
+### VEG-V1C.14 — orders-of-magnitude Weather LightRay accent range
+
+Unity proof showed that AF5D remained severely underpowered because the controller's larger linear multiplier still saturated against the matched-LightRay `min(4, ...)` edge-gain ceiling. The active contract therefore removes that LightRay-specific ceiling and uses an exponential normalized mapping while preserving `0 = off`:
+
+```text
+relativeScale(c) = c <= 0 ? 0 : 1001^c - 1
+
+0.00 -> 0x
+0.03 -> approximately the former low baseline
+0.10 -> approximately 1x the former AF5D maximum
+0.20 -> approximately 3x
+0.50 -> approximately 31x
+1.00 -> 1000x
+```
+
+Vegetation first evaluates the former AF5D full-scale gain (`min(4, baseGain * 12)`) only as a reference unit, then multiplies it by the exponential shared-controller scale. This affects only the geometrically matched Weather LightRay Spot accent contribution. Spot body lighting, atmospheric shafts, ordinary punctual lights, and `Hut_Warm_Point` remain unchanged. Future GeneratedMass, river, tree, and other receiver implementations should consume the same normalized controller value but retain receiver-specific equations.
+
+The exponential mapping is evaluated once on the controller CPU and published as `_WeatherLightRayAccentLineResolvedScale`; vegetation performs only a multiply with the resolved scale. The normalized `_WeatherLightRayAccentLineIntensity` remains published as the shared cross-system authoring value. No per-fragment `pow` was added.
+
+### VEG-V1C.15 — proportional AF5F accent reduction
+
+After Unity visual proof found the uncapped AF5E result slightly excessive, AF5F preserves the exponential controller shape but halves the resolved scale at every value:
+
+```text
+relativeScale(c) = c <= 0 ? 0 : 0.5 * (1001^c - 1)
+```
+
+The matched Weather LightRay vegetation accent therefore receives exactly half the AF5E radiance for the same normalized controller value. The geometric Spot match, body-light path, ordinary punctual-light accents, and vegetation material controls remain unchanged. The reduction is calculated once on the Weather controller CPU.
+
+
+
+### VEG-V1C.16 — 200x maximum Weather LightRay accent range
+
+Unity validation found AF5F's upper half still excessive. AF5G preserves the normalized exponential slider shape and reduces the resolved scale to `40%` of AF5F at every value:
+
+```text
+relativeScale(c) = c <= 0 ? 0 : 0.2 * (1001^c - 1)
+```
+
+Reference points are approximately `0.046x` at `0.03`, `0.20x` at `0.10`, `0.60x` at `0.20`, `6.13x` at `0.50`, and exactly `200x` at `1.00`, all relative to the former AF5D maximum. The matched LightRay accent path is the only consumer changed; real Spot body lighting, geometric matching, ordinary punctual-light accents, and vegetation material controls remain unchanged.
+
+### VEG-V1C.17 — AF5H cached response and zero-output match bypass
+
+`WEATHER-LIGHT-RAY-V1.1D-AF5H` is cleanup and freeze preparation; it does not recalibrate AF5G. The active matched-LightRay response remains exactly:
+
+```text
+relativeScale(c) = c <= 0 ? 0 : 0.2 * (1001^c - 1)
+```
+
+The Weather controller now caches the effective normalized value and resolved exponential scale. `Mathf.Pow` runs only when the authored value or LightRay-enabled state changes; stable controller updates republish cached values without allocations.
+
+The vegetation include checks a uniform production/diagnostic gate before geometric Spot identity work. When the resolved production scale is zero and diagnostics are inactive, the shader retains the evaluated URP light direction and skips the published-position subtraction, range test, normalizations, and direction-agreement dot product. When the consolidated diagnostic suite is active, matching is forced even at zero artistic output so identity and branch classification remain testable. At zero scale, a successful diagnostic match may remain blue because final edge radiance is intentionally zero; this is not a geometric-match failure.
+
+AF5H retains one published vegetation-accent Spot position/range and therefore supports one simultaneously matched active authored LightRay zone. Central slot capacity is storage only and does not authorize multi-zone vegetation matching. The source default for newly created controllers remains provisional `0.03`; existing serialized controllers retain their stored value and no migration is performed. Ordinary punctual lights, Spot body lighting, atmospheric rendering, geometric threshold `0.999`, and the default receiver Rendering Layer mask remain unchanged. Unity compilation, visual comparison, diagnostics, and target-resolution profiling remain pending.
+
+
+### VEG-V1C.18 — AH LightRay-only accent participation coverage
+
+`WEATHER-LIGHT-RAY-V1.1D-AH` adds one Weather-controller-owned `LightRay Vegetation Accent Coverage` value in the `0..1` range, defaulting to `1`. It does not scale radiance. Instead, each vegetation blade/card receives a stable noninterpolated candidate hash generated from indirect instance ID and one discrete crossed-card index. Only the geometrically matched Weather LightRay Spot applies the threshold. Ordinary directional lights, ordinary punctual lights, `Hut_Warm_Point`, and LightRay body illumination do not read the coverage value.
+
+Production participation is deterministic: `0` selects no candidates, `1` selects all candidates, and intermediate values select approximately that fraction. Diagnostic mode bypasses the participation filter so all correctly matched candidates remain available for geometric and radiance classification. The benchmark shader wrapper is intentionally part of the patch because stable per-card selection cannot be derived safely from fragment world position under wind deformation. Unity validation remains pending.
+
+
+### WEATHER-LIGHT-RAY-V1.1D-AH1 — whole-card LightRay coverage identity
+
+AH1 corrects the coverage-selection unit without changing the controller or response equation. The AH centreline input varied between the root, middle, and tip vertex rows, allowing separate triangles of one card to be accepted independently. The benchmark crossed-card mesh contains six vertices per card, so the vertex shader now derives `cardIndex = SV_VertexID / 6` and hashes `instanceId + cardIndex`. Every triangle and longitudinal segment of an accepted card retains the complete existing LightRay accent response; rejected cards contribute no LightRay accent. Ordinary lights, body illumination, diagnostic coverage bypass, wind deformation, and accent brightness remain unchanged. Unity validation must confirm that low coverage produces a strict whole-card subset of the full-coverage result.
+
+---
+
+## Historical and rejected — Rendering Layer LightRay identity
+
+The attempted registered Rendering Layer bit-7 identity did not produce reliable Weather vegetation accents and is superseded. Runtime LightRay Spots retain the default receiver mask. Rendering Layers remain receiver filtering only and must not be restored as project-specific LightRay metadata.
+
+## Active contract — indexed per-additional-light accent sidecar
+
+Weather LightRay vegetation tuning does not depend on a Rendering Layer identity bit or geometric Spot matching. A pre-render CPU publication step writes one two-`float4` structured record in each camera's own URP additional-light order. The vegetation additional-light loop resolves the same global light index (`GetPerObjectLightIndex` in Forward, direct cluster index in Forward+) and performs one O(1) structured-buffer read.
+
+Record layout:
+
+```text
+parameters = strength scale, stable whole-card coverage, edge-profile softness, override weight
+sourceDirectionWS = normalized horizontal direction toward the LightRay source, direction-valid flag
+```
+
+Ordinary lights receive a zero record and retain the established generic local-light accent response. Weather LightRay Spot proxies receive active-preset values plus their source direction. No nested LightRay search, position comparison, extra light loop, geometric Spot match, or GPU readback is permitted.
+
+## WEATHER-LIGHT-RAY-V1.2D2 — Vegetation accent control contract closure
+
+The active Weather LightRay vegetation path is a direct indexed per-additional-light sidecar. One GPU record contains two `float4` values and is aligned to each camera's own URP additional-light ordering:
+
+```text
+parameters = resolved intensity scale, stable whole-card coverage, edge-profile softness, override active
+sourceDirectionWS = normalized horizontal direction toward source, direction valid
+```
+
+Protected receiver contracts:
+
+- URP `Light.direction`, attenuation, colour, cone, and range remain authoritative for vegetation body lighting.
+- Only a Weather override may use `sourceDirectionWS` for the stylized blade-edge side selector.
+- The punctual Spot's radial fragment direction must never be used as the Weather edge-selector direction; doing so creates centre rejection and rim-biased accents.
+- Intensity is resolved from the active Weather LightRay preset and scales only Weather edge radiance.
+- Coverage is a deterministic whole-card threshold based on instance/card identity. `0` selects none, `1` selects all directionally eligible cards, and intermediate values produce a stable spatially unbiased subset. Coverage does not scale surviving radiance.
+- Softness shapes only the selected blade-edge profile after card participation and direction selection. It must not alter the participating-card set, directional gate, attenuation, LightRay footprint, or body illumination. `0.5` preserves the authored vegetation edge mask.
+- Ordinary local lights retain the established generic punctual-light path and receive zero Weather records.
+- Game and Scene View cameras publish independent sidecars from their own visible-light ordering. Atmospheric LightRay compositing remains Game-camera-only.
+
+The C# and HLSL record layouts are one contract. A change to either layout requires a matching change to both `WeatherLightRayRendererFeature.cs` and `VegetationLighting.hlsl`. Shader-side LightRay searches, geometric matching, and Rendering Layer identity are prohibited.

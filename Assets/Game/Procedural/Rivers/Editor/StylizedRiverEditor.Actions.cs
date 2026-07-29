@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Splines;
@@ -50,137 +51,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Configured probes use the production lifetime plumbing. The " +
                 "absolute one-second probe isolates raw Remaining Life aging.",
                 EditorStyles.wordWrappedMiniLabel);
-        }
-
-        private void DrawFoamManualBirthSourceSection(
-            StylizedRiver river,
-            StylizedRiverFoamRuntime runtime)
-        {
-            EditorGUILayout.LabelField(
-                "Creates stable Layer C source material for transport and " +
-                "lifecycle validation. It does not author macro fracture.",
-                EditorStyles.wordWrappedMiniLabel);
-
-            EditorGUILayout.LabelField(
-                "Source Position",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                Find("foamSpawnDistanceNormalized"),
-                new GUIContent(
-                    "Compatibility Longitudinal Position",
-                    "Normalized authoring control from logical upstream start " +
-                    "(0) to downstream end (1). It resolves to global river " +
-                    "distance when the source is submitted."));
-            EditorGUILayout.PropertyField(
-                Find("foamSpawnAcrossNormalized"),
-                new GUIContent(
-                    "Compatibility Across Position",
-                    "Normalized authoring control: -1 left edge, 0 centre, +1 " +
-                    "right edge. It resolves against the local river half-width " +
-                    "when the source is submitted."));
-
-            if (river.TryResolveFoamSpawnMetricPlacement(
-                    out float resolvedGlobalDistance,
-                    out float resolvedLateralMetres,
-                    out float resolvedDriftMetres,
-                    out float resolvedMaximumBendMetres))
-            {
-                DrawReadOnlyRow(
-                    new GUIContent(
-                        "Resolved Metric Placement",
-                        "Physical command values represented by the current " +
-                        "normalized compatibility controls at the source start."),
-                    $"s={resolvedGlobalDistance:0.000} m · " +
-                    $"n={resolvedLateralMetres:0.000} m · " +
-                    $"drift={resolvedDriftMetres:0.000} m · " +
-                    $"bend≤{resolvedMaximumBendMetres:0.000} m");
-            }
-
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField(
-                "Source Material",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                Find("foamSpawnAmount"),
-                new GUIContent(
-                    "Amount",
-                    "Source coverage amount. This is not Remaining Life, " +
-                    "opacity, or fracture severity."));
-            EditorGUILayout.PropertyField(
-                Find("foamSpawnRemainingLife"),
-                new GUIContent(
-                    "Initial Remaining Life",
-                    "Normalized Remaining Life assigned to accepted source " +
-                    "material."));
-
-            EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField(
-                "Source Shape",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.PropertyField(
-                Find("foamSpawnScale"),
-                new GUIContent(
-                    "Half Width",
-                    "World-space half-width of the moving manual source."));
-
-            if (DrawInlineFoldout(
-                    InspectorSection.FoamManualSourceMotion,
-                    "Source Path Motion"))
-            {
-                using (new EditorGUI.IndentLevelScope())
-                {
-                    EditorGUILayout.PropertyField(
-                        Find("foamSpawnRibbonDuration"),
-                        new GUIContent("Duration"));
-                    EditorGUILayout.PropertyField(
-                        Find("foamSpawnRibbonTravelDistance"),
-                        new GUIContent("Travel Distance"));
-                    EditorGUILayout.PropertyField(
-                        Find("foamSpawnRibbonAcrossDrift"),
-                        new GUIContent(
-                            "Compatibility Across Drift",
-                            "Normalized compatibility drift. Metric API callers " +
-                            "provide lateral drift directly in metres."));
-                    EditorGUILayout.PropertyField(
-                        Find("foamSpawnRibbonPathWander"),
-                        new GUIContent(
-                            "Compatibility Path Bend",
-                            "Normalized compatibility bend strength. Metric API " +
-                            "callers provide maximum bend directly in metres; " +
-                            "this is not Foam breakup."));
-                }
-            }
-
-            using (new EditorGUI.DisabledScope(!Application.isPlaying))
-            {
-                if (GUILayout.Button(
-                        new GUIContent(
-                            "Start Manual Source",
-                            "Starts one budgeted manual Layer C source event.")))
-                {
-                    ApplyFoamSpawnProperties();
-                    river.StartFoamSpawn();
-                }
-            }
-
-            DrawReadOnlyRow(
-                new GUIContent("Source State"),
-                runtime != null
-                    ? runtime.LatestFoamCompositionEventId > 0
-                        ? $"event {runtime.LatestFoamCompositionEventId}, " +
-                          $"active {runtime.ActiveFoamCompositionEventCount}/" +
-                          $"{runtime.FoamCompositionPoolCapacity}, " +
-                          $"budget {runtime.FoamCompositionBirthBudgetPerStep}/step"
-                        : $"Idle / budget " +
-                          $"{runtime.FoamCompositionBirthBudgetPerStep}/step"
-                    : Application.isPlaying
-                        ? "Runtime unavailable"
-                        : "Not in Play Mode");
-            DrawReadOnlyRow(
-                new GUIContent("Last Segment"),
-                runtime != null
-                    ? $"{runtime.LastFoamCompositionSegmentLength:0.000} m"
-                    : "—");
         }
 
         private void DrawMajorCandidatePreview()
@@ -763,46 +633,243 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         : runtime.TopologyCacheDiagnosticReportPath);
             }
 
-            EditorGUILayout.Space(4f);
+            EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Automatic Birth Reveal-Speed Audit",
+                "Cell-Exact Spawner Contract Audit",
                 EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(
-                "One Play Mode action captures the latest observed timing for " +
-                "all eight automatic Layer C source recipes, current active " +
-                "events, 32-slot pool occupancy, and rejected starts. The " +
-                "report is written to Library and can be copied directly.",
-                EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.HelpBox(
+                Application.isPlaying
+                    ? "PLAY MODE. The suite waits for the live River Foam runtime " +
+                      "to become Ready, dispatches isolated GPU raster cases from " +
+                      "LateUpdate, and measures temporary Coverage targets through " +
+                      "AsyncGPUReadback. The visible river Foam state is not used " +
+                      "as a raster target."
+                    : "PLAY MODE REQUIRED. Enter Play Mode and wait for River Foam " +
+                      "runtime initialization before starting either suite.",
+                Application.isPlaying ? MessageType.Info : MessageType.Warning);
+
+            bool auditRunning = runtime != null &&
+                runtime.CellSpawnerContractAuditRunning;
+            float auditProgress = runtime != null
+                ? runtime.CellSpawnerContractAuditProgress
+                : 0f;
+            Rect progressRect = GUILayoutUtility.GetRect(
+                18f, 22f, GUILayout.ExpandWidth(true));
+            string progressLabel = runtime == null
+                ? "Runtime unavailable"
+                : auditRunning
+                    ? $"{runtime.CellSpawnerContractAuditCompleted:N0} / " +
+                      $"{runtime.CellSpawnerContractAuditTotal:N0}  " +
+                      $"({auditProgress * 100f:0.0}%)"
+                    : runtime.CellSpawnerContractAuditStatus;
+            EditorGUI.ProgressBar(progressRect, auditProgress, progressLabel);
+
+            DrawReadOnlyRow(
+                new GUIContent("Execution Mode",
+                    "The suite advances from the live runtime LateUpdate lifecycle."),
+                Application.isPlaying ? "Play Mode" : "PLAY MODE REQUIRED");
+            DrawReadOnlyRow(
+                new GUIContent("Suite",
+                    "Smoke is the fast first gate; Exhaustive is the complete seed matrix."),
+                runtime != null
+                    ? runtime.CellSpawnerContractAuditSuiteName
+                    : "None");
+            DrawReadOnlyRow(
+                new GUIContent("Runtime Readiness",
+                    "Exact initialization/resource state observed by the suite."),
+                runtime != null
+                    ? runtime.CellSpawnerContractAuditRuntimeState
+                    : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent("Runner Phase",
+                    "Runtime readiness, GPU dispatch, GPU readback, complete, cancelled, or failed."),
+                runtime != null
+                    ? runtime.CellSpawnerContractAuditPhase
+                    : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent("Current Case",
+                    "Exact recipe, geometry scenario, and deterministic seed currently in flight."),
+                runtime != null
+                    ? runtime.CellSpawnerContractAuditCurrentCase
+                    : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent("Pass / Fail",
+                    "Live result counts from completed GPU readbacks."),
+                runtime != null
+                    ? $"{runtime.CellSpawnerContractAuditPassCount:N0} / " +
+                      $"{runtime.CellSpawnerContractAuditFailCount:N0}"
+                    : "0 / 0");
+            DrawReadOnlyRow(
+                new GUIContent("GPU Readback",
+                    "Whether the runner is currently waiting for AsyncGPUReadback."),
+                runtime != null && runtime.CellSpawnerContractAuditReadbackPending
+                    ? "Pending"
+                    : "Idle");
+            DrawReadOnlyRow(
+                new GUIContent("Elapsed / ETA",
+                    "Elapsed time and estimated remaining duration after completed cases establish a rate."),
+                runtime != null && auditRunning
+                    ? $"{runtime.CellSpawnerContractAuditElapsedSeconds:0.0}s / " +
+                      (runtime.CellSpawnerContractAuditEtaSeconds > 0.0
+                          ? $"{runtime.CellSpawnerContractAuditEtaSeconds:0.0}s"
+                          : "calculating")
+                    : "Not running");
+            DrawReadOnlyRow(
+                new GUIContent("Latest Result",
+                    "Most recently completed GPU footprint measurement."),
+                runtime != null
+                    ? runtime.CellSpawnerContractAuditLastResult
+                    : "None");
+            DrawReadOnlyRow(
+                new GUIContent("Report Files",
+                    "Smoke and Exhaustive reports are preserved separately under Library/RiverFoam."),
+                runtime != null &&
+                !string.IsNullOrEmpty(runtime.TopologyCacheDiagnosticReportPath)
+                    ? runtime.TopologyCacheDiagnosticReportPath
+                    : "Library/RiverFoam/CellExactSpawner[Smoke|Exhaustive]Suite.txt + .csv");
+
             EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(
-                       !Application.isPlaying ||
                        runtime == null ||
-                       river == null))
+                       !Application.isPlaying ||
+                       runtime.CellSpawnerContractAuditRunning))
             {
                 if (GUILayout.Button(
                         new GUIContent(
-                            "Write Automatic Birth Reveal-Speed Report",
-                            "Captures requested and actual reveal speed, path " +
-                            "distance, raw/resolved duration, cadence limiting, " +
-                            "active event counts, pool occupancy, and rejected " +
-                            "starts for the live automatic-source session.")))
+                            "Run Cell-Exact Smoke Suite",
+                            "Runs 84 high-value GPU footprint cases across all eight automatic recipes, including six raw replay checks and isolated Object body components.")))
                 {
-                    runtime.RunAutomaticBirthRevealSpeedReport();
+                    runtime.RunCellSpawnerSmokeSuite();
+                    Repaint();
+                }
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run Cell-Exact Exhaustive Suite",
+                            "Runs the complete 672-case recipe/scenario/seed matrix.")))
+                {
+                    runtime.RunCellSpawnerExhaustiveSuite();
                     Repaint();
                 }
             }
             using (new EditorGUI.DisabledScope(
                        runtime == null ||
-                       runtime.TopologyCacheDiagnosticSummary !=
-                           "Automatic birth reveal-speed evidence captured." ||
-                       string.IsNullOrEmpty(
-                           runtime.TopologyCacheDiagnosticReport)))
+                       !runtime.CellSpawnerContractAuditRunning))
             {
-                if (GUILayout.Button("Copy Reveal-Speed Report"))
+                if (GUILayout.Button("Cancel Suite"))
                 {
-                    EditorGUIUtility.systemCopyBuffer =
-                        runtime.TopologyCacheDiagnosticReport;
+                    runtime.CancelCellSpawnerContractAudit();
+                    Repaint();
                 }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            DrawLatestFoamReportCopyButton(runtime, "Copy Suite Report");
+            if (GUILayout.Button(
+                    new GUIContent(
+                        "Open Reports Folder",
+                        "Opens Library/RiverFoam, which contains the preserved Smoke and Exhaustive TXT/CSV reports.")))
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ??
+                    Application.dataPath;
+                string reportDirectory = Path.Combine(projectRoot, "Library", "RiverFoam");
+                Directory.CreateDirectory(reportDirectory);
+                EditorUtility.RevealInFinder(reportDirectory);
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField(
+                "Shore Ribbon Behavior Suite",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Dedicated Shore-only, multi-tick production-pipeline localization audit. It proves Shore-only control authority, then runs deterministic left/right-bank ribbons at 1 and 2 cells/s. Every checkpoint captures accumulated birth plus lifecycle-only, transport-only, and combined production simulation branches in audit-owned state. Reports metric-space direction, continuity, retention, and completion without modifying visible Foam or serialized scene state.",
+                Application.isPlaying ? MessageType.Info : MessageType.Warning);
+
+            bool shoreAuditRunning = runtime != null &&
+                runtime.ShoreRibbonBehaviorAuditRunning;
+            float shoreAuditProgress = runtime != null
+                ? runtime.ShoreRibbonBehaviorAuditProgress
+                : 0f;
+            Rect shoreProgressRect = GUILayoutUtility.GetRect(
+                18f, 22f, GUILayout.ExpandWidth(true));
+            EditorGUI.ProgressBar(
+                shoreProgressRect,
+                shoreAuditProgress,
+                runtime == null
+                    ? "Runtime unavailable"
+                    : shoreAuditRunning
+                        ? $"{runtime.ShoreRibbonBehaviorAuditCompleted:N0} / {runtime.ShoreRibbonBehaviorAuditTotal:N0} ({shoreAuditProgress * 100f:0.0}%)"
+                        : "Not running");
+            DrawReadOnlyRow(
+                new GUIContent("Phase", "Control authority, production raster ticks, GPU readback, complete, cancelled, or failed."),
+                runtime != null ? runtime.ShoreRibbonBehaviorAuditPhase : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent("Current Case", "Exact bank, reveal speed, length, and checkpoint currently being measured."),
+                runtime != null ? runtime.ShoreRibbonBehaviorAuditCurrentCase : "Runtime unavailable");
+            DrawReadOnlyRow(
+                new GUIContent("Pass / Fail", "Completed Shore Ribbon observations, including control authority and every cell checkpoint."),
+                runtime != null
+                    ? $"{runtime.ShoreRibbonBehaviorAuditPassCount:N0} / {runtime.ShoreRibbonBehaviorAuditFailCount:N0}"
+                    : "0 / 0");
+            DrawReadOnlyRow(
+                new GUIContent("GPU Readback", "The suite uses asynchronous readback only and never blocks the Editor."),
+                runtime != null && runtime.ShoreRibbonBehaviorAuditReadbackPending
+                    ? "Pending"
+                    : "Idle");
+            DrawReadOnlyRow(
+                new GUIContent("Elapsed / ETA", "Elapsed time and estimated remaining duration from completed checkpoints."),
+                runtime != null && shoreAuditRunning
+                    ? $"{runtime.ShoreRibbonBehaviorAuditElapsedSeconds:0.0}s / " +
+                      (runtime.ShoreRibbonBehaviorAuditEtaSeconds > 0.0
+                          ? $"{runtime.ShoreRibbonBehaviorAuditEtaSeconds:0.0}s"
+                          : "calculating")
+                    : "Not running");
+            DrawReadOnlyRow(
+                new GUIContent("Latest Result", "Most recently completed direction/continuity/material-state checkpoint."),
+                runtime != null ? runtime.ShoreRibbonBehaviorAuditLastResult : "None");
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       !Application.isPlaying ||
+                       runtime.ShoreRibbonBehaviorAuditRunning ||
+                       runtime.CellSpawnerContractAuditRunning))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Run Shore Ribbon Behavior Suite",
+                            "Runs only Shore Ribbon control-authority, metric direction, continuous birth, lifecycle-only, transport-only, combined simulation, delayed-tick, retention, and completion contracts.")))
+                {
+                    runtime.RunShoreRibbonBehaviorSuite();
+                    Repaint();
+                }
+            }
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       !runtime.ShoreRibbonBehaviorAuditRunning))
+            {
+                if (GUILayout.Button("Cancel Shore Suite"))
+                {
+                    runtime.CancelShoreRibbonBehaviorSuite();
+                    Repaint();
+                }
+            }
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+            DrawShoreRibbonReportCopyButton(runtime);
+            if (GUILayout.Button(
+                    new GUIContent(
+                        "Open Shore Reports Folder",
+                        "Opens Library/RiverFoam and selects the Shore Ribbon Behavior Suite TXT report. The CSV report is stored beside it.")))
+            {
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ??
+                    Application.dataPath;
+                string reportDirectory = Path.Combine(projectRoot, "Library", "RiverFoam");
+                Directory.CreateDirectory(reportDirectory);
+                string textPath = Path.Combine(reportDirectory, "ShoreRibbonBehaviorSuite.txt");
+                EditorUtility.RevealInFinder(File.Exists(textPath) ? textPath : reportDirectory);
             }
             EditorGUILayout.EndHorizontal();
 
@@ -1001,6 +1068,40 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             }
         }
 
+        private static void DrawShoreRibbonReportCopyButton(
+            StylizedRiverFoamRuntime runtime)
+        {
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(runtime.TopologyCacheDiagnosticReport)))
+            {
+                if (!GUILayout.Button(
+                        new GUIContent(
+                            "Copy Shore TXT + CSV",
+                            "Copies both ShoreRibbonBehaviorSuite.txt and ShoreRibbonBehaviorSuite.csv into the clipboard, with clear section headers.")))
+                {
+                    return;
+                }
+
+                string projectRoot = Directory.GetParent(Application.dataPath)?.FullName ??
+                    Application.dataPath;
+                string reportDirectory = Path.Combine(projectRoot, "Library", "RiverFoam");
+                string textPath = Path.Combine(reportDirectory, "ShoreRibbonBehaviorSuite.txt");
+                string csvPath = Path.Combine(reportDirectory, "ShoreRibbonBehaviorSuite.csv");
+                string textReport = File.Exists(textPath)
+                    ? File.ReadAllText(textPath)
+                    : runtime.TopologyCacheDiagnosticReport;
+                string csvReport = File.Exists(csvPath)
+                    ? File.ReadAllText(csvPath)
+                    : "CSV report is not available.";
+                EditorGUIUtility.systemCopyBuffer =
+                    "===== ShoreRibbonBehaviorSuite.txt =====" + System.Environment.NewLine +
+                    textReport + System.Environment.NewLine + System.Environment.NewLine +
+                    "===== ShoreRibbonBehaviorSuite.csv =====" + System.Environment.NewLine +
+                    csvReport;
+            }
+        }
+
         private static void DrawLatestFoamReportCopyButton(
             StylizedRiverFoamRuntime runtime,
             string buttonLabel)
@@ -1051,23 +1152,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 }
             }
             DrawLatestFoamReportCopyButton(runtime, "Copy P8 Report");
-            EditorGUILayout.EndHorizontal();
-
-            EditorGUILayout.BeginHorizontal();
-            using (new EditorGUI.DisabledScope(reportActionDisabled))
-            {
-                if (GUILayout.Button(
-                        new GUIContent(
-                            "Run P7 Source Contract Report",
-                            "Reruns the closed P7 automatic/manual source-unit, " +
-                            "range, evaluator, lifecycle, cleanup, and cache " +
-                            "immutability proof.")))
-                {
-                    runtime.RunP7ComprehensiveValidationReport();
-                    Repaint();
-                }
-            }
-            DrawLatestFoamReportCopyButton(runtime, "Copy P7 Report");
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.BeginHorizontal();
@@ -1176,7 +1260,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
             StylizedRiverFoamRuntime runtime =
                 river.GetComponent<StylizedRiverFoamRuntime>();
-            DrawFoamManualBirthSourceSection(river, runtime);
         }
 
         private void DrawFoamLifecycleProbeActions()

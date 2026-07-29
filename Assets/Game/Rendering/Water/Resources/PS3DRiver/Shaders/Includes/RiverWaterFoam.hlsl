@@ -916,7 +916,7 @@ float RiverWaterFoamResolveMeaningfulCoverageFootprint(
     // Lifecycle-Faithful requires meaningful geometric Coverage, but it does
     // not require dense local concentration before living material remains
     // visible. Intrinsic Presence is applied later as a single amplitude.
-    return smoothstep(0.02, 0.10, saturate(coverage));
+    return saturate(coverage);
 }
 
 struct RiverWaterFoamPatternFields
@@ -1592,28 +1592,44 @@ float2 RiverWaterFoamMetresToFieldUV(
         metres.y / max(0.0001, gridLateral.z * gridSpacing.w));
 }
 
+float4 RiverWaterFoamSamplePhaseShiftedState(
+    TEXTURE2D_PARAM(foamTexture, foamSampler),
+    float2 foamUV,
+    float2 phaseOffsetUV)
+{
+    float2 sampleUV = foamUV - phaseOffsetUV;
+    bool valid = all(sampleUV >= 0.0.xx) && all(sampleUV <= 1.0.xx);
+    return valid
+        ? SAMPLE_TEXTURE2D_LOD(
+            foamTexture,
+            foamSampler,
+            saturate(sampleUV),
+            0.0)
+        : 0.0.xxxx;
+}
+
 float4 RiverWaterFoamSampleInterpolatedState(
     TEXTURE2D_PARAM(previousFoam, previousFoamSampler),
     TEXTURE2D_PARAM(currentFoam, currentFoamSampler),
     float2 foamUV,
-    float interpolation)
+    float interpolation,
+    float2 previousPhaseOffsetUV,
+    float2 currentPhaseOffsetUV)
 {
-    float4 currentState = SAMPLE_TEXTURE2D_LOD(
-        currentFoam,
-        currentFoamSampler,
+    float4 currentState = RiverWaterFoamSamplePhaseShiftedState(
+        TEXTURE2D_ARGS(currentFoam, currentFoamSampler),
         foamUV,
-        0.0);
+        currentPhaseOffsetUV);
 
     if (interpolation >= 0.999)
     {
         return currentState;
     }
 
-    float4 previousState = SAMPLE_TEXTURE2D_LOD(
-        previousFoam,
-        previousFoamSampler,
+    float4 previousState = RiverWaterFoamSamplePhaseShiftedState(
+        TEXTURE2D_ARGS(previousFoam, previousFoamSampler),
         foamUV,
-        0.0);
+        previousPhaseOffsetUV);
     return lerp(
         previousState,
         currentState,
@@ -1751,6 +1767,8 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float globalStart,
     float fieldLength,
     float interpolation,
+    float2 previousPhaseOffsetUV,
+    float2 currentPhaseOffsetUV,
     float sharpness,
     float finalVisibilityMode,
     float presenceFootprintMode,
@@ -1840,7 +1858,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             currentFoam,
             currentFoamSampler),
         foamUV,
-        blend);
+        blend,
+        previousPhaseOffsetUV,
+        currentPhaseOffsetUV);
 
     // Material Pattern participates directly in every procedural Strand phase.
     // Measure its screen-space variation once outside wake/lee branches so the
@@ -1928,7 +1948,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
                 currentFoam,
                 currentFoamSampler),
             visualFoamUV,
-            blend)
+            blend,
+            previousPhaseOffsetUV,
+            currentPhaseOffsetUV)
         : 0.0.xxxx;
 
     float visualSoftVisibility;
@@ -2035,7 +2057,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
                     currentFoam,
                     currentFoamSampler),
                 saturate(leadFoamUVRaw),
-                blend)
+                blend,
+                previousPhaseOffsetUV,
+                currentPhaseOffsetUV)
             : 0.0.xxxx;
         float4 trailState = trailSampleValid
             ? RiverWaterFoamSampleInterpolatedState(
@@ -2046,7 +2070,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
                     currentFoam,
                     currentFoamSampler),
                 saturate(trailFoamUVRaw),
-                blend)
+                blend,
+                previousPhaseOffsetUV,
+                currentPhaseOffsetUV)
             : 0.0.xxxx;
 
         float leadSoftVisibility;

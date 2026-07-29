@@ -8153,22 +8153,57 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<OneSurfaceTriangleIndex> generalTriangles = null;
             OneSurfaceGeneralTriangulationAudit generalAudit = default;
             OneSurfaceCollinearReinsertionAudit collinearAudit = default;
-            if (TryFindStableOneSurfaceFanAnchor(
-                    face.Vertices,
-                    authoredNormal,
-                    minimumTriangleArea,
-                    out anchorIndex,
-                    out boundaryFanAudit))
+            bool hasStableFan = TryFindStableOneSurfaceFanAnchor(
+                face.Vertices,
+                authoredNormal,
+                minimumTriangleArea,
+                out anchorIndex,
+                out boundaryFanAudit);
+            List<OneSurfaceTriangleIndex> fanTriangles = hasStableFan
+                ? BuildOneSurfaceFanTriangles(
+                    face.Vertices.Count,
+                    anchorIndex)
+                : null;
+            bool hasGeneral = TryResolveGeneralOneSurfaceTriangulation(
+                face.Vertices,
+                authoredNormal,
+                minimumTriangleArea,
+                out generalTriangles,
+                out generalAudit);
+
+            if (hasStableFan && hasGeneral)
+            {
+                OneSurfaceTriangulationQuality fanQuality =
+                    EvaluateOneSurfaceTriangulationQuality(
+                        face.Vertices,
+                        authoredNormal,
+                        minimumTriangleArea,
+                        fanTriangles);
+                OneSurfaceTriangulationQuality generalQuality =
+                    EvaluateOneSurfaceTriangulationQuality(
+                        face.Vertices,
+                        authoredNormal,
+                        minimumTriangleArea,
+                        generalTriangles);
+                if (IsOneSurfaceTriangulationQualityBetter(
+                        generalQuality,
+                        fanQuality))
+                {
+                    triangulationMode =
+                        PolygonSurfaceTriangulationMode.GeneralTriangulation;
+                }
+                else
+                {
+                    triangulationMode =
+                        PolygonSurfaceTriangulationMode.BoundaryFan;
+                }
+            }
+            else if (hasStableFan)
             {
                 triangulationMode =
                     PolygonSurfaceTriangulationMode.BoundaryFan;
             }
-            else if (TryResolveGeneralOneSurfaceTriangulation(
-                    face.Vertices,
-                    authoredNormal,
-                    minimumTriangleArea,
-                    out generalTriangles,
-                    out generalAudit))
+            else if (hasGeneral)
             {
                 triangulationMode =
                     PolygonSurfaceTriangulationMode.GeneralTriangulation;
@@ -8219,20 +8254,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (triangulationMode ==
                 PolygonSurfaceTriangulationMode.BoundaryFan)
             {
-                Vector3 anchor = face.Vertices[anchorIndex];
-                for (int offset = 1;
-                     offset < face.Vertices.Count - 1;
-                     offset++)
+                for (int triangleIndex = 0;
+                     triangleIndex < fanTriangles.Count;
+                     triangleIndex++)
                 {
-                    Vector3 b = face.Vertices[
-                        (anchorIndex + offset) % face.Vertices.Count];
-                    Vector3 c = face.Vertices[
-                        (anchorIndex + offset + 1) %
-                            face.Vertices.Count];
+                    OneSurfaceTriangleIndex triangle =
+                        fanTriangles[triangleIndex];
                     if (!TryEmitOneSurfaceTriangle(
-                            anchor,
-                            b,
-                            c,
+                            face.Vertices[triangle.A],
+                            face.Vertices[triangle.B],
+                            face.Vertices[triangle.C],
                             face,
                             faceIndex,
                             authoredNormal,
@@ -8290,6 +8321,222 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return true;
         }
 
+        private static List<OneSurfaceTriangleIndex>
+            BuildOneSurfaceFanTriangles(
+                int vertexCount,
+                int anchorIndex)
+        {
+            List<OneSurfaceTriangleIndex> triangles =
+                new List<OneSurfaceTriangleIndex>(
+                    Mathf.Max(0, vertexCount - 2));
+            for (int offset = 1; offset < vertexCount - 1; offset++)
+            {
+                triangles.Add(new OneSurfaceTriangleIndex(
+                    anchorIndex,
+                    (anchorIndex + offset) % vertexCount,
+                    (anchorIndex + offset + 1) % vertexCount));
+            }
+            return triangles;
+        }
+
+        private static OneSurfaceTriangulationQuality
+            EvaluateOneSurfaceTriangulationQuality(
+                List<Vector3> vertices,
+                Vector3 authoredNormal,
+                float minimumTriangleArea,
+                List<OneSurfaceTriangleIndex> triangles)
+        {
+            if (vertices == null || triangles == null ||
+                triangles.Count != vertices.Count - 2)
+            {
+                return new OneSurfaceTriangulationQuality(
+                    false, 0f, 0f, float.PositiveInfinity, 0f);
+            }
+
+            float minimumArea = float.PositiveInfinity;
+            float minimumNormalDot = 1f;
+            float maximumAspectRatio = 0f;
+            float minimumAngleDegrees = 180f;
+            float polygonScale = ResolveOneSurfacePolygonScale(vertices);
+            float finalCoincidenceTolerance = Mathf.Max(
+                0.000001f,
+                polygonScale * 0.000001f);
+            float finalCoincidenceToleranceSqr =
+                finalCoincidenceTolerance * finalCoincidenceTolerance;
+            for (int triangleIndex = 0;
+                 triangleIndex < triangles.Count;
+                 triangleIndex++)
+            {
+                OneSurfaceTriangleIndex triangle = triangles[triangleIndex];
+                if (triangle.A < 0 || triangle.A >= vertices.Count ||
+                    triangle.B < 0 || triangle.B >= vertices.Count ||
+                    triangle.C < 0 || triangle.C >= vertices.Count ||
+                    triangle.A == triangle.B ||
+                    triangle.B == triangle.C ||
+                    triangle.C == triangle.A)
+                {
+                    return new OneSurfaceTriangulationQuality(
+                        false, 0f, 0f, float.PositiveInfinity, 0f);
+                }
+
+                Vector3 a = vertices[triangle.A];
+                Vector3 b = vertices[triangle.B];
+                Vector3 c = vertices[triangle.C];
+                if ((a - b).sqrMagnitude <= finalCoincidenceToleranceSqr ||
+                    (b - c).sqrMagnitude <= finalCoincidenceToleranceSqr ||
+                    (c - a).sqrMagnitude <= finalCoincidenceToleranceSqr ||
+                    !PassesOneSurfaceFinalEmissionAreaGate(
+                        a,
+                        b,
+                        c,
+                        minimumTriangleArea,
+                        polygonScale))
+                {
+                    return new OneSurfaceTriangulationQuality(
+                        false, 0f, 0f, float.PositiveInfinity, 0f);
+                }
+
+                OneSurfaceTriangleCandidate candidate =
+                    EvaluateOneSurfaceTriangleCandidate(
+                        a,
+                        b,
+                        c,
+                        authoredNormal,
+                        minimumTriangleArea);
+                if (!candidate.Valid)
+                {
+                    return new OneSurfaceTriangulationQuality(
+                        false, 0f, 0f, float.PositiveInfinity, 0f);
+                }
+
+                minimumArea = Mathf.Min(minimumArea, candidate.Area);
+                minimumNormalDot = Mathf.Min(
+                    minimumNormalDot,
+                    candidate.NormalDot);
+                maximumAspectRatio = Mathf.Max(
+                    maximumAspectRatio,
+                    candidate.AspectRatio);
+                minimumAngleDegrees = Mathf.Min(
+                    minimumAngleDegrees,
+                    candidate.MinimumAngleDegrees);
+            }
+
+            return new OneSurfaceTriangulationQuality(
+                true,
+                minimumArea,
+                minimumNormalDot,
+                maximumAspectRatio,
+                minimumAngleDegrees);
+        }
+
+        private static bool IsOneSurfaceTriangulationQualityBetter(
+            OneSurfaceTriangulationQuality candidate,
+            OneSurfaceTriangulationQuality current)
+        {
+            if (!candidate.Valid)
+            {
+                return false;
+            }
+            if (!current.Valid)
+            {
+                return true;
+            }
+
+            const float epsilon = 0.000001f;
+            if (candidate.MinimumNormalDot >
+                current.MinimumNormalDot + epsilon)
+            {
+                return true;
+            }
+            if (Mathf.Abs(
+                    candidate.MinimumNormalDot -
+                    current.MinimumNormalDot) > epsilon)
+            {
+                return false;
+            }
+            if (candidate.MaximumAspectRatio <
+                current.MaximumAspectRatio - epsilon)
+            {
+                return true;
+            }
+            if (Mathf.Abs(
+                    candidate.MaximumAspectRatio -
+                    current.MaximumAspectRatio) > epsilon)
+            {
+                return false;
+            }
+            if (candidate.MinimumAngleDegrees >
+                current.MinimumAngleDegrees + epsilon)
+            {
+                return true;
+            }
+            if (Mathf.Abs(
+                    candidate.MinimumAngleDegrees -
+                    current.MinimumAngleDegrees) > epsilon)
+            {
+                return false;
+            }
+            if (candidate.MinimumArea > current.MinimumArea + epsilon)
+            {
+                return true;
+            }
+            if (Mathf.Abs(
+                    candidate.MinimumArea - current.MinimumArea) > epsilon)
+            {
+                return false;
+            }
+            return false;
+        }
+
+        private static float ResolveOneSurfacePolygonScale(
+            List<Vector3> vertices)
+        {
+            if (vertices == null || vertices.Count == 0)
+            {
+                return 0f;
+            }
+
+            Vector3 minimum = vertices[0];
+            Vector3 maximum = vertices[0];
+            for (int index = 1; index < vertices.Count; index++)
+            {
+                minimum = Vector3.Min(minimum, vertices[index]);
+                maximum = Vector3.Max(maximum, vertices[index]);
+            }
+            return (maximum - minimum).magnitude;
+        }
+
+        private static bool PassesOneSurfaceFinalEmissionAreaGate(
+            Vector3 a,
+            Vector3 b,
+            Vector3 c,
+            float minimumTriangleArea,
+            float polygonScale)
+        {
+            double abx = (double)b.x - a.x;
+            double aby = (double)b.y - a.y;
+            double abz = (double)b.z - a.z;
+            double acx = (double)c.x - a.x;
+            double acy = (double)c.y - a.y;
+            double acz = (double)c.z - a.z;
+            double crossX = aby * acz - abz * acy;
+            double crossY = abz * acx - abx * acz;
+            double crossZ = abx * acy - aby * acx;
+            double crossLengthSquared =
+                crossX * crossX + crossY * crossY + crossZ * crossZ;
+            if (double.IsNaN(crossLengthSquared) ||
+                double.IsInfinity(crossLengthSquared))
+            {
+                return false;
+            }
+
+            double area = 0.5d * Math.Sqrt(crossLengthSquared);
+            double scaleAreaFloor =
+                Math.Max(1e-12d, (double)polygonScale * polygonScale * 1e-10d);
+            double requiredArea = Math.Max(minimumTriangleArea, scaleAreaFloor);
+            return area > requiredArea;
+        }
+
         private static bool TryResolveGeneralOneSurfaceTriangulation(
             List<Vector3> vertices,
             Vector3 authoredNormal,
@@ -8302,6 +8549,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 SelectedMinimumArea = 0f,
                 SelectedMinimumNormalDot = 0f,
+                SelectedMaximumAspectRatio = float.PositiveInfinity,
+                SelectedMinimumAngleDegrees = 0f,
                 SelectedTriangleEvidence = "none",
                 FailureReason = string.Empty
             };
@@ -8398,6 +8647,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         Succeeded = true,
                         MinimumArea = float.PositiveInfinity,
                         MinimumNormalDot = 1f,
+                        MaximumAspectRatio = 0f,
+                        MinimumAngleDegrees = 180f,
                         SplitIndex = -1
                     };
             }
@@ -8420,6 +8671,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             Succeeded = false,
                             MinimumArea = -1f,
                             MinimumNormalDot = -1f,
+                            MaximumAspectRatio = float.PositiveInfinity,
+                            MinimumAngleDegrees = -1f,
                             SplitIndex = -1
                         };
                     if (!diagonalValid[first, last])
@@ -8482,6 +8735,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             Mathf.Min(
                                 left.MinimumNormalDot,
                                 right.MinimumNormalDot));
+                        float maximumAspectRatio = Mathf.Max(
+                            candidate.AspectRatio,
+                            Mathf.Max(
+                                left.MaximumAspectRatio,
+                                right.MaximumAspectRatio));
+                        float minimumAngleDegrees = Mathf.Min(
+                            candidate.MinimumAngleDegrees,
+                            Mathf.Min(
+                                left.MinimumAngleDegrees,
+                                right.MinimumAngleDegrees));
+                        bool betterAspect =
+                            maximumAspectRatio <
+                                best.MaximumAspectRatio - rankingEpsilon;
+                        bool equalAspect = Mathf.Abs(
+                            maximumAspectRatio -
+                            best.MaximumAspectRatio) <= rankingEpsilon;
+                        bool betterAngle =
+                            minimumAngleDegrees >
+                                best.MinimumAngleDegrees + rankingEpsilon;
+                        bool equalAngle = Mathf.Abs(
+                            minimumAngleDegrees -
+                            best.MinimumAngleDegrees) <= rankingEpsilon;
                         bool betterArea =
                             minimumArea >
                                 best.MinimumArea + rankingEpsilon;
@@ -8496,13 +8771,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             best.MinimumNormalDot) <= rankingEpsilon;
                         bool betterSplit = best.SplitIndex < 0 ||
                             middle < best.SplitIndex;
-                        if (!best.Succeeded || betterArea ||
-                            (equalArea && betterNormal) ||
-                            (equalArea && equalNormal && betterSplit))
+                        if (!best.Succeeded || betterAspect ||
+                            (equalAspect && betterAngle) ||
+                            (equalAspect && equalAngle && betterArea) ||
+                            (equalAspect && equalAngle && equalArea &&
+                                betterNormal) ||
+                            (equalAspect && equalAngle && equalArea &&
+                                equalNormal && betterSplit))
                         {
                             best.Succeeded = true;
                             best.MinimumArea = minimumArea;
                             best.MinimumNormalDot = minimumNormalDot;
+                            best.MaximumAspectRatio = maximumAspectRatio;
+                            best.MinimumAngleDegrees = minimumAngleDegrees;
                             best.SplitIndex = middle;
                         }
                     }
@@ -8536,6 +8817,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             audit.SelectedMinimumArea = complete.MinimumArea;
             audit.SelectedMinimumNormalDot =
                 complete.MinimumNormalDot;
+            audit.SelectedMaximumAspectRatio =
+                complete.MaximumAspectRatio;
+            audit.SelectedMinimumAngleDegrees =
+                complete.MinimumAngleDegrees;
             StringBuilder selectedEvidence = new StringBuilder();
             for (int triangleIndex = 0;
                  triangleIndex < triangles.Count;
@@ -9704,6 +9989,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     boundaryFanAudit.BestMinimumNormalDot.ToString(
                         "G9",
                         CultureInfo.InvariantCulture) +
+                    ",bestMaximumAspectRatio:" +
+                    boundaryFanAudit.BestMaximumAspectRatio.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",bestMinimumAngleDegrees:" +
+                    boundaryFanAudit.BestMinimumAngleDegrees.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
                     ",rejectedTriangle:" + rejectionTriangle +
                     ",rejection:" +
                     boundaryFanAudit.Rejection + "}" +
@@ -9731,6 +10024,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         CultureInfo.InvariantCulture) +
                     ",selectedMinimumNormalDot:" +
                     generalAudit.SelectedMinimumNormalDot.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",selectedMaximumAspectRatio:" +
+                    generalAudit.SelectedMaximumAspectRatio.ToString(
+                        "G9",
+                        CultureInfo.InvariantCulture) +
+                    ",selectedMinimumAngleDegrees:" +
+                    generalAudit.SelectedMinimumAngleDegrees.ToString(
                         "G9",
                         CultureInfo.InvariantCulture) +
                     ",selectedTriangles:" +
@@ -9840,7 +10141,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 face.Feature,
                 face.FeatureStrength,
                 authoredNormal,
-                authoredSurfaceGroup);
+                authoredSurfaceGroup,
+                face.ProvenanceKind,
+                face.ProvenanceIndex);
             audit.PolygonSurfaceTriangleCount++;
             audit.PolygonSurfaceAuthoredNormalTriangleCount++;
             audit.PolygonSurfaceAuthoredSurfaceGroupTriangleCount++;
@@ -9939,12 +10242,59 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     OneSurfaceTriangleCandidateFailure.NonFinite);
             }
 
+            float ab = Vector3.Distance(a, b);
+            float bc = Vector3.Distance(b, c);
+            float ca = Vector3.Distance(c, a);
+            float longestEdge = Mathf.Max(ab, Mathf.Max(bc, ca));
+            float aspectRatio = area > 0f
+                ? longestEdge * longestEdge / (4f * area)
+                : float.PositiveInfinity;
+            float minimumAngleDegrees = CalculateOneSurfaceMinimumAngleDegrees(
+                ab,
+                bc,
+                ca);
+            if (!IsFiniteFloat(aspectRatio) ||
+                !IsFiniteFloat(minimumAngleDegrees))
+            {
+                return new OneSurfaceTriangleCandidate(
+                    false,
+                    area,
+                    normalDot,
+                    normalDeviation,
+                    OneSurfaceTriangleCandidateFailure.NonFinite);
+            }
+
             return new OneSurfaceTriangleCandidate(
                 true,
                 area,
                 normalDot,
                 normalDeviation,
+                aspectRatio,
+                minimumAngleDegrees,
                 OneSurfaceTriangleCandidateFailure.None);
+        }
+
+        private static float CalculateOneSurfaceMinimumAngleDegrees(
+            float ab,
+            float bc,
+            float ca)
+        {
+            if (!IsFiniteFloat(ab) || !IsFiniteFloat(bc) ||
+                !IsFiniteFloat(ca) || ab <= 0f || bc <= 0f || ca <= 0f)
+            {
+                return 0f;
+            }
+
+            float angleA = Mathf.Acos(Mathf.Clamp(
+                (ab * ab + ca * ca - bc * bc) / (2f * ab * ca),
+                -1f,
+                1f)) * Mathf.Rad2Deg;
+            float angleB = Mathf.Acos(Mathf.Clamp(
+                (ab * ab + bc * bc - ca * ca) / (2f * ab * bc),
+                -1f,
+                1f)) * Mathf.Rad2Deg;
+            float angleC = 180f - angleA - angleB;
+            return Mathf.Min(angleA, Mathf.Min(angleB, angleC));
         }
 
         private static bool TryResolveOneSurfaceTriangle(
@@ -10103,6 +10453,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 BestCertifiedTriangleCount = -1,
                 BestMinimumArea = 0f,
                 BestMinimumNormalDot = 0f,
+                BestMaximumAspectRatio = float.PositiveInfinity,
+                BestMinimumAngleDegrees = 0f,
                 RejectedTriangleA = -1,
                 RejectedTriangleB = -1,
                 RejectedTriangleC = -1,
@@ -10118,6 +10470,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             authoredNormal.Normalize();
             float bestMinimumNormalDot = -1f;
             float bestMinimumArea = -1f;
+            float bestMaximumAspectRatio = float.PositiveInfinity;
+            float bestMinimumAngleDegrees = -1f;
             const float rankingEpsilon = 0.000001f;
             for (int candidate = 0;
                  candidate < vertices.Count;
@@ -10127,6 +10481,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 anchor = vertices[candidate];
                 float minimumNormalDot = 1f;
                 float minimumArea = float.PositiveInfinity;
+                float maximumAspectRatio = 0f;
+                float minimumAngleDegrees = 180f;
                 int certifiedTriangleCount = 0;
                 int rejectedA = -1;
                 int rejectedB = -1;
@@ -10166,6 +10522,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumArea = Mathf.Min(
                         minimumArea,
                         triangle.Area);
+                    maximumAspectRatio = Mathf.Max(
+                        maximumAspectRatio,
+                        triangle.AspectRatio);
+                    minimumAngleDegrees = Mathf.Min(
+                        minimumAngleDegrees,
+                        triangle.MinimumAngleDegrees);
                 }
 
                 float comparableMinimumArea =
@@ -10222,19 +10584,42 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
 
                 audit.StableAnchors++;
+                bool betterAspect =
+                    maximumAspectRatio <
+                        bestMaximumAspectRatio - rankingEpsilon;
+                bool equalAspect = Mathf.Abs(
+                    maximumAspectRatio -
+                    bestMaximumAspectRatio) <= rankingEpsilon;
+                bool betterAngle =
+                    minimumAngleDegrees >
+                        bestMinimumAngleDegrees + rankingEpsilon;
+                bool equalAngle = Mathf.Abs(
+                    minimumAngleDegrees -
+                    bestMinimumAngleDegrees) <= rankingEpsilon;
+                bool betterArea =
+                    minimumArea > bestMinimumArea + rankingEpsilon;
+                bool equalArea = Mathf.Abs(
+                    minimumArea - bestMinimumArea) <= rankingEpsilon;
                 bool betterNormalAgreement =
                     minimumNormalDot >
                         bestMinimumNormalDot + rankingEpsilon;
                 bool equalNormalAgreement = Mathf.Abs(
                     minimumNormalDot - bestMinimumNormalDot) <=
                         rankingEpsilon;
-                if (!betterNormalAgreement &&
-                    (!equalNormalAgreement ||
-                     minimumArea <= bestMinimumArea))
+                bool lowerAnchor = anchorIndex < 0 || candidate < anchorIndex;
+                if (anchorIndex >= 0 && !betterAspect &&
+                    !(equalAspect && betterAngle) &&
+                    !(equalAspect && equalAngle && betterArea) &&
+                    !(equalAspect && equalAngle && equalArea &&
+                        betterNormalAgreement) &&
+                    !(equalAspect && equalAngle && equalArea &&
+                        equalNormalAgreement && lowerAnchor))
                 {
                     continue;
                 }
 
+                bestMaximumAspectRatio = maximumAspectRatio;
+                bestMinimumAngleDegrees = minimumAngleDegrees;
                 bestMinimumNormalDot = minimumNormalDot;
                 bestMinimumArea = minimumArea;
                 anchorIndex = candidate;
@@ -10248,6 +10633,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 audit.BestMinimumArea = bestMinimumArea;
                 audit.BestMinimumNormalDot =
                     bestMinimumNormalDot;
+                audit.BestMaximumAspectRatio =
+                    bestMaximumAspectRatio;
+                audit.BestMinimumAngleDegrees =
+                    bestMinimumAngleDegrees;
                 audit.RejectedTriangleA = -1;
                 audit.RejectedTriangleB = -1;
                 audit.RejectedTriangleC = -1;

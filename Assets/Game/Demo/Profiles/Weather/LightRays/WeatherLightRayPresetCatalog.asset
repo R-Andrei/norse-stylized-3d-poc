@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7c8fade4db84dae939ebaefc1784ea3, type: 3}
+  m_Name: WeatherLightRayPresetCatalog
+  m_EditorClassIdentifier: 
+  defaultSun: {fileID: 11400000, guid: 70ed4e3bd03340e0bf4377107879d198, type: 2}
+  sunClear: {fileID: 11400000, guid: 65ed379ccc0844a8a94940c49a7fb9d7, type: 2}
+  sunIntense: {fileID: 11400000, guid: 37b096dc9f3b4311861ffb2190e5c459, type: 2}
+  sunHazy: {fileID: 11400000, guid: 118e04f0f1fc4a829c6787eb7dd29de8, type: 2}
+  moonCold: {fileID: 11400000, guid: c5e9bb555ab04c15bf812c1c57616688, type: 2}
+  moonWhite: {fileID: 11400000, guid: 15e7f7312bc845c78333f53df32c35b7, type: 2}
+  moonSubtle: {fileID: 11400000, guid: 8020dc259daa43f6984597d4132242fc, type: 2}
+  bloodMoon: {fileID: 11400000, guid: 483d3d3ef6aa4ba5b439bb704c98043a, type: 2}

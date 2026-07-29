@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using UnityEngine;
 using ProgrammaticStylized3D.Geometry;
 
@@ -883,7 +885,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         faces,
                         PolygonFaceProvenanceKind.EdgeBevelPlane,
                         edge.SourceEdgeIndex);
-                if (edgeFaces.Count != 1)
+                bool fragmentAware =
+                    ShouldUsePlaneCutFragmentAwareBandCertification();
+                bool validOwnedBand = edgeFaces.Count == 1;
+                string ownedBandBlocker = string.Empty;
+                if (fragmentAware && edgeFaces.Count > 0)
+                {
+                    validOwnedBand =
+                        TryValidatePlaneCutOwnedBevelBandSet(
+                            edgeFaces,
+                            edge,
+                            out ownedBandBlocker);
+                }
+                if (!validOwnedBand)
                 {
                     if (edgeFaces.Count == 0)
                     {
@@ -909,16 +923,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             ? "bevel-band edge " +
                                 edge.SourceEdgeIndex +
                                 " has no surviving owned face"
-                            : "bevel-band edge " +
-                                edge.SourceEdgeIndex +
-                                " split into " + edgeFaces.Count +
-                                " owned faces";
+                            : !string.IsNullOrEmpty(ownedBandBlocker)
+                                ? ownedBandBlocker
+                                : "bevel-band edge " +
+                                    edge.SourceEdgeIndex +
+                                    " split into " + edgeFaces.Count +
+                                    " owned faces";
                     }
                     continue;
                 }
-                result.BandSingleFaceCount++;
-
-                PolygonFace edgeFace = edgeFaces[0];
+                if (edgeFaces.Count == 1)
+                {
+                    result.BandSingleFaceCount++;
+                }
                 Vector3 sourceA =
                     context.Graph.Vertices[edge.VertexA].Position;
                 Vector3 sourceB =
@@ -949,19 +966,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector3 edgeDirection = edgeVector / edgeLength;
                 float minimumParameter = float.PositiveInfinity;
                 float maximumParameter = float.NegativeInfinity;
-                for (int vertexIndex = 0;
-                     vertexIndex < edgeFace.Vertices.Count;
-                     vertexIndex++)
+                for (int ownedFaceIndex = 0;
+                     ownedFaceIndex < edgeFaces.Count;
+                     ownedFaceIndex++)
                 {
-                    float parameter = Vector3.Dot(
-                        edgeFace.Vertices[vertexIndex] - sourceA,
-                        edgeDirection) / edgeLength;
-                    minimumParameter = Mathf.Min(
-                        minimumParameter,
-                        parameter);
-                    maximumParameter = Mathf.Max(
-                        maximumParameter,
-                        parameter);
+                    PolygonFace edgeFace = edgeFaces[ownedFaceIndex];
+                    for (int vertexIndex = 0;
+                         vertexIndex < edgeFace.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        float parameter = Vector3.Dot(
+                            edgeFace.Vertices[vertexIndex] - sourceA,
+                            edgeDirection) / edgeLength;
+                        minimumParameter = Mathf.Min(
+                            minimumParameter,
+                            parameter);
+                        maximumParameter = Mathf.Max(
+                            maximumParameter,
+                            parameter);
+                    }
                 }
                 float coverageRatio = Mathf.Max(
                     0f,
@@ -987,7 +1010,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         blocker = "bevel-band edge " +
                             edge.SourceEdgeIndex +
                             " collapsed to axial coverage " +
-                            coverageRatio.ToString("G4");
+                            coverageRatio.ToString("G4") +
+                            "; trace={" +
+                            BuildPlaneCutCollapsedBandTrace(
+                                faces,
+                                edgeFaces,
+                                edge,
+                                sourceA,
+                                sourceB,
+                                minimumParameter,
+                                maximumParameter) +
+                            "}";
                     }
                 }
 
@@ -1082,80 +1115,97 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                 }
 
-                for (int boundaryIndex = 0;
-                     boundaryIndex < edgeFace.Vertices.Count;
-                     boundaryIndex++)
+                for (int ownedFaceIndex = 0;
+                     ownedFaceIndex < edgeFaces.Count;
+                     ownedFaceIndex++)
                 {
-                    Vector3 start = edgeFace.Vertices[boundaryIndex];
-                    Vector3 end = edgeFace.Vertices[
-                        (boundaryIndex + 1) % edgeFace.Vertices.Count];
-                    if (!TryFindPlaneCutAdjacentFace(
-                            faces,
-                            edgeFace,
-                            start,
-                            end,
-                            out PolygonFace adjacent) ||
-                        adjacent.Feature !=
-                            PolygonFaceFeature.ConvexEdgeWear)
+                    PolygonFace edgeFace = edgeFaces[ownedFaceIndex];
+                    for (int boundaryIndex = 0;
+                         boundaryIndex < edgeFace.Vertices.Count;
+                         boundaryIndex++)
                     {
-                        continue;
-                    }
-                    if ((adjacent.ProvenanceKind ==
-                             PolygonFaceProvenanceKind.VertexJunctionPlane ||
-                         adjacent.ProvenanceKind ==
-                             PolygonFaceProvenanceKind.BoundedEndpointCap) &&
-                        (adjacent.ProvenanceIndex == edge.VertexA ||
-                         adjacent.ProvenanceIndex == edge.VertexB))
-                    {
-                        continue;
-                    }
-
-                    float startParameter = Vector3.Dot(
-                        start - sourceA,
-                        edgeDirection) / edgeLength;
-                    float endParameter = Vector3.Dot(
-                        end - sourceA,
-                        edgeDirection) / edgeLength;
-                    float midpointParameter =
-                        (startParameter + endParameter) * 0.5f;
-                    float endpointAllowance = Mathf.Clamp(
-                        Mathf.Max(
-                            edge.Width * 4f,
-                            minimumStableEdgeLength * 0.5f) /
-                            edgeLength,
-                        0.03f,
-                        0.25f);
-                    if (midpointParameter > endpointAllowance &&
-                        midpointParameter < 1f - endpointAllowance)
-                    {
-                        edgeForeignCut = true;
-                        edgeInterrupted = true;
-                        int foreignEdgeIndex =
-                            adjacent.ProvenanceKind ==
-                                PolygonFaceProvenanceKind.EdgeBevelPlane
-                                ? adjacent.ProvenanceIndex
-                                : -1;
-                        int conflictVertex = midpointParameter < 0.5f
-                            ? edge.VertexA
-                            : edge.VertexB;
-                        RecordPlaneCutBandConflict(
-                            ref result,
-                            edge.SourceEdgeIndex,
-                            foreignEdgeIndex,
-                            conflictVertex,
-                            coverageRatio,
-                            midpointParameter,
-                            Mathf.Abs(endParameter - startParameter));
-                        if (offendingVertex < 0)
+                        Vector3 start = edgeFace.Vertices[boundaryIndex];
+                        Vector3 end = edgeFace.Vertices[
+                            (boundaryIndex + 1) % edgeFace.Vertices.Count];
+                        if (!TryFindPlaneCutAdjacentFace(
+                                faces,
+                                edgeFace,
+                                start,
+                                end,
+                                out PolygonFace adjacent) ||
+                            adjacent.Feature !=
+                                PolygonFaceFeature.ConvexEdgeWear)
                         {
-                            offendingVertex = conflictVertex;
-                            blocker = "foreign generated plane " +
-                                adjacent.ProvenanceKind + ":" +
-                                adjacent.ProvenanceIndex +
-                                " splits bevel-band edge " +
-                                edge.SourceEdgeIndex +
-                                " at axial parameter " +
-                                midpointParameter.ToString("G4");
+                            continue;
+                        }
+                        if (adjacent.ProvenanceKind ==
+                                PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                            adjacent.ProvenanceIndex == edge.SourceEdgeIndex)
+                        {
+                            continue;
+                        }
+                        if ((adjacent.ProvenanceKind ==
+                                 PolygonFaceProvenanceKind.
+                                     VertexJunctionPlane ||
+                             adjacent.ProvenanceKind ==
+                                 PolygonFaceProvenanceKind.
+                                     BoundedEndpointCap) &&
+                            (adjacent.ProvenanceIndex == edge.VertexA ||
+                             adjacent.ProvenanceIndex == edge.VertexB))
+                        {
+                            continue;
+                        }
+
+                        float startParameter = Vector3.Dot(
+                            start - sourceA,
+                            edgeDirection) / edgeLength;
+                        float endParameter = Vector3.Dot(
+                            end - sourceA,
+                            edgeDirection) / edgeLength;
+                        float midpointParameter =
+                            (startParameter + endParameter) * 0.5f;
+                        float endpointAllowance = Mathf.Clamp(
+                            Mathf.Max(
+                                edge.Width * 4f,
+                                minimumStableEdgeLength * 0.5f) /
+                                edgeLength,
+                            0.03f,
+                            0.25f);
+                        if (midpointParameter > endpointAllowance &&
+                            midpointParameter <
+                                1f - endpointAllowance)
+                        {
+                            edgeForeignCut = true;
+                            edgeInterrupted = true;
+                            int foreignEdgeIndex =
+                                adjacent.ProvenanceKind ==
+                                    PolygonFaceProvenanceKind.
+                                        EdgeBevelPlane
+                                    ? adjacent.ProvenanceIndex
+                                    : -1;
+                            int conflictVertex = midpointParameter < 0.5f
+                                ? edge.VertexA
+                                : edge.VertexB;
+                            RecordPlaneCutBandConflict(
+                                ref result,
+                                edge.SourceEdgeIndex,
+                                foreignEdgeIndex,
+                                conflictVertex,
+                                coverageRatio,
+                                midpointParameter,
+                                Mathf.Abs(
+                                    endParameter - startParameter));
+                            if (offendingVertex < 0)
+                            {
+                                offendingVertex = conflictVertex;
+                                blocker = "foreign generated plane " +
+                                    adjacent.ProvenanceKind + ":" +
+                                    adjacent.ProvenanceIndex +
+                                    " splits bevel-band edge " +
+                                    edge.SourceEdgeIndex +
+                                    " at axial parameter " +
+                                    midpointParameter.ToString("G4");
+                            }
                         }
                     }
                 }
@@ -1227,6 +1277,291 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return matches;
         }
 
+        private static bool
+            ShouldUsePlaneCutFragmentAwareBandCertification()
+        {
+            if (!IsCornerDamageRecoveryTournamentActive())
+            {
+                return false;
+            }
+            CornerDamageRecoveryTournamentConfiguration configuration =
+                ResolveCornerDamageRecoveryTournamentConfiguration();
+            return configuration.Strategy !=
+                CornerDamageRecoveryTournamentStrategy.
+                    LegacyBoundedEndpointCell;
+        }
+
+        private static bool TryValidatePlaneCutOwnedBevelBandSet(
+            List<PolygonFace> edgeFaces,
+            PlaneCutBevelCandidate edge,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (edgeFaces == null || edgeFaces.Count == 0)
+            {
+                blocker = "fragment-aware bevel band had no owned faces";
+                return false;
+            }
+
+            HashSet<string> signatures = new HashSet<string>(
+                StringComparer.Ordinal);
+            Dictionary<EdgeKey, List<int>> owners =
+                new Dictionary<EdgeKey, List<int>>();
+            Dictionary<EdgeKey,
+                List<KeyValuePair<VertexKey, VertexKey>>> directions =
+                    new Dictionary<EdgeKey,
+                        List<KeyValuePair<VertexKey, VertexKey>>>();
+            float tolerance = Mathf.Max(
+                edge.PlaneTolerance,
+                PointMergeDistance * 4f);
+            for (int faceIndex = 0;
+                 faceIndex < edgeFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = edgeFaces[faceIndex];
+                if (face == null || face.Vertices == null ||
+                    face.Vertices.Count < 3 ||
+                    Vector3.Dot(face.Normal, edge.Plane.Normal) < 0.999f)
+                {
+                    blocker = "bevel-band edge " +
+                        edge.SourceEdgeIndex +
+                        " retained a non-coplanar or degenerate fragment";
+                    return false;
+                }
+                string signature =
+                    BuildPlaneCutEndpointPatchFaceSignature(face);
+                if (!signatures.Add(signature))
+                {
+                    blocker = "bevel-band edge " +
+                        edge.SourceEdgeIndex +
+                        " retained duplicate polygon fragments";
+                    return false;
+                }
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    if (Mathf.Abs(edge.Plane.SignedDistance(
+                            face.Vertices[vertexIndex])) > tolerance)
+                    {
+                        blocker = "bevel-band edge " +
+                            edge.SourceEdgeIndex +
+                            " retained a fragment outside its defining plane";
+                        return false;
+                    }
+                    EdgeKey key = new EdgeKey(
+                        face.Vertices[vertexIndex],
+                        face.Vertices[
+                            (vertexIndex + 1) % face.Vertices.Count]);
+                    if (!owners.TryGetValue(key, out List<int> list))
+                    {
+                        list = new List<int>();
+                        owners.Add(key, list);
+                        directions.Add(
+                            key,
+                            new List<KeyValuePair<
+                                VertexKey, VertexKey>>());
+                    }
+                    list.Add(faceIndex);
+                    directions[key].Add(
+                        new KeyValuePair<VertexKey, VertexKey>(
+                            new VertexKey(face.Vertices[vertexIndex]),
+                            new VertexKey(face.Vertices[
+                                (vertexIndex + 1) %
+                                    face.Vertices.Count])));
+                }
+            }
+
+            List<HashSet<int>> adjacency = new List<HashSet<int>>(
+                edgeFaces.Count);
+            for (int faceIndex = 0;
+                 faceIndex < edgeFaces.Count;
+                 faceIndex++)
+            {
+                adjacency.Add(new HashSet<int>());
+            }
+            foreach (KeyValuePair<EdgeKey, List<int>> pair in owners)
+            {
+                if (pair.Value.Count > 2)
+                {
+                    blocker = "bevel-band edge " +
+                        edge.SourceEdgeIndex +
+                        " retained a non-manifold internal fragment edge";
+                    return false;
+                }
+                if (pair.Value.Count == 2)
+                {
+                    if (pair.Value[0] == pair.Value[1])
+                    {
+                        blocker = "bevel-band edge " +
+                            edge.SourceEdgeIndex +
+                            " retained a repeated edge inside one fragment";
+                        return false;
+                    }
+                    List<KeyValuePair<VertexKey, VertexKey>>
+                        edgeDirections = directions[pair.Key];
+                    if (edgeDirections.Count != 2 ||
+                        !edgeDirections[0].Key.Equals(
+                            edgeDirections[1].Value) ||
+                        !edgeDirections[0].Value.Equals(
+                            edgeDirections[1].Key))
+                    {
+                        blocker = "bevel-band edge " +
+                            edge.SourceEdgeIndex +
+                            " retained a same-winding internal fragment seam";
+                        return false;
+                    }
+                    adjacency[pair.Value[0]].Add(pair.Value[1]);
+                    adjacency[pair.Value[1]].Add(pair.Value[0]);
+                }
+            }
+
+            HashSet<int> visited = new HashSet<int>();
+            Queue<int> queue = new Queue<int>();
+            int componentCount = 0;
+            for (int seed = 0; seed < edgeFaces.Count; seed++)
+            {
+                if (!visited.Add(seed))
+                {
+                    continue;
+                }
+                componentCount++;
+                queue.Enqueue(seed);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    foreach (int neighbor in adjacency[current])
+                    {
+                        if (visited.Add(neighbor))
+                        {
+                            queue.Enqueue(neighbor);
+                        }
+                    }
+                }
+            }
+            if (componentCount != 1)
+            {
+                blocker = "bevel-band edge " +
+                    edge.SourceEdgeIndex +
+                    " split into " + componentCount +
+                    " disconnected fragment components";
+                return false;
+            }
+            return true;
+        }
+
+        private static string BuildPlaneCutCollapsedBandTrace(
+            List<PolygonFace> allFaces,
+            List<PolygonFace> ownedFaces,
+            PlaneCutBevelCandidate edge,
+            Vector3 sourceA,
+            Vector3 sourceB,
+            float minimumParameter,
+            float maximumParameter)
+        {
+            StringBuilder builder = new StringBuilder();
+            Vector3 axis = sourceB - sourceA;
+            builder.Append("sourceA=");
+            builder.Append(sourceA.ToString("G9"));
+            builder.Append(",sourceB=");
+            builder.Append(sourceB.ToString("G9"));
+            builder.Append(",sourceLength=");
+            builder.Append(axis.magnitude.ToString("G9"));
+            builder.Append(",retainedInterval=");
+            builder.Append(minimumParameter.ToString("G9"));
+            builder.Append("..");
+            builder.Append(maximumParameter.ToString("G9"));
+            builder.Append(",ownedVertices={");
+            if (ownedFaces == null || ownedFaces.Count == 0)
+            {
+                builder.Append("none");
+            }
+            else
+            {
+                bool firstVertex = true;
+                for (int faceIndex = 0;
+                     faceIndex < ownedFaces.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = ownedFaces[faceIndex];
+                    if (face == null || face.Vertices == null)
+                    {
+                        continue;
+                    }
+                    for (int vertexIndex = 0;
+                         vertexIndex < face.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        if (!firstVertex)
+                        {
+                            builder.Append('/');
+                        }
+                        firstVertex = false;
+                        Vector3 vertex = face.Vertices[vertexIndex];
+                        float parameter = axis.sqrMagnitude <=
+                                PointMergeDistance * PointMergeDistance
+                            ? 0f
+                            : Vector3.Dot(vertex - sourceA, axis) /
+                                axis.sqrMagnitude;
+                        builder.Append(vertex.ToString("G9"));
+                        builder.Append('@');
+                        builder.Append(parameter.ToString("G9"));
+                    }
+                }
+            }
+            builder.Append("},intersectingGeneratedPlanes={");
+            bool firstPlane = true;
+            if (allFaces != null && axis.sqrMagnitude >
+                PointMergeDistance * PointMergeDistance)
+            {
+                for (int faceIndex = 0;
+                     faceIndex < allFaces.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = allFaces[faceIndex];
+                    if (face == null || face.Vertices == null ||
+                        face.Vertices.Count == 0 ||
+                        (face.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                         face.ProvenanceIndex == edge.SourceEdgeIndex))
+                    {
+                        continue;
+                    }
+                    float denominator = Vector3.Dot(face.Normal, axis);
+                    if (Mathf.Abs(denominator) <= 1e-7f)
+                    {
+                        continue;
+                    }
+                    float parameter = Vector3.Dot(
+                        face.Normal,
+                        face.Vertices[0] - sourceA) / denominator;
+                    if (parameter < -0.1f || parameter > 1.1f)
+                    {
+                        continue;
+                    }
+                    if (!firstPlane)
+                    {
+                        builder.Append('/');
+                    }
+                    firstPlane = false;
+                    builder.Append(face.ProvenanceKind);
+                    builder.Append(':');
+                    builder.Append(face.ProvenanceIndex);
+                    builder.Append('@');
+                    builder.Append(parameter.ToString("G9"));
+                    builder.Append("[n=");
+                    builder.Append(face.Normal.ToString("G9"));
+                    builder.Append("]");
+                }
+            }
+            if (firstPlane)
+            {
+                builder.Append("none");
+            }
+            builder.Append('}');
+            return builder.ToString();
+        }
+
         private static bool TryFindSinglePlaneCutProvenanceFace(
             List<PolygonFace> faces,
             PolygonFaceProvenanceKind provenanceKind,
@@ -1285,6 +1620,79 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
             }
             return false;
+        }
+
+        private static string BuildPlaneCutTopologyFailureDiagnostic(
+            List<PolygonFace> faces,
+            EdgeWearTopologyStats topology)
+        {
+            Dictionary<EdgeKey, List<int>> edgeOwners =
+                new Dictionary<EdgeKey, List<int>>();
+            Dictionary<EdgeKey, string> edgeSignatures =
+                new Dictionary<EdgeKey, string>();
+            for (int faceIndex = 0;
+                 faceIndex < faces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = faces[faceIndex];
+                for (int edgeIndex = 0;
+                     edgeIndex < face.Vertices.Count;
+                     edgeIndex++)
+                {
+                    Vector3 start = face.Vertices[edgeIndex];
+                    Vector3 end = face.Vertices[
+                        (edgeIndex + 1) % face.Vertices.Count];
+                    EdgeKey key = new EdgeKey(start, end);
+                    if (!edgeOwners.TryGetValue(
+                            key,
+                            out List<int> owners))
+                    {
+                        owners = new List<int>();
+                        edgeOwners.Add(key, owners);
+                        string startSignature =
+                            BuildPlaneCutEndpointPatchPointSignature(start);
+                        string endSignature =
+                            BuildPlaneCutEndpointPatchPointSignature(end);
+                        edgeSignatures.Add(
+                            key,
+                            string.CompareOrdinal(
+                                    startSignature,
+                                    endSignature) <= 0
+                                ? startSignature + "->" + endSignature
+                                : endSignature + "->" + startSignature);
+                    }
+                    owners.Add(faceIndex);
+                }
+            }
+
+            List<KeyValuePair<EdgeKey, List<int>>> defects =
+                edgeOwners.Where(pair => pair.Value.Count != 2).
+                    OrderBy(pair => edgeSignatures[pair.Key],
+                        StringComparer.Ordinal).
+                    ToList();
+            string firstDefect = "none";
+            if (defects.Count > 0)
+            {
+                KeyValuePair<EdgeKey, List<int>> defect = defects[0];
+                List<string> ownerSignatures = defect.Value.Select(
+                    faceIndex =>
+                        ((int)faces[faceIndex].ProvenanceKind).ToString() +
+                        ":" +
+                        faces[faceIndex].ProvenanceIndex.ToString()).
+                    OrderBy(value => value, StringComparer.Ordinal).
+                    ToList();
+                firstDefect = edgeSignatures[defect.Key] +
+                    "@owners=" + defect.Value.Count +
+                    "@faces=" + string.Join("/", ownerSignatures);
+            }
+            else if (topology.TJunctionCount > 0)
+            {
+                firstDefect = "t-junction-vertex-unresolved";
+            }
+            return "topology(open=" + topology.OpenEdgeCount +
+                ",nonManifold=" + topology.NonManifoldEdgeCount +
+                ",tJunction=" + topology.TJunctionCount +
+                ",first=" + firstDefect + ")";
         }
 
         private static bool DoAcceptedPlaneCutJunctionCapsSurvive(
@@ -1726,6 +2134,5147 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return sum;
         }
 
+        private static bool TryPrepareCornerDamageRecoveryTournamentStrategy(
+            CornerDamageIntegrationPlan plan,
+            List<PlaneCutBevelCandidate> preparedCandidates,
+            List<PlaneCutBevelCandidate> minimumCandidates,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            int conflictVertexIndex,
+            CornerDamageRecoveryTournamentConfiguration configuration)
+        {
+            if (configuration.Strategy ==
+                CornerDamageRecoveryTournamentStrategy.
+                    LegacyBoundedEndpointCell)
+            {
+                return TryPrepareCornerDamageEndpointPatchRecovery(
+                    plan,
+                    preparedCandidates,
+                    minimumCandidates,
+                    victim,
+                    foreign,
+                    conflictVertexIndex);
+            }
+
+            PlaneCutBevelTerminationOwnership ownership =
+                PlaneCutBevelTerminationOwnership.EndpointStar;
+            PlaneCutBevelTerminationClosure closure =
+                PlaneCutBevelTerminationClosure.ConformingNormalizedCavity;
+            PlaneCutBevelTerminationPreconditioner preconditioner =
+                PlaneCutBevelTerminationPreconditioner.None;
+            PlaneCutRemoteComponentSelection remoteSelection =
+                PlaneCutRemoteComponentSelection.FurthestAxialReach;
+            float taperTipFraction = 0.35f;
+            float primaryWidthScale = 1f;
+            float favoredWidthScale = 1f;
+            int selectiveIdentityMode = -1;
+            int widthFavoredIdentityMode = -1;
+            bool widthScaleSelectedOnly = false;
+            bool selectAllExceptIdentity = false;
+            bool allowSingleIncident = false;
+            bool fragmentAwareBandCertification = true;
+            bool ownLimitIncidentPartition = false;
+            bool requireSimpleClosureCycles = false;
+            bool directSimpleCycleTriangles = false;
+            bool conformBeforeClosureDecision = false;
+            bool postClosureFixedPointConformance = false;
+
+            switch (configuration.Strategy)
+            {
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentConforming:
+                    remoteSelection = configuration.VariantIndex == 1
+                        ? PlaneCutRemoteComponentSelection.LargestArea
+                        : configuration.VariantIndex == 2
+                            ? PlaneCutRemoteComponentSelection.
+                                NearestRemoteEndpoint
+                            : PlaneCutRemoteComponentSelection.
+                                FurthestAxialReach;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentFixedPoint:
+                    remoteSelection = configuration.VariantIndex == 1
+                        ? PlaneCutRemoteComponentSelection.LargestArea
+                        : configuration.VariantIndex == 2
+                            ? PlaneCutRemoteComponentSelection.
+                                NearestRemoteEndpoint
+                            : PlaneCutRemoteComponentSelection.
+                                FurthestAxialReach;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentSimpleCycleFixedPoint:
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentSourceStripsFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        SourceFaceTransitionStrips;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentHalfEdgeFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        OrientedHalfEdgeCavity;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentCellFanFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        BoundaryEdgeCellFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentAxialTransitionFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        AxialCapsAndTransitionLoops;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentTaperTransitionFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        TaperFansAndTransitionLoops;
+                    taperTipFraction = Mathf.Clamp(
+                        configuration.PrimaryParameter,
+                        0.05f,
+                        0.95f);
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    RemoteComponentRawEdgeFanFixedPoint:
+                    closure = PlaneCutBevelTerminationClosure.
+                        RawEdgeCavityFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitSimpleCycleFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitSourceStripsFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        SourceFaceTransitionStrips;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitHalfEdgeFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        OrientedHalfEdgeCavity;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitCellFanFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        BoundaryEdgeCellFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitRawEdgeFanFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        RawEdgeCavityFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitAxialTransitionFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        AxialCapsAndTransitionLoops;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    OwnLimitTaperTransitionFixedPoint:
+                    remoteSelection = PlaneCutRemoteComponentSelection.None;
+                    ownLimitIncidentPartition = true;
+                    closure = PlaneCutBevelTerminationClosure.
+                        TaperFansAndTransitionLoops;
+                    taperTipFraction = Mathf.Clamp(
+                        configuration.PrimaryParameter,
+                        0.05f,
+                        0.95f);
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    WidthPreconditionedRemoteComponentFixedPoint:
+                    preconditioner =
+                        PlaneCutBevelTerminationPreconditioner.
+                            WidthRedistribution;
+                    primaryWidthScale = Mathf.Clamp(
+                        configuration.PrimaryParameter,
+                        0.05f,
+                        1f);
+                    favoredWidthScale = Mathf.Clamp(
+                        configuration.SecondaryParameter,
+                        primaryWidthScale,
+                        1f);
+                    widthScaleSelectedOnly =
+                        configuration.VariantIndex >= 10;
+                    widthFavoredIdentityMode = widthScaleSelectedOnly
+                        ? configuration.VariantIndex - 10
+                        : configuration.VariantIndex;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    SingleBandSuppressionFixedPoint:
+                    selectiveIdentityMode = 2 +
+                        Mathf.Max(0, configuration.VariantIndex);
+                    allowSingleIncident = true;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    conformBeforeClosureDecision = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    AllButOneBandSuppressionFixedPoint:
+                    selectiveIdentityMode = 2 +
+                        Mathf.Max(0, configuration.VariantIndex);
+                    selectAllExceptIdentity = true;
+                    allowSingleIncident = true;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    conformBeforeClosureDecision = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    AllBandSuppressionFixedPoint:
+                    selectiveIdentityMode = -1;
+                    allowSingleIncident = true;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    conformBeforeClosureDecision = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentSimpleCycleFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    requireSimpleClosureCycles = true;
+                    directSimpleCycleTriangles = true;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentSourceStripsFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        SourceFaceTransitionStrips;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentHalfEdgeFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        OrientedHalfEdgeCavity;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentCellFanFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        BoundaryEdgeCellFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentRawEdgeFanFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        RawEdgeCavityFan;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentAxialTransitionFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        AxialCapsAndTransitionLoops;
+                    postClosureFixedPointConformance = true;
+                    break;
+                case CornerDamageRecoveryTournamentStrategy.
+                    GeometricCellRemoteComponentTaperTransitionFixedPoint:
+                    ownership =
+                        PlaneCutBevelTerminationOwnership.GeometricCell;
+                    closure = PlaneCutBevelTerminationClosure.
+                        TaperFansAndTransitionLoops;
+                    taperTipFraction = Mathf.Clamp(
+                        configuration.PrimaryParameter,
+                        0.05f,
+                        0.95f);
+                    postClosureFixedPointConformance = true;
+                    break;
+            }
+
+            return TryPrepareCornerDamageBevelTerminationRecovery(
+                plan,
+                preparedCandidates,
+                minimumCandidates,
+                victim,
+                foreign,
+                conflictVertexIndex,
+                new PlaneCutBevelTerminationOptions(
+                    ownership,
+                    closure,
+                    preconditioner,
+                    remoteSelection,
+                    1f,
+                    taperTipFraction,
+                    primaryWidthScale,
+                    favoredWidthScale,
+                    selectiveIdentityMode,
+                    widthFavoredIdentityMode,
+                    widthScaleSelectedOnly,
+                    selectAllExceptIdentity,
+                    allowSingleIncident,
+                    fragmentAwareBandCertification,
+                    ownLimitIncidentPartition,
+                    requireSimpleClosureCycles,
+                    directSimpleCycleTriangles,
+                    conformBeforeClosureDecision,
+                    postClosureFixedPointConformance,
+                    configuration.Name));
+        }
+
+        private static bool TryPrepareCornerDamageBevelTerminationRecovery(
+            CornerDamageIntegrationPlan plan,
+            List<PlaneCutBevelCandidate> preparedCandidates,
+            List<PlaneCutBevelCandidate> minimumCandidates,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            int conflictVertexIndex)
+        {
+            if (IsCornerDamageRecoveryTournamentActive())
+            {
+                return TryPrepareCornerDamageRecoveryTournamentStrategy(
+                    plan,
+                    preparedCandidates,
+                    minimumCandidates,
+                    victim,
+                    foreign,
+                    conflictVertexIndex,
+                    ResolveCornerDamageRecoveryTournamentConfiguration());
+            }
+            return TryPrepareCornerDamageBevelTerminationRecovery(
+                plan,
+                preparedCandidates,
+                minimumCandidates,
+                victim,
+                foreign,
+                conflictVertexIndex,
+                PlaneCutBevelTerminationOptions.Production);
+        }
+
+        private static bool TryPrepareCornerDamageBevelTerminationRecovery(
+            CornerDamageIntegrationPlan plan,
+            List<PlaneCutBevelCandidate> preparedCandidates,
+            List<PlaneCutBevelCandidate> minimumCandidates,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            int conflictVertexIndex,
+            PlaneCutBevelTerminationOptions options)
+        {
+            if (plan == null)
+            {
+                return false;
+            }
+
+            System.Diagnostics.Stopwatch stopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            ResetEndpointPatchRecoveryAttempt(
+                plan,
+                victim.SourceEdgeIndex,
+                foreign.SourceEdgeIndex);
+            try
+            {
+                PlaneCutBevelSolvedPlan solvedPlan = plan.SolvedPlan;
+                if (solvedPlan == null || solvedPlan.Context == null ||
+                    solvedPlan.Context.Graph == null ||
+                    solvedPlan.SourceFaces == null ||
+                    preparedCandidates == null ||
+                    minimumCandidates == null ||
+                    conflictVertexIndex < 0 ||
+                    conflictVertexIndex >=
+                        solvedPlan.Context.Graph.Vertices.Count)
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                        "conflict-local bevel termination was unavailable because prepared topology was incomplete");
+                    return false;
+                }
+
+                int sharedVertexIndex = ResolvePlaneCutEndpointPatchVertex(
+                    victim,
+                    foreign);
+                if (sharedVertexIndex < 0 ||
+                    sharedVertexIndex != conflictVertexIndex)
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.UnsupportedStar,
+                        "conflict-local bevel termination requires the victim and foreign bands to share the implicated endpoint");
+                    return false;
+                }
+
+                List<PlaneCutBevelCandidate> effectivePreparedCandidates =
+                    preparedCandidates;
+                List<PlaneCutBevelCandidate> effectiveMinimumCandidates =
+                    minimumCandidates;
+                if (options.Preconditioner ==
+                    PlaneCutBevelTerminationPreconditioner.WidthRedistribution)
+                {
+                    if (!TryBuildPlaneCutBoundaryTournamentRedistribution(
+                            solvedPlan.Context,
+                            preparedCandidates,
+                            minimumCandidates,
+                            sharedVertexIndex,
+                            victim,
+                            foreign,
+                            options,
+                            solvedPlan.MinimumStableEdgeLength,
+                            out effectivePreparedCandidates,
+                            out effectiveMinimumCandidates,
+                            out string redistributionBlocker))
+                    {
+                        RecordEndpointPatchRecoveryRejection(
+                            plan,
+                            PlaneCutEndpointPatchRejectionKind.BandIntegrity,
+                            redistributionBlocker);
+                        return false;
+                    }
+                }
+
+                List<PlaneCutBevelCandidate> preparedIncident =
+                    GetActivePlaneCutIncidentCandidates(
+                        effectivePreparedCandidates,
+                        sharedVertexIndex);
+                List<PlaneCutBevelCandidate> minimumIncident =
+                    GetActivePlaneCutIncidentCandidates(
+                        effectiveMinimumCandidates,
+                        sharedVertexIndex);
+                plan.EndpointPatchRecoveryIncidentBandCount =
+                    preparedIncident.Count;
+                if (!IsSupportedEndpointPatchRecoverySet(
+                        preparedIncident,
+                        victim.SourceEdgeIndex,
+                        foreign.SourceEdgeIndex) ||
+                    !AreMatchingEndpointPatchRecoverySets(
+                        preparedIncident,
+                        minimumIncident))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.UnsupportedStar,
+                        "conflict-local bevel termination supports one complete retained two/three-band endpoint star");
+                    return false;
+                }
+
+                if (!TryResolvePlaneCutBevelTerminationIncidentSubset(
+                        preparedIncident,
+                        minimumIncident,
+                        victim,
+                        foreign,
+                        options,
+                        out List<PlaneCutBevelCandidate>
+                            terminationPreparedIncident,
+                        out List<PlaneCutBevelCandidate>
+                            terminationMinimumIncident,
+                        out string incidentSubsetBlocker))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.UnsupportedStar,
+                        incidentSubsetBlocker);
+                    return false;
+                }
+                plan.EndpointPatchRecoveryIncidentBandCount =
+                    terminationPreparedIncident.Count;
+
+                List<PlaneCutVertexJunctionCandidate> noJunctions =
+                    new List<PlaneCutVertexJunctionCandidate>();
+                if (!TryBuildPlaneCutSystemFaces(
+                        solvedPlan.SourceFaces,
+                        effectivePreparedCandidates,
+                        noJunctions,
+                        out List<PolygonFace> preparedFullFaces,
+                        out _,
+                        out string preparedFullBlocker,
+                        new PlaneCutNumericalRepairTelemetry()))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                        "prepared ordinary shell was unavailable: " +
+                        preparedFullBlocker);
+                    return false;
+                }
+                if (!TryBuildPlaneCutSystemFaces(
+                        solvedPlan.SourceFaces,
+                        effectiveMinimumCandidates,
+                        noJunctions,
+                        out List<PolygonFace> minimumFullFaces,
+                        out _,
+                        out string minimumFullBlocker,
+                        new PlaneCutNumericalRepairTelemetry()))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                        "legal-minimum ordinary shell was unavailable: " +
+                        minimumFullBlocker);
+                    return false;
+                }
+
+                HashSet<int> terminatedIdentities = new HashSet<int>();
+                for (int index = 0; index < terminationPreparedIncident.Count; index++)
+                {
+                    terminatedIdentities.Add(
+                        terminationPreparedIncident[index].SourceEdgeIndex);
+                }
+                List<PlaneCutBevelCandidate> preparedPocketCandidates =
+                    BuildPlaneCutCandidatesExcludingIdentities(
+                        effectivePreparedCandidates,
+                        terminatedIdentities);
+                List<PlaneCutBevelCandidate> minimumPocketCandidates =
+                    BuildPlaneCutCandidatesExcludingIdentities(
+                        effectiveMinimumCandidates,
+                        terminatedIdentities);
+                if (!TryBuildPlaneCutSystemFaces(
+                        solvedPlan.SourceFaces,
+                        preparedPocketCandidates,
+                        noJunctions,
+                        out List<PolygonFace> preparedPocketFaces,
+                        out _,
+                        out string preparedPocketBlocker,
+                        new PlaneCutNumericalRepairTelemetry()))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                        "prepared endpoint source-pocket shell was unavailable: " +
+                        preparedPocketBlocker);
+                    return false;
+                }
+                if (!TryBuildPlaneCutSystemFaces(
+                        solvedPlan.SourceFaces,
+                        minimumPocketCandidates,
+                        noJunctions,
+                        out List<PolygonFace> minimumPocketFaces,
+                        out _,
+                        out string minimumPocketBlocker,
+                        new PlaneCutNumericalRepairTelemetry()))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                        "legal-minimum endpoint source-pocket shell was unavailable: " +
+                        minimumPocketBlocker);
+                    return false;
+                }
+
+                if (!TryBuildPlaneCutBevelTerminationLimits(
+                        solvedPlan.Context,
+                        sharedVertexIndex,
+                        terminationPreparedIncident,
+                        solvedPlan.MinimumStableEdgeLength,
+                        options,
+                        out PlaneCutEndpointCellLimit[] limits,
+                        out string limitSignature,
+                        out string limitBlocker))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.Locality,
+                        limitBlocker);
+                    return false;
+                }
+
+                plan.EndpointPatchRecoveryTrialCount++;
+                if (!TryBuildPlaneCutBevelTerminationReplacement(
+                        preparedFullFaces,
+                        preparedPocketFaces,
+                        solvedPlan.Context,
+                        effectivePreparedCandidates,
+                        terminationPreparedIncident,
+                        sharedVertexIndex,
+                        limits,
+                        limitSignature,
+                        solvedPlan.MinimumStableEdgeLength,
+                        solvedPlan.MinimumStableFaceArea,
+                        options,
+                        out PlaneCutEndpointPatchReplacement prepared,
+                        out PlaneCutEndpointCellEvidence preparedEvidence,
+                        out PlaneCutEndpointPatchRejectionKind rejection,
+                        out string blocker))
+                {
+                    ApplyEndpointCellEvidence(plan, preparedEvidence);
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        rejection,
+                        blocker);
+                    return false;
+                }
+                ApplyEndpointCellEvidence(plan, preparedEvidence);
+
+                if (!TryBuildPlaneCutBevelTerminationReplacement(
+                        minimumFullFaces,
+                        minimumPocketFaces,
+                        solvedPlan.Context,
+                        effectiveMinimumCandidates,
+                        terminationMinimumIncident,
+                        sharedVertexIndex,
+                        limits,
+                        limitSignature,
+                        solvedPlan.MinimumStableEdgeLength,
+                        solvedPlan.MinimumStableFaceArea,
+                        options,
+                        out PlaneCutEndpointPatchReplacement minimum,
+                        out PlaneCutEndpointCellEvidence minimumEvidence,
+                        out rejection,
+                        out blocker))
+                {
+                    ApplyEndpointCellEvidence(plan, minimumEvidence);
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        rejection,
+                        "legal-minimum termination rejected: " + blocker);
+                    return false;
+                }
+                if (!DoPlaneCutBevelTerminationReplacementsMatch(
+                        prepared,
+                        minimum))
+                {
+                    RecordEndpointPatchRecoveryRejection(
+                        plan,
+                        PlaneCutEndpointPatchRejectionKind.PreparedMinimumParity,
+                        "prepared and legal-minimum bevel terminations produced different identity, loop, or replacement topology");
+                    return false;
+                }
+
+                solvedPlan.PreparedJunctions ??=
+                    new List<PlaneCutVertexJunctionCandidate>();
+                solvedPlan.PreparedJunctions.Clear();
+                if (options.Preconditioner ==
+                    PlaneCutBevelTerminationPreconditioner.WidthRedistribution)
+                {
+                    solvedPlan.RetainedCandidates =
+                        effectivePreparedCandidates;
+                }
+                solvedPlan.PreparedEndpointPatch = prepared;
+                plan.EndpointPatchRecoveryPrepared = true;
+                plan.EndpointPatchRecoveryRejection =
+                    PlaneCutEndpointPatchRejectionKind.None;
+                plan.EndpointPatchRecoveryVertexIndex = sharedVertexIndex;
+                plan.EndpointPatchRecoverySelectedFaceCount =
+                    prepared.SelectedFaceCount;
+                plan.EndpointPatchRecoveryBoundaryVertexCount =
+                    prepared.BoundaryVertexCount;
+                plan.EndpointPatchRecoveryBoundarySignature =
+                    prepared.TerminationLoopSignature;
+                plan.EndpointPatchRecoveryCellLimitSignature =
+                    prepared.CellLimitSignature;
+                plan.EndpointPatchRecoveryFacesSubdivided =
+                    prepared.FacesSubdivided;
+                plan.EndpointPatchRecoveryLocalFragmentCount =
+                    prepared.RestoredPocketFaceCount;
+                plan.EndpointPatchRecoveryRemoteRemainderCount =
+                    prepared.RemoteRemainderCount;
+                plan.EndpointPatchRecoveryCellFaceCount =
+                    prepared.CellFaceCount;
+                plan.EndpointPatchRecoveryCapVertexCount =
+                    prepared.CapVertexCount;
+                plan.EndpointPatchRecoveryDiagnostic =
+                    (string.IsNullOrEmpty(options.StrategyName)
+                        ? "conflict-local termination"
+                        : options.StrategyName) +
+                    " certified for incident edges {" +
+                    string.Join("/", prepared.TerminatedSourceEdgeIndices) +
+                    "}; remote bevel identities retained and endpoint source pocket restored";
+                return true;
+            }
+            finally
+            {
+                stopwatch.Stop();
+                plan.EndpointPatchRecoveryMilliseconds =
+                    stopwatch.Elapsed.TotalMilliseconds;
+            }
+        }
+
+        private static bool TryResolvePlaneCutBevelTerminationIncidentSubset(
+            List<PlaneCutBevelCandidate> preparedIncident,
+            List<PlaneCutBevelCandidate> minimumIncident,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            PlaneCutBevelTerminationOptions options,
+            out List<PlaneCutBevelCandidate> preparedSubset,
+            out List<PlaneCutBevelCandidate> minimumSubset,
+            out string blocker)
+        {
+            preparedSubset = new List<PlaneCutBevelCandidate>();
+            minimumSubset = new List<PlaneCutBevelCandidate>();
+            blocker = string.Empty;
+            if (preparedIncident == null || minimumIncident == null ||
+                preparedIncident.Count != minimumIncident.Count ||
+                preparedIncident.Count == 0)
+            {
+                blocker = "termination incident subsets were unavailable";
+                return false;
+            }
+            if (options.SelectiveIdentityMode < 0 &&
+                options.SelectiveIdentityMode != -2)
+            {
+                preparedSubset.AddRange(preparedIncident);
+                minimumSubset.AddRange(minimumIncident);
+                return true;
+            }
+
+            List<PlaneCutBevelCandidate> ordered =
+                new List<PlaneCutBevelCandidate>(preparedIncident);
+            ordered.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            int selectedIdentity;
+            if (options.SelectiveIdentityMode == -2)
+            {
+                PlaneCutBevelCandidate weakest = ordered[0];
+                for (int index = 1; index < ordered.Count; index++)
+                {
+                    PlaneCutBevelCandidate candidate = ordered[index];
+                    if (candidate.Width < weakest.Width - 0.0000001f ||
+                        (Mathf.Abs(candidate.Width - weakest.Width) <=
+                             0.0000001f &&
+                         candidate.SelectionScore <
+                             weakest.SelectionScore - 0.0000001f) ||
+                        (Mathf.Abs(candidate.Width - weakest.Width) <=
+                             0.0000001f &&
+                         Mathf.Abs(candidate.SelectionScore -
+                             weakest.SelectionScore) <= 0.0000001f &&
+                         candidate.SourceEdgeIndex <
+                             weakest.SourceEdgeIndex))
+                    {
+                        weakest = candidate;
+                    }
+                }
+                selectedIdentity = weakest.SourceEdgeIndex;
+            }
+            else if (options.SelectiveIdentityMode == 0)
+            {
+                selectedIdentity = victim.SourceEdgeIndex;
+            }
+            else if (options.SelectiveIdentityMode == 1)
+            {
+                selectedIdentity = foreign.SourceEdgeIndex;
+            }
+            else
+            {
+                int ordinal = Mathf.Abs(
+                    options.SelectiveIdentityMode - 2) %
+                    ordered.Count;
+                selectedIdentity = ordered[ordinal].SourceEdgeIndex;
+            }
+            if (!TryFindPlaneCutCandidateBySourceEdge(
+                    preparedIncident,
+                    selectedIdentity,
+                    out PlaneCutBevelCandidate prepared) ||
+                !TryFindPlaneCutCandidateBySourceEdge(
+                    minimumIncident,
+                    selectedIdentity,
+                    out PlaneCutBevelCandidate minimum))
+            {
+                blocker =
+                    "selective termination could not resolve incident identity " +
+                    selectedIdentity;
+                return false;
+            }
+            if (options.SelectAllExceptIdentity)
+            {
+                for (int index = 0; index < ordered.Count; index++)
+                {
+                    int identity = ordered[index].SourceEdgeIndex;
+                    if (identity == selectedIdentity)
+                    {
+                        continue;
+                    }
+                    if (!TryFindPlaneCutCandidateBySourceEdge(
+                            preparedIncident,
+                            identity,
+                            out PlaneCutBevelCandidate preparedOther) ||
+                        !TryFindPlaneCutCandidateBySourceEdge(
+                            minimumIncident,
+                            identity,
+                            out PlaneCutBevelCandidate minimumOther))
+                    {
+                        blocker =
+                            "complement termination could not resolve incident identity " +
+                            identity;
+                        return false;
+                    }
+                    preparedSubset.Add(preparedOther);
+                    minimumSubset.Add(minimumOther);
+                }
+                if (preparedSubset.Count == 0)
+                {
+                    blocker =
+                        "complement termination selected no incident identities";
+                    return false;
+                }
+                return true;
+            }
+
+            preparedSubset.Add(prepared);
+            minimumSubset.Add(minimum);
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutBoundaryTournamentRedistribution(
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> preparedCandidates,
+            List<PlaneCutBevelCandidate> minimumCandidates,
+            int sharedVertexIndex,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            PlaneCutBevelTerminationOptions options,
+            float minimumStableEdgeLength,
+            out List<PlaneCutBevelCandidate> redistributedPrepared,
+            out List<PlaneCutBevelCandidate> redistributedMinimum,
+            out string blocker)
+        {
+            redistributedPrepared = preparedCandidates;
+            redistributedMinimum = minimumCandidates;
+            blocker = string.Empty;
+            if (context == null || context.Graph == null ||
+                preparedCandidates == null || minimumCandidates == null)
+            {
+                blocker =
+                    "boundary tournament width redistribution inputs were incomplete";
+                return false;
+            }
+            List<PlaneCutBevelCandidate> incident =
+                GetActivePlaneCutIncidentCandidates(
+                    preparedCandidates,
+                    sharedVertexIndex);
+            if (incident.Count < 2)
+            {
+                blocker =
+                    "boundary tournament width redistribution requires a complete incident star";
+                return false;
+            }
+
+            List<PlaneCutBevelCandidate> orderedIncident =
+                new List<PlaneCutBevelCandidate>(incident);
+            orderedIncident.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            int favoredIdentity = victim.SourceEdgeIndex;
+            if (options.WidthFavoredIdentityMode == 1)
+            {
+                favoredIdentity = foreign.SourceEdgeIndex;
+            }
+            else if (options.WidthFavoredIdentityMode >= 2)
+            {
+                int ordinal = (options.WidthFavoredIdentityMode - 2) %
+                    orderedIncident.Count;
+                favoredIdentity =
+                    orderedIncident[ordinal].SourceEdgeIndex;
+            }
+            Dictionary<int, float> scaleByEdge =
+                new Dictionary<int, float>();
+            for (int index = 0; index < preparedCandidates.Count; index++)
+            {
+                PlaneCutBevelCandidate prepared = preparedCandidates[index];
+                float scale = 1f;
+                if (incident.Any(candidate =>
+                        candidate.SourceEdgeIndex ==
+                            prepared.SourceEdgeIndex))
+                {
+                    scale = options.WidthScaleSelectedOnly
+                        ? prepared.SourceEdgeIndex == favoredIdentity
+                            ? options.PrimaryWidthScale
+                            : options.FavoredWidthScale
+                        : prepared.SourceEdgeIndex == favoredIdentity
+                            ? options.FavoredWidthScale
+                            : options.PrimaryWidthScale;
+                    if (TryFindPlaneCutCandidateBySourceEdge(
+                            minimumCandidates,
+                            prepared.SourceEdgeIndex,
+                            out PlaneCutBevelCandidate minimum) &&
+                        prepared.Width > 0.0000001f)
+                    {
+                        scale = Mathf.Max(
+                            scale,
+                            minimum.Width / prepared.Width);
+                    }
+                    scale = Mathf.Clamp01(scale);
+                }
+                scaleByEdge[prepared.SourceEdgeIndex] = scale;
+            }
+            redistributedPrepared = BuildScaledPlaneCutCandidates(
+                preparedCandidates,
+                context,
+                scaleByEdge,
+                minimumStableEdgeLength);
+            if (redistributedPrepared == null ||
+                redistributedPrepared.Count != preparedCandidates.Count)
+            {
+                blocker =
+                    "boundary tournament width redistribution could not rebuild the prepared candidate set";
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryPrepareCornerDamageWidthRedistributionRecovery(
+            CornerDamageIntegrationPlan plan,
+            List<PlaneCutBevelCandidate> preparedCandidates,
+            List<PlaneCutBevelCandidate> minimumCandidates,
+            PlaneCutBevelCandidate victim,
+            PlaneCutBevelCandidate foreign,
+            int conflictVertexIndex,
+            CornerDamageRecoveryTournamentConfiguration configuration)
+        {
+            if (plan == null || plan.SolvedPlan == null ||
+                plan.SolvedPlan.Context == null ||
+                preparedCandidates == null || minimumCandidates == null)
+            {
+                return false;
+            }
+            ResetEndpointPatchRecoveryAttempt(
+                plan,
+                victim.SourceEdgeIndex,
+                foreign.SourceEdgeIndex);
+            PlaneCutBevelSolvedPlan solvedPlan = plan.SolvedPlan;
+            List<PlaneCutBevelCandidate> incident =
+                GetActivePlaneCutIncidentCandidates(
+                    preparedCandidates,
+                    conflictVertexIndex);
+            if (!IsSupportedEndpointPatchRecoverySet(
+                    incident,
+                    victim.SourceEdgeIndex,
+                    foreign.SourceEdgeIndex))
+            {
+                RecordEndpointPatchRecoveryRejection(
+                    plan,
+                    PlaneCutEndpointPatchRejectionKind.UnsupportedStar,
+                    "width redistribution requires a complete two/three-band incident star");
+                return false;
+            }
+
+            float primary = Mathf.Clamp(
+                configuration.PrimaryParameter,
+                0.05f,
+                1f);
+            float secondary = Mathf.Clamp(
+                configuration.SecondaryParameter,
+                0.05f,
+                1f);
+            Dictionary<int, float> scaleByEdge =
+                new Dictionary<int, float>();
+            for (int index = 0; index < preparedCandidates.Count; index++)
+            {
+                scaleByEdge[preparedCandidates[index].SourceEdgeIndex] = 1f;
+            }
+            List<PlaneCutBevelCandidate> ordered =
+                new List<PlaneCutBevelCandidate>(incident);
+            ordered.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            for (int index = 0; index < ordered.Count; index++)
+            {
+                scaleByEdge[ordered[index].SourceEdgeIndex] = primary;
+            }
+            switch (configuration.VariantIndex)
+            {
+                case 1:
+                    scaleByEdge[victim.SourceEdgeIndex] = secondary;
+                    break;
+                case 2:
+                    scaleByEdge[foreign.SourceEdgeIndex] = secondary;
+                    break;
+                default:
+                    if (configuration.VariantIndex >= 3)
+                    {
+                        int ordinal = (configuration.VariantIndex - 3) %
+                            ordered.Count;
+                        scaleByEdge[ordered[ordinal].SourceEdgeIndex] =
+                            secondary;
+                    }
+                    break;
+            }
+
+            List<PlaneCutBevelCandidate> redistributed =
+                BuildScaledPlaneCutCandidates(
+                    preparedCandidates,
+                    solvedPlan.Context,
+                    scaleByEdge,
+                    solvedPlan.MinimumStableEdgeLength);
+            List<PlaneCutVertexJunctionCandidate> noJunctions =
+                new List<PlaneCutVertexJunctionCandidate>();
+            plan.EndpointPatchRecoveryTrialCount++;
+            if (!TryBuildPlaneCutSystemFaces(
+                    solvedPlan.SourceFaces,
+                    redistributed,
+                    noJunctions,
+                    out List<PolygonFace> trialFaces,
+                    out _,
+                    out string blocker,
+                    new PlaneCutNumericalRepairTelemetry()))
+            {
+                RecordEndpointPatchRecoveryRejection(
+                    plan,
+                    PlaneCutEndpointPatchRejectionKind.PatchExtraction,
+                    "width redistribution shell failed: " + blocker);
+                return false;
+            }
+            PlaneCutSolveMetrics metrics = new PlaneCutSolveMetrics();
+            if (!IsPlaneCutJunctionTrialGeometryValid(
+                    trialFaces,
+                    solvedPlan.Context,
+                    redistributed,
+                    noJunctions,
+                    solvedPlan.MinimumStableEdgeLength,
+                    solvedPlan.MinimumStableFaceArea,
+                    ref metrics,
+                    out _,
+                    out blocker))
+            {
+                RecordEndpointPatchRecoveryRejection(
+                    plan,
+                    PlaneCutEndpointPatchRejectionKind.BandIntegrity,
+                    "width redistribution certification failed: " + blocker);
+                return false;
+            }
+
+            solvedPlan.RetainedCandidates = redistributed;
+            solvedPlan.PreparedEndpointPatch = null;
+            solvedPlan.PreparedJunctions ??=
+                new List<PlaneCutVertexJunctionCandidate>();
+            solvedPlan.PreparedJunctions.Clear();
+            plan.EndpointPatchRecoveryDiagnostic =
+                configuration.Name +
+                " certified a legal-width redistribution schedule";
+            return true;
+        }
+
+        private static List<PlaneCutBevelCandidate>
+            BuildPlaneCutCandidatesExcludingIdentities(
+                List<PlaneCutBevelCandidate> candidates,
+                HashSet<int> excluded)
+        {
+            List<PlaneCutBevelCandidate> retained =
+                new List<PlaneCutBevelCandidate>();
+            if (candidates == null)
+            {
+                return retained;
+            }
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                PlaneCutBevelCandidate candidate = candidates[index];
+                if (excluded == null ||
+                    !excluded.Contains(candidate.SourceEdgeIndex))
+                {
+                    retained.Add(candidate);
+                }
+            }
+            return retained;
+        }
+
+        private static bool TryBuildPlaneCutBevelTerminationLimits(
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            List<PlaneCutBevelCandidate> incident,
+            float minimumStableEdgeLength,
+            PlaneCutBevelTerminationOptions options,
+            out PlaneCutEndpointCellLimit[] limits,
+            out string signature,
+            out string blocker)
+        {
+            limits = Array.Empty<PlaneCutEndpointCellLimit>();
+            signature = string.Empty;
+            blocker = string.Empty;
+            if (context == null || context.Graph == null ||
+                sharedVertexIndex < 0 ||
+                sharedVertexIndex >= context.Graph.Vertices.Count ||
+                incident == null ||
+                incident.Count < (options.AllowSingleIncident ? 1 : 2))
+            {
+                blocker = "bevel-termination axial-limit inputs were incomplete";
+                return false;
+            }
+            List<PlaneCutBevelCandidate> ordered =
+                new List<PlaneCutBevelCandidate>(incident);
+            ordered.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            Vector3 origin = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            limits = new PlaneCutEndpointCellLimit[ordered.Count];
+            List<string> evidence = new List<string>();
+            for (int index = 0; index < ordered.Count; index++)
+            {
+                PlaneCutBevelCandidate edge = ordered[index];
+                int otherVertexIndex = edge.VertexA == sharedVertexIndex
+                    ? edge.VertexB
+                    : edge.VertexB == sharedVertexIndex
+                        ? edge.VertexA
+                        : -1;
+                if (otherVertexIndex < 0 ||
+                    otherVertexIndex >= context.Graph.Vertices.Count)
+                {
+                    blocker =
+                        "bevel termination encountered a non-incident source edge";
+                    return false;
+                }
+                Vector3 axis = context.Graph.Vertices[
+                    otherVertexIndex].Position - origin;
+                float sourceLength = axis.magnitude;
+                if (sourceLength <= PointMergeDistance)
+                {
+                    blocker =
+                        "bevel termination encountered a degenerate source edge";
+                    return false;
+                }
+                axis /= sourceLength;
+                float allowed = Mathf.Clamp(
+                    Mathf.Max(
+                        edge.Width * 4f,
+                        minimumStableEdgeLength * 0.5f) *
+                        options.AxialDistanceScale,
+                    sourceLength * (options.IsProduction ? 0.03f : 0.02f),
+                    sourceLength * (options.IsProduction ? 0.25f : 0.35f));
+                CutPlane plane = new CutPlane(
+                    axis,
+                    Vector3.Dot(axis, origin) + allowed);
+                limits[index] = new PlaneCutEndpointCellLimit(
+                    edge.SourceEdgeIndex,
+                    otherVertexIndex,
+                    plane,
+                    allowed,
+                    sourceLength);
+                evidence.Add(
+                    edge.SourceEdgeIndex.ToString() + ":" +
+                    allowed.ToString("R"));
+            }
+            signature = string.Join("/", evidence);
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutBevelTerminationReplacement(
+            List<PolygonFace> fullFaces,
+            List<PolygonFace> pocketFaces,
+            ChamferTopologyContext context,
+            List<PlaneCutBevelCandidate> activeCandidates,
+            List<PlaneCutBevelCandidate> incident,
+            int sharedVertexIndex,
+            PlaneCutEndpointCellLimit[] limits,
+            string limitSignature,
+            float minimumStableEdgeLength,
+            float minimumStableFaceArea,
+            PlaneCutBevelTerminationOptions options,
+            out PlaneCutEndpointPatchReplacement replacement,
+            out PlaneCutEndpointCellEvidence evidence,
+            out PlaneCutEndpointPatchRejectionKind rejection,
+            out string blocker)
+        {
+            replacement = null;
+            evidence = new PlaneCutEndpointCellEvidence
+            {
+                CellLimitSignature = limitSignature
+            };
+            rejection = PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+            blocker = string.Empty;
+            if (fullFaces == null || pocketFaces == null ||
+                context == null || context.Graph == null ||
+                activeCandidates == null || incident == null ||
+                incident.Count < (options.AllowSingleIncident ? 1 : 2) ||
+                limits == null ||
+                limits.Length != incident.Count)
+            {
+                blocker = "bevel-termination replacement inputs were incomplete";
+                return false;
+            }
+
+            HashSet<int> incidentIdentities = new HashSet<int>();
+            Dictionary<int, PlaneCutBevelCandidate> incidentByIdentity =
+                new Dictionary<int, PlaneCutBevelCandidate>();
+            for (int index = 0; index < incident.Count; index++)
+            {
+                incidentIdentities.Add(incident[index].SourceEdgeIndex);
+                incidentByIdentity[incident[index].SourceEdgeIndex] =
+                    incident[index];
+            }
+            HashSet<int> endpointStarSourceFaces =
+                BuildPlaneCutBevelTerminationEndpointStarSourceFaces(
+                    context,
+                    sharedVertexIndex);
+
+            Dictionary<TopologyEdgeKey, Vector3>[] fullCaches =
+                BuildPlaneCutTerminationIntersectionCaches(limits.Length);
+            Dictionary<TopologyEdgeKey, Vector3>[] pocketCaches =
+                BuildPlaneCutTerminationIntersectionCaches(limits.Length);
+            List<int> selectedFullIndices = new List<int>();
+            HashSet<int> selectedIncidentIdentities = new HashSet<int>();
+            List<PolygonFace> remoteRemainders = new List<PolygonFace>();
+            List<PolygonFace> restoredPocket = new List<PolygonFace>();
+            List<string> selectedProvenance = new List<string>();
+            List<string> remoteSignatures = new List<string>();
+            List<string> pocketSignatures = new List<string>();
+            List<Vector3> splitPoints = new List<Vector3>();
+
+            for (int faceIndex = 0; faceIndex < fullFaces.Count; faceIndex++)
+            {
+                PolygonFace face = fullFaces[faceIndex];
+                if (!TryPartitionPlaneCutBevelTerminationFace(
+                        face,
+                        limits,
+                        minimumStableFaceArea,
+                        fullCaches,
+                        options,
+                        out PolygonFace localFragment,
+                        out List<PolygonFace> remoteFragments,
+                        out List<Vector3> faceSplitPoints,
+                        out blocker))
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+                    return false;
+                }
+                if (localFragment == null)
+                {
+                    continue;
+                }
+                if (!IsPlaneCutBevelTerminationFaceOwned(
+                        face,
+                        incidentIdentities,
+                        endpointStarSourceFaces,
+                        options.Ownership))
+                {
+                    continue;
+                }
+                if (face.ProvenanceKind ==
+                        PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                    !incidentIdentities.Contains(face.ProvenanceIndex))
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+                    blocker =
+                        "bevel termination endpoint cell reached unrelated bevel identity " +
+                        face.ProvenanceIndex;
+                    return false;
+                }
+                selectedFullIndices.Add(faceIndex);
+                if (face.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane)
+                {
+                    selectedIncidentIdentities.Add(face.ProvenanceIndex);
+                }
+                selectedProvenance.Add(
+                    ((int)face.ProvenanceKind).ToString() + ":" +
+                    face.ProvenanceIndex.ToString());
+                splitPoints.AddRange(faceSplitPoints);
+                for (int remoteIndex = 0;
+                     remoteIndex < remoteFragments.Count;
+                     remoteIndex++)
+                {
+                    PolygonFace remote = remoteFragments[remoteIndex];
+                    remoteRemainders.Add(remote);
+                    remoteSignatures.Add(
+                        BuildPlaneCutEndpointPatchFaceSignature(remote));
+                }
+            }
+            if (!TrySelectPlaneCutRemoteBevelComponents(
+                    remoteRemainders,
+                    incident,
+                    selectedIncidentIdentities,
+                    context,
+                    sharedVertexIndex,
+                    options.RemoteComponentSelection,
+                    evidence,
+                    out blocker))
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.IncidentBandJoin;
+                return false;
+            }
+
+            if (selectedFullIndices.Count == 0)
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.NoLocalRemoval;
+                blocker =
+                    "bevel termination axial cell selected no ordinary-shell subfaces";
+                return false;
+            }
+
+            for (int faceIndex = 0;
+                 faceIndex < pocketFaces.Count;
+                 faceIndex++)
+            {
+                PolygonFace face = pocketFaces[faceIndex];
+                if (!TryPartitionPlaneCutBevelTerminationFace(
+                        face,
+                        limits,
+                        minimumStableFaceArea,
+                        pocketCaches,
+                        options,
+                        out PolygonFace localFragment,
+                        out _,
+                        out List<Vector3> faceSplitPoints,
+                        out blocker))
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+                    return false;
+                }
+                if (localFragment == null)
+                {
+                    continue;
+                }
+                if (!IsPlaneCutBevelTerminationFaceOwned(
+                        localFragment,
+                        incidentIdentities,
+                        endpointStarSourceFaces,
+                        options.Ownership))
+                {
+                    continue;
+                }
+                if (localFragment.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane)
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+                    blocker =
+                        "restored endpoint pocket would alter unrelated bevel identity " +
+                        localFragment.ProvenanceIndex;
+                    return false;
+                }
+                restoredPocket.Add(localFragment);
+                pocketSignatures.Add(
+                    BuildPlaneCutEndpointPatchFaceSignature(localFragment));
+                splitPoints.AddRange(faceSplitPoints);
+            }
+            if (restoredPocket.Count == 0)
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.NoLocalRemoval;
+                blocker =
+                    "bevel termination produced no endpoint source-face pocket";
+                return false;
+            }
+
+            HashSet<int> selected = new HashSet<int>(selectedFullIndices);
+            List<PolygonFace> hybrid = new List<PolygonFace>();
+            List<int> hybridOriginalFaceIndices = new List<int>();
+            for (int faceIndex = 0; faceIndex < fullFaces.Count; faceIndex++)
+            {
+                if (!selected.Contains(faceIndex))
+                {
+                    hybrid.Add(ClonePlaneCutPolygonFace(fullFaces[faceIndex]));
+                    hybridOriginalFaceIndices.Add(faceIndex);
+                }
+            }
+            int remoteHybridStart = hybrid.Count;
+            for (int index = 0; index < remoteRemainders.Count; index++)
+            {
+                hybrid.Add(ClonePlaneCutPolygonFace(remoteRemainders[index]));
+                hybridOriginalFaceIndices.Add(-1);
+            }
+            int pocketHybridStart = hybrid.Count;
+            for (int index = 0; index < restoredPocket.Count; index++)
+            {
+                hybrid.Add(ClonePlaneCutPolygonFace(restoredPocket[index]));
+                hybridOriginalFaceIndices.Add(-1);
+            }
+
+            List<PolygonFace> terminationCaps =
+                new List<PolygonFace>();
+            string loopSignature = string.Empty;
+            int loopVertexCount = 0;
+            if (options.IsProduction)
+            {
+                if (!TryBuildPlaneCutBevelTerminationCaps(
+                        hybrid,
+                        limits,
+                        incidentByIdentity,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        context,
+                        options,
+                        out terminationCaps,
+                        out loopSignature,
+                        out loopVertexCount,
+                        out blocker))
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.CapCreation;
+                    return false;
+                }
+            }
+            else if (!TryBuildPlaneCutBoundaryTournamentClosure(
+                    hybrid,
+                    hybridOriginalFaceIndices,
+                    context,
+                    sharedVertexIndex,
+                    limits,
+                    incidentByIdentity,
+                    minimumStableFaceArea,
+                    options,
+                    evidence,
+                    out terminationCaps,
+                    out loopSignature,
+                    out loopVertexCount,
+                    out blocker))
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.CapCreation;
+                return false;
+            }
+
+            int capHybridStart = hybrid.Count;
+            for (int index = 0; index < terminationCaps.Count; index++)
+            {
+                hybrid.Add(terminationCaps[index]);
+                hybridOriginalFaceIndices.Add(-1);
+            }
+            if (options.PostClosureFixedPointConformance &&
+                !TryConformPlaneCutLocalShellFixedPoint(
+                    hybrid,
+                    context,
+                    sharedVertexIndex,
+                    limits,
+                    evidence,
+                    out blocker))
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.StitchTopology;
+                evidence.FailureSource = blocker;
+                return false;
+            }
+
+            for (int index = 0; index < remoteRemainders.Count; index++)
+            {
+                remoteRemainders[index] = ClonePlaneCutPolygonFace(
+                    hybrid[remoteHybridStart + index]);
+            }
+            for (int index = 0; index < restoredPocket.Count; index++)
+            {
+                restoredPocket[index] = ClonePlaneCutPolygonFace(
+                    hybrid[pocketHybridStart + index]);
+            }
+            for (int index = 0; index < terminationCaps.Count; index++)
+            {
+                terminationCaps[index] = ClonePlaneCutPolygonFace(
+                    hybrid[capHybridStart + index]);
+            }
+            foreach (int hybridFaceIndex in
+                evidence.MutatedHybridFaceIndices.OrderBy(value => value))
+            {
+                if (hybridFaceIndex < 0 ||
+                    hybridFaceIndex >= hybrid.Count ||
+                    hybridFaceIndex >= hybridOriginalFaceIndices.Count)
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.PatchExtraction;
+                    blocker =
+                        "conforming boundary reconstruction recorded an invalid owner-face index";
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                int originalFaceIndex =
+                    hybridOriginalFaceIndices[hybridFaceIndex];
+                if (originalFaceIndex < 0 ||
+                    !selected.Add(originalFaceIndex))
+                {
+                    continue;
+                }
+                selectedFullIndices.Add(originalFaceIndex);
+                PolygonFace original = fullFaces[originalFaceIndex];
+                selectedProvenance.Add(
+                    ((int)original.ProvenanceKind).ToString() + ":" +
+                    original.ProvenanceIndex.ToString());
+                remoteRemainders.Add(ClonePlaneCutPolygonFace(
+                    hybrid[hybridFaceIndex]));
+            }
+
+            remoteSignatures.Clear();
+            for (int index = 0; index < remoteRemainders.Count; index++)
+            {
+                remoteSignatures.Add(
+                    BuildPlaneCutEndpointPatchFaceSignature(
+                        remoteRemainders[index]));
+            }
+            pocketSignatures.Clear();
+            for (int index = 0; index < restoredPocket.Count; index++)
+            {
+                pocketSignatures.Add(
+                    BuildPlaneCutEndpointPatchFaceSignature(
+                        restoredPocket[index]));
+            }
+
+            evidence.TransitionFaceCount = terminationCaps.Count;
+            evidence.ResidualOpenEdgeCount =
+                CollectPlaneCutOpenEdges(hybrid).Count;
+            if (evidence.ResidualOpenEdgeCount > 0)
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.StitchTopology;
+                blocker =
+                    (string.IsNullOrEmpty(options.StrategyName)
+                        ? "boundary reconstruction"
+                        : options.StrategyName) +
+                    " left " + evidence.ResidualOpenEdgeCount +
+                    " residual open edges";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+
+            EdgeWearTopologyStats topology = AuditEdgeWearTopology(
+                hybrid,
+                minimumStableEdgeLength);
+            if (topology.OpenEdgeCount > 0 ||
+                topology.NonManifoldEdgeCount > 0 ||
+                topology.TJunctionCount > 0)
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.StitchTopology;
+                blocker = BuildPlaneCutTopologyFailureDiagnostic(
+                    hybrid,
+                    topology);
+                evidence.FailureSource = blocker;
+                evidence.MechanismSignature += ":" + blocker;
+                return false;
+            }
+
+            int remoteIncidentCount = 0;
+            for (int index = 0; index < incident.Count; index++)
+            {
+                PlaneCutBevelCandidate edge = incident[index];
+                List<PolygonFace> owned = FindPlaneCutProvenanceFaces(
+                    hybrid,
+                    PolygonFaceProvenanceKind.EdgeBevelPlane,
+                    edge.SourceEdgeIndex);
+                bool validRemoteBand = owned.Count == 1;
+                string remoteBandBlocker = string.Empty;
+                if (options.FragmentAwareBandCertification &&
+                    owned.Count > 0)
+                {
+                    validRemoteBand = TryValidatePlaneCutOwnedBevelBandSet(
+                        owned,
+                        edge,
+                        out remoteBandBlocker);
+                }
+                if (!validRemoteBand)
+                {
+                    rejection =
+                        PlaneCutEndpointPatchRejectionKind.IncidentBandJoin;
+                    blocker = owned.Count == 0
+                        ? "terminated bevel identity " +
+                            edge.SourceEdgeIndex +
+                            " lost its remote band"
+                        : !string.IsNullOrEmpty(remoteBandBlocker)
+                            ? remoteBandBlocker
+                            : "terminated bevel identity " +
+                                edge.SourceEdgeIndex +
+                                " split into multiple remote bands";
+                    return false;
+                }
+                if (options.FragmentAwareBandCertification)
+                {
+                    evidence.MechanismSignature +=
+                        ":band" + edge.SourceEdgeIndex +
+                        "x" + owned.Count;
+                }
+                remoteIncidentCount++;
+            }
+
+            PlaneCutSolveMetrics metrics = new PlaneCutSolveMetrics();
+            if (!IsPlaneCutJunctionTrialGeometryValid(
+                    hybrid,
+                    context,
+                    activeCandidates,
+                    new List<PlaneCutVertexJunctionCandidate>(),
+                    minimumStableEdgeLength,
+                    minimumStableFaceArea,
+                    ref metrics,
+                    out _,
+                    out blocker))
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.BandIntegrity;
+                return false;
+            }
+
+            if (!TryBuildPlaneCutEndpointCellSelectedBoundary(
+                    fullFaces,
+                    selected,
+                    out Vector3[] boundaryLoop,
+                    out string boundaryTopologySignature,
+                    out string boundaryPositionSignature,
+                    out blocker))
+            {
+                rejection =
+                    PlaneCutEndpointPatchRejectionKind.BoundaryLoop;
+                return false;
+            }
+
+            string[] selectedSignatures =
+                new string[selectedFullIndices.Count];
+            for (int index = 0;
+                 index < selectedFullIndices.Count;
+                 index++)
+            {
+                selectedSignatures[index] =
+                    BuildPlaneCutEndpointPatchFaceSignature(
+                        fullFaces[selectedFullIndices[index]]);
+            }
+            Array.Sort(selectedSignatures, StringComparer.Ordinal);
+            selectedProvenance.Sort(StringComparer.Ordinal);
+            remoteSignatures.Sort(StringComparer.Ordinal);
+            pocketSignatures.Sort(StringComparer.Ordinal);
+            int[] terminated = new int[incident.Count];
+            for (int index = 0; index < incident.Count; index++)
+            {
+                terminated[index] = incident[index].SourceEdgeIndex;
+            }
+            Array.Sort(terminated);
+            List<Vector3> uniqueSplitPoints = GetUniquePoints(splitPoints);
+            int capVertexCount = 0;
+            List<string> terminationCapSignatures = new List<string>();
+            for (int index = 0; index < terminationCaps.Count; index++)
+            {
+                capVertexCount += terminationCaps[index].Vertices.Count;
+                terminationCapSignatures.Add(
+                    BuildPlaneCutEndpointPatchFaceSignature(
+                        terminationCaps[index]));
+            }
+            terminationCapSignatures.Sort(StringComparer.Ordinal);
+
+            evidence.FacesSubdivided = selectedFullIndices.Count;
+            evidence.LocalFragmentCount = restoredPocket.Count;
+            evidence.RemoteRemainderCount = remoteRemainders.Count;
+            evidence.SyntheticIncidentFragmentCount = terminationCaps.Count;
+            evidence.SyntheticIncidentIdentities =
+                string.Join("/", terminated);
+            evidence.CellVertexCount = uniqueSplitPoints.Count;
+            evidence.CellFaceCount = remoteRemainders.Count +
+                restoredPocket.Count + terminationCaps.Count;
+            evidence.CellSplitSignature =
+                BuildPlaneCutEndpointCellPointSetSignature(uniqueSplitPoints);
+            evidence.LocalFragmentSignature =
+                string.Join("/", pocketSignatures);
+            evidence.RemoteRemainderSignature =
+                string.Join("/", remoteSignatures);
+            evidence.FailureSource = string.Empty;
+
+            replacement = new PlaneCutEndpointPatchReplacement
+            {
+                VertexIndex = sharedVertexIndex,
+                Strength = 1f,
+                SourceVertexPosition = context.Graph.Vertices[
+                    sharedVertexIndex].Position,
+                IncidentSourceEdgeIndices = terminated,
+                SelectedFaceSignatures = selectedSignatures,
+                SelectedProvenanceSignature =
+                    string.Join("/", selectedProvenance),
+                BoundaryTopologySignature =
+                    boundaryTopologySignature,
+                BoundaryPositionSignature =
+                    boundaryPositionSignature,
+                BoundaryLoop = boundaryLoop,
+                ReplacementFaces = remoteRemainders
+                    .Concat(restoredPocket)
+                    .Concat(terminationCaps)
+                    .Select(ClonePlaneCutPolygonFace)
+                    .ToList(),
+                SelectedFaceCount = selectedFullIndices.Count,
+                BoundaryVertexCount = boundaryLoop.Length,
+                CapVertexCount = capVertexCount,
+                CellLimits = limits,
+                CellLimitSignature = limitSignature,
+                LocalFragmentSignature =
+                    string.Join("/", pocketSignatures),
+                RemoteRemainderSignature =
+                    string.Join("/", remoteSignatures),
+                CellSplitSignature =
+                    evidence.CellSplitSignature,
+                FacesSubdivided = selectedFullIndices.Count,
+                LocalFragmentCount = restoredPocket.Count,
+                RemoteRemainderCount = remoteRemainders.Count,
+                CellVertexCount = uniqueSplitPoints.Count,
+                CellFaceCount = evidence.CellFaceCount,
+                ConflictLocalTermination = true,
+                TerminatedSourceEdgeIndices = terminated,
+                TerminationLoopSignature = loopSignature,
+                TerminationCapSignature =
+                    string.Join("/", terminationCapSignatures),
+                RemoteIncidentBevelCount = remoteIncidentCount,
+                RestoredPocketFaceCount = restoredPocket.Count,
+                TerminationCapCount = terminationCaps.Count,
+                BoundaryComponentCount = evidence.BoundaryComponentCount,
+                ClosedCycleCount = evidence.ClosedCycleCount,
+                OpenChainCount = evidence.OpenChainCount,
+                BranchVertexCount = evidence.BranchVertexCount,
+                TransitionFaceCount = evidence.TransitionFaceCount,
+                ResidualOpenEdgeCount = evidence.ResidualOpenEdgeCount,
+                MechanismSignature = evidence.MechanismSignature,
+                ModifiedIdentitySignature =
+                    evidence.ModifiedIdentitySignature,
+                ClosurelessAccepted = evidence.ClosurelessAccepted
+            };
+            rejection = PlaneCutEndpointPatchRejectionKind.None;
+            return true;
+        }
+
+        private static Dictionary<TopologyEdgeKey, Vector3>[]
+            BuildPlaneCutTerminationIntersectionCaches(int count)
+        {
+            Dictionary<TopologyEdgeKey, Vector3>[] result =
+                new Dictionary<TopologyEdgeKey, Vector3>[count];
+            for (int index = 0; index < count; index++)
+            {
+                result[index] =
+                    new Dictionary<TopologyEdgeKey, Vector3>();
+            }
+            return result;
+        }
+
+        private static HashSet<int>
+            BuildPlaneCutBevelTerminationEndpointStarSourceFaces(
+                ChamferTopologyContext context,
+                int sharedVertexIndex)
+        {
+            HashSet<int> result = new HashSet<int>();
+            if (context == null || context.Graph == null ||
+                sharedVertexIndex < 0 ||
+                sharedVertexIndex >= context.Graph.Vertices.Count)
+            {
+                return result;
+            }
+            EdgeWearGraphVertex vertex =
+                context.Graph.Vertices[sharedVertexIndex];
+            for (int index = 0; index < vertex.FaceIndices.Count; index++)
+            {
+                int graphFaceIndex = vertex.FaceIndices[index];
+                if (graphFaceIndex < 0 ||
+                    graphFaceIndex >= context.Graph.Faces.Count)
+                {
+                    continue;
+                }
+                result.Add(graphFaceIndex);
+                result.Add(context.Graph.Faces[graphFaceIndex].SourceFaceIndex);
+            }
+            return result;
+        }
+
+        private static bool IsPlaneCutBevelTerminationFaceOwned(
+            PolygonFace face,
+            HashSet<int> incidentIdentities,
+            HashSet<int> endpointStarSourceFaces,
+            PlaneCutBevelTerminationOwnership ownership)
+        {
+            if (face == null)
+            {
+                return false;
+            }
+            if (ownership ==
+                PlaneCutBevelTerminationOwnership.GeometricCell)
+            {
+                return true;
+            }
+            if (face.ProvenanceKind ==
+                PolygonFaceProvenanceKind.EdgeBevelPlane)
+            {
+                return incidentIdentities != null &&
+                    incidentIdentities.Contains(face.ProvenanceIndex);
+            }
+            if (face.ProvenanceKind ==
+                PolygonFaceProvenanceKind.SourceFace)
+            {
+                return endpointStarSourceFaces != null &&
+                    endpointStarSourceFaces.Contains(face.ProvenanceIndex);
+            }
+            return face.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.CornerDamageCap ||
+                face.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.BoundedEndpointCap;
+        }
+
+        private readonly struct PlaneCutBoundarySegment
+        {
+            public readonly int FaceIndex;
+            public readonly Vector3 Start;
+            public readonly Vector3 End;
+            public readonly VertexKey StartKey;
+            public readonly VertexKey EndKey;
+            public readonly EdgeKey EdgeKey;
+
+            public PlaneCutBoundarySegment(
+                int faceIndex,
+                Vector3 start,
+                Vector3 end)
+            {
+                FaceIndex = faceIndex;
+                Start = start;
+                End = end;
+                StartKey = new VertexKey(start);
+                EndKey = new VertexKey(end);
+                EdgeKey = new EdgeKey(start, end);
+            }
+
+            public VertexKey Other(VertexKey key)
+            {
+                return StartKey.Equals(key) ? EndKey : StartKey;
+            }
+
+            public Vector3 Position(VertexKey key)
+            {
+                return StartKey.Equals(key) ? Start : End;
+            }
+        }
+
+        private readonly struct PlaneCutBoundaryPairKey :
+            IEquatable<PlaneCutBoundaryPairKey>
+        {
+            public readonly VertexKey Vertex;
+            public readonly int EdgeIndex;
+
+            public PlaneCutBoundaryPairKey(
+                VertexKey vertex,
+                int edgeIndex)
+            {
+                Vertex = vertex;
+                EdgeIndex = edgeIndex;
+            }
+
+            public bool Equals(PlaneCutBoundaryPairKey other)
+            {
+                return Vertex.Equals(other.Vertex) &&
+                    EdgeIndex == other.EdgeIndex;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is PlaneCutBoundaryPairKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    return Vertex.GetHashCode() * 397 ^ EdgeIndex;
+                }
+            }
+        }
+
+        private sealed class PlaneCutBoundaryCycleResult
+        {
+            public readonly List<Vector3[]> Cycles =
+                new List<Vector3[]>();
+            public int ComponentCount;
+            public int OpenChainCount;
+            public int BranchVertexCount;
+            public string Signature = string.Empty;
+        }
+
+        private static bool TryBuildPlaneCutBoundaryTournamentClosure(
+            List<PolygonFace> hybrid,
+            List<int> hybridOriginalFaceIndices,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            PlaneCutEndpointCellLimit[] limits,
+            Dictionary<int, PlaneCutBevelCandidate> incidentByIdentity,
+            float minimumStableFaceArea,
+            PlaneCutBevelTerminationOptions options,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            evidence ??= new PlaneCutEndpointCellEvidence();
+            evidence.MechanismSignature =
+                options.StrategyName +
+                (string.IsNullOrEmpty(evidence.MechanismSignature)
+                    ? string.Empty
+                    : evidence.MechanismSignature);
+            evidence.ModifiedIdentitySignature = string.Join(
+                "/",
+                incidentByIdentity.Keys.OrderBy(value => value));
+
+            switch (options.Closure)
+            {
+                case PlaneCutBevelTerminationClosure.Closureless:
+                    return TryAcceptPlaneCutClosurelessBoundary(
+                        hybrid,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.RawEdgeCavityFan:
+                    return TryBuildPlaneCutRawEdgeCavityFanClosure(
+                        hybrid,
+                        context,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.
+                    ConformingNormalizedCavity:
+                    return TryBuildPlaneCutConformingNormalizedClosure(
+                        hybrid,
+                        hybridOriginalFaceIndices,
+                        context,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        options,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.
+                    OrientedHalfEdgeCavity:
+                    return TryBuildPlaneCutOrientedHalfEdgeClosure(
+                        hybrid,
+                        context,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        false,
+                        options.RequireSimpleClosureCycles,
+                        options.DirectSimpleCycleTriangles,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.
+                    SourceFaceTransitionStrips:
+                    return TryBuildPlaneCutSourceFaceStripClosure(
+                        hybrid,
+                        context,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.
+                    BoundaryEdgeCellFan:
+                    return TryBuildPlaneCutBoundaryEdgeCellFanClosure(
+                        hybrid,
+                        context,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                case PlaneCutBevelTerminationClosure.
+                    AxialCapsAndTransitionLoops:
+                case PlaneCutBevelTerminationClosure.
+                    TaperFansAndTransitionLoops:
+                    return TryBuildPlaneCutAxialTransitionClosure(
+                        hybrid,
+                        context,
+                        sharedVertexIndex,
+                        limits,
+                        incidentByIdentity,
+                        minimumStableFaceArea,
+                        options,
+                        evidence,
+                        out closureFaces,
+                        out signature,
+                        out loopVertexCount,
+                        out blocker);
+                default:
+                    blocker =
+                        "boundary tournament selected no supported reconstruction mechanism";
+                    evidence.FailureSource = blocker;
+                    return false;
+            }
+        }
+
+        private static bool TryBuildPlaneCutAxialTransitionClosure(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            PlaneCutEndpointCellLimit[] limits,
+            Dictionary<int, PlaneCutBevelCandidate> incidentByIdentity,
+            float minimumStableFaceArea,
+            PlaneCutBevelTerminationOptions options,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            if (!TryBuildPlaneCutBevelTerminationCaps(
+                    hybrid,
+                    limits,
+                    incidentByIdentity,
+                    sharedVertexIndex,
+                    minimumStableFaceArea,
+                    context,
+                    options,
+                    out List<PolygonFace> axialFaces,
+                    out string axialSignature,
+                    out int axialVertices,
+                    out blocker))
+            {
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            List<PolygonFace> working = hybrid
+                .Select(ClonePlaneCutPolygonFace)
+                .ToList();
+            working.AddRange(axialFaces);
+            if (!TryBuildPlaneCutBevelTransitionClosures(
+                    working,
+                    context,
+                    sharedVertexIndex,
+                    minimumStableFaceArea,
+                    out List<PolygonFace> transitionFaces,
+                    out string transitionSignature,
+                    out blocker))
+            {
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            closureFaces.AddRange(axialFaces);
+            closureFaces.AddRange(transitionFaces);
+            loopVertexCount = axialVertices;
+            evidence.TransitionFaceCount = closureFaces.Count;
+            evidence.ResidualOpenEdgeCount = CollectPlaneCutOpenEdges(
+                working.Concat(transitionFaces).ToList()).Count;
+            signature = axialSignature + ":transition=" +
+                transitionSignature;
+            return closureFaces.Count > 0;
+        }
+
+        private static bool TryAcceptPlaneCutClosurelessBoundary(
+            List<PolygonFace> hybrid,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            List<PlaneCutOpenEdgeRecord> open =
+                CollectPlaneCutOpenEdges(hybrid);
+            evidence.ResidualOpenEdgeCount = open.Count;
+            evidence.TransitionFaceCount = 0;
+            if (open.Count != 0)
+            {
+                List<PlaneCutBoundarySegment> segments = open.Select(edge =>
+                    new PlaneCutBoundarySegment(
+                        edge.FaceIndex,
+                        edge.Start,
+                        edge.End)).ToList();
+                evidence.BoundaryComponentCount =
+                    BuildPlaneCutBoundaryComponents(segments).Count;
+                blocker =
+                    "closureless endpoint transaction retained " +
+                    open.Count + " open edges";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            evidence.ClosurelessAccepted = true;
+            evidence.MechanismSignature =
+                (string.IsNullOrEmpty(evidence.MechanismSignature)
+                    ? "closureless"
+                    : evidence.MechanismSignature + ":closureless") +
+                ":open=0";
+            signature = "closureless:open=0";
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutRawEdgeCavityFanClosure(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            List<PlaneCutOpenEdgeRecord> open =
+                CollectPlaneCutOpenEdges(hybrid);
+            List<PlaneCutBoundarySegment> segments = open.Select(edge =>
+                new PlaneCutBoundarySegment(
+                    edge.FaceIndex,
+                    edge.Start,
+                    edge.End)).ToList();
+            segments.Sort(ComparePlaneCutBoundarySegments);
+            return TryBuildPlaneCutBoundaryFanClosureFromSegments(
+                hybrid,
+                context,
+                sharedVertexIndex,
+                minimumStableFaceArea,
+                segments,
+                "raw-edge-cavity-fan",
+                evidence,
+                out closureFaces,
+                out signature,
+                out loopVertexCount,
+                out blocker);
+        }
+
+        private static bool TryBuildPlaneCutBoundaryFanClosureFromSegments(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            List<PlaneCutBoundarySegment> segments,
+            string mechanismName,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            if (segments == null || segments.Count < 3)
+            {
+                blocker = mechanismName +
+                    " found fewer than three boundary segments";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+
+            List<List<PlaneCutBoundarySegment>> components =
+                BuildPlaneCutBoundaryComponents(segments);
+            evidence.BoundaryComponentCount = components.Count;
+            Vector3 endpoint = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            List<string> componentSignatures = new List<string>();
+            for (int componentIndex = 0;
+                 componentIndex < components.Count;
+                 componentIndex++)
+            {
+                List<PlaneCutBoundarySegment> component =
+                    components[componentIndex];
+                Dictionary<VertexKey, Vector3> positions =
+                    new Dictionary<VertexKey, Vector3>();
+                Dictionary<VertexKey, int> degree =
+                    new Dictionary<VertexKey, int>();
+                Vector3 normalSum = Vector3.zero;
+                for (int segmentIndex = 0;
+                     segmentIndex < component.Count;
+                     segmentIndex++)
+                {
+                    PlaneCutBoundarySegment segment = component[segmentIndex];
+                    positions[segment.StartKey] = segment.Start;
+                    positions[segment.EndKey] = segment.End;
+                    degree.TryGetValue(segment.StartKey, out int startDegree);
+                    degree[segment.StartKey] = startDegree + 1;
+                    degree.TryGetValue(segment.EndKey, out int endDegree);
+                    degree[segment.EndKey] = endDegree + 1;
+                    if (segment.FaceIndex >= 0 &&
+                        segment.FaceIndex < hybrid.Count)
+                    {
+                        normalSum += hybrid[segment.FaceIndex].Normal;
+                    }
+                }
+                int oddVertices = degree.Count(pair =>
+                    (pair.Value & 1) != 0);
+                int branches = degree.Count(pair => pair.Value > 2);
+                evidence.OpenChainCount += oddVertices;
+                evidence.BranchVertexCount += branches;
+
+                Vector3 centroid = Vector3.zero;
+                List<VertexKey> orderedKeys = positions.Keys.ToList();
+                orderedKeys.Sort((left, right) => left.CompareTo(right));
+                for (int index = 0; index < orderedKeys.Count; index++)
+                {
+                    centroid += positions[orderedKeys[index]];
+                }
+                centroid /= Mathf.Max(1, positions.Count);
+                Vector3 averageNormal = normalSum.sqrMagnitude >
+                    MinimumEdgeLengthSqr
+                    ? normalSum.normalized
+                    : Vector3.up;
+                float offset = Mathf.Max(
+                    PointMergeDistance * 8f,
+                    Mathf.Sqrt(Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea)) * 0.2f);
+                Vector3[] candidateCentres =
+                {
+                    centroid,
+                    Vector3.Lerp(centroid, endpoint, 0.35f),
+                    centroid + averageNormal * offset,
+                    centroid - averageNormal * offset
+                };
+
+                List<PolygonFace> bestFaces = null;
+                string bestSignature = string.Empty;
+                int bestResidual = int.MaxValue;
+                for (int centreIndex = 0;
+                     centreIndex < candidateCentres.Length;
+                     centreIndex++)
+                {
+                    Vector3 centre = candidateCentres[centreIndex];
+                    List<PolygonFace> trialFaces = new List<PolygonFace>();
+                    List<string> trialSignatures = new List<string>();
+                    bool valid = true;
+                    for (int segmentIndex = 0;
+                         segmentIndex < component.Count;
+                         segmentIndex++)
+                    {
+                        PlaneCutBoundarySegment segment =
+                            component[segmentIndex];
+                        List<Vector3> triangle = new List<Vector3>
+                        {
+                            segment.End,
+                            segment.Start,
+                            centre
+                        };
+                        Vector3 triangleNormal =
+                            CalculatePolygonNormal(triangle);
+                        if (!IsFinite(triangleNormal) ||
+                            triangleNormal.sqrMagnitude <= 0.000001f ||
+                            CalculatePolygonArea(triangle) <= Mathf.Max(
+                                TinyFaceAreaEpsilon,
+                                minimumStableFaceArea * 0.005f))
+                        {
+                            valid = false;
+                            break;
+                        }
+                        PolygonFace oriented = CreateOrientedFace(
+                            triangleNormal,
+                            PolygonFaceFeature.Base,
+                            0f,
+                            triangle.ToArray());
+                        trialFaces.Add(new PolygonFace(
+                            oriented.Vertices,
+                            oriented.Normal,
+                            PolygonFaceFeature.Base,
+                            0f,
+                            PolygonFaceProvenanceKind.BoundedEndpointCap,
+                            sharedVertexIndex));
+                        trialSignatures.Add(string.Join(
+                            "|",
+                            triangle.Select(
+                                BuildPlaneCutEndpointPatchPointSignature)));
+                    }
+                    if (!valid || trialFaces.Count == 0)
+                    {
+                        continue;
+                    }
+                    List<PolygonFace> trialShell = hybrid
+                        .Select(ClonePlaneCutPolygonFace)
+                        .ToList();
+                    trialShell.AddRange(trialFaces);
+                    int residual = CollectPlaneCutOpenEdges(trialShell).Count;
+                    if (residual < bestResidual)
+                    {
+                        bestResidual = residual;
+                        bestFaces = trialFaces;
+                        bestSignature =
+                            centreIndex + ":" +
+                            string.Join("/", trialSignatures);
+                    }
+                }
+                if (bestFaces == null)
+                {
+                    blocker = mechanismName +
+                        " produced no non-degenerate boundary cell";
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                closureFaces.AddRange(bestFaces);
+                loopVertexCount += component.Count;
+                componentSignatures.Add(
+                    "c" + componentIndex + ":r" + bestResidual +
+                    ":" + bestSignature);
+            }
+            evidence.ClosedCycleCount = components.Count(component =>
+            {
+                Dictionary<VertexKey, int> degree =
+                    new Dictionary<VertexKey, int>();
+                for (int index = 0; index < component.Count; index++)
+                {
+                    degree.TryGetValue(
+                        component[index].StartKey,
+                        out int startDegree);
+                    degree[component[index].StartKey] = startDegree + 1;
+                    degree.TryGetValue(
+                        component[index].EndKey,
+                        out int endDegree);
+                    degree[component[index].EndKey] = endDegree + 1;
+                }
+                return degree.Values.All(value => value == 2);
+            });
+            evidence.TransitionFaceCount = closureFaces.Count;
+            signature = mechanismName + ":" +
+                string.Join("/", componentSignatures);
+            if (closureFaces.Count == 0)
+            {
+                blocker = mechanismName + " produced no closure faces";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutConformingNormalizedClosure(
+            List<PolygonFace> hybrid,
+            List<int> hybridOriginalFaceIndices,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            PlaneCutBevelTerminationOptions options,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            List<PlaneCutOpenEdgeRecord> initialOpen =
+                CollectPlaneCutOpenEdges(hybrid);
+            if (initialOpen.Count == 0)
+            {
+                evidence.ClosurelessAccepted = true;
+                evidence.ResidualOpenEdgeCount = 0;
+                evidence.MechanismSignature += ":already-closed";
+                return true;
+            }
+
+            List<PlaneCutBoundarySegment> normalized;
+            int conformedFaceCount = 0;
+            int insertedVertexCount = 0;
+            if (options.ConformBeforeClosureDecision)
+            {
+                if (!TryConformPlaneCutHybridBoundaryOwners(
+                        hybrid,
+                        hybridOriginalFaceIndices,
+                        initialOpen,
+                        evidence,
+                        out conformedFaceCount,
+                        out insertedVertexCount,
+                        out blocker))
+                {
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                List<PlaneCutOpenEdgeRecord> conformedBeforeDecision =
+                    CollectPlaneCutOpenEdges(hybrid);
+                evidence.MechanismSignature +=
+                    ":preconform=" + conformedFaceCount +
+                    "/" + insertedVertexCount +
+                    ":open=" + conformedBeforeDecision.Count;
+                if (conformedBeforeDecision.Count == 0)
+                {
+                    evidence.ClosurelessAccepted = true;
+                    evidence.ResidualOpenEdgeCount = 0;
+                    return true;
+                }
+                normalized = NormalizePlaneCutBoundarySegments(
+                    conformedBeforeDecision);
+                if (normalized.Count < 3)
+                {
+                    blocker =
+                        "preconformed cavity retained fewer than three true boundary segments: " +
+                        normalized.Count;
+                    evidence.FailureSource = blocker;
+                    evidence.ResidualOpenEdgeCount =
+                        conformedBeforeDecision.Count;
+                    return false;
+                }
+            }
+            else
+            {
+                normalized = NormalizePlaneCutBoundarySegments(initialOpen);
+                if (normalized.Count < 3)
+                {
+                    blocker =
+                        "conforming normalized cavity found fewer than three boundary segments";
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                if (!TryConformPlaneCutHybridBoundaryOwners(
+                        hybrid,
+                        hybridOriginalFaceIndices,
+                        initialOpen,
+                        evidence,
+                        out conformedFaceCount,
+                        out insertedVertexCount,
+                        out blocker))
+                {
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+
+                List<PlaneCutOpenEdgeRecord> conformedOpen =
+                    CollectPlaneCutOpenEdges(hybrid);
+                HashSet<EdgeKey> expected = new HashSet<EdgeKey>(
+                    normalized.Select(segment => segment.EdgeKey));
+                HashSet<EdgeKey> actual = new HashSet<EdgeKey>(
+                    conformedOpen.Select(edge => edge.EdgeKey));
+                if (expected.Count != actual.Count ||
+                    !expected.SetEquals(actual))
+                {
+                    blocker =
+                        "conforming normalized cavity owner edges did not match the normalized boundary: expected=" +
+                        expected.Count + ",actual=" + actual.Count;
+                    evidence.FailureSource = blocker;
+                    evidence.ResidualOpenEdgeCount = conformedOpen.Count;
+                    return false;
+                }
+            }
+
+            evidence.MechanismSignature =
+                (string.IsNullOrEmpty(evidence.MechanismSignature)
+                    ? "conforming-normalized-cavity"
+                    : evidence.MechanismSignature) +
+                ":faces=" + conformedFaceCount +
+                ":inserted=" + insertedVertexCount +
+                ":segments=" + normalized.Count;
+            return TryBuildPlaneCutOrientedHalfEdgeClosure(
+                hybrid,
+                context,
+                sharedVertexIndex,
+                minimumStableFaceArea,
+                false,
+                options.RequireSimpleClosureCycles,
+                options.DirectSimpleCycleTriangles,
+                evidence,
+                out closureFaces,
+                out signature,
+                out loopVertexCount,
+                out blocker);
+        }
+
+        private static bool TryConformPlaneCutHybridBoundaryOwners(
+            List<PolygonFace> hybrid,
+            List<int> hybridOriginalFaceIndices,
+            List<PlaneCutOpenEdgeRecord> openEdges,
+            PlaneCutEndpointCellEvidence evidence,
+            out int conformedFaceCount,
+            out int insertedVertexCount,
+            out string blocker)
+        {
+            conformedFaceCount = 0;
+            insertedVertexCount = 0;
+            blocker = string.Empty;
+            if (hybrid == null || hybridOriginalFaceIndices == null ||
+                hybrid.Count != hybridOriginalFaceIndices.Count ||
+                openEdges == null || openEdges.Count == 0)
+            {
+                blocker =
+                    "conforming normalized cavity owner inputs were incomplete";
+                return false;
+            }
+
+            List<Vector3> boundaryPoints = new List<Vector3>();
+            Dictionary<int, HashSet<EdgeKey>> openKeysByFace =
+                new Dictionary<int, HashSet<EdgeKey>>();
+            for (int index = 0; index < openEdges.Count; index++)
+            {
+                PlaneCutOpenEdgeRecord open = openEdges[index];
+                AddPointIfDifferent(boundaryPoints, open.Start);
+                AddPointIfDifferent(boundaryPoints, open.End);
+                if (!openKeysByFace.TryGetValue(
+                        open.FaceIndex,
+                        out HashSet<EdgeKey> keys))
+                {
+                    keys = new HashSet<EdgeKey>();
+                    openKeysByFace.Add(open.FaceIndex, keys);
+                }
+                keys.Add(open.EdgeKey);
+            }
+            float tolerance = Mathf.Max(
+                PointMergeDistance * 4f,
+                0.00002f);
+            foreach (KeyValuePair<int, HashSet<EdgeKey>> pair
+                in openKeysByFace.OrderBy(entry => entry.Key))
+            {
+                int faceIndex = pair.Key;
+                if (faceIndex < 0 || faceIndex >= hybrid.Count)
+                {
+                    blocker =
+                        "conforming normalized cavity referenced an invalid owner face";
+                    return false;
+                }
+                PolygonFace face = hybrid[faceIndex];
+                List<Vector3> rebuilt = new List<Vector3>();
+                int faceInserted = 0;
+                for (int vertexIndex = 0;
+                     vertexIndex < face.Vertices.Count;
+                     vertexIndex++)
+                {
+                    Vector3 start = face.Vertices[vertexIndex];
+                    Vector3 end = face.Vertices[
+                        (vertexIndex + 1) % face.Vertices.Count];
+                    AddPointIfDifferent(rebuilt, start);
+                    EdgeKey key = new EdgeKey(start, end);
+                    if (!pair.Value.Contains(key))
+                    {
+                        continue;
+                    }
+                    Vector3 axis = end - start;
+                    float lengthSqr = axis.sqrMagnitude;
+                    if (lengthSqr <= MinimumEdgeLengthSqr)
+                    {
+                        continue;
+                    }
+                    List<KeyValuePair<float, Vector3>> splits =
+                        new List<KeyValuePair<float, Vector3>>();
+                    for (int pointIndex = 0;
+                         pointIndex < boundaryPoints.Count;
+                         pointIndex++)
+                    {
+                        Vector3 point = boundaryPoints[pointIndex];
+                        float parameter = Vector3.Dot(
+                            point - start,
+                            axis) / lengthSqr;
+                        if (parameter <= 0.000001f ||
+                            parameter >= 0.999999f)
+                        {
+                            continue;
+                        }
+                        Vector3 closest = start + axis * parameter;
+                        if (Vector3.Distance(closest, point) <= tolerance)
+                        {
+                            splits.Add(new KeyValuePair<float, Vector3>(
+                                parameter,
+                                point));
+                        }
+                    }
+                    splits.Sort((left, right) =>
+                        left.Key.CompareTo(right.Key));
+                    for (int splitIndex = 0;
+                         splitIndex < splits.Count;
+                         splitIndex++)
+                    {
+                        int before = rebuilt.Count;
+                        AddPointIfDifferent(rebuilt, splits[splitIndex].Value);
+                        if (rebuilt.Count > before)
+                        {
+                            faceInserted++;
+                        }
+                    }
+                }
+                if (faceInserted == 0)
+                {
+                    continue;
+                }
+                if (rebuilt.Count < 3)
+                {
+                    blocker =
+                        "conforming normalized cavity collapsed an owner face";
+                    return false;
+                }
+                hybrid[faceIndex] = new PolygonFace(
+                    rebuilt,
+                    face.Normal,
+                    face.Feature,
+                    face.FeatureStrength,
+                    face.ProvenanceKind,
+                    face.ProvenanceIndex);
+                evidence.MutatedHybridFaceIndices.Add(faceIndex);
+                conformedFaceCount++;
+                insertedVertexCount += faceInserted;
+            }
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutOrientedHalfEdgeClosure(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            bool useCellApex,
+            bool requireSimpleCycles,
+            bool directSimpleCycleTriangles,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            if (!TryBuildPlaneCutNormalizedBoundaryCycles(
+                    hybrid,
+                    out PlaneCutBoundaryCycleResult cycles,
+                    out blocker))
+            {
+                ApplyPlaneCutBoundaryCycleEvidence(evidence, cycles);
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            ApplyPlaneCutBoundaryCycleEvidence(evidence, cycles);
+            if (requireSimpleCycles &&
+                !TryResolvePlaneCutSimpleBoundaryCycles(
+                    cycles,
+                    evidence,
+                    out blocker))
+            {
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            Vector3 endpoint = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            List<string> signatures = new List<string>();
+            for (int cycleIndex = 0;
+                 cycleIndex < cycles.Cycles.Count;
+                 cycleIndex++)
+            {
+                Vector3[] cycle = cycles.Cycles[cycleIndex];
+                if (!TryTriangulatePlaneCutBoundaryCycle(
+                        cycle,
+                        endpoint,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        useCellApex,
+                        directSimpleCycleTriangles,
+                        out List<PolygonFace> cycleFaces,
+                        out string cycleSignature,
+                        out blocker))
+                {
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                closureFaces.AddRange(cycleFaces);
+                loopVertexCount += cycle.Length;
+                signatures.Add(cycleSignature);
+            }
+            evidence.ClosedCycleCount = cycles.Cycles.Count;
+            evidence.TransitionFaceCount = closureFaces.Count;
+            signature = string.Join("/", signatures);
+            if (closureFaces.Count == 0)
+            {
+                blocker =
+                    "oriented half-edge reconstruction produced no closure faces";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryResolvePlaneCutSimpleBoundaryCycles(
+            PlaneCutBoundaryCycleResult cycles,
+            PlaneCutEndpointCellEvidence evidence,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (cycles == null || cycles.Cycles.Count == 0)
+            {
+                blocker = "simple-cycle reconstruction received no cycles";
+                return false;
+            }
+
+            List<Vector3[]> resolved = new List<Vector3[]>();
+            int repeatedVertexCount = 0;
+            for (int cycleIndex = 0;
+                 cycleIndex < cycles.Cycles.Count;
+                 cycleIndex++)
+            {
+                if (!TrySplitPlaneCutBoundaryWalkIntoSimpleCycles(
+                        cycles.Cycles[cycleIndex],
+                        resolved,
+                        ref repeatedVertexCount,
+                        out blocker))
+                {
+                    return false;
+                }
+            }
+
+            Dictionary<EdgeKey, int> edgeOwners =
+                new Dictionary<EdgeKey, int>();
+            Dictionary<VertexKey, int> vertexOwners =
+                new Dictionary<VertexKey, int>();
+            int sharedEdgeCount = 0;
+            for (int cycleIndex = 0;
+                 cycleIndex < resolved.Count;
+                 cycleIndex++)
+            {
+                Vector3[] cycle = resolved[cycleIndex];
+                HashSet<VertexKey> cycleVertices = new HashSet<VertexKey>();
+                for (int vertexIndex = 0;
+                     vertexIndex < cycle.Length;
+                     vertexIndex++)
+                {
+                    VertexKey vertexKey = new VertexKey(cycle[vertexIndex]);
+                    if (!cycleVertices.Add(vertexKey))
+                    {
+                        blocker =
+                            "simple-cycle reconstruction retained a repeated cycle vertex";
+                        return false;
+                    }
+                    EdgeKey edgeKey = new EdgeKey(
+                        cycle[vertexIndex],
+                        cycle[(vertexIndex + 1) % cycle.Length]);
+                    edgeOwners.TryGetValue(edgeKey, out int edgeCount);
+                    edgeOwners[edgeKey] = edgeCount + 1;
+                    if (edgeCount > 0)
+                    {
+                        sharedEdgeCount++;
+                    }
+                }
+                foreach (VertexKey vertexKey in cycleVertices)
+                {
+                    vertexOwners.TryGetValue(vertexKey, out int ownerCount);
+                    vertexOwners[vertexKey] = ownerCount + 1;
+                }
+            }
+            if (sharedEdgeCount > 0)
+            {
+                blocker = "simple-cycle reconstruction produced " +
+                    sharedEdgeCount + " overlapping cycle edges";
+                return false;
+            }
+
+            int sharedVertexCount = vertexOwners.Count(pair =>
+                pair.Value > 1);
+            cycles.Cycles.Clear();
+            cycles.Cycles.AddRange(resolved);
+            cycles.Signature +=
+                ":simple=" + resolved.Count +
+                ":repeated=" + repeatedVertexCount +
+                ":sharedVertices=" + sharedVertexCount +
+                ":sharedEdges=0";
+            evidence.ClosedCycleCount = resolved.Count;
+            evidence.MechanismSignature =
+                string.IsNullOrEmpty(evidence.MechanismSignature)
+                    ? cycles.Signature
+                    : evidence.MechanismSignature + ":" +
+                        cycles.Signature;
+            return true;
+        }
+
+        private static bool TrySplitPlaneCutBoundaryWalkIntoSimpleCycles(
+            Vector3[] walk,
+            List<Vector3[]> resolved,
+            ref int repeatedVertexCount,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (walk == null || walk.Length < 3)
+            {
+                blocker = "simple-cycle reconstruction received a degenerate walk";
+                return false;
+            }
+            Queue<List<Vector3>> pending = new Queue<List<Vector3>>();
+            pending.Enqueue(new List<Vector3>(walk));
+            int guard = walk.Length * 4 + 16;
+            while (pending.Count > 0 && guard-- > 0)
+            {
+                List<Vector3> current = pending.Dequeue();
+                Dictionary<VertexKey, int> firstIndex =
+                    new Dictionary<VertexKey, int>();
+                int repeatedStart = -1;
+                int repeatedEnd = -1;
+                for (int index = 0; index < current.Count; index++)
+                {
+                    VertexKey key = new VertexKey(current[index]);
+                    if (firstIndex.TryGetValue(key, out int first))
+                    {
+                        repeatedStart = first;
+                        repeatedEnd = index;
+                        break;
+                    }
+                    firstIndex.Add(key, index);
+                }
+                if (repeatedStart < 0)
+                {
+                    if (current.Count < 3)
+                    {
+                        blocker =
+                            "simple-cycle reconstruction produced a cycle with fewer than three vertices";
+                        return false;
+                    }
+                    resolved.Add(current.ToArray());
+                    continue;
+                }
+
+                repeatedVertexCount++;
+                List<Vector3> firstCycle = current.GetRange(
+                    repeatedStart,
+                    repeatedEnd - repeatedStart);
+                List<Vector3> secondCycle = new List<Vector3>();
+                secondCycle.AddRange(current.GetRange(
+                    repeatedEnd,
+                    current.Count - repeatedEnd));
+                if (repeatedStart > 0)
+                {
+                    secondCycle.AddRange(current.GetRange(
+                        0,
+                        repeatedStart));
+                }
+                if (firstCycle.Count < 3 || secondCycle.Count < 3)
+                {
+                    blocker =
+                        "simple-cycle reconstruction split a self-touching walk into a degenerate cycle";
+                    return false;
+                }
+                pending.Enqueue(firstCycle);
+                pending.Enqueue(secondCycle);
+            }
+            if (pending.Count > 0)
+            {
+                blocker = "simple-cycle reconstruction exceeded its split guard";
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutBoundaryEdgeCellFanClosure(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            List<PlaneCutBoundarySegment> segments =
+                NormalizePlaneCutBoundarySegments(
+                    CollectPlaneCutOpenEdges(hybrid));
+            if (segments.Count < 3)
+            {
+                blocker =
+                    "boundary-edge cell-fan reconstruction found fewer than three boundary segments";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+
+            List<List<PlaneCutBoundarySegment>> components =
+                BuildPlaneCutBoundaryComponents(segments);
+            evidence.BoundaryComponentCount = components.Count;
+            Vector3 endpoint = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            List<string> componentSignatures = new List<string>();
+            for (int componentIndex = 0;
+                 componentIndex < components.Count;
+                 componentIndex++)
+            {
+                List<PlaneCutBoundarySegment> component =
+                    components[componentIndex];
+                Dictionary<VertexKey, Vector3> positions =
+                    new Dictionary<VertexKey, Vector3>();
+                Dictionary<VertexKey, int> degree =
+                    new Dictionary<VertexKey, int>();
+                Vector3 normalSum = Vector3.zero;
+                for (int segmentIndex = 0;
+                     segmentIndex < component.Count;
+                     segmentIndex++)
+                {
+                    PlaneCutBoundarySegment segment =
+                        component[segmentIndex];
+                    positions[segment.StartKey] = segment.Start;
+                    positions[segment.EndKey] = segment.End;
+                    degree.TryGetValue(segment.StartKey, out int startDegree);
+                    degree[segment.StartKey] = startDegree + 1;
+                    degree.TryGetValue(segment.EndKey, out int endDegree);
+                    degree[segment.EndKey] = endDegree + 1;
+                    if (segment.FaceIndex >= 0 &&
+                        segment.FaceIndex < hybrid.Count)
+                    {
+                        normalSum += hybrid[segment.FaceIndex].Normal;
+                    }
+                }
+                int oddVertices = degree.Count(pair =>
+                    (pair.Value & 1) != 0);
+                int branches = degree.Count(pair => pair.Value > 2);
+                evidence.OpenChainCount += oddVertices;
+                evidence.BranchVertexCount += branches;
+
+                Vector3 centroid = Vector3.zero;
+                List<VertexKey> orderedPositionKeys =
+                    positions.Keys.ToList();
+                orderedPositionKeys.Sort((left, right) =>
+                    left.CompareTo(right));
+                for (int positionIndex = 0;
+                     positionIndex < orderedPositionKeys.Count;
+                     positionIndex++)
+                {
+                    centroid += positions[
+                        orderedPositionKeys[positionIndex]];
+                }
+                centroid /= Mathf.Max(1, positions.Count);
+                Vector3 averageNormal = normalSum.sqrMagnitude >
+                    MinimumEdgeLengthSqr
+                    ? normalSum.normalized
+                    : Vector3.up;
+                float offset = Mathf.Max(
+                    PointMergeDistance * 8f,
+                    Mathf.Sqrt(Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea)) * 0.2f);
+                Vector3[] candidateCentres =
+                {
+                    Vector3.Lerp(centroid, endpoint, 0.35f),
+                    centroid + averageNormal * offset,
+                    centroid - averageNormal * offset
+                };
+
+                List<PolygonFace> bestFaces = null;
+                string bestSignature = string.Empty;
+                int bestResidual = int.MaxValue;
+                for (int centreIndex = 0;
+                     centreIndex < candidateCentres.Length;
+                     centreIndex++)
+                {
+                    Vector3 centre = candidateCentres[centreIndex];
+                    List<PolygonFace> trialFaces =
+                        new List<PolygonFace>();
+                    List<string> trialSignatures =
+                        new List<string>();
+                    bool valid = true;
+                    for (int segmentIndex = 0;
+                         segmentIndex < component.Count;
+                         segmentIndex++)
+                    {
+                        PlaneCutBoundarySegment segment =
+                            component[segmentIndex];
+                        List<Vector3> triangle = new List<Vector3>
+                        {
+                            segment.End,
+                            segment.Start,
+                            centre
+                        };
+                        Vector3 triangleNormal =
+                            CalculatePolygonNormal(triangle);
+                        if (!IsFinite(triangleNormal) ||
+                            triangleNormal.sqrMagnitude <= 0.000001f ||
+                            CalculatePolygonArea(triangle) <= Mathf.Max(
+                                TinyFaceAreaEpsilon,
+                                minimumStableFaceArea * 0.005f))
+                        {
+                            valid = false;
+                            break;
+                        }
+                        PolygonFace oriented = CreateOrientedFace(
+                            triangleNormal,
+                            PolygonFaceFeature.Base,
+                            0f,
+                            triangle.ToArray());
+                        trialFaces.Add(new PolygonFace(
+                            oriented.Vertices,
+                            oriented.Normal,
+                            PolygonFaceFeature.Base,
+                            0f,
+                            PolygonFaceProvenanceKind.BoundedEndpointCap,
+                            sharedVertexIndex));
+                        trialSignatures.Add(string.Join(
+                            "|",
+                            triangle.Select(
+                                BuildPlaneCutEndpointPatchPointSignature)));
+                    }
+                    if (!valid || trialFaces.Count == 0)
+                    {
+                        continue;
+                    }
+                    List<PolygonFace> trialShell = hybrid
+                        .Select(ClonePlaneCutPolygonFace)
+                        .ToList();
+                    trialShell.AddRange(trialFaces);
+                    int residual = CollectPlaneCutOpenEdges(
+                        trialShell).Count;
+                    if (residual < bestResidual)
+                    {
+                        bestResidual = residual;
+                        bestFaces = trialFaces;
+                        bestSignature =
+                            centreIndex + ":" +
+                            string.Join("/", trialSignatures);
+                    }
+                }
+                if (bestFaces == null)
+                {
+                    blocker =
+                        "boundary-edge cell-fan reconstruction produced no non-degenerate boundary-edge cell";
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                closureFaces.AddRange(bestFaces);
+                loopVertexCount += component.Count;
+                componentSignatures.Add(
+                    "c" + componentIndex + ":r" + bestResidual +
+                    ":" + bestSignature);
+            }
+            evidence.ClosedCycleCount = components.Count(component =>
+            {
+                Dictionary<VertexKey, int> degree =
+                    new Dictionary<VertexKey, int>();
+                for (int index = 0; index < component.Count; index++)
+                {
+                    degree.TryGetValue(
+                        component[index].StartKey,
+                        out int startDegree);
+                    degree[component[index].StartKey] = startDegree + 1;
+                    degree.TryGetValue(
+                        component[index].EndKey,
+                        out int endDegree);
+                    degree[component[index].EndKey] = endDegree + 1;
+                }
+                return degree.Values.All(value => value == 2);
+            });
+            evidence.TransitionFaceCount = closureFaces.Count;
+            signature = string.Join("/", componentSignatures);
+            if (closureFaces.Count == 0)
+            {
+                blocker =
+                    "boundary-edge cell-fan reconstruction produced no closure faces";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutSourceFaceStripClosure(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            PlaneCutEndpointCellEvidence evidence,
+            out List<PolygonFace> closureFaces,
+            out string signature,
+            out int loopVertexCount,
+            out string blocker)
+        {
+            closureFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            loopVertexCount = 0;
+            blocker = string.Empty;
+            List<PlaneCutOpenEdgeRecord> open =
+                CollectPlaneCutOpenEdges(hybrid);
+            List<PlaneCutBoundarySegment> normalized =
+                NormalizePlaneCutBoundarySegments(open);
+            if (normalized.Count == 0)
+            {
+                blocker =
+                    "source-face strip reconstruction found no open boundary";
+                evidence.FailureSource = blocker;
+                return false;
+            }
+
+            Dictionary<int, List<PlaneCutBoundarySegment>> bySourceFace =
+                new Dictionary<int, List<PlaneCutBoundarySegment>>();
+            for (int index = 0; index < normalized.Count; index++)
+            {
+                PlaneCutBoundarySegment segment = normalized[index];
+                if (segment.FaceIndex < 0 ||
+                    segment.FaceIndex >= hybrid.Count)
+                {
+                    continue;
+                }
+                PolygonFace owner = hybrid[segment.FaceIndex];
+                if (owner.ProvenanceKind !=
+                    PolygonFaceProvenanceKind.SourceFace)
+                {
+                    continue;
+                }
+                if (!bySourceFace.TryGetValue(
+                        owner.ProvenanceIndex,
+                        out List<PlaneCutBoundarySegment> group))
+                {
+                    group = new List<PlaneCutBoundarySegment>();
+                    bySourceFace.Add(owner.ProvenanceIndex, group);
+                }
+                group.Add(segment);
+            }
+
+            List<PolygonFace> working = hybrid
+                .Select(ClonePlaneCutPolygonFace)
+                .ToList();
+            List<string> signatures = new List<string>();
+            foreach (KeyValuePair<int, List<PlaneCutBoundarySegment>> pair
+                in bySourceFace.OrderBy(entry => entry.Key))
+            {
+                if (!TryBuildPlaneCutSourceFaceTransitionFaces(
+                        working,
+                        pair.Key,
+                        pair.Value,
+                        sharedVertexIndex,
+                        minimumStableFaceArea,
+                        out List<PolygonFace> sourceFaces,
+                        out int sourceLoopVertices,
+                        out int sourceComponents,
+                        out int sourceChains,
+                        out int sourceBranches,
+                        out string sourceSignature,
+                        out blocker))
+                {
+                    evidence.BoundaryComponentCount += sourceComponents;
+                    evidence.OpenChainCount += sourceChains;
+                    evidence.BranchVertexCount += sourceBranches;
+                    evidence.FailureSource = blocker;
+                    return false;
+                }
+                evidence.BoundaryComponentCount += sourceComponents;
+                evidence.OpenChainCount += sourceChains;
+                evidence.BranchVertexCount += sourceBranches;
+                closureFaces.AddRange(sourceFaces);
+                working.AddRange(sourceFaces);
+                loopVertexCount += sourceLoopVertices;
+                signatures.Add(pair.Key + ":" + sourceSignature);
+            }
+
+            PlaneCutEndpointCellEvidence residualEvidence =
+                new PlaneCutEndpointCellEvidence();
+            if (!TryBuildPlaneCutOrientedHalfEdgeClosure(
+                    working,
+                    context,
+                    sharedVertexIndex,
+                    minimumStableFaceArea,
+                    false,
+                    false,
+                    false,
+                    residualEvidence,
+                    out List<PolygonFace> residualFaces,
+                    out string residualSignature,
+                    out int residualVertices,
+                    out blocker))
+            {
+                evidence.BoundaryComponentCount +=
+                    residualEvidence.BoundaryComponentCount;
+                evidence.ClosedCycleCount +=
+                    residualEvidence.ClosedCycleCount;
+                evidence.OpenChainCount +=
+                    residualEvidence.OpenChainCount;
+                evidence.BranchVertexCount +=
+                    residualEvidence.BranchVertexCount;
+                evidence.FailureSource = blocker;
+                return false;
+            }
+            closureFaces.AddRange(residualFaces);
+            loopVertexCount += residualVertices;
+            evidence.BoundaryComponentCount +=
+                residualEvidence.BoundaryComponentCount;
+            evidence.ClosedCycleCount +=
+                residualEvidence.ClosedCycleCount;
+            evidence.OpenChainCount +=
+                residualEvidence.OpenChainCount;
+            evidence.BranchVertexCount +=
+                residualEvidence.BranchVertexCount;
+            evidence.TransitionFaceCount = closureFaces.Count;
+            signatures.Add("residual:" + residualSignature);
+            signature = string.Join("/", signatures);
+            return closureFaces.Count > 0;
+        }
+
+        private static bool TryBuildPlaneCutSourceFaceTransitionFaces(
+            List<PolygonFace> hybrid,
+            int sourceFaceIdentity,
+            List<PlaneCutBoundarySegment> segments,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            out List<PolygonFace> faces,
+            out int loopVertexCount,
+            out int componentCount,
+            out int openChainCount,
+            out int branchVertexCount,
+            out string signature,
+            out string blocker)
+        {
+            faces = new List<PolygonFace>();
+            loopVertexCount = 0;
+            componentCount = 0;
+            openChainCount = 0;
+            branchVertexCount = 0;
+            signature = string.Empty;
+            blocker = string.Empty;
+            List<List<PlaneCutBoundarySegment>> components =
+                BuildPlaneCutBoundaryComponents(segments);
+            componentCount = components.Count;
+            List<string> signatures = new List<string>();
+            for (int componentIndex = 0;
+                 componentIndex < components.Count;
+                 componentIndex++)
+            {
+                List<PlaneCutBoundarySegment> component =
+                    components[componentIndex];
+                if (!TryOrderPlaneCutBoundaryPath(
+                        component,
+                        out Vector3[] ordered,
+                        out bool closed,
+                        out int branches,
+                        out blocker))
+                {
+                    branchVertexCount += branches;
+                    return false;
+                }
+                branchVertexCount += branches;
+                if (!closed)
+                {
+                    openChainCount++;
+                }
+                if (ordered.Length < 3)
+                {
+                    blocker =
+                        "source-face transition component had fewer than three vertices";
+                    return false;
+                }
+                List<Vector3> polygon = new List<Vector3>(ordered);
+                polygon.Reverse();
+                Vector3 normal = Vector3.zero;
+                for (int faceIndex = 0;
+                     faceIndex < hybrid.Count;
+                     faceIndex++)
+                {
+                    PolygonFace candidate = hybrid[faceIndex];
+                    if (candidate.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.SourceFace &&
+                        candidate.ProvenanceIndex == sourceFaceIdentity)
+                    {
+                        normal = candidate.Normal;
+                        break;
+                    }
+                }
+                if (!IsFinite(normal) ||
+                    normal.sqrMagnitude <= 0.000001f)
+                {
+                    blocker =
+                        "source-face transition strip could not resolve its owner normal";
+                    return false;
+                }
+                polygon = SanitizePolygon(polygon, normal);
+                if (polygon.Count < 3 ||
+                    CalculatePolygonArea(polygon) <= Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea * 0.02f))
+                {
+                    blocker =
+                        "source-face transition strip was degenerate";
+                    return false;
+                }
+                PolygonFace oriented = CreateOrientedFace(
+                    normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    polygon.ToArray());
+                faces.Add(new PolygonFace(
+                    oriented.Vertices,
+                    oriented.Normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    PolygonFaceProvenanceKind.BoundedEndpointCap,
+                    sharedVertexIndex));
+                loopVertexCount += polygon.Count;
+                signatures.Add(
+                    polygon.Count + ":" +
+                    string.Join("|", polygon.Select(
+                        BuildPlaneCutEndpointPatchPointSignature)));
+            }
+            signature = string.Join("/", signatures);
+            return true;
+        }
+
+        private static bool TryBuildPlaneCutNormalizedBoundaryCycles(
+            List<PolygonFace> faces,
+            out PlaneCutBoundaryCycleResult result,
+            out string blocker)
+        {
+            result = new PlaneCutBoundaryCycleResult();
+            blocker = string.Empty;
+            List<PlaneCutBoundarySegment> segments =
+                NormalizePlaneCutBoundarySegments(
+                    CollectPlaneCutOpenEdges(faces));
+            if (segments.Count < 3)
+            {
+                blocker =
+                    "normalized boundary contained fewer than three segments";
+                return false;
+            }
+            List<List<PlaneCutBoundarySegment>> components =
+                BuildPlaneCutBoundaryComponents(segments);
+            result.ComponentCount = components.Count;
+            List<string> signatures = new List<string>();
+            for (int componentIndex = 0;
+                 componentIndex < components.Count;
+                 componentIndex++)
+            {
+                if (!TryDecomposePlaneCutBoundaryComponentIntoCycles(
+                        components[componentIndex],
+                        out List<Vector3[]> cycles,
+                        out int openChains,
+                        out int branches,
+                        out string componentSignature,
+                        out blocker))
+                {
+                    result.OpenChainCount += openChains;
+                    result.BranchVertexCount += branches;
+                    return false;
+                }
+                result.OpenChainCount += openChains;
+                result.BranchVertexCount += branches;
+                result.Cycles.AddRange(cycles);
+                signatures.Add(componentSignature);
+            }
+            result.Signature = string.Join("/", signatures);
+            if (result.Cycles.Count == 0)
+            {
+                blocker = "normalized boundary produced no closed cycles";
+                return false;
+            }
+            return true;
+        }
+
+        private static List<PlaneCutBoundarySegment>
+            NormalizePlaneCutBoundarySegments(
+                List<PlaneCutOpenEdgeRecord> openEdges)
+        {
+            List<PlaneCutBoundarySegment> result =
+                new List<PlaneCutBoundarySegment>();
+            if (openEdges == null || openEdges.Count == 0)
+            {
+                return result;
+            }
+            List<Vector3> points = new List<Vector3>();
+            for (int index = 0; index < openEdges.Count; index++)
+            {
+                AddPointIfDifferent(points, openEdges[index].Start);
+                AddPointIfDifferent(points, openEdges[index].End);
+            }
+            float tolerance = Mathf.Max(
+                PointMergeDistance * 4f,
+                0.00002f);
+            Dictionary<EdgeKey, PlaneCutBoundarySegment> segmentByKey =
+                new Dictionary<EdgeKey, PlaneCutBoundarySegment>();
+            Dictionary<EdgeKey, int> useCount =
+                new Dictionary<EdgeKey, int>();
+            for (int edgeIndex = 0;
+                 edgeIndex < openEdges.Count;
+                 edgeIndex++)
+            {
+                PlaneCutOpenEdgeRecord edge = openEdges[edgeIndex];
+                Vector3 axis = edge.End - edge.Start;
+                float lengthSqr = axis.sqrMagnitude;
+                if (lengthSqr <= MinimumEdgeLengthSqr)
+                {
+                    continue;
+                }
+                List<KeyValuePair<float, Vector3>> splits =
+                    new List<KeyValuePair<float, Vector3>>
+                    {
+                        new KeyValuePair<float, Vector3>(0f, edge.Start),
+                        new KeyValuePair<float, Vector3>(1f, edge.End)
+                    };
+                for (int pointIndex = 0;
+                     pointIndex < points.Count;
+                     pointIndex++)
+                {
+                    Vector3 point = points[pointIndex];
+                    float parameter = Vector3.Dot(
+                        point - edge.Start,
+                        axis) / lengthSqr;
+                    if (parameter <= 0.000001f ||
+                        parameter >= 0.999999f)
+                    {
+                        continue;
+                    }
+                    Vector3 closest = edge.Start + axis * parameter;
+                    if (Vector3.Distance(closest, point) <= tolerance)
+                    {
+                        splits.Add(new KeyValuePair<float, Vector3>(
+                            parameter,
+                            point));
+                    }
+                }
+                splits.Sort((left, right) =>
+                    left.Key.CompareTo(right.Key));
+                for (int splitIndex = 0;
+                     splitIndex < splits.Count - 1;
+                     splitIndex++)
+                {
+                    Vector3 start = splits[splitIndex].Value;
+                    Vector3 end = splits[splitIndex + 1].Value;
+                    if (AreSamePoint(start, end))
+                    {
+                        continue;
+                    }
+                    PlaneCutBoundarySegment segment =
+                        new PlaneCutBoundarySegment(
+                            edge.FaceIndex,
+                            start,
+                            end);
+                    useCount.TryGetValue(segment.EdgeKey, out int count);
+                    useCount[segment.EdgeKey] = count + 1;
+                    if (!segmentByKey.ContainsKey(segment.EdgeKey))
+                    {
+                        segmentByKey.Add(segment.EdgeKey, segment);
+                    }
+                }
+            }
+            foreach (KeyValuePair<EdgeKey, PlaneCutBoundarySegment> pair
+                in segmentByKey)
+            {
+                if ((useCount[pair.Key] & 1) != 0)
+                {
+                    result.Add(pair.Value);
+                }
+            }
+            result.Sort(ComparePlaneCutBoundarySegments);
+            return result;
+        }
+
+        private static List<List<PlaneCutBoundarySegment>>
+            BuildPlaneCutBoundaryComponents(
+                List<PlaneCutBoundarySegment> segments)
+        {
+            List<List<PlaneCutBoundarySegment>> result =
+                new List<List<PlaneCutBoundarySegment>>();
+            if (segments == null || segments.Count == 0)
+            {
+                return result;
+            }
+            Dictionary<VertexKey, List<int>> byVertex =
+                new Dictionary<VertexKey, List<int>>();
+            for (int index = 0; index < segments.Count; index++)
+            {
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    segments[index].StartKey,
+                    index);
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    segments[index].EndKey,
+                    index);
+            }
+            HashSet<int> remaining = new HashSet<int>(
+                Enumerable.Range(0, segments.Count));
+            while (remaining.Count > 0)
+            {
+                int seed = remaining.Min();
+                Queue<int> queue = new Queue<int>();
+                List<PlaneCutBoundarySegment> component =
+                    new List<PlaneCutBoundarySegment>();
+                queue.Enqueue(seed);
+                remaining.Remove(seed);
+                while (queue.Count > 0)
+                {
+                    int current = queue.Dequeue();
+                    PlaneCutBoundarySegment segment = segments[current];
+                    component.Add(segment);
+                    VertexKey[] keys =
+                    {
+                        segment.StartKey,
+                        segment.EndKey
+                    };
+                    for (int keyIndex = 0;
+                         keyIndex < keys.Length;
+                         keyIndex++)
+                    {
+                        if (!byVertex.TryGetValue(
+                                keys[keyIndex],
+                                out List<int> connected))
+                        {
+                            continue;
+                        }
+                        for (int connectedIndex = 0;
+                             connectedIndex < connected.Count;
+                             connectedIndex++)
+                        {
+                            if (remaining.Remove(connected[connectedIndex]))
+                            {
+                                queue.Enqueue(connected[connectedIndex]);
+                            }
+                        }
+                    }
+                }
+                result.Add(component);
+            }
+            return result;
+        }
+
+        private static void AddPlaneCutBoundaryEdgeIndex(
+            Dictionary<VertexKey, List<int>> byVertex,
+            VertexKey key,
+            int edgeIndex)
+        {
+            if (!byVertex.TryGetValue(key, out List<int> indices))
+            {
+                indices = new List<int>();
+                byVertex.Add(key, indices);
+            }
+            indices.Add(edgeIndex);
+        }
+
+        private static int ComparePlaneCutBoundarySegments(
+            PlaneCutBoundarySegment left,
+            PlaneCutBoundarySegment right)
+        {
+            int start = left.StartKey.CompareTo(right.StartKey);
+            if (start != 0)
+            {
+                return start;
+            }
+            int end = left.EndKey.CompareTo(right.EndKey);
+            if (end != 0)
+            {
+                return end;
+            }
+            return left.FaceIndex.CompareTo(right.FaceIndex);
+        }
+
+        private static VertexKey GetMinimumPlaneCutBoundaryVertexKey(
+            IEnumerable<VertexKey> keys)
+        {
+            bool found = false;
+            VertexKey minimum = default;
+            foreach (VertexKey key in keys)
+            {
+                if (!found || key.CompareTo(minimum) < 0)
+                {
+                    minimum = key;
+                    found = true;
+                }
+            }
+            return minimum;
+        }
+
+        private static bool TryDecomposePlaneCutBoundaryComponentIntoCycles(
+            List<PlaneCutBoundarySegment> component,
+            out List<Vector3[]> cycles,
+            out int openChainCount,
+            out int branchVertexCount,
+            out string signature,
+            out string blocker)
+        {
+            cycles = new List<Vector3[]>();
+            openChainCount = 0;
+            branchVertexCount = 0;
+            signature = string.Empty;
+            blocker = string.Empty;
+            Dictionary<VertexKey, List<int>> byVertex =
+                new Dictionary<VertexKey, List<int>>();
+            Dictionary<VertexKey, Vector3> positions =
+                new Dictionary<VertexKey, Vector3>();
+            for (int index = 0; index < component.Count; index++)
+            {
+                PlaneCutBoundarySegment segment = component[index];
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    segment.StartKey,
+                    index);
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    segment.EndKey,
+                    index);
+                positions[segment.StartKey] = segment.Start;
+                positions[segment.EndKey] = segment.End;
+            }
+            List<VertexKey> orderedVertexKeys = byVertex.Keys.ToList();
+            orderedVertexKeys.Sort((left, right) =>
+                left.CompareTo(right));
+            for (int vertexIndex = 0;
+                 vertexIndex < orderedVertexKeys.Count;
+                 vertexIndex++)
+            {
+                List<int> incidentEdges = byVertex[
+                    orderedVertexKeys[vertexIndex]];
+                if ((incidentEdges.Count & 1) != 0)
+                {
+                    openChainCount++;
+                }
+                if (incidentEdges.Count > 2)
+                {
+                    branchVertexCount++;
+                }
+            }
+            if (openChainCount > 0)
+            {
+                blocker =
+                    "normalized boundary retained " + openChainCount +
+                    " odd-degree chain endpoints";
+                return false;
+            }
+
+            Dictionary<PlaneCutBoundaryPairKey, int> pairedEdge =
+                new Dictionary<PlaneCutBoundaryPairKey, int>();
+            for (int vertexIndex = 0;
+                 vertexIndex < orderedVertexKeys.Count;
+                 vertexIndex++)
+            {
+                VertexKey vertexKey = orderedVertexKeys[vertexIndex];
+                List<int> available = new List<int>(
+                    byVertex[vertexKey]);
+                available.Sort();
+                while (available.Count > 0)
+                {
+                    int first = available[0];
+                    available.RemoveAt(0);
+                    int bestPosition = -1;
+                    float bestDot = float.PositiveInfinity;
+                    Vector3 firstDirection = (
+                        component[first].Position(
+                            component[first].Other(vertexKey)) -
+                        positions[vertexKey]).normalized;
+                    for (int candidatePosition = 0;
+                         candidatePosition < available.Count;
+                         candidatePosition++)
+                    {
+                        int candidate = available[candidatePosition];
+                        Vector3 candidateDirection = (
+                            component[candidate].Position(
+                                component[candidate].Other(vertexKey)) -
+                            positions[vertexKey]).normalized;
+                        float dot = Vector3.Dot(
+                            firstDirection,
+                            candidateDirection);
+                        if (dot < bestDot - 0.000001f ||
+                            (Mathf.Abs(dot - bestDot) <= 0.000001f &&
+                             candidate < (bestPosition < 0
+                                 ? int.MaxValue
+                                 : available[bestPosition])))
+                        {
+                            bestDot = dot;
+                            bestPosition = candidatePosition;
+                        }
+                    }
+                    if (bestPosition < 0)
+                    {
+                        blocker =
+                            "boundary branch pairing could not resolve an even-degree vertex";
+                        return false;
+                    }
+                    int second = available[bestPosition];
+                    available.RemoveAt(bestPosition);
+                    pairedEdge[BuildPlaneCutBoundaryPairKey(
+                        vertexKey,
+                        first)] = second;
+                    pairedEdge[BuildPlaneCutBoundaryPairKey(
+                        vertexKey,
+                        second)] = first;
+                }
+            }
+
+            HashSet<int> unused = new HashSet<int>(
+                Enumerable.Range(0, component.Count));
+            List<string> signatures = new List<string>();
+            while (unused.Count > 0)
+            {
+                int startEdge = unused.Min();
+                PlaneCutBoundarySegment seed = component[startEdge];
+                VertexKey startVertex = seed.StartKey.CompareTo(
+                    seed.EndKey) <= 0
+                    ? seed.StartKey
+                    : seed.EndKey;
+                VertexKey currentVertex = startVertex;
+                int currentEdge = startEdge;
+                List<VertexKey> keys = new List<VertexKey>();
+                List<int> traversedEdges = new List<int>();
+                int guard = component.Count * 2 + 4;
+                while (guard-- > 0)
+                {
+                    if (!unused.Remove(currentEdge))
+                    {
+                        blocker =
+                            "boundary cycle traversal repeated an edge";
+                        return false;
+                    }
+                    keys.Add(currentVertex);
+                    traversedEdges.Add(currentEdge);
+                    VertexKey nextVertex =
+                        component[currentEdge].Other(currentVertex);
+                    if (!pairedEdge.TryGetValue(
+                            BuildPlaneCutBoundaryPairKey(
+                                nextVertex,
+                                currentEdge),
+                            out int nextEdge))
+                    {
+                        blocker =
+                            "boundary cycle traversal lost its paired successor";
+                        return false;
+                    }
+                    currentVertex = nextVertex;
+                    currentEdge = nextEdge;
+                    if (currentVertex.Equals(startVertex) &&
+                        currentEdge == startEdge)
+                    {
+                        break;
+                    }
+                }
+                if (!currentVertex.Equals(startVertex) ||
+                    currentEdge != startEdge || keys.Count < 3)
+                {
+                    blocker =
+                        "paired boundary component did not close into a cycle";
+                    return false;
+                }
+                List<Vector3> ordered = keys.Select(key =>
+                    positions[key]).ToList();
+                int matchingDirection = 0;
+                for (int index = 0; index < ordered.Count; index++)
+                {
+                    Vector3 a = ordered[index];
+                    Vector3 b = ordered[(index + 1) % ordered.Count];
+                    PlaneCutBoundarySegment segment =
+                        component[traversedEdges[index]];
+                    if (AreSamePoint(segment.Start, a) &&
+                        AreSamePoint(segment.End, b))
+                    {
+                        matchingDirection++;
+                    }
+                }
+                if (matchingDirection * 2 >= ordered.Count)
+                {
+                    ordered.Reverse();
+                }
+                cycles.Add(ordered.ToArray());
+                signatures.Add(
+                    ordered.Count + ":" +
+                    string.Join("|", ordered.Select(
+                        BuildPlaneCutEndpointPatchPointSignature)));
+            }
+            signature = string.Join("/", signatures);
+            return true;
+        }
+
+        private static PlaneCutBoundaryPairKey
+            BuildPlaneCutBoundaryPairKey(
+                VertexKey key,
+                int edgeIndex)
+        {
+            return new PlaneCutBoundaryPairKey(key, edgeIndex);
+        }
+
+        private static bool TryOrderPlaneCutBoundaryPath(
+            List<PlaneCutBoundarySegment> component,
+            out Vector3[] ordered,
+            out bool closed,
+            out int branchVertexCount,
+            out string blocker)
+        {
+            ordered = Array.Empty<Vector3>();
+            closed = false;
+            branchVertexCount = 0;
+            blocker = string.Empty;
+            Dictionary<VertexKey, List<int>> byVertex =
+                new Dictionary<VertexKey, List<int>>();
+            Dictionary<VertexKey, Vector3> positions =
+                new Dictionary<VertexKey, Vector3>();
+            for (int index = 0; index < component.Count; index++)
+            {
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    component[index].StartKey,
+                    index);
+                AddPlaneCutBoundaryEdgeIndex(
+                    byVertex,
+                    component[index].EndKey,
+                    index);
+                positions[component[index].StartKey] =
+                    component[index].Start;
+                positions[component[index].EndKey] =
+                    component[index].End;
+            }
+            List<VertexKey> endpoints = new List<VertexKey>();
+            foreach (KeyValuePair<VertexKey, List<int>> pair in byVertex)
+            {
+                if (pair.Value.Count == 1)
+                {
+                    endpoints.Add(pair.Key);
+                }
+                else if (pair.Value.Count != 2)
+                {
+                    branchVertexCount++;
+                }
+            }
+            if (branchVertexCount > 0 ||
+                (endpoints.Count != 0 && endpoints.Count != 2))
+            {
+                blocker =
+                    "source-face boundary component retained branched topology";
+                return false;
+            }
+            closed = endpoints.Count == 0;
+            VertexKey start = closed
+                ? GetMinimumPlaneCutBoundaryVertexKey(byVertex.Keys)
+                : GetMinimumPlaneCutBoundaryVertexKey(endpoints);
+            List<Vector3> result = new List<Vector3>();
+            HashSet<int> used = new HashSet<int>();
+            VertexKey current = start;
+            int guard = component.Count + 2;
+            while (guard-- > 0)
+            {
+                result.Add(positions[current]);
+                int nextEdge = -1;
+                List<int> incident = byVertex[current];
+                for (int index = 0; index < incident.Count; index++)
+                {
+                    if (!used.Contains(incident[index]))
+                    {
+                        nextEdge = incident[index];
+                        break;
+                    }
+                }
+                if (nextEdge < 0)
+                {
+                    break;
+                }
+                used.Add(nextEdge);
+                current = component[nextEdge].Other(current);
+                if (closed && current.Equals(start))
+                {
+                    break;
+                }
+            }
+            if (used.Count != component.Count || result.Count < 3)
+            {
+                blocker =
+                    "source-face boundary path did not consume its component";
+                return false;
+            }
+            ordered = result.ToArray();
+            return true;
+        }
+
+        private static bool TryTriangulatePlaneCutBoundaryCycle(
+            Vector3[] cycle,
+            Vector3 endpoint,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            bool useCellApex,
+            bool directSimpleCycleTriangles,
+            out List<PolygonFace> faces,
+            out string signature,
+            out string blocker)
+        {
+            faces = new List<PolygonFace>();
+            signature = string.Empty;
+            blocker = string.Empty;
+            List<Vector3> sanitized = SanitizePolygon(
+                new List<Vector3>(cycle),
+                CalculatePolygonNormal(new List<Vector3>(cycle)));
+            if (sanitized.Count < 3)
+            {
+                blocker =
+                    "boundary reconstruction produced a cycle with fewer than three vertices";
+                return false;
+            }
+            if (directSimpleCycleTriangles && sanitized.Count == 3)
+            {
+                Vector3 triangleNormal = CalculatePolygonNormal(sanitized);
+                if (!IsFinite(triangleNormal) ||
+                    triangleNormal.sqrMagnitude <= 0.000001f ||
+                    CalculatePolygonArea(sanitized) <= Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea * 0.005f))
+                {
+                    blocker =
+                        "simple-cycle reconstruction produced a degenerate direct triangle";
+                    return false;
+                }
+                PolygonFace orientedTriangle = CreateOrientedFace(
+                    triangleNormal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    sanitized.ToArray());
+                faces.Add(new PolygonFace(
+                    orientedTriangle.Vertices,
+                    orientedTriangle.Normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    PolygonFaceProvenanceKind.BoundedEndpointCap,
+                    sharedVertexIndex));
+                signature = string.Join(
+                    "|",
+                    sanitized.Select(
+                        BuildPlaneCutEndpointPatchPointSignature));
+                return true;
+            }
+
+            Vector3 centroid = Vector3.zero;
+            for (int index = 0; index < sanitized.Count; index++)
+            {
+                centroid += sanitized[index];
+            }
+            centroid /= sanitized.Count;
+            Vector3 normal = CalculatePolygonNormal(sanitized);
+            if (!IsFinite(normal) || normal.sqrMagnitude <= 0.000001f)
+            {
+                blocker =
+                    "boundary reconstruction cycle had no finite orientation";
+                return false;
+            }
+            Vector3 centre = centroid;
+            if (useCellApex)
+            {
+                Vector3 radial = centroid - endpoint;
+                float offset = Mathf.Max(
+                    PointMergeDistance * 8f,
+                    Mathf.Sqrt(Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea)) * 0.15f);
+                Vector3 side = radial.sqrMagnitude > MinimumEdgeLengthSqr
+                    ? radial.normalized
+                    : normal;
+                centre = centroid + (normal + side * 0.25f).normalized *
+                    offset;
+            }
+            List<string> triangleSignatures = new List<string>();
+            for (int index = 0; index < sanitized.Count; index++)
+            {
+                List<Vector3> triangle = new List<Vector3>
+                {
+                    sanitized[index],
+                    sanitized[(index + 1) % sanitized.Count],
+                    centre
+                };
+                Vector3 triangleNormal = CalculatePolygonNormal(triangle);
+                if (!IsFinite(triangleNormal) ||
+                    triangleNormal.sqrMagnitude <= 0.000001f ||
+                    CalculatePolygonArea(triangle) <= Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea * 0.005f))
+                {
+                    blocker =
+                        "boundary reconstruction produced a degenerate closure triangle";
+                    return false;
+                }
+                PolygonFace oriented = CreateOrientedFace(
+                    triangleNormal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    triangle.ToArray());
+                faces.Add(new PolygonFace(
+                    oriented.Vertices,
+                    oriented.Normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    PolygonFaceProvenanceKind.BoundedEndpointCap,
+                    sharedVertexIndex));
+                triangleSignatures.Add(
+                    string.Join("|", triangle.Select(
+                        BuildPlaneCutEndpointPatchPointSignature)));
+            }
+            signature = string.Join("/", triangleSignatures);
+            return true;
+        }
+
+        private static void ApplyPlaneCutBoundaryCycleEvidence(
+            PlaneCutEndpointCellEvidence evidence,
+            PlaneCutBoundaryCycleResult cycles)
+        {
+            if (evidence == null || cycles == null)
+            {
+                return;
+            }
+            evidence.BoundaryComponentCount = cycles.ComponentCount;
+            evidence.ClosedCycleCount = cycles.Cycles.Count;
+            evidence.OpenChainCount = cycles.OpenChainCount;
+            evidence.BranchVertexCount = cycles.BranchVertexCount;
+            evidence.MechanismSignature =
+                string.IsNullOrEmpty(evidence.MechanismSignature)
+                    ? cycles.Signature
+                    : evidence.MechanismSignature + ":" +
+                        cycles.Signature;
+        }
+
+
+        private static bool TryBuildPlaneCutBevelTransitionClosures(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            out List<PolygonFace> transitionFaces,
+            out string signature,
+            out string blocker)
+        {
+            transitionFaces = new List<PolygonFace>();
+            signature = string.Empty;
+            blocker = string.Empty;
+            if (context == null || context.Graph == null ||
+                sharedVertexIndex < 0 ||
+                sharedVertexIndex >= context.Graph.Vertices.Count)
+            {
+                blocker =
+                    "transition closure endpoint context was unavailable";
+                return false;
+            }
+            Vector3 endpointPosition = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            List<PlaneCutOpenEdgeRecord> openEdges =
+                CollectPlaneCutOpenEdges(hybrid);
+            if (openEdges.Count == 0)
+            {
+                return true;
+            }
+
+            Dictionary<VertexKey, List<int>> edgesByVertex =
+                new Dictionary<VertexKey, List<int>>();
+            for (int edgeIndex = 0;
+                 edgeIndex < openEdges.Count;
+                 edgeIndex++)
+            {
+                PlaneCutOpenEdgeRecord edge = openEdges[edgeIndex];
+                if (!edgesByVertex.TryGetValue(
+                        edge.StartKey,
+                        out List<int> startEdges))
+                {
+                    startEdges = new List<int>();
+                    edgesByVertex.Add(edge.StartKey, startEdges);
+                }
+                if (!edgesByVertex.TryGetValue(
+                        edge.EndKey,
+                        out List<int> endEdges))
+                {
+                    endEdges = new List<int>();
+                    edgesByVertex.Add(edge.EndKey, endEdges);
+                }
+                startEdges.Add(edgeIndex);
+                endEdges.Add(edgeIndex);
+            }
+
+            HashSet<int> remaining = new HashSet<int>(
+                Enumerable.Range(0, openEdges.Count));
+            List<string> signatures = new List<string>();
+            while (remaining.Count > 0)
+            {
+                int seed = remaining.First();
+                Queue<int> queue = new Queue<int>();
+                List<PlaneCutOpenEdgeRecord> component =
+                    new List<PlaneCutOpenEdgeRecord>();
+                queue.Enqueue(seed);
+                remaining.Remove(seed);
+                while (queue.Count > 0)
+                {
+                    int edgeIndex = queue.Dequeue();
+                    PlaneCutOpenEdgeRecord edge = openEdges[edgeIndex];
+                    component.Add(edge);
+                    VertexKey[] keys =
+                    {
+                        edge.StartKey,
+                        edge.EndKey
+                    };
+                    for (int keyIndex = 0;
+                         keyIndex < keys.Length;
+                         keyIndex++)
+                    {
+                        if (!edgesByVertex.TryGetValue(
+                                keys[keyIndex],
+                                out List<int> connected))
+                        {
+                            continue;
+                        }
+                        for (int connectedIndex = 0;
+                             connectedIndex < connected.Count;
+                             connectedIndex++)
+                        {
+                            int candidate = connected[connectedIndex];
+                            if (remaining.Remove(candidate))
+                            {
+                                queue.Enqueue(candidate);
+                            }
+                        }
+                    }
+                }
+
+                if (!TryOrderPlaneCutBevelTerminationLoop(
+                        component,
+                        out Vector3[] loop,
+                        out string topologySignature,
+                        out blocker))
+                {
+                    blocker =
+                        "transition closure could not order an open-edge component: " +
+                        blocker;
+                    return false;
+                }
+                List<Vector3> rawLoop = new List<Vector3>(loop);
+                List<Vector3> sanitized = SanitizePolygon(
+                    rawLoop,
+                    CalculatePolygonNormal(rawLoop));
+                Vector3 normal = CalculatePolygonNormal(sanitized);
+                if (sanitized.Count < 3 || !IsFinite(normal) ||
+                    normal.sqrMagnitude <= 0.000001f ||
+                    CalculatePolygonArea(sanitized) <= Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea * 0.02f))
+                {
+                    blocker =
+                        "transition closure produced a degenerate polygon";
+                    return false;
+                }
+                Vector3 centroid = Vector3.zero;
+                for (int index = 0; index < sanitized.Count; index++)
+                {
+                    centroid += sanitized[index];
+                }
+                centroid /= sanitized.Count;
+                if (Vector3.Dot(
+                        normal,
+                        centroid - endpointPosition) < 0f)
+                {
+                    normal = -normal;
+                }
+                PolygonFace oriented = CreateOrientedFace(
+                    normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    sanitized.ToArray());
+                transitionFaces.Add(new PolygonFace(
+                    oriented.Vertices,
+                    oriented.Normal,
+                    PolygonFaceFeature.Base,
+                    0f,
+                    PolygonFaceProvenanceKind.BoundedEndpointCap,
+                    sharedVertexIndex));
+                signatures.Add(topologySignature);
+            }
+            signature = string.Join("/", signatures);
+            return true;
+        }
+
+        private static bool TryPartitionPlaneCutBevelTerminationFace(
+            PolygonFace face,
+            PlaneCutEndpointCellLimit[] limits,
+            float minimumStableFaceArea,
+            Dictionary<TopologyEdgeKey, Vector3>[] caches,
+            PlaneCutBevelTerminationOptions options,
+            out PolygonFace localFragment,
+            out List<PolygonFace> remoteFragments,
+            out List<Vector3> splitPoints,
+            out string blocker)
+        {
+            localFragment = null;
+            remoteFragments = new List<PolygonFace>();
+            splitPoints = new List<Vector3>();
+            blocker = string.Empty;
+            if (face == null || face.Vertices == null ||
+                face.Vertices.Count < 3 || limits == null ||
+                caches == null || caches.Length != limits.Length)
+            {
+                blocker = "bevel-termination face partition inputs were incomplete";
+                return false;
+            }
+            float minimumArea = Mathf.Max(
+                TinyFaceAreaEpsilon,
+                minimumStableFaceArea * 0.05f);
+            List<int> effectiveLimitIndices = new List<int>();
+            if (options.OwnLimitIncidentPartition &&
+                face.ProvenanceKind ==
+                    PolygonFaceProvenanceKind.EdgeBevelPlane)
+            {
+                for (int limitIndex = 0;
+                     limitIndex < limits.Length;
+                     limitIndex++)
+                {
+                    if (limits[limitIndex].SourceEdgeIndex ==
+                        face.ProvenanceIndex)
+                    {
+                        effectiveLimitIndices.Add(limitIndex);
+                    }
+                }
+                if (effectiveLimitIndices.Count == 0)
+                {
+                    for (int limitIndex = 0;
+                         limitIndex < limits.Length;
+                         limitIndex++)
+                    {
+                        effectiveLimitIndices.Add(limitIndex);
+                    }
+                }
+                else if (effectiveLimitIndices.Count != 1)
+                {
+                    blocker =
+                        "own-limit partition resolved duplicate axial limits for bevel identity " +
+                        face.ProvenanceIndex;
+                    return false;
+                }
+            }
+            else
+            {
+                for (int limitIndex = 0;
+                     limitIndex < limits.Length;
+                     limitIndex++)
+                {
+                    effectiveLimitIndices.Add(limitIndex);
+                }
+            }
+
+            List<Vector3> local = new List<Vector3>(face.Vertices);
+            for (int effectiveIndex = 0;
+                 effectiveIndex < effectiveLimitIndices.Count;
+                 effectiveIndex++)
+            {
+                int limitIndex = effectiveLimitIndices[effectiveIndex];
+                if (!TrySplitPlaneCutEndpointCellPolygon(
+                        local,
+                        limits[limitIndex].Plane,
+                        PointMergeDistance * 2f,
+                        caches[limitIndex],
+                        out List<Vector3> inside,
+                        out List<Vector3> outside,
+                        out List<Vector3> intersections))
+                {
+                    blocker = "bevel-termination axial polygon split failed";
+                    return false;
+                }
+                List<Vector3> sanitizedOutside = SanitizePolygon(
+                    outside,
+                    face.Normal);
+                if (sanitizedOutside.Count >= 3 &&
+                    CalculatePolygonArea(sanitizedOutside) > minimumArea)
+                {
+                    remoteFragments.Add(new PolygonFace(
+                        sanitizedOutside,
+                        face.Normal,
+                        face.Feature,
+                        face.FeatureStrength,
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex));
+                }
+                splitPoints.AddRange(intersections);
+                local = SanitizePolygon(inside, face.Normal);
+                if (local.Count < 3 ||
+                    CalculatePolygonArea(local) <= minimumArea)
+                {
+                    localFragment = null;
+                    remoteFragments.Clear();
+                    splitPoints.Clear();
+                    return true;
+                }
+            }
+            localFragment = new PolygonFace(
+                local,
+                face.Normal,
+                face.Feature,
+                face.FeatureStrength,
+                face.ProvenanceKind,
+                face.ProvenanceIndex);
+            return true;
+        }
+
+        private static bool TrySelectPlaneCutRemoteBevelComponents(
+            List<PolygonFace> remoteRemainders,
+            List<PlaneCutBevelCandidate> incident,
+            HashSet<int> selectedIncidentIdentities,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            PlaneCutRemoteComponentSelection selection,
+            PlaneCutEndpointCellEvidence evidence,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (selection == PlaneCutRemoteComponentSelection.None)
+            {
+                return true;
+            }
+            if (remoteRemainders == null || incident == null ||
+                selectedIncidentIdentities == null ||
+                context == null || context.Graph == null ||
+                sharedVertexIndex < 0 ||
+                sharedVertexIndex >= context.Graph.Vertices.Count)
+            {
+                blocker =
+                    "remote-component selection inputs were incomplete";
+                return false;
+            }
+
+            Vector3 origin = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            HashSet<int> remove = new HashSet<int>();
+            List<string> signatures = new List<string>();
+            List<PlaneCutBevelCandidate> orderedIncident =
+                new List<PlaneCutBevelCandidate>(incident);
+            orderedIncident.Sort((left, right) =>
+                left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex));
+            for (int incidentIndex = 0;
+                 incidentIndex < orderedIncident.Count;
+                 incidentIndex++)
+            {
+                PlaneCutBevelCandidate edge =
+                    orderedIncident[incidentIndex];
+                if (!selectedIncidentIdentities.Contains(
+                        edge.SourceEdgeIndex))
+                {
+                    signatures.Add(edge.SourceEdgeIndex + ":untouched");
+                    continue;
+                }
+                List<int> owned = new List<int>();
+                for (int faceIndex = 0;
+                     faceIndex < remoteRemainders.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = remoteRemainders[faceIndex];
+                    if (face.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.EdgeBevelPlane &&
+                        face.ProvenanceIndex == edge.SourceEdgeIndex)
+                    {
+                        owned.Add(faceIndex);
+                    }
+                }
+                if (owned.Count == 0)
+                {
+                    blocker = "remote-component selection lost bevel identity " +
+                        edge.SourceEdgeIndex;
+                    return false;
+                }
+
+                Dictionary<EdgeKey, List<int>> owners =
+                    new Dictionary<EdgeKey, List<int>>();
+                for (int localIndex = 0;
+                     localIndex < owned.Count;
+                     localIndex++)
+                {
+                    PolygonFace face = remoteRemainders[
+                        owned[localIndex]];
+                    for (int vertexIndex = 0;
+                         vertexIndex < face.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        EdgeKey key = new EdgeKey(
+                            face.Vertices[vertexIndex],
+                            face.Vertices[(vertexIndex + 1) %
+                                face.Vertices.Count]);
+                        if (!owners.TryGetValue(
+                                key,
+                                out List<int> edgeOwners))
+                        {
+                            edgeOwners = new List<int>();
+                            owners.Add(key, edgeOwners);
+                        }
+                        if (!edgeOwners.Contains(localIndex))
+                        {
+                            edgeOwners.Add(localIndex);
+                        }
+                    }
+                }
+
+                List<HashSet<int>> adjacency = new List<HashSet<int>>();
+                for (int index = 0; index < owned.Count; index++)
+                {
+                    adjacency.Add(new HashSet<int>());
+                }
+                foreach (KeyValuePair<EdgeKey, List<int>> pair in owners)
+                {
+                    if (pair.Value.Count > 2)
+                    {
+                        blocker = "remote-component selection found a non-manifold fragment seam for bevel identity " +
+                            edge.SourceEdgeIndex;
+                        return false;
+                    }
+                    if (pair.Value.Count == 2)
+                    {
+                        adjacency[pair.Value[0]].Add(pair.Value[1]);
+                        adjacency[pair.Value[1]].Add(pair.Value[0]);
+                    }
+                }
+
+                List<List<int>> components = new List<List<int>>();
+                HashSet<int> visited = new HashSet<int>();
+                for (int seed = 0; seed < owned.Count; seed++)
+                {
+                    if (!visited.Add(seed))
+                    {
+                        continue;
+                    }
+                    Queue<int> queue = new Queue<int>();
+                    List<int> component = new List<int>();
+                    queue.Enqueue(seed);
+                    while (queue.Count > 0)
+                    {
+                        int current = queue.Dequeue();
+                        component.Add(current);
+                        foreach (int neighbour in adjacency[current])
+                        {
+                            if (visited.Add(neighbour))
+                            {
+                                queue.Enqueue(neighbour);
+                            }
+                        }
+                    }
+                    component.Sort();
+                    components.Add(component);
+                }
+                if (components.Count == 1)
+                {
+                    signatures.Add(edge.SourceEdgeIndex + ":1");
+                    continue;
+                }
+
+                int otherVertexIndex = edge.VertexA == sharedVertexIndex
+                    ? edge.VertexB
+                    : edge.VertexB == sharedVertexIndex
+                        ? edge.VertexA
+                        : -1;
+                if (otherVertexIndex < 0 ||
+                    otherVertexIndex >= context.Graph.Vertices.Count)
+                {
+                    blocker =
+                        "remote-component selection encountered a non-incident bevel";
+                    return false;
+                }
+                Vector3 remote = context.Graph.Vertices[
+                    otherVertexIndex].Position;
+                Vector3 axis = remote - origin;
+                float sourceLength = axis.magnitude;
+                if (sourceLength <= PointMergeDistance)
+                {
+                    blocker =
+                        "remote-component selection encountered a degenerate source edge";
+                    return false;
+                }
+                axis /= sourceLength;
+
+                int selectedComponent = -1;
+                float selectedPrimary = float.NegativeInfinity;
+                float selectedReach = float.NegativeInfinity;
+                float selectedArea = float.NegativeInfinity;
+                string selectedSignature = string.Empty;
+                for (int componentIndex = 0;
+                     componentIndex < components.Count;
+                     componentIndex++)
+                {
+                    float reach = float.NegativeInfinity;
+                    float area = 0f;
+                    float nearestRemote = float.PositiveInfinity;
+                    List<string> faceSignatures = new List<string>();
+                    for (int memberIndex = 0;
+                         memberIndex < components[componentIndex].Count;
+                         memberIndex++)
+                    {
+                        PolygonFace face = remoteRemainders[owned[
+                            components[componentIndex][memberIndex]]];
+                        area += CalculatePolygonArea(face.Vertices);
+                        faceSignatures.Add(
+                            BuildPlaneCutEndpointPatchFaceSignature(face));
+                        for (int vertexIndex = 0;
+                             vertexIndex < face.Vertices.Count;
+                             vertexIndex++)
+                        {
+                            Vector3 vertex = face.Vertices[vertexIndex];
+                            reach = Mathf.Max(
+                                reach,
+                                Vector3.Dot(vertex - origin, axis) /
+                                    sourceLength);
+                            nearestRemote = Mathf.Min(
+                                nearestRemote,
+                                (vertex - remote).sqrMagnitude);
+                        }
+                    }
+                    faceSignatures.Sort(StringComparer.Ordinal);
+                    string componentSignature = string.Join(
+                        "/", faceSignatures);
+                    float primary = selection ==
+                        PlaneCutRemoteComponentSelection.LargestArea
+                        ? area
+                        : selection == PlaneCutRemoteComponentSelection.
+                            NearestRemoteEndpoint
+                            ? -nearestRemote
+                            : reach;
+                    bool better = selectedComponent < 0 ||
+                        primary > selectedPrimary + 0.0000001f ||
+                        (Mathf.Abs(primary - selectedPrimary) <=
+                             0.0000001f &&
+                         (reach > selectedReach + 0.0000001f ||
+                          (Mathf.Abs(reach - selectedReach) <=
+                               0.0000001f &&
+                           (area > selectedArea + 0.0000001f ||
+                            (Mathf.Abs(area - selectedArea) <=
+                                 0.0000001f &&
+                             string.CompareOrdinal(
+                                 componentSignature,
+                                 selectedSignature) < 0)))));
+                    if (better)
+                    {
+                        selectedComponent = componentIndex;
+                        selectedPrimary = primary;
+                        selectedReach = reach;
+                        selectedArea = area;
+                        selectedSignature = componentSignature;
+                    }
+                }
+
+                for (int componentIndex = 0;
+                     componentIndex < components.Count;
+                     componentIndex++)
+                {
+                    if (componentIndex == selectedComponent)
+                    {
+                        continue;
+                    }
+                    for (int memberIndex = 0;
+                         memberIndex < components[componentIndex].Count;
+                         memberIndex++)
+                    {
+                        remove.Add(owned[components[componentIndex][
+                            memberIndex]]);
+                    }
+                }
+                signatures.Add(
+                    edge.SourceEdgeIndex + ":" + components.Count +
+                    ":keep=" + selectedComponent);
+            }
+
+            foreach (int faceIndex in remove.OrderByDescending(value => value))
+            {
+                remoteRemainders.RemoveAt(faceIndex);
+            }
+            evidence.MechanismSignature +=
+                ":remote{" + string.Join("|", signatures) + "}";
+            return true;
+        }
+
+        private static bool TryConformPlaneCutLocalShellFixedPoint(
+            List<PolygonFace> hybrid,
+            ChamferTopologyContext context,
+            int sharedVertexIndex,
+            PlaneCutEndpointCellLimit[] limits,
+            PlaneCutEndpointCellEvidence evidence,
+            out string blocker)
+        {
+            blocker = string.Empty;
+            if (hybrid == null || context == null ||
+                context.Graph == null || limits == null ||
+                sharedVertexIndex < 0 ||
+                sharedVertexIndex >= context.Graph.Vertices.Count)
+            {
+                blocker =
+                    "fixed-point local conformance inputs were incomplete";
+                return false;
+            }
+            Vector3 endpoint = context.Graph.Vertices[
+                sharedVertexIndex].Position;
+            float localRadius = PointMergeDistance * 32f;
+            for (int index = 0; index < limits.Length; index++)
+            {
+                localRadius = Mathf.Max(
+                    localRadius,
+                    limits[index].AxialLimit * 1.75f);
+            }
+            float localRadiusSqr = localRadius * localRadius;
+            float tolerance = Mathf.Max(
+                PointMergeDistance * 4f,
+                0.00001f);
+            float toleranceSqr = tolerance * tolerance;
+            int totalInserted = 0;
+            int totalFaces = 0;
+            int iteration = 0;
+            const int maximumIterations = 8;
+            for (; iteration < maximumIterations; iteration++)
+            {
+                Dictionary<VertexKey, Vector3> candidates =
+                    new Dictionary<VertexKey, Vector3>();
+                for (int faceIndex = 0;
+                     faceIndex < hybrid.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = hybrid[faceIndex];
+                    for (int vertexIndex = 0;
+                         vertexIndex < face.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        Vector3 vertex = face.Vertices[vertexIndex];
+                        if ((vertex - endpoint).sqrMagnitude <=
+                            localRadiusSqr)
+                        {
+                            candidates[new VertexKey(vertex)] = vertex;
+                        }
+                    }
+                }
+
+                List<KeyValuePair<VertexKey, Vector3>>
+                    orderedCandidatePairs = candidates.ToList();
+                orderedCandidatePairs.Sort((left, right) =>
+                    left.Key.CompareTo(right.Key));
+                List<Vector3> orderedCandidates =
+                    orderedCandidatePairs
+                        .Select(pair => pair.Value)
+                        .ToList();
+                int insertedThisIteration = 0;
+                for (int faceIndex = 0;
+                     faceIndex < hybrid.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = hybrid[faceIndex];
+                    List<Vector3> rebuilt = new List<Vector3>();
+                    int faceInserted = 0;
+                    for (int vertexIndex = 0;
+                         vertexIndex < face.Vertices.Count;
+                         vertexIndex++)
+                    {
+                        Vector3 start = face.Vertices[vertexIndex];
+                        Vector3 end = face.Vertices[
+                            (vertexIndex + 1) % face.Vertices.Count];
+                        AddPointIfDifferent(rebuilt, start);
+                        Vector3 segment = end - start;
+                        float lengthSqr = segment.sqrMagnitude;
+                        if (lengthSqr <= MinimumEdgeLengthSqr ||
+                            DistancePlaneCutEndpointPatchPointToSegmentSquared(
+                                endpoint, start, end) > localRadiusSqr)
+                        {
+                            continue;
+                        }
+                        List<KeyValuePair<float, Vector3>> insertions =
+                            new List<KeyValuePair<float, Vector3>>();
+                        foreach (Vector3 candidate in orderedCandidates)
+                        {
+                            if ((candidate - start).sqrMagnitude <=
+                                    toleranceSqr ||
+                                (candidate - end).sqrMagnitude <=
+                                    toleranceSqr)
+                            {
+                                continue;
+                            }
+                            float parameter = Vector3.Dot(
+                                candidate - start,
+                                segment) / lengthSqr;
+                            if (parameter <= 0.00001f ||
+                                parameter >= 0.99999f)
+                            {
+                                continue;
+                            }
+                            Vector3 projected = start +
+                                segment * parameter;
+                            if ((candidate - projected).sqrMagnitude >
+                                toleranceSqr)
+                            {
+                                continue;
+                            }
+                            insertions.Add(
+                                new KeyValuePair<float, Vector3>(
+                                    parameter,
+                                    candidate));
+                        }
+                        insertions.Sort((left, right) =>
+                        {
+                            int parameterOrder =
+                                left.Key.CompareTo(right.Key);
+                            if (parameterOrder != 0)
+                            {
+                                return parameterOrder;
+                            }
+                            return new VertexKey(left.Value).CompareTo(
+                                new VertexKey(right.Value));
+                        });
+                        VertexKey lastKey = default;
+                        bool hasLast = false;
+                        for (int insertionIndex = 0;
+                             insertionIndex < insertions.Count;
+                             insertionIndex++)
+                        {
+                            VertexKey key = new VertexKey(
+                                insertions[insertionIndex].Value);
+                            if (hasLast && key.Equals(lastKey))
+                            {
+                                continue;
+                            }
+                            int before = rebuilt.Count;
+                            AddPointIfDifferent(
+                                rebuilt,
+                                insertions[insertionIndex].Value);
+                            lastKey = key;
+                            hasLast = true;
+                            if (rebuilt.Count > before)
+                            {
+                                faceInserted++;
+                            }
+                        }
+                    }
+                    if (faceInserted == 0)
+                    {
+                        continue;
+                    }
+                    if (rebuilt.Count < 3)
+                    {
+                        blocker =
+                            "fixed-point local conformance collapsed a polygon";
+                        return false;
+                    }
+                    hybrid[faceIndex] = new PolygonFace(
+                        rebuilt,
+                        face.Normal,
+                        face.Feature,
+                        face.FeatureStrength,
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex);
+                    evidence.MutatedHybridFaceIndices.Add(faceIndex);
+                    insertedThisIteration += faceInserted;
+                    totalFaces++;
+                }
+                totalInserted += insertedThisIteration;
+                if (insertedThisIteration == 0)
+                {
+                    evidence.MechanismSignature +=
+                        ":fixedpoint=" + (iteration + 1) +
+                        "/faces=" + totalFaces +
+                        "/inserted=" + totalInserted;
+                    return true;
+                }
+            }
+            blocker =
+                "fixed-point local conformance exceeded " +
+                maximumIterations + " iterations";
+            return false;
+        }
+
+        private static bool TryBuildPlaneCutBevelTerminationCaps(
+            List<PolygonFace> hybrid,
+            PlaneCutEndpointCellLimit[] limits,
+            Dictionary<int, PlaneCutBevelCandidate> incidentByIdentity,
+            int sharedVertexIndex,
+            float minimumStableFaceArea,
+            ChamferTopologyContext context,
+            PlaneCutBevelTerminationOptions options,
+            out List<PolygonFace> caps,
+            out string loopSignature,
+            out int totalLoopVertices,
+            out string blocker)
+        {
+            caps = new List<PolygonFace>();
+            loopSignature = string.Empty;
+            totalLoopVertices = 0;
+            blocker = string.Empty;
+            List<PlaneCutOpenEdgeRecord> openEdges =
+                CollectPlaneCutOpenEdges(hybrid);
+            if (openEdges.Count == 0)
+            {
+                blocker =
+                    "bevel termination hybrid shell exposed no termination loops";
+                return false;
+            }
+            Dictionary<int, List<PlaneCutOpenEdgeRecord>> byIdentity =
+                new Dictionary<int, List<PlaneCutOpenEdgeRecord>>();
+            for (int index = 0; index < limits.Length; index++)
+            {
+                byIdentity[limits[index].SourceEdgeIndex] =
+                    new List<PlaneCutOpenEdgeRecord>();
+            }
+            float tolerance = Mathf.Max(
+                PointMergeDistance * 8f,
+                0.0001f);
+            for (int edgeIndex = 0;
+                 edgeIndex < openEdges.Count;
+                 edgeIndex++)
+            {
+                PlaneCutOpenEdgeRecord open = openEdges[edgeIndex];
+                int selectedIdentity = -1;
+                float selectedResidual = float.PositiveInfinity;
+                for (int limitIndex = 0;
+                     limitIndex < limits.Length;
+                     limitIndex++)
+                {
+                    float startResidual = Mathf.Abs(
+                        limits[limitIndex].Plane.SignedDistance(open.Start));
+                    float endResidual = Mathf.Abs(
+                        limits[limitIndex].Plane.SignedDistance(open.End));
+                    float residual = startResidual + endResidual;
+                    if (startResidual <= tolerance &&
+                        endResidual <= tolerance &&
+                        (residual < selectedResidual - 0.0000001f ||
+                         (Mathf.Abs(residual - selectedResidual) <=
+                              0.0000001f &&
+                          limits[limitIndex].SourceEdgeIndex <
+                              selectedIdentity)))
+                    {
+                        selectedIdentity =
+                            limits[limitIndex].SourceEdgeIndex;
+                        selectedResidual = residual;
+                    }
+                }
+                if (selectedIdentity < 0)
+                {
+                    if (options.Closure ==
+                        PlaneCutBevelTerminationClosure.AxialCaps)
+                    {
+                        blocker =
+                            "bevel termination exposed an open edge outside every incident axial plane";
+                        return false;
+                    }
+                    continue;
+                }
+                byIdentity[selectedIdentity].Add(open);
+            }
+
+            List<string> signatures = new List<string>();
+            for (int limitIndex = 0;
+                 limitIndex < limits.Length;
+                 limitIndex++)
+            {
+                PlaneCutEndpointCellLimit limit = limits[limitIndex];
+                if (!byIdentity.TryGetValue(
+                        limit.SourceEdgeIndex,
+                        out List<PlaneCutOpenEdgeRecord> loopEdges) ||
+                    loopEdges.Count < 3 ||
+                    !TryOrderPlaneCutBevelTerminationLoop(
+                        loopEdges,
+                        out Vector3[] loop,
+                        out string topologySignature,
+                        out blocker))
+                {
+                    blocker = string.IsNullOrEmpty(blocker)
+                        ? "bevel termination did not expose one closed loop for source edge " +
+                            limit.SourceEdgeIndex
+                        : blocker;
+                    return false;
+                }
+                List<Vector3> sanitized = SanitizePolygon(
+                    new List<Vector3>(loop),
+                    -limit.Plane.Normal);
+                if (sanitized.Count < 3 ||
+                    CalculatePolygonArea(sanitized) <= Mathf.Max(
+                        TinyFaceAreaEpsilon,
+                        minimumStableFaceArea * 0.05f))
+                {
+                    blocker =
+                        "bevel termination cap was degenerate for source edge " +
+                        limit.SourceEdgeIndex;
+                    return false;
+                }
+                if (!incidentByIdentity.TryGetValue(
+                        limit.SourceEdgeIndex,
+                        out PlaneCutBevelCandidate edge))
+                {
+                    blocker =
+                        "bevel termination cap lost its incident candidate identity";
+                    return false;
+                }
+                if (options.Closure ==
+                    PlaneCutBevelTerminationClosure.
+                        TaperFansAndTransitionLoops)
+                {
+                    if (context == null || context.Graph == null ||
+                        sharedVertexIndex < 0 ||
+                        sharedVertexIndex >=
+                            context.Graph.Vertices.Count ||
+                        limit.OtherVertexIndex < 0 ||
+                        limit.OtherVertexIndex >=
+                            context.Graph.Vertices.Count)
+                    {
+                        blocker =
+                            "tapered termination lacked its source-edge axis";
+                        return false;
+                    }
+                    Vector3 origin = context.Graph.Vertices[
+                        sharedVertexIndex].Position;
+                    Vector3 axis = context.Graph.Vertices[
+                        limit.OtherVertexIndex].Position - origin;
+                    if (axis.sqrMagnitude <= MinimumEdgeLengthSqr)
+                    {
+                        blocker =
+                            "tapered termination encountered a degenerate source edge";
+                        return false;
+                    }
+                    Vector3 tip = origin + axis.normalized *
+                        (limit.AxialLimit * options.TaperTipFraction);
+                    for (int vertexIndex = 0;
+                         vertexIndex < sanitized.Count;
+                         vertexIndex++)
+                    {
+                        Vector3 a = sanitized[vertexIndex];
+                        Vector3 b = sanitized[
+                            (vertexIndex + 1) % sanitized.Count];
+                        List<Vector3> triangle = new List<Vector3>
+                        {
+                            a,
+                            b,
+                            tip
+                        };
+                        Vector3 triangleNormal =
+                            CalculatePolygonNormal(triangle);
+                        if (!IsFinite(triangleNormal) ||
+                            triangleNormal.sqrMagnitude <= 0.000001f ||
+                            CalculatePolygonArea(triangle) <= Mathf.Max(
+                                TinyFaceAreaEpsilon,
+                                minimumStableFaceArea * 0.02f))
+                        {
+                            blocker =
+                                "tapered termination produced a degenerate transition triangle";
+                            return false;
+                        }
+                        PolygonFace tapered = CreateOrientedFace(
+                            triangleNormal,
+                            PolygonFaceFeature.ConvexEdgeWear,
+                            edge.Strength,
+                            triangle.ToArray());
+                        caps.Add(new PolygonFace(
+                            tapered.Vertices,
+                            tapered.Normal,
+                            PolygonFaceFeature.ConvexEdgeWear,
+                            edge.Strength,
+                            PolygonFaceProvenanceKind.BoundedEndpointCap,
+                            sharedVertexIndex));
+                    }
+                }
+                else
+                {
+                    PolygonFace oriented = CreateOrientedFace(
+                        -limit.Plane.Normal,
+                        PolygonFaceFeature.ConvexEdgeWear,
+                        edge.Strength,
+                        sanitized.ToArray());
+                    caps.Add(new PolygonFace(
+                        oriented.Vertices,
+                        oriented.Normal,
+                        PolygonFaceFeature.ConvexEdgeWear,
+                        edge.Strength,
+                        PolygonFaceProvenanceKind.BoundedEndpointCap,
+                        sharedVertexIndex));
+                }
+                totalLoopVertices += sanitized.Count;
+                signatures.Add(
+                    limit.SourceEdgeIndex.ToString() + ":" +
+                    topologySignature);
+            }
+            loopSignature = string.Join("/", signatures);
+            return signatures.Count == limits.Length;
+        }
+
+        private static bool TryOrderPlaneCutBevelTerminationLoop(
+            List<PlaneCutOpenEdgeRecord> edges,
+            out Vector3[] loop,
+            out string topologySignature,
+            out string blocker)
+        {
+            loop = Array.Empty<Vector3>();
+            topologySignature = string.Empty;
+            blocker = string.Empty;
+            Dictionary<VertexKey, List<VertexKey>> adjacency =
+                new Dictionary<VertexKey, List<VertexKey>>();
+            Dictionary<VertexKey, Vector3> positions =
+                new Dictionary<VertexKey, Vector3>();
+            HashSet<EdgeKey> expectedEdges = new HashSet<EdgeKey>();
+            for (int index = 0; index < edges.Count; index++)
+            {
+                PlaneCutOpenEdgeRecord edge = edges[index];
+                if (edge.StartKey.Equals(edge.EndKey))
+                {
+                    continue;
+                }
+                if (!adjacency.TryGetValue(
+                        edge.StartKey,
+                        out List<VertexKey> startNeighbors))
+                {
+                    startNeighbors = new List<VertexKey>();
+                    adjacency.Add(edge.StartKey, startNeighbors);
+                    positions.Add(edge.StartKey, edge.Start);
+                }
+                if (!adjacency.TryGetValue(
+                        edge.EndKey,
+                        out List<VertexKey> endNeighbors))
+                {
+                    endNeighbors = new List<VertexKey>();
+                    adjacency.Add(edge.EndKey, endNeighbors);
+                    positions.Add(edge.EndKey, edge.End);
+                }
+                if (!startNeighbors.Contains(edge.EndKey))
+                {
+                    startNeighbors.Add(edge.EndKey);
+                }
+                if (!endNeighbors.Contains(edge.StartKey))
+                {
+                    endNeighbors.Add(edge.StartKey);
+                }
+                expectedEdges.Add(edge.EdgeKey);
+            }
+            if (adjacency.Count < 3)
+            {
+                blocker = "termination loop had fewer than three vertices";
+                return false;
+            }
+            foreach (KeyValuePair<VertexKey, List<VertexKey>> pair in adjacency)
+            {
+                if (pair.Value.Count != 2)
+                {
+                    blocker =
+                        "termination loop was branched or open at degree " +
+                        pair.Value.Count;
+                    return false;
+                }
+            }
+
+            VertexKey start = adjacency.Keys.First();
+            foreach (VertexKey candidate in adjacency.Keys)
+            {
+                Vector3 a = positions[candidate];
+                Vector3 b = positions[start];
+                if (a.x < b.x ||
+                    (Mathf.Approximately(a.x, b.x) &&
+                     (a.y < b.y ||
+                      (Mathf.Approximately(a.y, b.y) && a.z < b.z))))
+                {
+                    start = candidate;
+                }
+            }
+            List<Vector3> ordered = new List<Vector3>();
+            HashSet<EdgeKey> visited = new HashSet<EdgeKey>();
+            VertexKey current = start;
+            VertexKey previous = default;
+            bool hasPrevious = false;
+            for (int step = 0; step <= expectedEdges.Count; step++)
+            {
+                ordered.Add(positions[current]);
+                List<VertexKey> neighbors = adjacency[current];
+                VertexKey next;
+                if (!hasPrevious)
+                {
+                    Vector3 first = positions[neighbors[0]];
+                    Vector3 second = positions[neighbors[1]];
+                    next = first.x < second.x ||
+                        (Mathf.Approximately(first.x, second.x) &&
+                         (first.y < second.y ||
+                          (Mathf.Approximately(first.y, second.y) &&
+                           first.z <= second.z)))
+                        ? neighbors[0]
+                        : neighbors[1];
+                }
+                else
+                {
+                    next = neighbors[0].Equals(previous)
+                        ? neighbors[1]
+                        : neighbors[0];
+                }
+                EdgeKey traversed = new EdgeKey(
+                    positions[current],
+                    positions[next]);
+                if (!expectedEdges.Contains(traversed) ||
+                    !visited.Add(traversed))
+                {
+                    blocker =
+                        "termination loop traversal repeated or left its edge set";
+                    return false;
+                }
+                previous = current;
+                current = next;
+                hasPrevious = true;
+                if (current.Equals(start))
+                {
+                    break;
+                }
+            }
+            if (!current.Equals(start) ||
+                visited.Count != expectedEdges.Count ||
+                ordered.Count < 3)
+            {
+                blocker =
+                    "termination edges did not form one connected closed loop";
+                return false;
+            }
+            loop = ordered.ToArray();
+            topologySignature =
+                ordered.Count.ToString() + ":" +
+                string.Join("|", ordered.Select(
+                    BuildPlaneCutEndpointPatchPointSignature));
+            return true;
+        }
+
+        private static bool DoPlaneCutBevelTerminationReplacementsMatch(
+            PlaneCutEndpointPatchReplacement prepared,
+            PlaneCutEndpointPatchReplacement minimum)
+        {
+            if (prepared == null || minimum == null ||
+                !prepared.ConflictLocalTermination ||
+                !minimum.ConflictLocalTermination ||
+                prepared.VertexIndex != minimum.VertexIndex ||
+                prepared.SelectedFaceCount != minimum.SelectedFaceCount ||
+                prepared.TerminationCapCount != minimum.TerminationCapCount ||
+                prepared.RemoteIncidentBevelCount !=
+                    minimum.RemoteIncidentBevelCount ||
+                prepared.RestoredPocketFaceCount !=
+                    minimum.RestoredPocketFaceCount ||
+                prepared.CellFaceCount != minimum.CellFaceCount ||
+                prepared.BoundaryComponentCount !=
+                    minimum.BoundaryComponentCount ||
+                prepared.ClosedCycleCount != minimum.ClosedCycleCount ||
+                prepared.OpenChainCount != minimum.OpenChainCount ||
+                prepared.BranchVertexCount != minimum.BranchVertexCount ||
+                prepared.TransitionFaceCount !=
+                    minimum.TransitionFaceCount ||
+                prepared.ResidualOpenEdgeCount !=
+                    minimum.ResidualOpenEdgeCount ||
+                prepared.ClosurelessAccepted !=
+                    minimum.ClosurelessAccepted ||
+                !string.Equals(
+                    prepared.MechanismSignature,
+                    minimum.MechanismSignature,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    prepared.ModifiedIdentitySignature,
+                    minimum.ModifiedIdentitySignature,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    prepared.CellLimitSignature,
+                    minimum.CellLimitSignature,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    prepared.SelectedProvenanceSignature,
+                    minimum.SelectedProvenanceSignature,
+                    StringComparison.Ordinal) ||
+                prepared.TerminatedSourceEdgeIndices.Length !=
+                    minimum.TerminatedSourceEdgeIndices.Length)
+            {
+                return false;
+            }
+            for (int index = 0;
+                 index < prepared.TerminatedSourceEdgeIndices.Length;
+                 index++)
+            {
+                if (prepared.TerminatedSourceEdgeIndices[index] !=
+                    minimum.TerminatedSourceEdgeIndices[index])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+
         private static bool TryPrepareCornerDamageEndpointPatchRecovery(
             CornerDamageIntegrationPlan plan,
             List<PlaneCutBevelCandidate> preparedCandidates,
@@ -2126,6 +7675,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             plan.EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
             plan.EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
             plan.EndpointPatchRecoveryCellFailureSource = string.Empty;
+            plan.EndpointPatchRecoveryBoundaryComponentCount = 0;
+            plan.EndpointPatchRecoveryClosedCycleCount = 0;
+            plan.EndpointPatchRecoveryOpenChainCount = 0;
+            plan.EndpointPatchRecoveryBranchVertexCount = 0;
+            plan.EndpointPatchRecoveryTransitionFaceCount = 0;
+            plan.EndpointPatchRecoveryResidualOpenEdgeCount = 0;
+            plan.EndpointPatchRecoveryMechanismSignature = string.Empty;
+            plan.EndpointPatchRecoveryModifiedIdentitySignature = string.Empty;
             plan.EndpointPatchRecoveryDiagnostic = string.Empty;
         }
 
@@ -2237,6 +7794,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 evidence.RemoteRemainderSignature ?? string.Empty;
             plan.EndpointPatchRecoveryCellFailureSource =
                 evidence.FailureSource ?? string.Empty;
+            plan.EndpointPatchRecoveryBoundaryComponentCount =
+                evidence.BoundaryComponentCount;
+            plan.EndpointPatchRecoveryClosedCycleCount =
+                evidence.ClosedCycleCount;
+            plan.EndpointPatchRecoveryOpenChainCount =
+                evidence.OpenChainCount;
+            plan.EndpointPatchRecoveryBranchVertexCount =
+                evidence.BranchVertexCount;
+            plan.EndpointPatchRecoveryTransitionFaceCount =
+                evidence.TransitionFaceCount;
+            plan.EndpointPatchRecoveryResidualOpenEdgeCount =
+                evidence.ResidualOpenEdgeCount;
+            plan.EndpointPatchRecoveryMechanismSignature =
+                evidence.MechanismSignature ?? string.Empty;
+            plan.EndpointPatchRecoveryModifiedIdentitySignature =
+                evidence.ModifiedIdentitySignature ?? string.Empty;
         }
 
         private static void RecordEndpointPatchRecoveryRejection(
@@ -4822,7 +10395,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 expected.AddRange(
                     replacement.RemoteRemainderSignature.Split('/'));
             }
+            List<string> expectedCaps = new List<string>();
+            if (replacement.ConflictLocalTermination &&
+                !string.IsNullOrEmpty(replacement.TerminationCapSignature))
+            {
+                expectedCaps.AddRange(
+                    replacement.TerminationCapSignature.Split('/'));
+            }
             List<string> actual = new List<string>();
+            List<string> actualCaps = new List<string>();
             int capCount = 0;
             for (int index = 0;
                  index < replacement.ReplacementFaces.Count;
@@ -4834,15 +10415,26 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     face.ProvenanceIndex == replacement.VertexIndex)
                 {
                     capCount++;
+                    actualCaps.Add(
+                        BuildPlaneCutEndpointPatchFaceSignature(face));
                     continue;
                 }
                 actual.Add(
                     BuildPlaneCutEndpointPatchFaceSignature(face));
             }
             expected.RemoveAll(string.IsNullOrEmpty);
+            expectedCaps.RemoveAll(string.IsNullOrEmpty);
             expected.Sort(StringComparer.Ordinal);
+            expectedCaps.Sort(StringComparer.Ordinal);
             actual.Sort(StringComparer.Ordinal);
-            if (capCount != 1 || expected.Count != actual.Count)
+            actualCaps.Sort(StringComparer.Ordinal);
+            int expectedCapCount = replacement.ConflictLocalTermination
+                ? replacement.TerminationCapCount
+                : 1;
+            if (capCount != expectedCapCount ||
+                expected.Count != actual.Count ||
+                (replacement.ConflictLocalTermination &&
+                 expectedCaps.Count != actualCaps.Count))
             {
                 return false;
             }
@@ -4851,6 +10443,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 if (!string.Equals(
                         expected[index],
                         actual[index],
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            for (int index = 0; index < expectedCaps.Count; index++)
+            {
+                if (!string.Equals(
+                        expectedCaps[index],
+                        actualCaps[index],
                         StringComparison.Ordinal))
                 {
                     return false;
@@ -4869,6 +10471,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return true;
             }
+            bool experimentalTermination =
+                replacement.ConflictLocalTermination &&
+                !string.IsNullOrEmpty(replacement.MechanismSignature);
             if (faces == null || replacement.ReplacementFaces == null ||
                 replacement.SelectedFaceSignatures == null ||
                 replacement.SelectedFaceSignatures.Length == 0 ||
@@ -4881,6 +10486,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 replacement.SyntheticIncidentSourceEdgeIndices == null ||
                 replacement.SyntheticIncidentFragmentCount !=
                     replacement.SyntheticIncidentSourceEdgeIndices.Length ||
+                (replacement.ConflictLocalTermination &&
+                 (replacement.TerminatedSourceEdgeIndices == null ||
+                  replacement.TerminatedSourceEdgeIndices.Length == 0 ||
+                  replacement.TerminationCapCount < 0 ||
+                  (!replacement.ClosurelessAccepted &&
+                   replacement.TerminationCapCount <= 0) ||
+                  (replacement.ClosurelessAccepted &&
+                   replacement.TerminationCapCount != 0) ||
+                  (!experimentalTermination &&
+                   replacement.TerminationCapCount !=
+                       replacement.TerminatedSourceEdgeIndices.Length) ||
+                  (experimentalTermination &&
+                   replacement.ResidualOpenEdgeCount != 0) ||
+                  string.IsNullOrEmpty(
+                      replacement.TerminationLoopSignature) ||
+                  (!replacement.ClosurelessAccepted &&
+                   string.IsNullOrEmpty(
+                       replacement.TerminationCapSignature)))) ||
                 !string.Equals(
                     replacement.CellLimitSignature,
                     BuildPlaneCutEndpointCellLimitSignature(
@@ -4962,11 +10585,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 spliced.Add(ClonePlaneCutPolygonFace(
                     replacement.ReplacementFaces[faceIndex]));
             }
-            if (!TryFindSinglePlaneCutProvenanceFace(
-                    spliced,
-                    PolygonFaceProvenanceKind.BoundedEndpointCap,
-                    replacement.VertexIndex,
-                    out _))
+            if (replacement.ConflictLocalTermination)
+            {
+                int capCount = 0;
+                for (int faceIndex = 0;
+                     faceIndex < spliced.Count;
+                     faceIndex++)
+                {
+                    PolygonFace face = spliced[faceIndex];
+                    if (face.ProvenanceKind ==
+                            PolygonFaceProvenanceKind.BoundedEndpointCap &&
+                        face.ProvenanceIndex == replacement.VertexIndex)
+                    {
+                        capCount++;
+                    }
+                }
+                if (capCount != replacement.TerminationCapCount)
+                {
+                    blocker =
+                        "authoritative bevel termination emitted the wrong bounded-cap count";
+                    return false;
+                }
+            }
+            else if (!TryFindSinglePlaneCutProvenanceFace(
+                         spliced,
+                         PolygonFaceProvenanceKind.BoundedEndpointCap,
+                         replacement.VertexIndex,
+                         out _))
             {
                 blocker =
                     "authoritative endpoint patch splice emitted no unique bounded cap";

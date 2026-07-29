@@ -58,7 +58,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             FoamLayerD,
             FoamLayerE,
             FoamRuntimeQuality,
-            FoamManualSourceMotion,
             FoamBirthShore,
             FoamBirthShoreRibbonPattern,
             FoamBirthInwardWashPattern,

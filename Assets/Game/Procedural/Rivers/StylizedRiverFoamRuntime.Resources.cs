@@ -1249,6 +1249,8 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
 
+
+
         private void ReleaseResources(
             bool releaseTopologyTransition = true)
         {
@@ -1417,7 +1419,6 @@ namespace ProgrammaticStylized3D.Rivers
             metricRows = Array.Empty<FoamMetricRow>();
             computeShader = null;
             clearKernel = -1;
-            injectKernel = -1;
             rasterizeFoamSourceEventKernel = -1;
             rasterizeFoamSourceEventDebugKernel = -1;
             writeIsolatedLifeProbeKernel = -1;
@@ -1434,6 +1435,9 @@ namespace ProgrammaticStylized3D.Rivers
             resetTransportMetricsKernel = -1;
             remapPersistentStateKernel = -1;
             simulateKernel = -1;
+            bulkTransportPhaseCells = 0f;
+            previousBulkTransportPhaseCells = 0f;
+            bulkTransportIntegerShift = 0;
             buildFilmSourceKernel = -1;
             buildFilmSupportKernel = -1;
             evaluateShapeKernel = -1;

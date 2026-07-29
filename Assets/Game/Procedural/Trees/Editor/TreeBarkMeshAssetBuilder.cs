@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -33,6 +34,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
             Shader.PropertyToID("_TreePhase");
         private static readonly int DebugModeId =
             Shader.PropertyToID("_TreeDebugMode");
+        private static readonly int DeadBranchMetadataEnabledId =
+            Shader.PropertyToID("_TreeDeadBranchMetadataEnabled");
 
         internal static bool BuildOrUpdate(
             TreeReferenceGallery gallery,
@@ -45,9 +48,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             buildResult = null;
             report = string.Empty;
             failure = string.Empty;
-            if (gallery == null || library == null || instance == null)
+            if (gallery == null || instance == null)
             {
-                failure = "Gallery, generation library, or procedural instance is null.";
+                failure = "Gallery or procedural instance is null.";
                 return false;
             }
 
@@ -57,87 +60,125 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 return false;
             }
 
-            Material material = TreeReferenceGalleryBuilder.LoadSharedBarkMaterial(
-                instance.Family);
-            if (material == null)
+            Material material;
+            if (instance.UsesRecipeOnlyGeneration)
             {
-                failure =
-                    "Shared bark material is missing for " + instance.Family + ".";
-                return false;
+                material = instance.Recipe != null
+                    ? instance.Recipe.BarkMaterial
+                    : null;
+                if (material == null)
+                {
+                    failure =
+                        "Standalone recipe bark material is missing. Recipe-only " +
+                        "generation does not inherit a material from the imported " +
+                        "reference grouping.";
+                    return false;
+                }
+            }
+            else
+            {
+                material = instance.Recipe != null &&
+                    instance.Recipe.BarkMaterial != null
+                        ? instance.Recipe.BarkMaterial
+                        : TreeReferenceGalleryBuilder.LoadSharedBarkMaterial(
+                            instance.Family);
+                if (material == null)
+                {
+                    failure =
+                        "Legacy recipe/shared bark material is missing for " +
+                        instance.Family + ".";
+                    return false;
+                }
             }
 
-            Mesh mesh = FindOrCreateManagedMesh(library, instance);
-            if (mesh == null)
-            {
-                failure = "Managed bark mesh asset could not be created.";
-                return false;
-            }
-
-            TreeBarkMeshSettings settings =
-                TreeBarkMeshSettings.CreateVerticalSliceDefaults(
+            TreeBarkMeshSettings settings = instance.UsesRecipeOnlyGeneration
+                ? TreeBarkMeshSettings.CreateRecipeOnlyDefaults()
+                : TreeBarkMeshSettings.CreateVerticalSliceDefaults(
                     instance.Family);
-            buildResult = TreeBarkMeshGenerator.Build(
-                instance.GeneratedDefinition,
-                settings,
-                mesh);
-            if (!buildResult.Passed)
+            var candidateMesh = new Mesh
             {
-                return FailBuild(
-                    instance,
-                    mesh,
-                    buildResult,
-                    buildResult.Failure,
-                    out failure);
-            }
-
-            if (!ValidateRepeatableBuild(
+                name = BuildManagedMeshName(instance) + " Candidate",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            try
+            {
+                buildResult = TreeBarkMeshGenerator.Build(
                     instance.GeneratedDefinition,
                     settings,
-                    buildResult,
-                    out string repeatabilityFailure))
-            {
-                return FailBuild(
-                    instance,
+                    candidateMesh);
+                if (!buildResult.Passed)
+                {
+                    return FailBuild(
+                        instance,
+                        buildResult,
+                        buildResult.Failure,
+                        out failure);
+                }
+
+                if (!ValidateRepeatableBuild(
+                        instance.GeneratedDefinition,
+                        settings,
+                        buildResult,
+                        out string repeatabilityFailure))
+                {
+                    return FailBuild(
+                        instance,
+                        buildResult,
+                        repeatabilityFailure,
+                        out failure);
+                }
+
+                buildResult.MarkRepeatabilityPassed();
+                Mesh mesh = FindOrCreateManagedMesh(library, instance);
+                if (mesh == null)
+                {
+                    return FailBuild(
+                        instance,
+                        buildResult,
+                        "Managed bark mesh asset could not be created.",
+                        out failure);
+                }
+
+                CommitCandidateMesh(candidateMesh, mesh);
+                GameObject barkObject = EnsureBarkChild(instance);
+                MeshFilter filter = barkObject.GetComponent<MeshFilter>();
+                if (filter == null)
+                {
+                    filter = Undo.AddComponent<MeshFilter>(barkObject);
+                }
+
+                MeshRenderer renderer = barkObject.GetComponent<MeshRenderer>();
+                if (renderer == null)
+                {
+                    renderer = Undo.AddComponent<MeshRenderer>(barkObject);
+                }
+
+                filter.sharedMesh = null;
+                filter.sharedMesh = mesh;
+                renderer.sharedMaterial = material;
+                renderer.receiveShadows = true;
+                renderer.shadowCastingMode = ShadowCastingMode.On;
+                renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
+                renderer.reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
+                ApplyPropertyBlock(gallery, instance, renderer);
+
+                report = BuildReport(instance, settings, buildResult, material);
+                instance.RecordGeneratedBarkMesh(
                     mesh,
+                    barkObject,
                     buildResult,
-                    repeatabilityFailure,
-                    out failure);
+                    report);
+                EditorUtility.SetDirty(mesh);
+                EditorUtility.SetDirty(filter);
+                EditorUtility.SetDirty(renderer);
+                EditorUtility.SetDirty(instance);
+                MarkSceneDirty(instance);
+                return true;
             }
-
-            buildResult.MarkRepeatabilityPassed();
-            GameObject barkObject = EnsureBarkChild(instance);
-            MeshFilter filter = barkObject.GetComponent<MeshFilter>();
-            if (filter == null)
+            finally
             {
-                filter = Undo.AddComponent<MeshFilter>(barkObject);
+                UnityEngine.Object.DestroyImmediate(candidateMesh);
             }
-
-            MeshRenderer renderer = barkObject.GetComponent<MeshRenderer>();
-            if (renderer == null)
-            {
-                renderer = Undo.AddComponent<MeshRenderer>(barkObject);
-            }
-
-            filter.sharedMesh = mesh;
-            renderer.sharedMaterial = material;
-            renderer.receiveShadows = true;
-            renderer.shadowCastingMode = ShadowCastingMode.On;
-            renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
-            renderer.reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
-            ApplyPropertyBlock(gallery, instance, renderer);
-
-            report = BuildReport(instance, settings, buildResult, material);
-            instance.RecordGeneratedBarkMesh(
-                mesh,
-                barkObject,
-                buildResult,
-                report);
-            EditorUtility.SetDirty(mesh);
-            EditorUtility.SetDirty(filter);
-            EditorUtility.SetDirty(renderer);
-            EditorUtility.SetDirty(instance);
-            MarkSceneDirty(instance);
-            return true;
         }
 
         internal static bool RebuildRepresentativeIfPresent(
@@ -197,7 +238,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             failure = string.Empty;
             var verificationMesh = new Mesh
             {
-                name = "TREE-GEN.2C Repeatability Verification",
+                name = "TREE-CONTROLS.4 Bark Repeatability Verification",
                 hideFlags = HideFlags.HideAndDontSave
             };
             try
@@ -212,7 +253,57 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     repeated.GeometryFingerprint == baseline.GeometryFingerprint &&
                     repeated.VertexCount == baseline.VertexCount &&
                     repeated.TriangleCount == baseline.TriangleCount &&
-                    repeated.MeshedBranchCount == baseline.MeshedBranchCount;
+                    repeated.MeshedBranchCount == baseline.MeshedBranchCount &&
+                    repeated.TrunkTipClosureApplied ==
+                        baseline.TrunkTipClosureApplied &&
+                    repeated.TrunkTipRemovedRingCount ==
+                        baseline.TrunkTipRemovedRingCount &&
+                    Mathf.Abs(
+                        repeated.TrunkTipClosureLength -
+                        baseline.TrunkTipClosureLength) <= 0.0001f &&
+                    repeated.EffectiveTrunkRingCount ==
+                        baseline.EffectiveTrunkRingCount &&
+                    repeated.RootZoneLongitudinalIntervals ==
+                        baseline.RootZoneLongitudinalIntervals &&
+                    Mathf.Abs(
+                        repeated.AuthoredRootHeightNormalized -
+                        baseline.AuthoredRootHeightNormalized) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.EffectiveRootTransitionHeightNormalized -
+                        baseline.EffectiveRootTransitionHeightNormalized) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.RootTransitionSafetyTailNormalized -
+                        baseline.RootTransitionSafetyTailNormalized) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.ButtressSamplesPerLobe -
+                        baseline.ButtressSamplesPerLobe) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.GroundButtressCrestMultiplier -
+                        baseline.GroundButtressCrestMultiplier) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.HalfHeightButtressCrestMultiplier -
+                        baseline.HalfHeightButtressCrestMultiplier) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.HalfHeightRootExtensionRatio -
+                        baseline.HalfHeightRootExtensionRatio) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.HalfHeightButtressAngularWidthScale -
+                        baseline.HalfHeightButtressAngularWidthScale) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.RootTopRootOnlyMultiplier -
+                        baseline.RootTopRootOnlyMultiplier) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.MaximumGroundButtressCrestTurnDegrees -
+                        baseline.MaximumGroundButtressCrestTurnDegrees) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.MaximumPathSpiralRadius -
+                        baseline.MaximumPathSpiralRadius) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.MinimumGroundCrossSectionMultiplier -
+                        baseline.MinimumGroundCrossSectionMultiplier) <= 0.0001f &&
+                    Mathf.Abs(
+                        repeated.MeasuredAxialTwistDegrees -
+                        baseline.MeasuredAxialTwistDegrees) <= 0.0001f;
                 if (!passed)
                 {
                     failure =
@@ -233,7 +324,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
         private static bool FailBuild(
             ProceduralTreeInstance instance,
-            Mesh mesh,
             TreeBarkMeshBuildResult buildResult,
             string buildFailure,
             out string failure)
@@ -243,22 +333,69 @@ namespace ProgrammaticStylized3D.Trees.Editor
             {
                 buildResult.MarkFailed(failure);
             }
-            mesh.Clear();
-            Transform staleBark = instance.transform.Find(GeneratedBarkChildName);
-            if (staleBark != null)
+
+            Mesh preservedMesh = instance != null
+                ? instance.GeneratedBarkMesh
+                : null;
+            GameObject preservedObject = instance != null
+                ? instance.GeneratedBarkObject
+                : null;
+            bool preserved = preservedMesh != null && preservedObject != null;
+            if (instance != null)
             {
-                Undo.DestroyObjectImmediate(staleBark.gameObject);
+                instance.RecordGeneratedBarkMesh(
+                    preservedMesh,
+                    preservedObject,
+                    buildResult,
+                    "FAIL | " + failure +
+                    " | Previous valid bark output preserved: " +
+                    (preserved ? "YES" : "NO"));
+                EditorUtility.SetDirty(instance);
+                MarkSceneDirty(instance);
             }
 
-            instance.RecordGeneratedBarkMesh(
-                null,
-                null,
-                buildResult,
-                "FAIL | " + failure);
-            EditorUtility.SetDirty(mesh);
-            EditorUtility.SetDirty(instance);
-            MarkSceneDirty(instance);
             return false;
+        }
+
+        private static void CommitCandidateMesh(
+            Mesh candidate,
+            Mesh destination)
+        {
+            string destinationName = destination.name;
+            HideFlags destinationFlags = destination.hideFlags;
+
+            destination.Clear(false);
+            destination.indexFormat = candidate.indexFormat;
+            destination.SetVertices(candidate.vertices);
+            destination.SetNormals(candidate.normals);
+            destination.SetTangents(candidate.tangents);
+            destination.SetColors(candidate.colors);
+            destination.SetUVs(0, candidate.uv);
+            destination.subMeshCount = candidate.subMeshCount;
+            for (int subMesh = 0; subMesh < candidate.subMeshCount; subMesh++)
+            {
+                destination.SetIndices(
+                    candidate.GetIndices(subMesh),
+                    candidate.GetTopology(subMesh),
+                    subMesh,
+                    false);
+            }
+
+            destination.bounds = candidate.bounds;
+            destination.name = destinationName;
+            destination.hideFlags = destinationFlags;
+            destination.UploadMeshData(false);
+
+            if (destination.vertexCount != candidate.vertexCount ||
+                destination.GetIndexCount(0) != candidate.GetIndexCount(0))
+            {
+                throw new InvalidOperationException(
+                    "Committed bark mesh buffers do not match the validated candidate. " +
+                    "candidateVertices=" + candidate.vertexCount +
+                    " destinationVertices=" + destination.vertexCount +
+                    " candidateIndices=" + candidate.GetIndexCount(0) +
+                    " destinationIndices=" + destination.GetIndexCount(0) + ".");
+            }
         }
 
         private static Mesh FindOrCreateManagedMesh(
@@ -266,24 +403,42 @@ namespace ProgrammaticStylized3D.Trees.Editor
             ProceduralTreeInstance instance)
         {
             string meshName = BuildManagedMeshName(instance);
-            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(
-                TreeGenerationLibraryBuilder.LibraryAssetPath);
-            for (int index = 0; index < assets.Length; index++)
+            if (library != null)
             {
-                if (assets[index] is Mesh existing &&
-                    existing.name == meshName)
+                string libraryPath = AssetDatabase.GetAssetPath(library);
+                UnityEngine.Object[] assets =
+                    string.IsNullOrEmpty(libraryPath)
+                        ? Array.Empty<UnityEngine.Object>()
+                        : AssetDatabase.LoadAllAssetsAtPath(libraryPath);
+                for (int index = 0; index < assets.Length; index++)
                 {
-                    return existing;
+                    if (assets[index] is Mesh existing &&
+                        existing.name == meshName)
+                    {
+                        return existing;
+                    }
                 }
+
+                var managedMesh = new Mesh
+                {
+                    name = meshName,
+                    hideFlags = HideFlags.HideInHierarchy
+                };
+                AssetDatabase.AddObjectToAsset(managedMesh, library);
+                return managedMesh;
             }
 
-            var mesh = new Mesh
+            if (instance.GeneratedBarkMesh != null)
+            {
+                instance.GeneratedBarkMesh.name = meshName;
+                return instance.GeneratedBarkMesh;
+            }
+
+            return new Mesh
             {
                 name = meshName,
-                hideFlags = HideFlags.HideInHierarchy
+                hideFlags = HideFlags.DontSaveInBuild
             };
-            AssetDatabase.AddObjectToAsset(mesh, library);
-            return mesh;
         }
 
         private static GameObject EnsureBarkChild(
@@ -333,7 +488,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 RootPositionOsId,
                 new Vector4(0f, 0f, 0f, 1f));
             ResolveWindResponse(
-                instance.Family,
+                instance,
                 out float stiffness,
                 out float macroStrength);
             block.SetFloat(StiffnessId, stiffness);
@@ -347,14 +502,33 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 PhaseId,
                 (phaseSeed & 0x00FFFFFF) / 16777216f);
             block.SetFloat(DebugModeId, (float)gallery.DebugMode);
+            block.SetFloat(
+                DeadBranchMetadataEnabledId,
+                definition.ResolvedParameters.RecipeOnlyControlSource
+                    ? 1f
+                    : 0f);
             renderer.SetPropertyBlock(block);
         }
 
         private static void ResolveWindResponse(
-            TreeFamily family,
+            ProceduralTreeInstance instance,
             out float stiffness,
             out float macroStrength)
         {
+            if (instance != null && instance.UsesRecipeOnlyGeneration)
+            {
+                // Wind-response authoring is not part of the accepted 42-control
+                // structural schema. Keep one neutral recipe-only response rather
+                // than deriving hidden behavior from a reference-family label or
+                // overloading an unrelated damage control.
+                stiffness = 0.55f;
+                macroStrength = 0.45f;
+                return;
+            }
+
+            TreeFamily family = instance != null
+                ? instance.Family
+                : TreeFamily.Common;
             switch (family)
             {
                 case TreeFamily.Pine:
@@ -376,6 +550,59 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
         }
 
+        private static float CalculateMaximumNonTrunkSegmentTurn(
+            TreeDefinition definition)
+        {
+            float maximumTurn = 0f;
+            if (definition == null || definition.Branches == null)
+            {
+                return maximumTurn;
+            }
+
+            IReadOnlyList<TreeBranchDefinition> branches = definition.Branches;
+            for (int branchIndex = 0;
+                 branchIndex < branches.Count;
+                 branchIndex++)
+            {
+                TreeBranchDefinition branch = branches[branchIndex];
+                if (branch == null || branch.BranchOrder == 0 ||
+                    branch.Samples == null || branch.Samples.Count < 3)
+                {
+                    continue;
+                }
+
+                Vector3 previousDirection =
+                    branch.Samples[1].Position -
+                    branch.Samples[0].Position;
+                if (previousDirection.sqrMagnitude <= 0.000001f)
+                {
+                    continue;
+                }
+                previousDirection.Normalize();
+
+                for (int sampleIndex = 2;
+                     sampleIndex < branch.Samples.Count;
+                     sampleIndex++)
+                {
+                    Vector3 segment =
+                        branch.Samples[sampleIndex].Position -
+                        branch.Samples[sampleIndex - 1].Position;
+                    if (segment.sqrMagnitude <= 0.000001f)
+                    {
+                        continue;
+                    }
+
+                    Vector3 direction = segment.normalized;
+                    maximumTurn = Mathf.Max(
+                        maximumTurn,
+                        Vector3.Angle(previousDirection, direction));
+                    previousDirection = direction;
+                }
+            }
+
+            return maximumTurn;
+        }
+
         private static string BuildManagedMeshName(
             ProceduralTreeInstance instance)
         {
@@ -391,7 +618,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             Material material)
         {
             var report = new StringBuilder(1024);
-            report.AppendLine("[TREE-GEN.2C Generated Bark Mesh]");
+            report.AppendLine("[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]");
+            report.Append("Bark algorithm version: ")
+                .AppendLine(TreeBarkMeshGenerator.BarkAlgorithmVersion.ToString());
             report.Append("Slot: ")
                 .Append(instance.Family)
                 .Append(" ")
@@ -410,6 +639,14 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 .AppendLine(result.PhaseAlignedRingCount.ToString());
             report.Append("Curvature-radius safety clamps: ")
                 .AppendLine(result.CurvatureRadiusClampCount.ToString());
+            report.Append("Collapsed circular render rings removed: ")
+                .AppendLine(result.CircularBranchRingRemovalCount.ToString());
+            report.Append("Tapered trunk-tip closure / removed rings / length: ")
+                .Append(result.TrunkTipClosureApplied ? "YES" : "NO")
+                .Append(" / ")
+                .Append(result.TrunkTipRemovedRingCount)
+                .Append(" / ")
+                .AppendLine(result.TrunkTipClosureLength.ToString("F4"));
             TreeResolvedParameters resolved =
                 instance.GeneratedDefinition.ResolvedParameters;
             report.Append("Radial segments effective T / authored P/S/T: ")
@@ -417,19 +654,170 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 .Append(settings.PrimaryRadialSegments).Append("/")
                 .Append(settings.SecondaryRadialSegments).Append("/")
                 .AppendLine(settings.TertiaryRadialSegments.ToString());
-            report.Append("Trunk twist degrees / ridges / depth: ")
-                .Append(resolved.TrunkSurfaceTorsionDegrees.ToString("F2"))
+            report.Append("Effective trunk rings / root-zone intervals / buttress samples per lobe: ")
+                .Append(result.EffectiveTrunkRingCount)
                 .Append(" / ")
-                .Append(resolved.TrunkTwistRidgeCount)
+                .Append(result.RootZoneLongitudinalIntervals)
                 .Append(" / ")
-                .AppendLine(resolved.TrunkTwistRidgeDepth.ToString("F3"));
-            report.Append("Root buttress strength / height / flare: ")
-                .Append(resolved.RootButtressStrength.ToString("F3"))
+                .AppendLine(result.ButtressSamplesPerLobe.ToString("F2"));
+            report.Append("Trunk axial twist degrees: ")
+                .AppendLine(resolved.TrunkSurfaceTorsionDegrees.ToString("F2"));
+            report.Append("Requested / measured twist / error: ")
+                .Append(result.RequestedAxialTwistDegrees.ToString("F2"))
                 .Append(" / ")
-                .Append(resolved.RootButtressHeight.ToString("F3"))
+                .Append(result.MeasuredAxialTwistDegrees.ToString("F2"))
                 .Append(" / ")
-                .AppendLine(resolved.RootFlareScale.ToString("F3"));
-            report.Append("Cross-section max multiplier / root width / depth: ")
+                .AppendLine(result.AxialTwistErrorDegrees.ToString("F3"));
+            report.Append("Twist turns: ")
+                .AppendLine(result.AxialTwistTurns.ToString("F3"));
+            report.Append(
+                    resolved.RecipeOnlyControlSource
+                        ? "Path spiral radius fraction / signed turns / maximum radius: "
+                        : "Legacy path spiral strength / turns / direction / maximum radius: ")
+                .Append(result.PathSpiralStrength.ToString("F3"))
+                .Append(" / ");
+            if (resolved.RecipeOnlyControlSource)
+            {
+                report.Append((
+                    result.PathSpiralTurns *
+                    (result.PathSpiralDirection < 0f ? -1f : 1f))
+                    .ToString("F2"));
+            }
+            else
+            {
+                report.Append(result.PathSpiralTurns.ToString("F2"))
+                    .Append(" / ")
+                    .Append(result.PathSpiralDirection < 0f ? "CW" : "CCW");
+            }
+            report.Append(" / ")
+                .AppendLine(result.MaximumPathSpiralRadius.ToString("F3"));
+            if (resolved.RecipeOnlyControlSource)
+            {
+                report.Append("Recipe roots count / reach / thickness / height: ")
+                    .Append(resolved.RootButtressCount)
+                    .Append(" / ")
+                    .Append(resolved.RootReach.ToString("F3"))
+                    .Append(" / ")
+                    .Append(resolved.RootThickness.ToString("F3"))
+                    .Append(" / ")
+                    .AppendLine(resolved.RootButtressHeight.ToString("F3"));
+            }
+            else
+            {
+                report.Append("Legacy roots count / strength / height / flare: ")
+                    .Append(resolved.RootButtressCount)
+                    .Append(" / ")
+                    .Append(resolved.RootButtressStrength.ToString("F3"))
+                    .Append(" / ")
+                    .Append(resolved.RootButtressHeight.ToString("F3"))
+                    .Append(" / ")
+                    .AppendLine(resolved.RootFlareScale.ToString("F3"));
+            }
+            if (resolved.RecipeOnlyControlSource)
+            {
+                report.Append("Root transition authored / effective / safety tail: ")
+                    .Append(result.AuthoredRootHeightNormalized.ToString("F4"))
+                    .Append(" / ")
+                    .Append(result.EffectiveRootTransitionHeightNormalized.ToString("F4"))
+                    .Append(" / ")
+                    .AppendLine(result.RootTransitionSafetyTailNormalized.ToString("F4"));
+                report.Append("Root transition plateau end / lobe collapse end: ")
+                    .Append(result.RootGroundPlateauEndNormalized.ToString("F4"))
+                    .Append(" / ")
+                    .AppendLine(result.RootLobeCollapseEndNormalized.ToString("F4"));
+            }
+            if (resolved.RecipeOnlyControlSource)
+            {
+                report.Append("Recipe branch count / secondary density / tertiary density / elevation: ")
+                    .Append(resolved.PrimaryBranchCount)
+                    .Append(" / ")
+                    .Append(resolved.SecondaryDensity.ToString("F3"))
+                    .Append(" / ")
+                    .Append(resolved.TertiaryDensity.ToString("F3"))
+                    .Append(" / ")
+                    .Append(resolved.InitialBranchElevationDegrees.ToString("F1"))
+                    .AppendLine(" degrees");
+            }
+            else
+            {
+                report.Append("Legacy branch count / secondary-per-primary / elevation: ")
+                    .Append(resolved.PrimaryBranchCount)
+                    .Append(" / ")
+                    .Append(resolved.SecondaryBranchesPerPrimary)
+                    .Append(" / ")
+                    .Append(resolved.InitialBranchElevationDegrees.ToString("F1"))
+                    .AppendLine(" degrees");
+            }
+            report.Append("Primary length / radius / signed arch / late sag: ")
+                .Append(resolved.PrimaryBranchLengthRatio.ToString("F3"))
+                .Append(" / ")
+                .Append(resolved.PrimaryBranchRadiusRatio.ToString("F3"))
+                .Append(" / ")
+                .Append((resolved.BranchArchDirection *
+                    resolved.BranchArchStrength).ToString("F3"))
+                .Append(" / ")
+                .AppendLine(resolved.LateBranchSag.ToString("F3"));
+            report.Append("Primary start/end / symmetry / directional bias: ")
+                .Append(resolved.PrimaryBranchStartHeight.ToString("F3"))
+                .Append(" / ")
+                .Append(resolved.PrimaryBranchEndHeight.ToString("F3"))
+                .Append(" / ")
+                .Append(resolved.AzimuthSymmetry.ToString("F3"))
+                .Append(" / ")
+                .AppendLine(resolved.DirectionalBiasStrength.ToString("F3"));
+            float sampledTurnLimit;
+            if (instance.UsesRecipeOnlyGeneration)
+            {
+                sampledTurnLimit = Mathf.Max(
+                    4f,
+                    TreeGenerationRuntimePolicy.RecipeOnly()
+                        .MaximumBranchSegmentTurnDegrees * 0.45f);
+            }
+            else
+            {
+                sampledTurnLimit =
+                    (instance.Family == TreeFamily.Twisted ||
+                     instance.Family == TreeFamily.Dead) &&
+                    instance.Recipe != null &&
+                    instance.Recipe.FamilyProfile != null
+                        ? Mathf.Max(
+                            4f,
+                            instance.Recipe.FamilyProfile.StructuralConstraints
+                                .MaximumBranchSegmentTurnDegrees * 0.45f)
+                        : 0f;
+            }
+            report.Append("Measured maximum branch-segment turn / sampled limit: ")
+                .Append(CalculateMaximumNonTrunkSegmentTurn(
+                    instance.GeneratedDefinition).ToString("F2"))
+                .Append(" / ")
+                .AppendLine(sampledTurnLimit.ToString("F2"));
+            report.Append("Root profile ground crest / valley / half crest / half extension ratio: ")
+                .Append(result.GroundButtressCrestMultiplier.ToString("F3"))
+                .Append(" / ")
+                .Append(result.MinimumGroundCrossSectionMultiplier.ToString("F3"))
+                .Append(" / ")
+                .Append(result.HalfHeightButtressCrestMultiplier.ToString("F3"))
+                .Append(" / ")
+                .AppendLine(result.HalfHeightRootExtensionRatio.ToString("F3"));
+            report.Append("Root profile half-height angular width scale: ")
+                .AppendLine(result.HalfHeightButtressAngularWidthScale.ToString("F3"));
+            report.Append("Ground root half-extension full angular width / chord width: ")
+                .Append(result.GroundRootHalfExtensionAngularWidthDegrees.ToString("F2"))
+                .Append(" degrees / ")
+                .Append(result.GroundRootHalfExtensionChordWidth.ToString("F3"))
+                .AppendLine(" m");
+            report.Append("Root support requested / emitted / count clamp: ")
+                .Append(result.RequestedRootSupportAngularWidthDegrees.ToString("F2"))
+                .Append(" / ")
+                .Append(result.EmittedRootSupportAngularWidthDegrees.ToString("F2"))
+                .Append(" degrees / ")
+                .AppendLine(result.RootSupportWidthClampedByCount ? "YES" : "NO");
+            report.Append("Root profile top root-only / maximum crest turn: ")
+                .Append(result.RootTopRootOnlyMultiplier.ToString("F4"))
+                .Append(" / ")
+                .Append(result.MaximumGroundButtressCrestTurnDegrees.ToString("F2"))
+                .AppendLine(" degrees");
+            report.Append("Cross-section max / root width / depth: ")
                 .Append(result.MaximumCrossSectionMultiplier.ToString("F3"))
                 .Append(" / ")
                 .Append(result.GeneratedRootWidth.ToString("F3"))
@@ -459,10 +847,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 .AppendLine(material.HasProperty(BaseColorId)
                     ? material.GetColor(BaseColorId).ToString()
                     : "Not exposed");
-            report.Append("Resolved palette/recipe bark tint: ")
+            report.Append("Resolved bark tint: ")
                 .AppendLine(instance.GeneratedDefinition.ResolvedParameters.BarkTint.ToString());
             report.Append("Final property-block bark tint: ")
                 .AppendLine(instance.GeneratedDefinition.ResolvedParameters.BarkTint.ToString());
+            report.Append("Dead-branch vertex metadata enabled: ")
+                .AppendLine(
+                    instance.GeneratedDefinition.ResolvedParameters
+                        .RecipeOnlyControlSource
+                            ? "YES"
+                            : "NO (legacy compatibility metadata preserved)");
             if (result.TopologyAudit != null)
             {
                 report.AppendLine();

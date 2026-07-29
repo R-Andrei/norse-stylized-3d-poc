@@ -71,6 +71,18 @@ namespace ProgrammaticStylized3D.Rivers
                     1f);
         }
 
+        private float ResolveSourceLongitudinalSpacingMetres()
+        {
+            if (gridDescriptor.IsCreated && gridDescriptor.UsesFixedMetricLattice)
+            {
+                return Mathf.Max(0.005f, gridDescriptor.ResolvedDxMetres);
+            }
+
+            return Mathf.Max(
+                0.005f,
+                fieldLength / Mathf.Max(1, fieldWidth));
+        }
+
         private float ResolveSourceLateralSpacingMetres(
             float globalDistance,
             float sideSign)
@@ -478,14 +490,16 @@ namespace ProgrammaticStylized3D.Rivers
                     float end = Mathf.Max(
                         sourceEvent.StartGlobalDistance,
                         sourceEvent.EndGlobalDistance);
+                    float lateralCellSpacing = Mathf.Max(
+                        0.005f,
+                        descriptor.ResolvedDyMetres);
                     float inwardExtent = Mathf.Max(
-                        sourceEvent.ShoreInsetMetres +
-                            sourceEvent.InwardReachMetres,
-                        sourceEvent.ShoreInsetMetres +
-                            Mathf.Max(
-                                sourceEvent.WidthMetres,
-                                sourceEvent.ShoreRibbonThicknessMetres) * 0.5f);
-                    inwardExtent += sourceEvent.FeatherMetres * 2f +
+                        (sourceEvent.ShoreInsetMetres +
+                            sourceEvent.InwardReachMetres) * lateralCellSpacing,
+                        (sourceEvent.ShoreInsetMetres +
+                            sourceEvent.WidthMetres * 0.5f) * lateralCellSpacing);
+                    inwardExtent +=
+                        sourceEvent.FeatherMetres * 0.5f * lateralCellSpacing +
                         descriptor.ResolvedDyMetres;
                     int sampleCount = Mathf.Max(0, countX) + 2;
                     for (int sampleIndex = 0;
@@ -608,212 +622,6 @@ namespace ProgrammaticStylized3D.Rivers
                 1,
                 out startY,
                 out countY);
-        }
-
-        private bool TryResolveManualInjectionDispatchRange(
-            PendingInjection injection,
-            out P7SourceDispatchRange range)
-        {
-            return TryResolveManualInjectionDispatchRange(
-                injection,
-                gridDescriptor,
-                fieldWidth,
-                fieldHeight,
-                fieldLength,
-                out range);
-        }
-
-        private bool TryResolveManualInjectionDispatchRange(
-            PendingInjection injection,
-            StylizedRiverFoamGridDescriptor descriptor,
-            int resolvedFieldWidth,
-            int resolvedFieldHeight,
-            float resolvedFieldLength,
-            out P7SourceDispatchRange range)
-        {
-            range = default;
-            float storageGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.GlobalDistance);
-            float storageSegmentStartGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.SegmentStartGlobalDistance);
-            float storageSegmentEndGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.SegmentEndGlobalDistance);
-            float minimumGlobal;
-            float maximumGlobal;
-            if (injection.SegmentShape)
-            {
-                float segmentPadding = Mathf.Max(
-                    injection.SegmentStartRadius,
-                    injection.SegmentEndRadius);
-                minimumGlobal = Mathf.Min(
-                    storageSegmentStartGlobalDistance,
-                    storageSegmentEndGlobalDistance) - segmentPadding;
-                maximumGlobal = Mathf.Max(
-                    storageSegmentStartGlobalDistance,
-                    storageSegmentEndGlobalDistance) + segmentPadding;
-            }
-            else
-            {
-                float alongRadius = injection.Radius * injection.Elongation *
-                    (injection.CompoundShape ? 1.25f : 1f);
-                minimumGlobal = storageGlobalDistance - alongRadius;
-                maximumGlobal = storageGlobalDistance + alongRadius;
-            }
-
-            if (!TryResolveSourceLongitudinalRange(
-                    descriptor,
-                    resolvedFieldWidth,
-                    resolvedFieldLength,
-                    minimumGlobal,
-                    maximumGlobal,
-                    2,
-                    out int startX,
-                    out int countX))
-            {
-                return false;
-            }
-
-            int startY = 0;
-            int countY = resolvedFieldHeight;
-            if (descriptor.IsCreated && descriptor.UsesFixedMetricLattice)
-            {
-                float minimumLateral;
-                float maximumLateral;
-                if (injection.SegmentShape)
-                {
-                    if (injection.UsesMetricLateral)
-                    {
-                        minimumLateral = Mathf.Min(
-                            injection.SegmentStartLateralMetres,
-                            injection.SegmentEndLateralMetres);
-                        maximumLateral = Mathf.Max(
-                            injection.SegmentStartLateralMetres,
-                            injection.SegmentEndLateralMetres);
-                    }
-                    else
-                    {
-                        ResolveCompatibilityManualLateralBounds(
-                            descriptor,
-                            startX,
-                            countX,
-                            injection.SegmentStartAcrossNormalized,
-                            injection.SegmentEndAcrossNormalized,
-                            out minimumLateral,
-                            out maximumLateral);
-                    }
-
-                    float radius = Mathf.Max(
-                        injection.SegmentStartRadius,
-                        injection.SegmentEndRadius);
-                    minimumLateral -= radius;
-                    maximumLateral += radius;
-                }
-                else
-                {
-                    if (injection.UsesMetricLateral)
-                    {
-                        minimumLateral = injection.LateralMetres;
-                        maximumLateral = injection.LateralMetres;
-                    }
-                    else
-                    {
-                        ResolveCompatibilityManualLateralBounds(
-                            descriptor,
-                            startX,
-                            countX,
-                            injection.AcrossNormalized,
-                            injection.AcrossNormalized,
-                            out minimumLateral,
-                            out maximumLateral);
-                    }
-
-                    float lateralRadius = injection.Radius *
-                        (injection.CompoundShape ? 1.25f : 1f);
-                    minimumLateral -= lateralRadius;
-                    maximumLateral += lateralRadius;
-                }
-
-                float centreLateralMetres =
-                    (minimumLateral + maximumLateral) * 0.5f;
-                float lateralExtentMetres =
-                    (maximumLateral - minimumLateral) * 0.5f;
-                TryResolveSourceLateralRange(
-                    descriptor,
-                    resolvedFieldHeight,
-                    injection.GlobalDistance,
-                    injection.AcrossNormalized,
-                    centreLateralMetres,
-                    lateralExtentMetres,
-                    2,
-                    out startY,
-                    out countY);
-            }
-
-            range = new P7SourceDispatchRange(
-                startX,
-                countX,
-                startY,
-                countY);
-            return range.IsValid;
-        }
-
-        private void ResolveCompatibilityManualLateralBounds(
-            StylizedRiverFoamGridDescriptor descriptor,
-            int startX,
-            int countX,
-            float firstAcrossNormalized,
-            float secondAcrossNormalized,
-            out float minimumLateral,
-            out float maximumLateral)
-        {
-            minimumLateral = float.PositiveInfinity;
-            maximumLateral = float.NegativeInfinity;
-            int endX = Mathf.Min(
-                descriptor.ColumnCount,
-                startX + Mathf.Max(0, countX));
-            for (int localX = Mathf.Max(0, startX);
-                 localX < endX;
-                 localX++)
-            {
-                float globalDistance = Mathf.Clamp(
-                    river.Domain.GlobalDistanceMinimum +
-                    descriptor.ResolveLocalDistanceAtColumnCentre(localX),
-                    river.Domain.GlobalDistanceMinimum,
-                    river.Domain.GlobalDistanceMaximum);
-                float firstLateral = ResolveSourceLateralMetres(
-                    globalDistance,
-                    firstAcrossNormalized);
-                float secondLateral = ResolveSourceLateralMetres(
-                    globalDistance,
-                    secondAcrossNormalized);
-                minimumLateral = Mathf.Min(
-                    minimumLateral,
-                    Mathf.Min(firstLateral, secondLateral));
-                maximumLateral = Mathf.Max(
-                    maximumLateral,
-                    Mathf.Max(firstLateral, secondLateral));
-            }
-
-            if (float.IsPositiveInfinity(minimumLateral) ||
-                float.IsNegativeInfinity(maximumLateral))
-            {
-                float fallbackDistance = Mathf.Clamp(
-                    river.Domain.GlobalDistanceMinimum +
-                    descriptor.FieldOrStripStartMetres,
-                    river.Domain.GlobalDistanceMinimum,
-                    river.Domain.GlobalDistanceMaximum);
-                float firstLateral = ResolveSourceLateralMetres(
-                    fallbackDistance,
-                    firstAcrossNormalized);
-                float secondLateral = ResolveSourceLateralMetres(
-                    fallbackDistance,
-                    secondAcrossNormalized);
-                minimumLateral = Mathf.Min(firstLateral, secondLateral);
-                maximumLateral = Mathf.Max(firstLateral, secondLateral);
-            }
         }
 
         private void ResolveP7LifeProbeLayout(

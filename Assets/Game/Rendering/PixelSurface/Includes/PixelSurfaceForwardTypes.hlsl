@@ -8,6 +8,7 @@
                 float2 uv : TEXCOORD0;
                 float4 uv2 : TEXCOORD2;
                 float2 featureAtlasUV : TEXCOORD3;
+                float4 structuralFeatures : TEXCOORD4;
                 half4 color : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -24,6 +25,7 @@
                 float4 materialMasks : TEXCOORD5;
                 half3 normalOS : TEXCOORD6;
                 float2 featureAtlasUV : TEXCOORD7;
+                float4 structuralFeatures : TEXCOORD8;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -50,6 +52,7 @@
                 output.materialMasks = input.uv2;
                 output.normalOS = normalize(input.normalOS);
                 output.featureAtlasUV = input.featureAtlasUV;
+                output.structuralFeatures = input.structuralFeatures;
                 return output;
             }
 #endif // PS3D_PIXELSURFACEFORWARDTYPES_HLSL

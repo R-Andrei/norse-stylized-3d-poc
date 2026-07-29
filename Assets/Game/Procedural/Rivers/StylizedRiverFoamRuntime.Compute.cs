@@ -8,7 +8,6 @@ namespace ProgrammaticStylized3D.Rivers
         private void ResolveComputeKernels()
         {
             clearKernel = computeShader.FindKernel("ClearRange");
-            injectKernel = computeShader.FindKernel("InjectFoam");
             rasterizeFoamSourceEventKernel =
                 computeShader.FindKernel("RasterizeFoamSourceEvent");
             rasterizeFoamSourceEventDebugKernel =
@@ -150,9 +149,20 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamTransportMetricFixedPointScale",
                 TransportMetricFixedPointScale);
+            StylizedRiverFoamTransportScheme transportScheme =
+                river.FoamTransportScheme;
             computeShader.SetInt(
                 "_FoamTransportScheme",
-                (int)river.FoamTransportScheme);
+                (int)transportScheme);
+            computeShader.SetInt(
+                "_FoamBulkTransportIntegerShift",
+                bulkTransportIntegerShift);
+            computeShader.SetFloat(
+                "_FoamBulkTransportPhaseCells",
+                bulkTransportPhaseCells);
+            computeShader.SetFloat(
+                "_FoamBulkTransportSpeed",
+                ResolveBaseFoamDownstreamSpeedMetresPerSecond());
             computeShader.SetFloat(
                 "_FoamTransportReconstructionCourant",
                 Mathf.Clamp01(
@@ -316,11 +326,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
 
-            // Conservative packed-state advection and lifecycle aging share one
-            // pass. Donor Cell preserves the accepted baseline; the optional TVD
-            // branch changes only interior face reconstruction. The caller may
-            // repeat this kernel for CFL-safe substeps; every pass reads one
-            // committed packed state and writes the next ping-pong state.
+            // Every supported material mode remains one
+            // full-field dispatch per CFL-safe substep. Donor/TVD use face fluxes;
+            // Bulk-Phase TVD adds only scalar phase/offset parameters.
             Dispatch(simulateKernel, countX, fieldHeight);
         }
 

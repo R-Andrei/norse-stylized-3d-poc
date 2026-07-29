@@ -39,6 +39,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
         private SerializedProperty foliageDiffuseWrap;
         private SerializedProperty foliageShadowReceiveStrength;
         private SerializedProperty foliageShadowFloor;
+        private SerializedProperty recipeCatalog;
+        private SerializedProperty curatedGallerySeed;
         private SerializedProperty generationLibrary;
         private SerializedProperty showGeneratedStructuralPreviews;
         private SerializedProperty generatedPreviewScope;
@@ -100,6 +102,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "foliageShadowReceiveStrength");
             foliageShadowFloor = serializedObject.FindProperty(
                 "foliageShadowFloor");
+            recipeCatalog = serializedObject.FindProperty(
+                "recipeCatalog");
+            curatedGallerySeed = serializedObject.FindProperty(
+                "curatedGallerySeed");
             generationLibrary = serializedObject.FindProperty(
                 "generationLibrary");
             showGeneratedStructuralPreviews = serializedObject.FindProperty(
@@ -199,7 +205,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     Vector3.up * labelHeight;
                 ProceduralTreeInstance generated = imported
                     ? null
-                    : specimen.GetComponent<ProceduralTreeInstance>();
+                    : specimen.GetComponentInChildren<ProceduralTreeInstance>(
+                        true);
                 string role = imported ? "REF" : "PROC";
                 string metrics = imported
                     ? $"H {specimen.VisibleHeight:F2} m | {specimen.TriangleCount} tris"
@@ -373,14 +380,26 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
-                "Generated Tree Library",
+                "Curated Recipe Generation",
                 EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(
+                recipeCatalog,
+                new GUIContent("Recipe Catalog"));
+            EditorGUILayout.PropertyField(
+                curatedGallerySeed,
+                new GUIContent("Stable Gallery Seed"));
             using (new EditorGUI.DisabledScope(true))
             {
                 EditorGUILayout.PropertyField(
                     generationLibrary,
-                    new GUIContent("Managed Library"));
+                    new GUIContent("Bark Mesh Storage / Legacy Evidence"));
             }
+            EditorGUILayout.HelpBox(
+                "Every procedural comparison slot owns a TreeRecipeSpawner. " +
+                "The spawned child owns the sampled exact controls and remains " +
+                "independently editable. The old family and calibration assets " +
+                "do not provide behavioral values to this path.",
+                MessageType.Info);
 
             EditorGUILayout.PropertyField(
                 showGeneratedStructuralPreviews,
@@ -421,29 +440,74 @@ namespace ProgrammaticStylized3D.Trees.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Actions", EditorStyles.boldLabel);
 
-            if (GUILayout.Button("Rebuild Complete Tree Comparison Gallery"))
+            bool curatedRunning =
+                TreeCuratedGalleryGenerationCoordinator.IsRunning;
+            using (new EditorGUI.DisabledScope(curatedRunning))
             {
-                RecordUnifiedResult(
-                    gallery,
-                    TreeGalleryGenerationCoordinator.Rebuild(gallery));
+                if (GUILayout.Button(
+                        "Rebuild Curated Recipe Comparison Gallery"))
+                {
+                    if (!TreeCuratedGalleryGenerationCoordinator.Start(
+                            gallery,
+                            out string startMessage))
+                    {
+                        Debug.LogError(
+                            "[TREE-CONTROLS.3] " + startMessage,
+                            gallery);
+                    }
+                    else
+                    {
+                        Debug.Log(
+                            "[TREE-CONTROLS.3] " + startMessage,
+                            gallery);
+                    }
+                }
             }
 
-            bool hasGeneratedOutputs =
-                TreeGalleryGenerationCoordinator.CountGeneratedInstances(
-                    gallery) > 0;
-            using (new EditorGUI.DisabledScope(!hasGeneratedOutputs))
+            if (curatedRunning)
             {
-                if (GUILayout.Button("Remove Generated Tree Outputs"))
+                EditorGUILayout.LabelField(
+                    "Current Slot",
+                    TreeCuratedGalleryGenerationCoordinator.CurrentOperation);
+                Rect progressRect = EditorGUILayout.GetControlRect(false, 18f);
+                EditorGUI.ProgressBar(
+                    progressRect,
+                    TreeCuratedGalleryGenerationCoordinator.Progress,
+                    Mathf.RoundToInt(
+                        TreeCuratedGalleryGenerationCoordinator.Progress *
+                        100f) + "% | ETA " +
+                    TreeCuratedGalleryGenerationCoordinator.Eta);
+                if (GUILayout.Button("Cancel Curated Gallery Rebuild"))
                 {
-                    RecordUnifiedResult(
-                        gallery,
-                        TreeGalleryGenerationCoordinator.RemoveGeneratedOutputs(
-                            gallery));
+                    TreeCuratedGalleryGenerationCoordinator.Cancel();
+                }
+                UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+            }
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                using (new EditorGUI.DisabledScope(
+                           !gallery.HasUnifiedGenerationReport))
+                {
+                    if (GUILayout.Button("Copy Curated Gallery Report"))
+                    {
+                        EditorGUIUtility.systemCopyBuffer =
+                            gallery.LastUnifiedGenerationReport;
+                    }
+                }
+
+                if (GUILayout.Button("Open Curated Report Folder"))
+                {
+                    TreeCuratedGalleryGenerationCoordinator.OpenReportFolder();
                 }
             }
 
             EditorGUILayout.HelpBox(
-                "Normal workflow: use Rebuild Complete Tree Comparison Gallery. It performs source audit/repair, reference rebuild, library setup, slot binding, structural generation, and deterministic validation in one action.",
+                "This incremental operation configures twenty stable recipe " +
+                "spawners, samples exact controls, validates same-seed " +
+                "repeatability, generates structure and bark, and writes a " +
+                "partial report after every completed slot. It is explicit, " +
+                "cancellable, and safe to resume.",
                 MessageType.Info);
 
             showAdvancedValidation = EditorGUILayout.Foldout(
@@ -452,6 +516,29 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 true);
             if (showAdvancedValidation)
             {
+                if (GUILayout.Button(
+                        "Legacy Full Rebuild (Compatibility Evidence)"))
+                {
+                    RecordUnifiedResult(
+                        gallery,
+                        TreeGalleryGenerationCoordinator.Rebuild(gallery));
+                }
+
+                bool hasLegacyOutputs =
+                    TreeGalleryGenerationCoordinator.CountGeneratedInstances(
+                        gallery) > 0;
+                using (new EditorGUI.DisabledScope(!hasLegacyOutputs))
+                {
+                    if (GUILayout.Button(
+                            "Remove Legacy Generated Outputs"))
+                    {
+                        RecordUnifiedResult(
+                            gallery,
+                            TreeGalleryGenerationCoordinator
+                                .RemoveGeneratedOutputs(gallery));
+                    }
+                }
+
                 bool canBuild = gallery.LastSourceAuditPassed &&
                     gallery.ReferenceGround != null;
                 bool hasSlice =
@@ -667,13 +754,18 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     : gallery.LastCompleteGalleryTimestamp);
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
-                "Managed generation library",
+                "Curated recipe catalog",
+                gallery.RecipeCatalog != null
+                    ? gallery.RecipeCatalog.name
+                    : "Not assigned");
+            EditorGUILayout.LabelField(
+                "Bark mesh storage / legacy evidence",
                 gallery.GenerationLibrary != null
                     ? gallery.GenerationLibrary.name
                     : "Not created");
             EditorGUILayout.LabelField(
                 "Generated procedural instances",
-                TreeGalleryGenerationCoordinator.CountGeneratedInstances(
+                TreeCuratedGalleryGenerationCoordinator.CountSpawnedInstances(
                     gallery).ToString() + " / 20");
             EditorGUILayout.LabelField(
                 "Last unified comparison build",

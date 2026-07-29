@@ -64,10 +64,7 @@ namespace ProgrammaticStylized3D.Trees
         private float trunkSurfaceTorsionDegrees;
 
         [SerializeField]
-        private int trunkTwistRidgeCount;
-
-        [SerializeField]
-        private float trunkTwistRidgeDepth;
+        private int rootButtressCount;
 
         [SerializeField]
         private float rootButtressStrength;
@@ -76,7 +73,34 @@ namespace ProgrammaticStylized3D.Trees
         private float rootButtressHeight;
 
         [SerializeField]
+        private float buttressTransition = 1f;
+
+        [SerializeField]
         private float rootFlareScale = 1f;
+
+        [SerializeField]
+        private bool recipeOnlyControlSource;
+
+        [SerializeField]
+        private float rootReach;
+
+        [SerializeField]
+        private float rootThickness = 1f;
+
+        [SerializeField]
+        private float secondaryDensity;
+
+        [SerializeField]
+        private float tertiaryDensity;
+
+        [SerializeField]
+        private float childScale;
+
+        [SerializeField]
+        private float tierSpacing;
+
+        [SerializeField]
+        private float tipUpturn;
 
         [SerializeField]
         private float trunkSpiralStrength;
@@ -256,11 +280,19 @@ namespace ProgrammaticStylized3D.Trees
         public float TrunkLeanDirectionDegrees { get => trunkLeanDirectionDegrees; internal set => trunkLeanDirectionDegrees = value; }
         public float TrunkTwistDegrees { get => trunkSurfaceTorsionDegrees; internal set => trunkSurfaceTorsionDegrees = value; }
         public float TrunkSurfaceTorsionDegrees { get => trunkSurfaceTorsionDegrees; internal set => trunkSurfaceTorsionDegrees = value; }
-        public int TrunkTwistRidgeCount { get => trunkTwistRidgeCount; internal set => trunkTwistRidgeCount = value; }
-        public float TrunkTwistRidgeDepth { get => trunkTwistRidgeDepth; internal set => trunkTwistRidgeDepth = value; }
+        public int RootButtressCount { get => rootButtressCount; internal set => rootButtressCount = value; }
         public float RootButtressStrength { get => rootButtressStrength; internal set => rootButtressStrength = value; }
         public float RootButtressHeight { get => rootButtressHeight; internal set => rootButtressHeight = value; }
+        public float ButtressTransition { get => buttressTransition; internal set => buttressTransition = value; }
         public float RootFlareScale { get => rootFlareScale; internal set => rootFlareScale = value; }
+        public bool RecipeOnlyControlSource { get => recipeOnlyControlSource; internal set => recipeOnlyControlSource = value; }
+        public float RootReach { get => rootReach; internal set => rootReach = value; }
+        public float RootThickness { get => rootThickness; internal set => rootThickness = value; }
+        public float SecondaryDensity { get => secondaryDensity; internal set => secondaryDensity = value; }
+        public float TertiaryDensity { get => tertiaryDensity; internal set => tertiaryDensity = value; }
+        public float ChildScale { get => childScale; internal set => childScale = value; }
+        public float TierSpacing { get => tierSpacing; internal set => tierSpacing = value; }
+        public float TipUpturn { get => tipUpturn; internal set => tipUpturn = value; }
         public float TrunkSpiralStrength { get => trunkSpiralStrength; internal set => trunkSpiralStrength = value; }
         public float TrunkSpiralTurns { get => trunkSpiralTurns; internal set => trunkSpiralTurns = value; }
         public float TrunkSpiralDirection { get => trunkSpiralDirection; internal set => trunkSpiralDirection = value; }

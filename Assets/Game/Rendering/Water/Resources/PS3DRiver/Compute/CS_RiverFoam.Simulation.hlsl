@@ -116,35 +116,38 @@ float4 FoamMergeBornMaterial(float4 existingPacked, float4 sourcePacked)
         return FoamEncodeMaterialState(source);
     }
 
+    // D7 packet-independence contract: a birth may affect only the fraction
+    // of the cell that it genuinely adds. Repeated overlap over an already
+    // occupied fraction must not reset Presence, Remaining Life, or Pattern.
     float addedCoverage = max(
         0.0,
         source.coverage - existing.coverage);
-    float combinedCoverage = max(
-        existing.coverage,
-        source.coverage);
-
-    FoamMaterialState combined;
-    combined.coverage = combinedCoverage;
-    combined.presence = max(
-        existing.presence,
-        source.presence);
-    combined.remainingLife = max(
-        existing.remainingLife,
-        source.remainingLife);
-
-    // Repeated writes refresh Presence and Life without swimming the stable
-    // material identity. Pattern changes only where the source contributes
-    // genuinely new geometric Coverage.
-    combined.materialPattern = existing.materialPattern;
-    if (addedCoverage > FoamMaterialStateEpsilon)
+    if (addedCoverage <= FoamMaterialStateEpsilon)
     {
-        combined.materialPattern = saturate(
-            (existing.coverage * existing.materialPattern +
-             addedCoverage * source.materialPattern) /
-            max(FoamMaterialStateEpsilon, combinedCoverage));
+        return FoamEncodeMaterialState(existing);
     }
 
-    return FoamEncodeMaterialState(combined);
+    float existingAmount =
+        existing.coverage * existing.presence;
+    float addedAmount =
+        addedCoverage * source.presence;
+    float combinedCoverage =
+        existing.coverage + addedCoverage;
+    float combinedAmount =
+        existingAmount + addedAmount;
+
+    // The packed moments are additive over only the newly occupied fraction.
+    // Returning them directly avoids decode/re-encode divisions in the birth
+    // raster hot path while preserving CP/CPL/CPM/C invariants.
+    return float4(
+        saturate(combinedAmount),
+        saturate(
+            existingAmount * existing.remainingLife +
+            addedAmount * source.remainingLife),
+        saturate(
+            existingAmount * existing.materialPattern +
+            addedAmount * source.materialPattern),
+        saturate(combinedCoverage));
 }
 
 float4 FoamClipPackedToValidFluid(float4 packed, float validFluid)
@@ -201,21 +204,37 @@ float4 FoamLoadTransportPacked(int2 coordinate, out float validFluid)
         return 0.0.xxxx;
     }
 
+    int2 sampleCoordinate = coordinate;
+    if (_FoamTransportScheme == 2)
+    {
+        sampleCoordinate.x -= _FoamBulkTransportIntegerShift;
+    }
+    if (!FoamTransportInsideSimulation(sampleCoordinate))
+    {
+        return 0.0.xxxx;
+    }
+
     return FoamClipPackedToValidFluid(
         FoamClampPackedMaterialState(
-            _FoamStateRead.Load(int3(coordinate, 0))),
+            _FoamStateRead.Load(int3(sampleCoordinate, 0))),
         validFluid);
 }
 
 float2 FoamResolveGridVelocity(int2 coordinate, float validFluid)
 {
+    float2 motionCoordinate = (float2)coordinate + 0.5;
+    motionCoordinate.x += _FoamBulkTransportPhaseCells;
     RiverWaterFoamResolvedVelocity resolved = FoamResolveVelocity(
-        (float2)coordinate + 0.5,
+        motionCoordinate,
         validFluid);
     float flowSign = _FoamFlowDirection >= 0.0 ? 1.0 : -1.0;
-    return float2(
-        resolved.velocityMetresPerSecond.x * flowSign,
-        resolved.velocityMetresPerSecond.y);
+    float downstream = resolved.velocityMetresPerSecond.x * flowSign;
+    if (_FoamTransportScheme == 2)
+    {
+        downstream -= _FoamBulkTransportSpeed * flowSign *
+            saturate(validFluid);
+    }
+    return float2(downstream, resolved.velocityMetresPerSecond.y);
 }
 
 float FoamTransportLongitudinalSpacing(int x)
@@ -283,11 +302,14 @@ float FoamTransportLateralFaceLength(int x, int lowerY)
 }
 
 static const int FoamTransportSchemeTvdSuperbee = 1;
+static const int FoamTransportSchemeBulkPhaseResidualTvd = 2;
 
 bool FoamTransportUsesTvdSuperbee()
 {
-    return _FoamTransportScheme == FoamTransportSchemeTvdSuperbee;
+    return _FoamTransportScheme == FoamTransportSchemeTvdSuperbee ||
+        _FoamTransportScheme == FoamTransportSchemeBulkPhaseResidualTvd;
 }
+
 
 float FoamTransportSuperbeeSlopeComponent(
     float backwardDifference,
@@ -575,6 +597,8 @@ float4 FoamResolveLateralFaceFlux(int x, int lowerY)
         ignoredPresence,
         ignoredLength);
 }
+
+
 
 uint FoamTransportFixedPoint(float value)
 {

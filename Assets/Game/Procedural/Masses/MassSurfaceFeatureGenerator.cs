@@ -22,7 +22,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             float cornerChipDepthVariation = 0.15f,
             float cornerChipTopFacingPreference = 0.65f,
             float cornerChipCapRingWidthScale = 0.75f,
-            float cornerChipCapRingWearStrength = 1f)
+            float cornerChipCapRingWearStrength = 1f,
+            int cornerChipCount = -1)
         {
             Archetype = archetype;
             SurfaceSeed = surfaceSeed;
@@ -34,7 +35,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             EdgeWearMacroVariation =
                 Mathf.Clamp01(edgeWearMacroVariation);
             EdgeWearSoftness = Mathf.Clamp01(edgeWearSoftness);
-            CornerChippingEnabled = cornerChippingEnabled;
+            CornerChipCount = Mathf.Clamp(
+                cornerChipCount < 0
+                    ? (cornerChippingEnabled ? 1 : 0)
+                    : cornerChipCount,
+                0,
+                16);
+            CornerChippingEnabled = CornerChipCount > 0;
             CornerChipDepth = Mathf.Clamp(cornerChipDepth, 0.04f, 0.35f);
             CornerChipDepthVariation = Mathf.Clamp(
                 cornerChipDepthVariation,
@@ -65,6 +72,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearMacroVariation { get; }
         public float EdgeWearSoftness { get; }
         public bool CornerChippingEnabled { get; }
+        public int CornerChipCount { get; }
         public float CornerChipDepth { get; }
         public float CornerChipDepthVariation { get; }
         public float CornerChipTopFacingPreference { get; }

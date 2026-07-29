@@ -56,6 +56,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public readonly float Area;
             public readonly float NormalDot;
             public readonly float NormalDeviationDegrees;
+            public readonly float AspectRatio;
+            public readonly float MinimumAngleDegrees;
             public readonly OneSurfaceTriangleCandidateFailure Failure;
 
             public OneSurfaceTriangleCandidate(
@@ -64,11 +66,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float normalDot,
                 float normalDeviationDegrees,
                 OneSurfaceTriangleCandidateFailure failure)
+                : this(
+                    valid,
+                    area,
+                    normalDot,
+                    normalDeviationDegrees,
+                    float.PositiveInfinity,
+                    0f,
+                    failure)
+            {
+            }
+
+            public OneSurfaceTriangleCandidate(
+                bool valid,
+                float area,
+                float normalDot,
+                float normalDeviationDegrees,
+                float aspectRatio,
+                float minimumAngleDegrees,
+                OneSurfaceTriangleCandidateFailure failure)
             {
                 Valid = valid;
                 Area = area;
                 NormalDot = normalDot;
                 NormalDeviationDegrees = normalDeviationDegrees;
+                AspectRatio = aspectRatio;
+                MinimumAngleDegrees = minimumAngleDegrees;
                 Failure = failure;
             }
         }
@@ -79,7 +102,33 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public bool Succeeded;
             public float MinimumArea;
             public float MinimumNormalDot;
+            public float MaximumAspectRatio;
+            public float MinimumAngleDegrees;
             public int SplitIndex;
+        }
+
+
+        private readonly struct OneSurfaceTriangulationQuality
+        {
+            public readonly bool Valid;
+            public readonly float MinimumArea;
+            public readonly float MinimumNormalDot;
+            public readonly float MaximumAspectRatio;
+            public readonly float MinimumAngleDegrees;
+
+            public OneSurfaceTriangulationQuality(
+                bool valid,
+                float minimumArea,
+                float minimumNormalDot,
+                float maximumAspectRatio,
+                float minimumAngleDegrees)
+            {
+                Valid = valid;
+                MinimumArea = minimumArea;
+                MinimumNormalDot = minimumNormalDot;
+                MaximumAspectRatio = maximumAspectRatio;
+                MinimumAngleDegrees = minimumAngleDegrees;
+            }
         }
 
         private struct OneSurfaceBoundaryFanAudit
@@ -90,6 +139,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int BestCertifiedTriangleCount;
             public float BestMinimumArea;
             public float BestMinimumNormalDot;
+            public float BestMaximumAspectRatio;
+            public float BestMinimumAngleDegrees;
             public int RejectedTriangleA;
             public int RejectedTriangleB;
             public int RejectedTriangleC;
@@ -109,6 +160,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CompleteSolutionFound;
             public float SelectedMinimumArea;
             public float SelectedMinimumNormalDot;
+            public float SelectedMaximumAspectRatio;
+            public float SelectedMinimumAngleDegrees;
             public string SelectedTriangleEvidence;
             public string FailureReason;
         }
@@ -2130,10 +2183,15 @@ private readonly struct EdgeWearTopologyStats
             public int ConvexIncidentEdgeCount;
             public float MaximumIncidentDihedral;
             public float MinimumIncidentEdgeLength;
+            public float NormalizedHeight;
+            public float BottomProtectionWeight = 1f;
+            public float ConvexityScore;
             public float SharpnessScore;
             public float SizeScore;
+            public float UpwardNormalScore;
             public float UpwardExposureScore;
             public float RandomScore;
+            public float EstimatedDepth;
             public float Score;
             public readonly List<int> IncidentFaceIndices =
                 new List<int>();
@@ -2141,6 +2199,16 @@ private readonly struct EdgeWearTopologyStats
                 new List<int>();
             public readonly List<int> IncidentOriginalEdgeIndices =
                 new List<int>();
+        }
+
+
+        private sealed class CornerDamageCommittedChipRecord
+        {
+            public int SequenceIndex;
+            public Vector3 SelectedPosition;
+            public float AcceptedDepth;
+            public readonly List<Vector3> CapVertices =
+                new List<Vector3>();
         }
 
         private sealed class CornerDamageEdgeIdentityRecord
@@ -2207,6 +2275,12 @@ private readonly struct EdgeWearTopologyStats
             public int NormalizedEdgeCount;
             public int NormalizedFaceCount;
             public int EligibleCandidateCount;
+            public int RequestedChipCount = 1;
+            public int CommittedChipCount;
+            public int CandidateAttemptCount;
+            public int DepthTrialCount;
+            public int InitialSafeCapacity;
+            public string EarlyStopReason = string.Empty;
             public int SelectedCandidateRank = -1;
             public int SelectedGraphVertexIndex = -1;
             public Vector3 SelectedPosition;
@@ -2249,6 +2323,11 @@ private readonly struct EdgeWearTopologyStats
                 new List<CornerDamageCandidateRecord>();
             public readonly List<CornerDamageTrialRecord> Trials =
                 new List<CornerDamageTrialRecord>();
+            public readonly List<CornerDamageCommittedChipRecord>
+                CommittedChips =
+                    new List<CornerDamageCommittedChipRecord>();
+            public CornerSelectionTransactionContract
+                SelectionTransaction;
         }
 
         private sealed class CornerDamagePreflightReplayRecord
@@ -2387,6 +2466,168 @@ private readonly struct EdgeWearTopologyStats
             public string InfluenceSignature = string.Empty;
         }
 
+        private enum PlaneCutBevelTerminationOwnership
+        {
+            GeometricCell,
+            EndpointStar
+        }
+
+        private enum PlaneCutBevelTerminationClosure
+        {
+            AxialCaps,
+            AxialCapsAndTransitionLoops,
+            TaperFansAndTransitionLoops,
+            OrientedHalfEdgeCavity,
+            SourceFaceTransitionStrips,
+            BoundaryEdgeCellFan,
+            Closureless,
+            RawEdgeCavityFan,
+            ConformingNormalizedCavity
+        }
+
+        private enum PlaneCutBevelTerminationPreconditioner
+        {
+            None,
+            WidthRedistribution
+        }
+
+        private enum PlaneCutRemoteComponentSelection
+        {
+            None,
+            FurthestAxialReach,
+            LargestArea,
+            NearestRemoteEndpoint
+        }
+
+        private readonly struct PlaneCutBevelTerminationOptions
+        {
+            public readonly PlaneCutBevelTerminationOwnership Ownership;
+            public readonly PlaneCutBevelTerminationClosure Closure;
+            public readonly PlaneCutBevelTerminationPreconditioner Preconditioner;
+            public readonly PlaneCutRemoteComponentSelection
+                RemoteComponentSelection;
+            public readonly float AxialDistanceScale;
+            public readonly float TaperTipFraction;
+            public readonly float PrimaryWidthScale;
+            public readonly float FavoredWidthScale;
+            public readonly int SelectiveIdentityMode;
+            public readonly int WidthFavoredIdentityMode;
+            public readonly bool WidthScaleSelectedOnly;
+            public readonly bool SelectAllExceptIdentity;
+            public readonly bool AllowSingleIncident;
+            public readonly bool FragmentAwareBandCertification;
+            public readonly bool OwnLimitIncidentPartition;
+            public readonly bool RequireSimpleClosureCycles;
+            public readonly bool DirectSimpleCycleTriangles;
+            public readonly bool ConformBeforeClosureDecision;
+            public readonly bool PostClosureFixedPointConformance;
+            public readonly string StrategyName;
+
+            public bool IsProduction =>
+                Ownership == PlaneCutBevelTerminationOwnership.GeometricCell &&
+                Closure == PlaneCutBevelTerminationClosure.AxialCaps &&
+                Preconditioner == PlaneCutBevelTerminationPreconditioner.None &&
+                RemoteComponentSelection ==
+                    PlaneCutRemoteComponentSelection.None &&
+                Mathf.Abs(AxialDistanceScale - 1f) <= 0.000001f &&
+                Mathf.Abs(TaperTipFraction - 0.35f) <= 0.000001f &&
+                Mathf.Abs(PrimaryWidthScale - 1f) <= 0.000001f &&
+                Mathf.Abs(FavoredWidthScale - 1f) <= 0.000001f &&
+                SelectiveIdentityMode < 0 &&
+                WidthFavoredIdentityMode < 0 &&
+                !WidthScaleSelectedOnly &&
+                !SelectAllExceptIdentity &&
+                !AllowSingleIncident &&
+                !FragmentAwareBandCertification &&
+                !OwnLimitIncidentPartition &&
+                !RequireSimpleClosureCycles &&
+                !DirectSimpleCycleTriangles &&
+                !ConformBeforeClosureDecision &&
+                !PostClosureFixedPointConformance;
+
+            public PlaneCutBevelTerminationOptions(
+                PlaneCutBevelTerminationOwnership ownership,
+                PlaneCutBevelTerminationClosure closure,
+                PlaneCutBevelTerminationPreconditioner preconditioner,
+                PlaneCutRemoteComponentSelection remoteComponentSelection,
+                float axialDistanceScale,
+                float taperTipFraction,
+                float primaryWidthScale,
+                float favoredWidthScale,
+                int selectiveIdentityMode,
+                int widthFavoredIdentityMode,
+                bool widthScaleSelectedOnly,
+                bool selectAllExceptIdentity,
+                bool allowSingleIncident,
+                bool fragmentAwareBandCertification,
+                bool ownLimitIncidentPartition,
+                bool requireSimpleClosureCycles,
+                bool directSimpleCycleTriangles,
+                bool conformBeforeClosureDecision,
+                bool postClosureFixedPointConformance,
+                string strategyName)
+            {
+                Ownership = ownership;
+                Closure = closure;
+                Preconditioner = preconditioner;
+                RemoteComponentSelection = remoteComponentSelection;
+                AxialDistanceScale = Mathf.Clamp(
+                    axialDistanceScale,
+                    0.35f,
+                    1.75f);
+                TaperTipFraction = Mathf.Clamp(
+                    taperTipFraction,
+                    0.05f,
+                    0.95f);
+                PrimaryWidthScale = Mathf.Clamp(
+                    primaryWidthScale,
+                    0.05f,
+                    1f);
+                FavoredWidthScale = Mathf.Clamp(
+                    favoredWidthScale,
+                    PrimaryWidthScale,
+                    1f);
+                SelectiveIdentityMode = selectiveIdentityMode;
+                WidthFavoredIdentityMode = widthFavoredIdentityMode;
+                WidthScaleSelectedOnly = widthScaleSelectedOnly;
+                SelectAllExceptIdentity = selectAllExceptIdentity;
+                AllowSingleIncident = allowSingleIncident;
+                FragmentAwareBandCertification =
+                    fragmentAwareBandCertification;
+                OwnLimitIncidentPartition = ownLimitIncidentPartition;
+                RequireSimpleClosureCycles = requireSimpleClosureCycles;
+                DirectSimpleCycleTriangles = directSimpleCycleTriangles;
+                ConformBeforeClosureDecision =
+                    conformBeforeClosureDecision;
+                PostClosureFixedPointConformance =
+                    postClosureFixedPointConformance;
+                StrategyName = strategyName ?? string.Empty;
+            }
+
+            public static PlaneCutBevelTerminationOptions Production =>
+                new PlaneCutBevelTerminationOptions(
+                    PlaneCutBevelTerminationOwnership.GeometricCell,
+                    PlaneCutBevelTerminationClosure.AxialCaps,
+                    PlaneCutBevelTerminationPreconditioner.None,
+                    PlaneCutRemoteComponentSelection.None,
+                    1f,
+                    0.35f,
+                    1f,
+                    1f,
+                    -1,
+                    -1,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "production-c1a4");
+        }
+
         private readonly struct PlaneCutEndpointCellLimit
         {
             public readonly int SourceEdgeIndex;
@@ -2423,6 +2664,17 @@ private readonly struct EdgeWearTopologyStats
             public string CellSplitSignature = string.Empty;
             public string LocalFragmentSignature = string.Empty;
             public string RemoteRemainderSignature = string.Empty;
+            public int BoundaryComponentCount;
+            public int ClosedCycleCount;
+            public int OpenChainCount;
+            public int BranchVertexCount;
+            public int TransitionFaceCount;
+            public int ResidualOpenEdgeCount;
+            public string MechanismSignature = string.Empty;
+            public string ModifiedIdentitySignature = string.Empty;
+            public bool ClosurelessAccepted;
+            public readonly HashSet<int> MutatedHybridFaceIndices =
+                new HashSet<int>();
             public string FailureSource = string.Empty;
         }
 
@@ -2488,6 +2740,22 @@ private readonly struct EdgeWearTopologyStats
                 Array.Empty<int>();
             public int CellVertexCount;
             public int CellFaceCount;
+            public bool ConflictLocalTermination;
+            public int[] TerminatedSourceEdgeIndices = Array.Empty<int>();
+            public string TerminationLoopSignature = string.Empty;
+            public string TerminationCapSignature = string.Empty;
+            public int RemoteIncidentBevelCount;
+            public int RestoredPocketFaceCount;
+            public int TerminationCapCount;
+            public int BoundaryComponentCount;
+            public int ClosedCycleCount;
+            public int OpenChainCount;
+            public int BranchVertexCount;
+            public int TransitionFaceCount;
+            public int ResidualOpenEdgeCount;
+            public string MechanismSignature = string.Empty;
+            public string ModifiedIdentitySignature = string.Empty;
+            public bool ClosurelessAccepted;
         }
 
         private sealed class PlaneCutBevelSolvedPlan
@@ -2505,7 +2773,6 @@ private readonly struct EdgeWearTopologyStats
             public float MinimumStableFaceArea;
             public int LocalityDeferredCount;
             public bool MaximumCoverageMode;
-            public bool AllowCoexistenceSearch;
             public bool SolveValid;
             public bool PolygonGeometryValid;
             public bool Materialized;
@@ -2625,6 +2892,14 @@ private readonly struct EdgeWearTopologyStats
             public string EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
             public string EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
             public string EndpointPatchRecoveryCellFailureSource = string.Empty;
+            public int EndpointPatchRecoveryBoundaryComponentCount;
+            public int EndpointPatchRecoveryClosedCycleCount;
+            public int EndpointPatchRecoveryOpenChainCount;
+            public int EndpointPatchRecoveryBranchVertexCount;
+            public int EndpointPatchRecoveryTransitionFaceCount;
+            public int EndpointPatchRecoveryResidualOpenEdgeCount;
+            public string EndpointPatchRecoveryMechanismSignature = string.Empty;
+            public string EndpointPatchRecoveryModifiedIdentitySignature = string.Empty;
             public string EndpointPatchRecoveryDiagnostic = string.Empty;
             public bool Valid;
             public string Diagnostic = string.Empty;
@@ -2712,6 +2987,7 @@ private readonly struct EdgeWearTopologyStats
             public CornerDamagePreviewKind PreviewKind;
             public CornerDamageTransactionAuditResult Transaction;
             public bool AuthoringEnabled;
+            public bool FreshPostChipOrdinaryPass;
             public float OrdinaryRequestedWidth;
             public float CapRingWidthScale;
             public float CapRingOrdinaryLimit;
@@ -2977,6 +3253,8 @@ private struct EdgeWearGraphBuildStats
                     new Dictionary<int, EdgeWearEdgeViabilityRecord>();
             public EdgeWearMicroTopologyNormalizationResult
                 MicroTopologyNormalization;
+            public GeneratedMassSelectionArchitectureAudit
+                SelectionArchitectureAudit;
             public float MacroVariationCoverage;
             public float MacroVariation;
             public float MacroBaseRequestedWidth;
@@ -3177,6 +3455,10 @@ private struct EdgeWearGraphBuildStats
                     CollateralLostEdgeIndices);
                 clone.CollateralChangedEdgeIndices.AddRange(
                     CollateralChangedEdgeIndices);
+                clone.SelectionArchitectureAudit =
+                    SelectionArchitectureAudit == null
+                        ? null
+                        : SelectionArchitectureAudit.Clone();
                 return clone;
             }
         }

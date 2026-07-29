@@ -35,7 +35,7 @@ The **selected first complete implementation is a URP main directional-light coo
 
 The performance acceptance gate is complete for the current V0 stress view. The final corrected 2560 × 1440 suite measured `+0.016 ms` mean paired GPU median delta for a static cookie and `+0.011 ms` for the normal moving cookie, with unchanged SetPass count and restoration `PASS`. These deltas are below ordinary run-to-run variation and do not justify a hybrid receiver system. The hybrid shared-mask design remains a deferred contingency only if later Player-build or low-end-hardware evidence demonstrates a material regression.
 
-The field remains Weather-owned and moves with authoritative Weather wind direction or a deterministic bounded angular offset. No visible cloud mesh, cloud plane, volumetric system, projector, decal, fullscreen pass, per-object cloud state, or custom vertex cloud field is part of the frozen cloud-shadow V0. The adjacent feature is now the approved Weather LightRay V1 architecture in `Assets/Docs/Weather_Light_Ray_Architecture.md`: it may query the same cloud transmission and evolution state, but it remains a separate hybrid presentation and gameplay-zone subsystem and does not modify the frozen receiver-cookie path.
+The field remains Weather-owned and moves with authoritative Weather wind direction or a deterministic bounded angular offset. No visible cloud mesh, cloud plane, volumetric system, projector, decal, fullscreen pass, per-object cloud state, or custom vertex cloud field is part of the frozen cloud-shadow V0. The adjacent Weather LightRay architecture is defined in `Assets/Docs/Weather_Light_Ray_Architecture.md`: it may query the same cloud transmission and evolution state, but it remains a separate hybrid presentation and gameplay-zone subsystem and does not modify the frozen receiver-cookie path. Its current AF4 renderer direction is a dense-overlap bundle of separate continuous parallel beam ribbons plus one pooled shadowless URP Spot Light per active zone for receiver-material lighting, with the prior depth-aware screen-space circular lift retained only as an optional zero-default complement. The rejected sampled-volume renderer is not a cloud-system dependency.
 
 The accepted visual starting points remain:
 
@@ -751,24 +751,27 @@ The concise handoff initiated the architecture discussion and remains useful as 
 
 ### `WEATHER-CLOUD-SHADOW-HANDOFF-V0.6` — LightRay architecture cross-reference
 
-**Status:** complete on 2026-07-24 as part of `WEATHER-LIGHT-RAY-DOC-V0.1`.
+**Status:** synchronized through `WEATHER-LIGHT-RAY-V1.1D-AF4`; the cloud-shadow implementation remains frozen and unchanged.
 
-The adjacent feature is renamed Weather LightRay and now has an approved V1 architecture and implementation plan. The new canonical document records:
+Weather LightRay remains the approved adjacent subsystem. The canonical document records:
 
 - shared Sun/Moon source abstraction with mutually exclusive day/night source groups;
-- mandatory hybrid world-space plus screen-space rendering from the first visible implementation;
 - cloud-respecting and cloud-ignoring policies;
 - graceful transition suspension for cloud-respecting rays and continued operation for ignore-cloud rays;
 - timed, permanent, and externally controlled lifetimes;
 - authored and gameplay-requested divine overrides;
 - analytical gameplay influence independent of rendering;
-- Unity 6 URP Render Graph passes, quality budgets, diagnostics, implementation sequence, and validation gates.
+- mandatory hybrid rendering;
+- several separate continuous parallel beam ribbons per LightRay zone;
+- full-resolution atmospheric masks and composite, one real shadowless per-zone Spot Light for material response, and an optional zero-default screen-space complement;
+- explicit rejection of the sampled frustum/tube/ellipse renderer and broad visible envelope;
+- performance, diagnostics, implementation order, and validation gates.
 
-The cloud-shadow implementation remains frozen. `WEATHER-LIGHT-RAY-V1.0` adds the approved minimal source-neutral cloud-transmission query to `WeatherCloudShadowController`. The query projects controlled world positions into the existing directional-cookie plane and samples the retained readable `R8` cookie with bilinear repeat filtering. It does not alter the installed cookie, receiver integration, generation, movement, evolution cadence, restoration, benchmark state, or cloud visual baseline.
+The cloud-shadow implementation remains frozen. The existing LightRay CPU query projects controlled world positions into the directional-cookie plane and samples the retained readable `R8` cookie with bilinear repeat filtering. It does not alter the installed cookie, receiver integration, generation, movement, evolution cadence, restoration, benchmark state, or cloud visual baseline.
 
 ### `WEATHER-CLOUD-SHADOW-HANDOFF-V0.7` — LightRay CPU query contract
 
-**Status:** source changes prepared; Unity compilation and Scene-view projection comparison pending.
+**Status:** accepted. Unity compilation passed and the CPU projection markers were visually validated against the Cloud + Sun Openings overlay after the V1.0B visibility and V1.0C shared-focus corrections.
 
 Changed cloud source:
 
@@ -1067,6 +1070,7 @@ The editor receiver audit must later provide a scene-specific material/shader li
 | Godrays exploration handoff | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.5` | Separate concise Markdown handoff | Delivered with V0.4 | Documentation only | Complete, historical | Points to relevant source and frozen decisions | Superseded by LightRay canonical architecture | Retain as historical orientation |
 | LightRay architecture cross-reference | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.6` | Three Weather Markdown documents | Exact docs-only scope | Documentation only | Complete | Confirms LightRay consumes cloud state without modifying receiver-cookie V0.4 | LightRay runtime not started | Follow `Weather_Light_Ray_Architecture.md` |
 | LightRay CPU cloud-query contract | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.7` | Cloud controller plus LightRay source/docs | Query-only cloud modification | No cloud steady-state work; samples occur only when called | Source prepared; Unity pending | Query samples retained cookie and exposes evolution stability | Cloud V0.4 generation/receiver path unchanged | Validate CPU markers against shader overlay |
+| LightRay future-transmission query | `WEATHER-CLOUD-SHADOW-HANDOFF-V0.8` | Cloud controller + three Weather documents + LightRay population source scope | Query-only cloud source change; no generator/receiver change | No idle cloud work; one CPU projection + bilinear sample per LightRay request | Source prepared; Unity pending | Static exact-scope and query-contract audit passed | Validate through V1.2D population |
 
 ## T. Receiving-model startup checklist
 
@@ -1110,5 +1114,72 @@ The source patch implements the approved cookie architecture and all mandatory c
 - V0.3E static exact-scope, unique-GUID, delimiter/lexical, UTF-8/NUL, obsolete-API, and subsystem-drift checks passed. The first Unity compile exposed `CS1626` in the top-level iterator.
 - V0.3E1 changes only the canonical handoff and benchmark source, removes the illegal iterator form, preserves case ordering and single restoration/finalization behavior, and passes exact-scope, lexical/delimiter, UTF-8/NUL, and nested-driver contract checks. It compiled and completed two live Editor Play Mode suites with restoration PASS.
 - Live-source inspection confirmed that persistent execution already alternated correctly; only the creation-order detailed report was misleading. V0.3E2 changes exactly the handoff and benchmark source, records actual execution indices/start offsets/elapsed times, prints pair order and actual detailed order, versions the report as V0.3E2, and leaves all measurement and cloud behavior unchanged.
+- V0.8 adds only a query-time future offset to the existing CPU cookie projection; the cookie generator, installed directional cookie, receiver shaders, and V0.4 benchmark path remain unchanged.
 - Hybrid optimization remains deferred behind measured Player or low-end-hardware failure.
 - The concise godrays exploration handoff remains historical orientation. `Assets/Docs/Weather_Light_Ray_Architecture.md` is now the authoritative adjacent-system plan and still does not authorize runtime edits without a separately approved patch.
+
+## U. LightRay future-transmission query boundary — `WEATHER-CLOUD-SHADOW-HANDOFF-V0.8`
+
+### Status
+
+Source implementation prepared as part of `WEATHER-LIGHT-RAY-V1.2D`; Unity validation is pending.
+
+### Contract
+
+`WeatherCloudShadowController` now exposes a query-only future-time transmission path for LightRay candidate forecasting:
+
+```text
+TrySampleCloudTransmissionAtTimeOffset(
+    world position,
+    celestial directional light,
+    future seconds,
+    out transmission sample)
+```
+
+The query reuses the existing readable generated cookie and the exact source-local directional-cookie projection. Future offset is derived analytically from the controller-owned current world phase plus resolved wind direction multiplied by movement speed and requested future time. It does not regenerate cookie pixels, scan the cookie, read back the GPU, alter the installed directional cookie, change receiver shader work, or create a second cloud field.
+
+The frozen V0.4 cloud producer remains authoritative for generation, movement, evolution, cookie assignment, and universal receiver shading. Automatic LightRay candidates, world-cell identity, ground validation, footprint sampling, budgets, hysteresis, handles, and lifecycle remain owned by `WeatherLightRayController` and its non-component population runtime.
+
+During seed evolution the query reports `EvolutionUnstable` exactly as the present-time query does. LightRay population owns the established suspension rule and does not request dual outgoing/incoming cloud evaluation in V1.2D.
+
+### Exact source impact
+
+Modified cloud source:
+
+- `Assets/Game/Procedural/Weather/WeatherCloudShadowController.cs`
+
+Unchanged cloud sources and assets:
+
+- `WeatherCloudShadowCookieGenerator.cs`
+- cloud debug overlay shader;
+- cloud benchmark runner;
+- receiver shaders and includes;
+- scene, material, renderer, light, layer, tag, and project settings.
+
+### Performance
+
+Each requested future sample performs one CPU cookie projection and one `Texture2D.GetPixelBilinear` read against the existing readable texture. There is no idle cloud cost when LightRay automatic population is disabled. Population cadence and sample count are bounded by the LightRay controller; the cloud controller performs no autonomous forecast loop.
+
+
+## V. LightRay measured-cover and population-policy consumer boundary — `WEATHER-CLOUD-SHADOW-HANDOFF-V0.9`
+
+`WEATHER-LIGHT-RAY-V1.2E` consumes the frozen cloud field through two independent contracts:
+
+1. existing current/future world-position transmission queries for bounded `Clear Footprint` and `Distinct Cloud Opening` candidate qualification;
+2. one cached normalized global cloud-cover value for population-rule activation curves.
+
+`WeatherCloudShadowController.MeasuredCloudCover` is computed only from the already generated CPU R8 transmission pixels when the current or next cookie is generated. During seed evolution, the cached current/next measurements are interpolated with the same eased evolution progress. Steady reads are `O(1)`. The LightRay selector/population system must not trigger cookie generation, scan pixels per frame, read back GPU state, or alter receiver shading.
+
+Cloud-data requirement belongs to each LightRay population rule:
+
+- `Ignored`: no cloud query and no evolution dependency; only unrestricted placement is valid.
+- `Optional`: a genuinely absent or disabled cloud producer is clear sky, but an enabled producer that is unready or invalid suspends the rule.
+- `Required`: a published, enabled, ready cloud field is mandatory.
+
+Spatial policy is also consumer-owned:
+
+- `Any Position`: no per-candidate transmission samples;
+- `Clear Footprint`: the existing bounded 13-position by 4-time forecast contract;
+- `Distinct Cloud Opening`: clear footprint plus a bounded surrounding-cloud contrast ring, with no connected-component extraction or full-cookie search.
+
+The common sunlight contract is `Optional + Clear Footprint`, so one rule supports both cloudless skies and clear openings when clouds exist. This consumer extension does not reopen the frozen cloud generator, directional-cookie assignment, world movement, evolution, receiver compatibility, benchmark baseline, or native URP cookie sample.

@@ -23,12 +23,12 @@ namespace ProgrammaticStylized3D.Trees.Editor
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             var report = new StringBuilder(16384);
             report.AppendLine(
-                "[TREE-GEN.2C Four-Family Trunk Grammar Build]");
+                "[TREE-GEN.2C.3H5R1 Exact H5 Regression Revert Build]");
             report.Append("Generated: ").AppendLine(timestamp);
             report.AppendLine(
-                "Workflow: one action audits and repairs source imports, rebuilds all twenty imported references and procedural slots, upgrades the managed generation library, generates calibrated constrained structures, builds the four bark representatives with compact buttress/ridge/twist grammar, and validates deterministic repeatability and selective regeneration.");
+                "Workflow: one action audits and repairs source imports, rebuilds all twenty imported references and procedural slots, migrates exact H5 managed Common/Twisted values back to the live-passed H4 targets, restores the H4 rounded body/quadratic-foot geometry, retains H4 shoulder narrowing and ten-sample root lobes, and validates deterministic repeatability and selective regeneration.");
             report.AppendLine(
-                "Output: all twenty procedural slots receive ProceduralTreeInstance structural previews; Common 1, Pine 1, Twisted 1, and Dead 1 receive persistent bark meshes with non-circular trunk cross-sections and root buttresses. Foliage meshes remain TREE-GEN.3 work.");
+                "Output: all twenty procedural slots receive ProceduralTreeInstance structural previews; Common 1, Pine 1, Twisted 1, and Dead 1 receive the H4 bark geometry and managed root targets. H5 smootherstep body/compact-foot envelopes and H5 Common/Twisted mass values are removed. Branch visual work remains pending; foliage meshes remain TREE-GEN.3 work.");
             report.AppendLine();
 
             if (gallery == null)
@@ -234,9 +234,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
 
             report.AppendLine();
-            report.AppendLine("[Trunk Grammar Bark Vertical Slice]");
+            report.AppendLine("[H5 Regression Revert — H4 Buttress Shoulder Vertical Slice]");
             int barkMeshCount = 0;
             var aggregateFailures = new List<string>();
+            var pendingBranchDiagnostics = new List<string>();
             for (int index = 0; index < barkRepresentatives.Count; index++)
             {
                 ProceduralTreeInstance representative =
@@ -281,14 +282,50 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     .Append(barkResult.PhaseAlignedRingCount)
                     .Append(" | radiusClamps=")
                     .Append(barkResult.CurvatureRadiusClampCount)
+                    .Append(" | collapsedRings=")
+                    .Append(barkResult.CircularBranchRingRemovalCount)
                     .Append(" | trunkSegments=")
                     .Append(barkResult.EffectiveTrunkRadialSegments)
+                    .Append(" | trunkRings=")
+                    .Append(barkResult.EffectiveTrunkRingCount)
+                    .Append(" | rootIntervals=")
+                    .Append(barkResult.RootZoneLongitudinalIntervals)
+                    .Append(" | buttresses=")
+                    .Append(representative.GeneratedDefinition.ResolvedParameters.RootButtressCount)
+                    .Append(" | samplesPerLobe=")
+                    .Append(barkResult.ButtressSamplesPerLobe.ToString("F2"))
+                    .Append(" | pathSpiral=")
+                    .Append(barkResult.PathSpiralStrength.ToString("F3"))
+                    .Append("x")
+                    .Append(barkResult.PathSpiralTurns.ToString("F2"))
+                    .Append(barkResult.PathSpiralDirection < 0f ? "CW" : "CCW")
+                    .Append("@")
+                    .Append(barkResult.MaximumPathSpiralRadius.ToString("F3"))
                     .Append(" | crossSection=")
                     .Append(barkResult.MaximumCrossSectionMultiplier.ToString("F3"))
+                    .Append(" | rootProfile=")
+                    .Append(barkResult.GroundButtressCrestMultiplier.ToString("F3"))
+                    .Append("/")
+                    .Append(barkResult.MinimumGroundCrossSectionMultiplier.ToString("F3"))
+                    .Append("/")
+                    .Append(barkResult.HalfHeightRootExtensionRatio.ToString("F3"))
+                    .Append("/")
+                    .Append(barkResult.HalfHeightButtressAngularWidthScale.ToString("F3"))
+                    .Append("/")
+                    .Append(barkResult.MaximumGroundButtressCrestTurnDegrees.ToString("F2"))
                     .Append(" | rootWD=")
                     .Append(barkResult.GeneratedRootWidth.ToString("F3"))
                     .Append("/")
                     .Append(barkResult.GeneratedRootDepth.ToString("F3"))
+                    .Append(" | twistReq/Measured/Error=")
+                    .Append(barkResult.RequestedAxialTwistDegrees.ToString("F2"))
+                    .Append("/")
+                    .Append(barkResult.MeasuredAxialTwistDegrees.ToString("F2"))
+                    .Append("/")
+                    .Append(barkResult.AxialTwistErrorDegrees.ToString("F3"))
+                    .Append(" | branchTurn=")
+                    .Append(CalculateMaximumNonTrunkSegmentTurn(
+                        representative.GeneratedDefinition).ToString("F2"))
                     .Append(" | bounds=")
                     .Append(barkResult.LocalBounds.size.ToString("F3"))
                     .Append(" | repeat=")
@@ -304,12 +341,261 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     .Append(" | mesh=")
                     .AppendLine(barkResult.GeometryFingerprint);
                 report.AppendLine(barkReport);
+
+                bool rootBearingRepresentative =
+                    representative.Family == TreeFamily.Common ||
+                    representative.Family == TreeFamily.Pine ||
+                    representative.Family == TreeFamily.Twisted ||
+                    representative.Family == TreeFamily.Dead;
+                if (rootBearingRepresentative &&
+                    barkResult.ButtressSamplesPerLobe + 0.0001f < 10f)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 emitted only " +
+                        barkResult.ButtressSamplesPerLobe.ToString("F2") +
+                        " buttress samples per lobe; required at least 10.00.");
+                }
+
+                if (rootBearingRepresentative &&
+                    barkResult.RootZoneLongitudinalIntervals < 10)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 emitted only " +
+                        barkResult.RootZoneLongitudinalIntervals +
+                        " root-zone longitudinal intervals; required at least 10.");
+                }
+
+                if (rootBearingRepresentative &&
+                    (barkResult.MinimumGroundCrossSectionMultiplier < 0.995f ||
+                     barkResult.MinimumGroundCrossSectionMultiplier > 1.005f))
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 ground valley multiplier reached " +
+                        barkResult.MinimumGroundCrossSectionMultiplier.ToString("F3") +
+                        "; valley-safe root reconstruction requires 0.995 through 1.005.");
+                }
+
+                if (rootBearingRepresentative &&
+                    barkResult.RootTopRootOnlyMultiplier > 0.005f)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 retained " +
+                        barkResult.RootTopRootOnlyMultiplier.ToString("F4") +
+                        " root-only contribution at Root Buttress Height; maximum is 0.0050.");
+                }
+
+                if (rootBearingRepresentative &&
+                    barkResult.MaximumGroundButtressCrestTurnDegrees > 22.001f)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 ground buttress crest turn reached " +
+                        barkResult.MaximumGroundButtressCrestTurnDegrees.ToString("F2") +
+                        " degrees; rounded-crest maximum is 22.00.");
+                }
+
+                if (rootBearingRepresentative &&
+                    (barkResult.HalfHeightRootExtensionRatio < 0.2699f ||
+                     barkResult.HalfHeightRootExtensionRatio > 0.3501f))
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 half-height/ground root-extension ratio reached " +
+                        barkResult.HalfHeightRootExtensionRatio.ToString("F3") +
+                        "; required range is 0.27 through 0.35.");
+                }
+
+                if (rootBearingRepresentative &&
+                    (barkResult.HalfHeightButtressAngularWidthScale < 0.7999f ||
+                     barkResult.HalfHeightButtressAngularWidthScale > 0.8001f))
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 half-height buttress angular-width scale reached " +
+                        barkResult.HalfHeightButtressAngularWidthScale.ToString("F4") +
+                        "; H5R1 restores the H4 requirement of 0.8000.");
+                }
+
+                float minimumGroundCrest = 0f;
+                float maximumGroundCrest = float.PositiveInfinity;
+                if (representative.Family == TreeFamily.Common)
+                {
+                    minimumGroundCrest = 1.72f;
+                    maximumGroundCrest = 1.80f;
+                }
+                else if (representative.Family == TreeFamily.Pine)
+                {
+                    minimumGroundCrest = 1.30f;
+                    maximumGroundCrest = 1.36f;
+                }
+                else if (representative.Family == TreeFamily.Twisted)
+                {
+                    minimumGroundCrest = 1.90f;
+                    maximumGroundCrest = 2.05f;
+                }
+                else if (representative.Family == TreeFamily.Dead)
+                {
+                    minimumGroundCrest = 1.84f;
+                    maximumGroundCrest = 1.98f;
+                }
+
+                if (rootBearingRepresentative &&
+                    (barkResult.GroundButtressCrestMultiplier < minimumGroundCrest ||
+                     barkResult.GroundButtressCrestMultiplier > maximumGroundCrest))
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 ground buttress crest multiplier reached " +
+                        barkResult.GroundButtressCrestMultiplier.ToString("F3") +
+                        "; required range is " +
+                        minimumGroundCrest.ToString("F2") +
+                        " through " +
+                        maximumGroundCrest.ToString("F2") + ".");
+                }
+
+                int resolvedButtressCount = representative.GeneratedDefinition
+                    .ResolvedParameters.RootButtressCount;
+                if (resolvedButtressCount < 3 || resolvedButtressCount > 8)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 resolved invalid root buttress count " +
+                        resolvedButtressCount + "; required 3 through 8.");
+                }
+
+                int expectedButtressCount = representative.Family == TreeFamily.Common
+                    ? 5
+                    : representative.Family == TreeFamily.Pine
+                        ? 5
+                        : representative.Family == TreeFamily.Twisted
+                            ? 5
+                            : representative.Family == TreeFamily.Dead
+                                ? 6
+                                : resolvedButtressCount;
+                if (resolvedButtressCount != expectedButtressCount)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 resolved " + resolvedButtressCount +
+                        " root buttresses; expected managed comparison value " +
+                        expectedButtressCount + ".");
+                }
+
+                TreeResolvedParameters branchParameters = representative
+                    .GeneratedDefinition.ResolvedParameters;
+                if (representative.Family == TreeFamily.Twisted &&
+                    (branchParameters.PrimaryBranchCount < 10 ||
+                     branchParameters.SecondaryBranchesPerPrimary < 3 ||
+                     branchParameters.InitialBranchElevationDegrees < 14f ||
+                     branchParameters.AzimuthSymmetry < 0.80f ||
+                     branchParameters.DirectionalBiasStrength > 0.1801f ||
+                     branchParameters.PrimaryBranchLengthRatio > 0.3801f))
+                {
+                    pendingBranchDiagnostics.Add(
+                        "Twisted 1 branch distribution remains pending: primary=" +
+                        branchParameters.PrimaryBranchCount +
+                        ", secondaryPerPrimary=" +
+                        branchParameters.SecondaryBranchesPerPrimary +
+                        ", elevation=" +
+                        branchParameters.InitialBranchElevationDegrees.ToString("F1") +
+                        ", symmetry=" +
+                        branchParameters.AzimuthSymmetry.ToString("F3") +
+                        ", bias=" +
+                        branchParameters.DirectionalBiasStrength.ToString("F3") +
+                        ", length=" +
+                        branchParameters.PrimaryBranchLengthRatio.ToString("F3") + ".");
+                }
+                else if (representative.Family == TreeFamily.Dead &&
+                    (branchParameters.PrimaryBranchCount < 14 ||
+                     branchParameters.SecondaryBranchesPerPrimary < 3 ||
+                     branchParameters.PrimaryBranchStartHeight < 0.30f ||
+                     branchParameters.InitialBranchElevationDegrees < 14f ||
+                     branchParameters.AzimuthSymmetry < 0.70f ||
+                     branchParameters.DirectionalBiasStrength > 0.2001f ||
+                     branchParameters.PrimaryBranchLengthRatio > 0.2601f))
+                {
+                    pendingBranchDiagnostics.Add(
+                        "Dead 1 branch placement/density remains pending: primary=" +
+                        branchParameters.PrimaryBranchCount +
+                        ", secondaryPerPrimary=" +
+                        branchParameters.SecondaryBranchesPerPrimary +
+                        ", start=" +
+                        branchParameters.PrimaryBranchStartHeight.ToString("F3") +
+                        ", elevation=" +
+                        branchParameters.InitialBranchElevationDegrees.ToString("F1") +
+                        ", symmetry=" +
+                        branchParameters.AzimuthSymmetry.ToString("F3") +
+                        ", bias=" +
+                        branchParameters.DirectionalBiasStrength.ToString("F3") +
+                        ", length=" +
+                        branchParameters.PrimaryBranchLengthRatio.ToString("F3") + ".");
+                }
+
+                if ((representative.Family == TreeFamily.Twisted ||
+                     representative.Family == TreeFamily.Dead) &&
+                    representative.Recipe != null &&
+                    representative.Recipe.FamilyProfile != null)
+                {
+                    float sampledTurnLimit = Mathf.Max(
+                        4f,
+                        representative.Recipe.FamilyProfile
+                            .StructuralConstraints
+                            .MaximumBranchSegmentTurnDegrees * 0.45f);
+                    float measuredBranchTurn =
+                        CalculateMaximumNonTrunkSegmentTurn(
+                            representative.GeneratedDefinition);
+                    if (measuredBranchTurn > sampledTurnLimit + 0.01f)
+                    {
+                        pendingBranchDiagnostics.Add(
+                            representative.Family +
+                            " 1 sampled branch turn remains pending at " +
+                            measuredBranchTurn.ToString("F2") +
+                            " degrees versus " +
+                            sampledTurnLimit.ToString("F2") + ".");
+                    }
+                }
+
+                float maximumAverageTwistStep =
+                    barkResult.EffectiveTrunkRingCount > 1
+                        ? Mathf.Abs(barkResult.RequestedAxialTwistDegrees) /
+                          (barkResult.EffectiveTrunkRingCount - 1)
+                        : float.PositiveInfinity;
+                if (maximumAverageTwistStep > 12.001f)
+                {
+                    aggregateFailures.Add(
+                        representative.Family +
+                        " 1 averages " +
+                        maximumAverageTwistStep.ToString("F2") +
+                        " degrees of twist per trunk ring; maximum is 12.00.");
+                }
+
+                if (representative.Family == TreeFamily.Twisted &&
+                    (barkResult.PathSpiralStrength < 0.1799f ||
+                     barkResult.PathSpiralTurns < 0.999f ||
+                     barkResult.PathSpiralDirection >= 0f))
+                {
+                    aggregateFailures.Add(
+                        "Twisted 1 did not retain the managed 0.18 strength, 1.00 turn, clockwise path spiral.");
+                }
+
+                if (representative.Family == TreeFamily.Dead &&
+                    (barkResult.PathSpiralStrength < 0.0999f ||
+                     barkResult.PathSpiralTurns < 0.749f ||
+                     barkResult.PathSpiralDirection >= 0f))
+                {
+                    aggregateFailures.Add(
+                        "Dead 1 did not retain the managed 0.10 strength, 0.75 turn, clockwise path spiral.");
+                }
             }
 
             if (barkMeshCount != 4)
             {
                 aggregateFailures.Add(
-                    "Four-family trunk-grammar vertical slice expected four meshes but built " +
+                    "Four-family rounded-root-profile vertical slice expected four meshes but built " +
                     barkMeshCount + ".");
             }
 
@@ -368,7 +654,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.Append("Managed library: ")
                 .AppendLine(TreeGenerationLibraryBuilder.LibraryAssetPath);
             report.AppendLine(
-                "Normal workflow: select Tree Reference Gallery and use Rebuild Complete Tree Comparison Gallery. Structural previews default to Selected Tree; Common 1, Pine 1, Twisted 1, and Dead 1 carry the TREE-GEN.2C buttress/ridge/twist bark vertical slice.");
+                "Normal workflow: select Tree Reference Gallery and use Rebuild Complete Tree Comparison Gallery. Common 1, Pine 1, Twisted 1, and Dead 1 carry the TREE-GEN.2C.3H5R1 exact regression revert, restoring H4 buttress geometry and values. Branch visual calibration remains pending and non-blocking.");
             if (!passedBuild)
             {
                 report.AppendLine("Failures:");
@@ -378,6 +664,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 {
                     report.Append("- ")
                         .AppendLine(aggregateFailures[failureIndex]);
+                }
+            }
+            if (pendingBranchDiagnostics.Count > 0)
+            {
+                report.AppendLine("Pending branch diagnostics (non-blocking):");
+                for (int diagnosticIndex = 0;
+                     diagnosticIndex < pendingBranchDiagnostics.Count;
+                     diagnosticIndex++)
+                {
+                    report.Append("- ")
+                        .AppendLine(pendingBranchDiagnostics[diagnosticIndex]);
                 }
             }
 
@@ -390,12 +687,65 @@ namespace ProgrammaticStylized3D.Trees.Editor
             };
         }
 
+        private static float CalculateMaximumNonTrunkSegmentTurn(
+            TreeDefinition definition)
+        {
+            float maximumTurn = 0f;
+            if (definition == null || definition.Branches == null)
+            {
+                return maximumTurn;
+            }
+
+            IReadOnlyList<TreeBranchDefinition> branches = definition.Branches;
+            for (int branchIndex = 0;
+                 branchIndex < branches.Count;
+                 branchIndex++)
+            {
+                TreeBranchDefinition branch = branches[branchIndex];
+                if (branch == null || branch.BranchOrder == 0 ||
+                    branch.Samples == null || branch.Samples.Count < 3)
+                {
+                    continue;
+                }
+
+                Vector3 previousDirection =
+                    branch.Samples[1].Position -
+                    branch.Samples[0].Position;
+                if (previousDirection.sqrMagnitude <= 0.000001f)
+                {
+                    continue;
+                }
+                previousDirection.Normalize();
+
+                for (int sampleIndex = 2;
+                     sampleIndex < branch.Samples.Count;
+                     sampleIndex++)
+                {
+                    Vector3 segment =
+                        branch.Samples[sampleIndex].Position -
+                        branch.Samples[sampleIndex - 1].Position;
+                    if (segment.sqrMagnitude <= 0.000001f)
+                    {
+                        continue;
+                    }
+
+                    Vector3 direction = segment.normalized;
+                    maximumTurn = Mathf.Max(
+                        maximumTurn,
+                        Vector3.Angle(previousDirection, direction));
+                    previousDirection = direction;
+                }
+            }
+
+            return maximumTurn;
+        }
+
         internal static TreeUnifiedGalleryBuildResult RemoveGeneratedOutputs(
             TreeReferenceGallery gallery)
         {
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             var report = new StringBuilder(2048);
-            report.AppendLine("[TREE-GEN.2C Remove Generated Tree Outputs]");
+            report.AppendLine("[TREE-GEN.2C.3H5R1 Remove Generated Tree Outputs]");
             report.Append("Generated: ").AppendLine(timestamp);
             if (gallery == null)
             {

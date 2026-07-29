@@ -1618,7 +1618,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 metrics.VertexCount,
                 metrics.TriangleCount,
                 metrics.MaterialLayout,
-                "Managed procedural comparison slot");
+                "Curated recipe-spawned procedural comparison slot");
+
+            if (!TreeCuratedGalleryUtility.TryConfigureSpawner(
+                    gallery,
+                    slotSpecimen,
+                    out _,
+                    out string spawnerFailure))
+            {
+                report.Append("  WARNING | Curated spawner not configured: ")
+                    .AppendLine(spawnerFailure);
+            }
 
             createdSpecimens = 2;
             report.Append("  PASS | ")
@@ -2050,7 +2060,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 metrics.VertexCount,
                 metrics.TriangleCount,
                 metrics.MaterialLayout,
-                "Managed procedural comparison slot");
+                "Curated recipe-spawned procedural comparison slot");
+
+            if (!TreeCuratedGalleryUtility.TryConfigureSpawner(
+                    gallery,
+                    slotSpecimen,
+                    out _,
+                    out string spawnerFailure))
+            {
+                report.Append("  WARNING | Curated spawner not configured: ")
+                    .AppendLine(spawnerFailure);
+            }
 
             createdSpecimens = 2;
             report.Append("PASS | ")

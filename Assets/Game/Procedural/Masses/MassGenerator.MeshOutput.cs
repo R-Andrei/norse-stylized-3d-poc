@@ -1152,6 +1152,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             TriangleSoup soup,
             MassRecipe recipe)
         {
+            BeginBevelShadingDiagnosticMeshBuild();
             if (soup.Positions.Count < 3 ||
                 soup.Positions.Count % 3 != 0)
             {
@@ -1262,6 +1263,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 PolygonFaceFeature faceFeature = soup.ResolveFeature(i);
                 float faceFeatureStrength = soup.ResolveFeatureStrength(i);
+                MassSurfaceFeatureContribution primaryContribution =
+                    soup.ResolvePrimarySurfaceContribution(i);
+                MassSurfaceFeatureContribution secondaryContribution =
+                    soup.ResolveSecondarySurfaceContribution(i);
 
                 int indexA = AddRenderedVertex(
                     meshData,
@@ -1278,7 +1283,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     authoredSurfaceGroup,
                     recipe,
                     faceFeature,
-                    faceFeatureStrength);
+                    faceFeatureStrength,
+                    primaryContribution,
+                    secondaryContribution);
 
                 int indexB = AddRenderedVertex(
                     meshData,
@@ -1295,7 +1302,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     authoredSurfaceGroup,
                     recipe,
                     faceFeature,
-                    faceFeatureStrength);
+                    faceFeatureStrength,
+                    primaryContribution,
+                    secondaryContribution);
 
                 int indexC = AddRenderedVertex(
                     meshData,
@@ -1312,13 +1321,433 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     authoredSurfaceGroup,
                     recipe,
                     faceFeature,
-                    faceFeatureStrength);
+                    faceFeatureStrength,
+                    primaryContribution,
+                    secondaryContribution);
 
                 meshData.AddTriangle(indexA, indexB, indexC);
             }
 
+            BeginBevelShadingMaskCompilationDiagnostics(soup, meshData);
+            InheritGeneratedFaceMaterialMasks(soup, meshData);
+            CaptureFinalBevelShadingTriangles(soup, meshData);
             ValidateGeneratedMassMeshData(meshData);
+            CompleteBevelShadingDiagnosticMeshBuild(meshData, true);
             return meshData;
+        }
+
+        private static void CaptureFinalBevelShadingTriangles(
+            TriangleSoup soup,
+            MeshData meshData)
+        {
+            if (activeBevelShadingCapture == null)
+            {
+                return;
+            }
+
+            int triangleCount = meshData.Triangles.Count / 3;
+            for (int triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+            {
+                int soupIndex = triangleIndex * 3;
+                int ia = meshData.Triangles[soupIndex];
+                int ib = meshData.Triangles[soupIndex + 1];
+                int ic = meshData.Triangles[soupIndex + 2];
+                soup.TryResolveProvenance(
+                    soupIndex,
+                    out PolygonFaceProvenanceKind provenanceKind,
+                    out int provenanceIndex);
+                soup.TryResolveAuthoredSurfaceGroup(soupIndex, out int surfaceGroup);
+                soup.TryResolveAuthoredSurfaceNormal(soupIndex, out Vector3 authoredNormal);
+                Vector3 a = meshData.Vertices[ia];
+                Vector3 b = meshData.Vertices[ib];
+                Vector3 c = meshData.Vertices[ic];
+                Vector3 geometricNormal = Vector3.Cross(b - a, c - a).normalized;
+                Vector3 renderNormal = (meshData.Normals[ia] + meshData.Normals[ib] + meshData.Normals[ic]).normalized;
+                CaptureFinalTriangle(
+                    triangleIndex,
+                    provenanceKind,
+                    provenanceIndex,
+                    surfaceGroup,
+                    a, b, c,
+                    geometricNormal,
+                    renderNormal,
+                    authoredNormal,
+                    new Vector4(meshData.Colors[ia].r, meshData.Colors[ia].g, meshData.Colors[ia].b, meshData.UV2[ia].y),
+                    new Vector4(meshData.Colors[ib].r, meshData.Colors[ib].g, meshData.Colors[ib].b, meshData.UV2[ib].y),
+                    new Vector4(meshData.Colors[ic].r, meshData.Colors[ic].g, meshData.Colors[ic].b, meshData.UV2[ic].y),
+                    meshData.SurfaceFeatures[ia],
+                    meshData.SurfaceFeatures[ib],
+                    meshData.SurfaceFeatures[ic]);
+            }
+        }
+
+
+        private readonly struct GeneratedMassMaterialMaskSample
+        {
+            public readonly float Exposure;
+            public readonly float Crevice;
+            public readonly float DirtDeposit;
+
+            public GeneratedMassMaterialMaskSample(
+                float exposure,
+                float crevice,
+                float dirtDeposit)
+            {
+                Exposure = exposure;
+                Crevice = crevice;
+                DirtDeposit = dirtDeposit;
+            }
+
+            public static GeneratedMassMaterialMaskSample Lerp(
+                GeneratedMassMaterialMaskSample a,
+                GeneratedMassMaterialMaskSample b,
+                float t)
+            {
+                t = Mathf.Clamp01(t);
+                return new GeneratedMassMaterialMaskSample(
+                    Mathf.Lerp(a.Exposure, b.Exposure, t),
+                    Mathf.Lerp(a.Crevice, b.Crevice, t),
+                    Mathf.Lerp(a.DirtDeposit, b.DirtDeposit, t));
+            }
+        }
+
+        private static void InheritGeneratedFaceMaterialMasks(
+            TriangleSoup soup,
+            MeshData meshData)
+        {
+            const float quantization = 100000f;
+            var sourceSamples =
+                new Dictionary<Vector3Int, List<GeneratedMassMaterialMaskSample>>();
+
+            for (int i = 0; i < meshData.Vertices.Count; i++)
+            {
+                if (IsGeneratedMassFeatureVertex(meshData.SurfaceFeatures[i]))
+                {
+                    continue;
+                }
+
+                Vector3Int key = BuildGeneratedMassMaskPositionKey(
+                    meshData.Vertices[i],
+                    quantization);
+                if (!sourceSamples.TryGetValue(key, out var samples))
+                {
+                    samples = new List<GeneratedMassMaterialMaskSample>();
+                    sourceSamples.Add(key, samples);
+                }
+
+                samples.Add(ReadGeneratedMassMaterialMaskSample(meshData, i));
+            }
+
+            var resolved = new bool[meshData.Vertices.Count];
+            var inherited = new GeneratedMassMaterialMaskSample[
+                meshData.Vertices.Count];
+
+            // Resolve only exact source-boundary ownership first. Unlike the
+            // retired implementation, this does not collapse every source
+            // sample touching a generated triangle into one triangle-wide value.
+            for (int i = 0; i < meshData.Vertices.Count; i++)
+            {
+                if (!IsGeneratedMassFeatureVertex(meshData.SurfaceFeatures[i]))
+                {
+                    continue;
+                }
+
+                Vector3Int key = BuildGeneratedMassMaskPositionKey(
+                    meshData.Vertices[i],
+                    quantization);
+                if (!sourceSamples.TryGetValue(key, out var samples) ||
+                    samples.Count == 0)
+                {
+                    continue;
+                }
+
+                inherited[i] = AverageGeneratedMassMaterialMaskSamples(samples);
+                resolved[i] = true;
+            }
+
+            // Interior generated vertices are resolved from the exact boundary
+            // samples on their own triangle. This preserves a gradient across a
+            // bevel/cap transition instead of assigning one flat pre-light value
+            // to the complete generated triangle.
+            for (int triangleOffset = 0;
+                 triangleOffset < meshData.Triangles.Count;
+                 triangleOffset += 3)
+            {
+                int ia = meshData.Triangles[triangleOffset];
+                int ib = meshData.Triangles[triangleOffset + 1];
+                int ic = meshData.Triangles[triangleOffset + 2];
+                int[] indices = { ia, ib, ic };
+
+                bool generatedTriangle = false;
+                for (int k = 0; k < 3; k++)
+                {
+                    generatedTriangle |= IsGeneratedMassFeatureVertex(
+                        meshData.SurfaceFeatures[indices[k]]);
+                }
+                if (!generatedTriangle)
+                {
+                    continue;
+                }
+
+                for (int k = 0; k < 3; k++)
+                {
+                    int index = indices[k];
+                    if (!IsGeneratedMassFeatureVertex(
+                            meshData.SurfaceFeatures[index]) ||
+                        resolved[index])
+                    {
+                        continue;
+                    }
+
+                    int first = indices[(k + 1) % 3];
+                    int second = indices[(k + 2) % 3];
+                    bool firstResolved = resolved[first];
+                    bool secondResolved = resolved[second];
+
+                    if (firstResolved && secondResolved)
+                    {
+                        Vector3 position = meshData.Vertices[index];
+                        float firstDistance = Vector3.Distance(
+                            position,
+                            meshData.Vertices[first]);
+                        float secondDistance = Vector3.Distance(
+                            position,
+                            meshData.Vertices[second]);
+                        float distanceSum = firstDistance + secondDistance;
+                        float t = distanceSum > 0.000001f
+                            ? firstDistance / distanceSum
+                            : 0.5f;
+                        inherited[index] = GeneratedMassMaterialMaskSample.Lerp(
+                            inherited[first],
+                            inherited[second],
+                            t);
+                        resolved[index] = true;
+                    }
+                    else if (firstResolved || secondResolved)
+                    {
+                        int owner = firstResolved ? first : second;
+                        inherited[index] = inherited[owner];
+                        resolved[index] = true;
+                    }
+                }
+            }
+
+            // A generated face with no source-boundary sample is an explicit cap
+            // or closure. Keep its generation-time compiled channels rather than
+            // inventing a new orientation-based classification here.
+            for (int i = 0; i < meshData.Vertices.Count; i++)
+            {
+                if (!IsGeneratedMassFeatureVertex(meshData.SurfaceFeatures[i]) ||
+                    !resolved[i])
+                {
+                    continue;
+                }
+
+                WriteGeneratedMassMaterialMaskSample(meshData, i, inherited[i]);
+            }
+
+            ReconcileLogicalBevelMaterialMasks(
+                soup,
+                meshData,
+                quantization,
+                out int reconciledPositionGroups,
+                out int reconciledVertices);
+            CompleteBevelShadingMaskCompilationDiagnostics(
+                soup,
+                meshData,
+                reconciledPositionGroups,
+                reconciledVertices);
+        }
+
+        private readonly struct LogicalBevelMaskPositionKey :
+            IEquatable<LogicalBevelMaskPositionKey>
+        {
+            private readonly int provenanceKind;
+            private readonly int provenanceIndex;
+            private readonly Vector3Int position;
+
+            public LogicalBevelMaskPositionKey(
+                PolygonFaceProvenanceKind provenanceKind,
+                int provenanceIndex,
+                Vector3Int position)
+            {
+                this.provenanceKind = (int)provenanceKind;
+                this.provenanceIndex = provenanceIndex;
+                this.position = position;
+            }
+
+            public bool Equals(LogicalBevelMaskPositionKey other)
+            {
+                return provenanceKind == other.provenanceKind &&
+                    provenanceIndex == other.provenanceIndex &&
+                    position == other.position;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is LogicalBevelMaskPositionKey other &&
+                    Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = provenanceKind;
+                    hash = hash * 397 ^ provenanceIndex;
+                    hash = hash * 397 ^ position.GetHashCode();
+                    return hash;
+                }
+            }
+        }
+
+        private static void ReconcileLogicalBevelMaterialMasks(
+            TriangleSoup soup,
+            MeshData meshData,
+            float quantization,
+            out int reconciledPositionGroups,
+            out int reconciledVertices)
+        {
+            reconciledPositionGroups = 0;
+            reconciledVertices = 0;
+            if (soup == null || meshData == null) return;
+
+            var groups = new Dictionary<
+                LogicalBevelMaskPositionKey,
+                List<int>>();
+            int triangleCount = meshData.Triangles.Count / 3;
+            for (int triangleIndex = 0;
+                 triangleIndex < triangleCount;
+                 triangleIndex++)
+            {
+                int soupIndex = triangleIndex * 3;
+                if (!soup.TryResolveProvenance(
+                        soupIndex,
+                        out PolygonFaceProvenanceKind provenanceKind,
+                        out int provenanceIndex) ||
+                    !IsOrdinaryBevelProvenance(provenanceKind) ||
+                    provenanceIndex < 0)
+                {
+                    continue;
+                }
+
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int vertexIndex = meshData.Triangles[soupIndex + corner];
+                    LogicalBevelMaskPositionKey key =
+                        new LogicalBevelMaskPositionKey(
+                            provenanceKind,
+                            provenanceIndex,
+                            BuildGeneratedMassMaskPositionKey(
+                                meshData.Vertices[vertexIndex],
+                                quantization));
+                    if (!groups.TryGetValue(key, out List<int> vertices))
+                    {
+                        vertices = new List<int>(2);
+                        groups.Add(key, vertices);
+                    }
+                    vertices.Add(vertexIndex);
+                }
+            }
+
+            foreach (KeyValuePair<
+                     LogicalBevelMaskPositionKey,
+                     List<int>> pair in groups)
+            {
+                List<int> vertices = pair.Value;
+                if (vertices.Count < 2) continue;
+
+                GeneratedMassMaterialMaskSample average =
+                    default;
+                float exposure = 0f;
+                float crevice = 0f;
+                float dirt = 0f;
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    GeneratedMassMaterialMaskSample sample =
+                        ReadGeneratedMassMaterialMaskSample(
+                            meshData,
+                            vertices[i]);
+                    exposure += sample.Exposure;
+                    crevice += sample.Crevice;
+                    dirt += sample.DirtDeposit;
+                }
+                float inverse = 1f / vertices.Count;
+                average = new GeneratedMassMaterialMaskSample(
+                    exposure * inverse,
+                    crevice * inverse,
+                    dirt * inverse);
+                for (int i = 0; i < vertices.Count; i++)
+                {
+                    WriteGeneratedMassMaterialMaskSample(
+                        meshData,
+                        vertices[i],
+                        average);
+                }
+                reconciledPositionGroups++;
+                reconciledVertices += vertices.Count;
+            }
+        }
+
+        private static bool IsGeneratedMassFeatureVertex(Vector4 feature)
+        {
+            return Mathf.RoundToInt(feature.x) != 0 ||
+                Mathf.RoundToInt(feature.z) != 0;
+        }
+
+        private static Vector3Int BuildGeneratedMassMaskPositionKey(
+            Vector3 position,
+            float quantization)
+        {
+            return new Vector3Int(
+                Mathf.RoundToInt(position.x * quantization),
+                Mathf.RoundToInt(position.y * quantization),
+                Mathf.RoundToInt(position.z * quantization));
+        }
+
+        private static GeneratedMassMaterialMaskSample
+            ReadGeneratedMassMaterialMaskSample(MeshData meshData, int index)
+        {
+            return new GeneratedMassMaterialMaskSample(
+                meshData.Colors[index].g,
+                meshData.Colors[index].b,
+                meshData.UV2[index].y);
+        }
+
+        private static GeneratedMassMaterialMaskSample
+            AverageGeneratedMassMaterialMaskSamples(
+                List<GeneratedMassMaterialMaskSample> samples)
+        {
+            float exposure = 0f;
+            float crevice = 0f;
+            float dirt = 0f;
+            for (int i = 0; i < samples.Count; i++)
+            {
+                exposure += samples[i].Exposure;
+                crevice += samples[i].Crevice;
+                dirt += samples[i].DirtDeposit;
+            }
+
+            float inv = samples.Count > 0 ? 1f / samples.Count : 0f;
+            return new GeneratedMassMaterialMaskSample(
+                exposure * inv,
+                crevice * inv,
+                dirt * inv);
+        }
+
+        private static void WriteGeneratedMassMaterialMaskSample(
+            MeshData meshData,
+            int index,
+            GeneratedMassMaterialMaskSample sample)
+        {
+            Color color = meshData.Colors[index];
+            color.g = Mathf.Clamp01(sample.Exposure);
+            color.b = Mathf.Clamp01(sample.Crevice);
+            meshData.Colors[index] = color;
+
+            Vector4 uv2 = meshData.UV2[index];
+            uv2.y = Mathf.Clamp01(sample.DirtDeposit);
+            meshData.UV2[index] = uv2;
         }
 
         private static void ValidateGeneratedMassMeshData(
@@ -1334,7 +1763,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshData.Normals.Count != meshData.Vertices.Count ||
                 meshData.UV0.Count != meshData.Vertices.Count ||
                 meshData.Colors.Count != meshData.Vertices.Count ||
-                meshData.UV2.Count != meshData.Vertices.Count)
+                meshData.UV2.Count != meshData.Vertices.Count ||
+                meshData.SurfaceFeatures.Count != meshData.Vertices.Count)
             {
                 throw new InvalidOperationException(
                     "Generated mass render channels are incomplete.");
@@ -1349,6 +1779,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector2 uv0 = meshData.UV0[vertexIndex];
                 Color color = meshData.Colors[vertexIndex];
                 Vector4 uv2 = meshData.UV2[vertexIndex];
+                Vector4 surfaceFeatures =
+                    meshData.SurfaceFeatures[vertexIndex];
                 if (!IsFiniteMassVector(position) ||
                     !TryNormalizeMassVector(normal, out _) ||
                     !IsFiniteMassValue(uv0.x) ||
@@ -1360,7 +1792,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !IsFiniteMassValue(uv2.x) ||
                     !IsFiniteMassValue(uv2.y) ||
                     !IsFiniteMassValue(uv2.z) ||
-                    !IsFiniteMassValue(uv2.w))
+                    !IsFiniteMassValue(uv2.w) ||
+                    !IsValidPackedSurfaceFeaturePair(surfaceFeatures))
                 {
                     throw new InvalidOperationException(
                         "Generated mass render channel is invalid at " +
@@ -1437,7 +1870,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int authoredSurfaceGroup,
             MassRecipe recipe,
             PolygonFaceFeature faceFeature,
-            float faceFeatureStrength)
+            float faceFeatureStrength,
+            MassSurfaceFeatureContribution primaryContribution,
+            MassSurfaceFeatureContribution secondaryContribution)
         {
             Vector2 uv = new Vector2(
                 (position.x - bounds.min.x) / width,
@@ -1491,14 +1926,77 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 edgeWear,
                 0f);
 
+            Vector4 packedSurfaceFeatures = PackSurfaceFeatureContributions(
+                primaryContribution,
+                secondaryContribution);
+
             int renderedVertex = meshData.AddVertex(
                 position,
                 uv,
                 new Color(red, green, blue, edgeWear),
-                materialMasks);
+                materialMasks,
+                packedSurfaceFeatures);
             meshData.Normals.Add(faceNormal);
             return renderedVertex;
         }
+
+        private static Vector4 PackSurfaceFeatureContributions(
+            MassSurfaceFeatureContribution primary,
+            MassSurfaceFeatureContribution secondary)
+        {
+            return new Vector4(
+                EncodeSurfaceFeatureType(primary),
+                primary.IsValid ? Mathf.Clamp01(primary.Strength) : 0f,
+                EncodeSurfaceFeatureType(secondary),
+                secondary.IsValid ? Mathf.Clamp01(secondary.Strength) : 0f);
+        }
+
+        private static float EncodeSurfaceFeatureType(
+            MassSurfaceFeatureContribution contribution)
+        {
+            return contribution.IsValid ? (float)contribution.Type : 0f;
+        }
+
+        private static bool IsValidPackedSurfaceFeaturePair(Vector4 packed)
+        {
+            if (!IsFiniteMassValue(packed.x) ||
+                !IsFiniteMassValue(packed.y) ||
+                !IsFiniteMassValue(packed.z) ||
+                !IsFiniteMassValue(packed.w))
+            {
+                return false;
+            }
+
+            int maximumType = (int)MassSurfaceFeatureType.MaterialSeam;
+            bool primaryTypeValid =
+                Mathf.Abs(packed.x - Mathf.Round(packed.x)) <= 0.0001f &&
+                packed.x >= 0f && packed.x <= maximumType;
+            bool secondaryTypeValid =
+                Mathf.Abs(packed.z - Mathf.Round(packed.z)) <= 0.0001f &&
+                packed.z >= 0f && packed.z <= maximumType;
+            bool strengthsValid =
+                packed.y >= 0f && packed.y <= 1f &&
+                packed.w >= 0f && packed.w <= 1f;
+            bool emptyPrimaryIsZero = packed.x != 0f || packed.y == 0f;
+            bool emptySecondaryIsZero = packed.z != 0f || packed.w == 0f;
+
+            return primaryTypeValid &&
+                secondaryTypeValid &&
+                strengthsValid &&
+                emptyPrimaryIsZero &&
+                emptySecondaryIsZero;
+        }
+
+        // TEXCOORD4 production structural-feature contract:
+        // X = primary MassSurfaceFeatureType integer code.
+        // Y = primary normalized strength.
+        // Z = secondary MassSurfaceFeatureType integer code.
+        // W = secondary normalized strength.
+        // Response role is derived from semantic type. Current response
+        // direction is derived from the final geometric/render normal. Feature
+        // identity remains generation-only and is deliberately not persisted.
+        // This fixed Vector4 costs 16 bytes per final render vertex and keeps
+        // fragment work independent of the total source feature count.
 
         // Vertex colour material contract:
         // R = existing deterministic surface variation.

@@ -185,8 +185,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Persistent State Meaning",
                 EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox(
-                "Coverage — geometric cell occupancy transported by Donor Cell " +
-                "or TVD Superbee. Source shape, subcell width, progressive reveal, " +
+                "Coverage — geometric cell occupancy transported by Donor Cell, " +
+                "TVD Superbee, or Bulk-Phase Residual TVD. " +
+                "Source shape, subcell width, progressive reveal, " +
                 "and valid-fluid clipping may change Coverage.\n\n" +
                 "Presence — intrinsic authored material strength. New material " +
                 "writes Initial Presence exactly; transport must not reinterpret " +
@@ -209,17 +210,28 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "one Material Transport Scheme.";
             }
 
-            return transport.enumValueIndex ==
-                    (int)StylizedRiverFoamTransportScheme.TvdSuperbee
-                ? "Transport — TVD Superbee reconstructs bounded geometric " +
+            StylizedRiverFoamTransportScheme scheme =
+                (StylizedRiverFoamTransportScheme)transport.enumValueIndex;
+            return scheme switch
+            {
+                StylizedRiverFoamTransportScheme.TvdSuperbee =>
+                    "Transport — TVD Superbee reconstructs bounded geometric " +
                     "Coverage at interior faces to reduce numerical diffusion " +
                     "and retain sharper Foam footprints. One coherent donor " +
                     "material state is transported, so decoded Presence and " +
-                    "Remaining Life are not independently limited or reduced."
-                : "Transport — Donor Cell transports the upstream coherent " +
+                    "Remaining Life are not independently limited or reduced.",
+                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
+                    "Transport — Bulk-Phase Residual TVD advances the shared " +
+                    "downstream speed as one global subcell phase. The existing " +
+                    "single-pass TVD solver handles only local slowdown residuals, " +
+                    "lateral motion, and obstacle routing. It allocates no extra " +
+                    "full-field texture and adds no material dispatch.",
+                _ =>
+                    "Transport — Donor Cell transports the upstream coherent " +
                     "material state conservatively. Coverage becomes broader " +
                     "and more numerically diffuse, but decoded Presence and " +
-                    "Remaining Life are not reduced merely because material moved.";
+                    "Remaining Life are not reduced merely because material moved."
+            };
         }
 
         private static string ResolveFoamVisibilityContractText(
@@ -278,17 +290,25 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "selectors to one shared combination to see an exact summary.";
             }
 
-            bool tvd = transport.enumValueIndex ==
-                (int)StylizedRiverFoamTransportScheme.TvdSuperbee;
+            StylizedRiverFoamTransportScheme transportScheme =
+                (StylizedRiverFoamTransportScheme)transport.enumValueIndex;
+            bool tvd = transportScheme ==
+                StylizedRiverFoamTransportScheme.TvdSuperbee;
+            bool bulkPhase = transportScheme ==
+                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
             bool lifecycle = visibility.enumValueIndex ==
                 (int)StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful;
             bool amplitude = footprint.enumValueIndex ==
                 (int)StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude;
 
+            string transportSummary = bulkPhase
+                ? "with the accepted one-dispatch Bulk-Phase transport"
+                : tvd
+                    ? "with sharper bounded Superbee reconstruction"
+                    : "with the more diffuse first-order Donor state";
+
             return "Combined Result — Foam Coverage is transported " +
-                (tvd ? "with sharper bounded reconstruction" :
-                    "with the more diffuse first-order donor state") +
-                ". " +
+                transportSummary + ". " +
                 (lifecycle
                     ? "Meaningful living Coverage remains visible until explicit " +
                         "lifecycle aging removes it. "
@@ -1160,6 +1180,26 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.indentLevel--;
         }
 
+        private void DrawMinMaxCellControls(
+            string label,
+            SerializedProperty minimum,
+            SerializedProperty maximum,
+            string tooltip = null)
+        {
+            EditorGUILayout.LabelField(label, EditorStyles.miniBoldLabel);
+            EditorGUI.indentLevel++;
+            string resolvedTooltip = string.IsNullOrEmpty(tooltip)
+                ? $"Authored {label.ToLowerInvariant()} range in Foam cells."
+                : tooltip;
+            EditorGUILayout.PropertyField(
+                minimum,
+                new GUIContent("Min Cells", resolvedTooltip));
+            EditorGUILayout.PropertyField(
+                maximum,
+                new GUIContent("Max Cells", resolvedTooltip));
+            EditorGUI.indentLevel--;
+        }
+
         private void DrawMinMaxUnitControls(
             string label,
             SerializedProperty minimum,
@@ -1180,7 +1220,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawFoamAutomaticSourcePopulationSection()
         {
             EditorGUILayout.HelpBox(
-                "Automatic birth creates finite Layer C material packets. Coverage selects a stable share of deterministic source slots, Activity controls how promptly a cleared slot fires, and Minimum Packet Gap prevents repeated emission from painting one continuous reservoir.",
+                "Automatic birth creates finite Layer C material packets. Coverage selects a stable share of deterministic source slots, Activity controls how promptly a cleared slot fires, and Minimum Packet Gap extends a bounded shared packet-envelope reservation so neighbouring Shore, Object, and Free-Water events do not start as one welded pack.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -1219,17 +1259,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamShoreMinimumPacketGapMetres"),
                     new GUIContent(
                         "Minimum Packet Gap (m)",
-                        "Minimum downstream clearance after a Shore packet completes before the same deterministic source slot may emit again."));
-                EditorGUILayout.PropertyField(
-                    Find("foamShoreFoamPatchSize"),
-                    new GUIContent(
-                        "Global Size Multiplier",
-                        "Broad global scale selector for shore-source path dimensions. Shore Ribbon contact thickness is authored separately in cross-river cells; Inward Wash retains metre-based width and reach."));
-                EditorGUILayout.PropertyField(
-                    Find("foamShoreFoamFormationSpeedMetresPerSecond"),
-                    new GUIContent(
-                        "Base Reveal Speed",
-                        "Base source-head reveal speed in metres per second. Per-pattern Reveal Speed multipliers below scale one event's progression; Activity and later Foam transport are separate."));
+                        "Minimum downstream clearance reserved after a Shore packet completes. It rearms the same slot and extends shared cross-source packet separation."));
+                EditorGUILayout.HelpBox(
+                    "D8.2 stages cell-authored source geometry. These Cell Geometry values are serialized now but remain non-authoritative until each recipe is converted to the shared D8.3 rasterizer. Existing births intentionally retain their D7C metric geometry in this patch.",
+                    MessageType.Info);
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamPattern"),
                     new GUIContent(
@@ -1259,30 +1292,23 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Shore Ribbon Pattern"))
                 {
                     EditorGUI.indentLevel++;
+                    DrawMinMaxCellControls(
+                        "Segment Length",
+                        Find("foamShoreRibbonLengthMinCells"),
+                        Find("foamShoreRibbonLengthMaxCells"));
+                    DrawMinMaxCellControls(
+                        "Width",
+                        Find("foamShoreRibbonWidthMinCells"),
+                        Find("foamShoreRibbonWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamShoreRibbonHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamShoreRibbonHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls(
+                        "Bank Offset",
+                        Find("foamShoreRibbonOffsetMinCells"),
+                        Find("foamShoreRibbonOffsetMaxCells"));
                     EditorGUILayout.PropertyField(
-                        Find("foamShoreRibbonFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Shore Foam Base Reveal Speed for Shore Ribbon events only."));
-                    DrawMinMaxMetreControls(
-                        "Length",
-                        Find("foamShoreRibbonLengthMinMetres"),
-                        Find("foamShoreRibbonLengthMaxMetres"));
-                    EditorGUILayout.PropertyField(
-                        Find("foamShoreRibbonThicknessCells"),
-                        new GUIContent(
-                            "Compatibility Thickness (Cells)",
-                            "LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves the same authored value to source-local metres when the event is prepared."));
-                    EditorGUILayout.PropertyField(
-                        Find("foamShoreRibbonOffsetMetres"),
-                        new GUIContent(
-                            "Source Offset",
-                            "Base inward offset from the live shore edge in metres. Keep this close to zero for a contact-attached ribbon."));
-                    EditorGUILayout.PropertyField(
-                        Find("foamShoreRibbonOffsetVariationCells"),
-                        new GUIContent(
-                            "Compatibility Offset Variation (Cells)",
-                            "LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves it to source-local metres. This should not create separated parallel bands."));
+                        Find("foamShoreRibbonRevealSpeedCellsPerSecond"),
+                        new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamShoreRibbonInitialPresenceMin"),
@@ -1301,27 +1327,29 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Inward Wash Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamInwardWashFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Shore Foam Base Reveal Speed for Inward Wash events only."));
-                    DrawMinMaxMetreControls(
-                        "Length",
-                        Find("foamInwardWashLengthMinMetres"),
-                        Find("foamInwardWashLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Width",
-                        Find("foamInwardWashWidthMinMetres"),
-                        Find("foamInwardWashWidthMaxMetres"));
-                    DrawMinMaxMetreControls(
+                    DrawMinMaxCellControls(
+                        "Along-Bank Length",
+                        Find("foamInwardWashAlongLengthMinCells"),
+                        Find("foamInwardWashAlongLengthMaxCells"));
+                    DrawMinMaxCellControls(
+                        "Stroke Width",
+                        Find("foamInwardWashWidthMinCells"),
+                        Find("foamInwardWashWidthMaxCells"));
+                    DrawMinMaxCellControls(
                         "Inward Reach",
-                        Find("foamInwardWashReachMinMetres"),
-                        Find("foamInwardWashReachMaxMetres"));
-                    DrawMinMaxMetreControls(
+                        Find("foamInwardWashReachMinCells"),
+                        Find("foamInwardWashReachMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamInwardWashHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamInwardWashHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls(
                         "Shore Start Offset",
-                        Find("foamInwardWashOffsetMinMetres"),
-                        Find("foamInwardWashOffsetMaxMetres"));
+                        Find("foamInwardWashOffsetMinCells"),
+                        Find("foamInwardWashOffsetMaxCells"));
+                    DrawMinMaxCellControls(
+                        "Bend Amplitude",
+                        Find("foamInwardWashBendAmplitudeMinCells"),
+                        Find("foamInwardWashBendAmplitudeMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamInwardWashRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamInwardWashInitialPresenceMin"),
@@ -1363,7 +1391,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamObjectContactMinimumPacketGapMetres"),
                     new GUIContent(
                         "Object Contact Minimum Packet Gap (m)",
-                        "Minimum downstream gap between released Object packets from the same anchor. Full Arc/Semi-Arc rearm uses the previous wake-arm length plus this gap at normal Foam downstream speed. Contact-only reinforcement has an independent interval and does not reset this packet clock."));
+                        "Minimum downstream gap between released Object packets from the same anchor. It also extends shared cross-source packet separation. Contact-only reinforcement from the same anchor remains the intentional overlap exemption."));
                 EditorGUILayout.PropertyField(
                     Find("foamObjectContactStrokeCount"),
                     new GUIContent(
@@ -1437,26 +1465,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Object Contact Arc Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactArcFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Object Foam Base Reveal Speed for every Contact Arc stroke. Stroke one reveals the complete packet; later strokes reveal only the contact profile."));
-                    DrawMinMaxMetreControls(
-                        "Wake Arm Length",
-                        Find("foamObjectContactArcLengthMinMetres"),
-                        Find("foamObjectContactArcLengthMaxMetres"),
-                        "Straight downstream distance of both thin wake arms after the source reaches the two side shoulders. This never changes the upstream contact bridge or permits rear wrapping.");
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactArcAlongFlowContactOffsetMetres"),
-                        new GUIContent(
-                            "Along-Flow Contact Offset",
-                            "Signed visual fit in metres for the upstream connector. Negative pulls it closer to or beneath the object silhouette; positive detaches it farther upstream. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactArcAcrossRiverContactOffsetMetres"),
-                        new GUIContent(
-                            "Across-River Contact Offset",
-                            "Signed visual fit in metres for both side shoulders and arms. Negative pulls them closer to or beneath the object sides; positive detaches them farther across-river. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
+                    DrawMinMaxCellControls("Contact Span", Find("foamObjectArcContactSpanMinCells"), Find("foamObjectArcContactSpanMaxCells"));
+                    DrawMinMaxCellControls("Contact Width", Find("foamObjectArcContactWidthMinCells"), Find("foamObjectArcContactWidthMaxCells"));
+                    DrawMinMaxCellControls("Wake Arm Length", Find("foamObjectArcWakeLengthMinCells"), Find("foamObjectArcWakeLengthMaxCells"));
+                    DrawMinMaxCellControls("Wake Arm Width", Find("foamObjectArcWakeWidthMinCells"), Find("foamObjectArcWakeWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectArcHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectArcHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectArcAlongFlowOffsetCells"), new GUIContent("Along-Flow Offset Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectArcAcrossRiverOffsetCells"), new GUIContent("Across-River Offset Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectArcRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactArcInitialPresenceMin"),
@@ -1475,26 +1492,15 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Object Contact Semi-Arc Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactSemiArcFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Object Foam Base Reveal Speed for every Contact Semi-Arc stroke. Stroke one reveals the complete packet; later strokes reveal only the selected contact profile."));
-                    DrawMinMaxMetreControls(
-                        "Wake Arm Length",
-                        Find("foamObjectContactSemiArcLengthMinMetres"),
-                        Find("foamObjectContactSemiArcLengthMaxMetres"),
-                        "Straight downstream distance of the single selected-side wake arm. The opposite side stops at the face shoulder and never receives a downstream arm.");
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactSemiArcAlongFlowContactOffsetMetres"),
-                        new GUIContent(
-                            "Along-Flow Contact Offset",
-                            "Signed visual fit in metres for the upstream connector. Negative pulls it closer to or beneath the object silhouette; positive detaches it farther upstream. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactSemiArcAcrossRiverContactOffsetMetres"),
-                        new GUIContent(
-                            "Across-River Contact Offset",
-                            "Signed visual fit in metres for the face endpoints and selected-side arm. Negative pulls them closer to or beneath the object sides; positive detaches them farther across-river. Zero follows the prepared physical waterline profile. No support-zone lookup or compensation is applied."));
+                    DrawMinMaxCellControls("Contact Span", Find("foamObjectSemiArcContactSpanMinCells"), Find("foamObjectSemiArcContactSpanMaxCells"));
+                    DrawMinMaxCellControls("Contact Width", Find("foamObjectSemiArcContactWidthMinCells"), Find("foamObjectSemiArcContactWidthMaxCells"));
+                    DrawMinMaxCellControls("Wake Arm Length", Find("foamObjectSemiArcWakeLengthMinCells"), Find("foamObjectSemiArcWakeLengthMaxCells"));
+                    DrawMinMaxCellControls("Wake Arm Width", Find("foamObjectSemiArcWakeWidthMinCells"), Find("foamObjectSemiArcWakeWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectSemiArcHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectSemiArcHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectSemiArcAlongFlowOffsetCells"), new GUIContent("Along-Flow Offset Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectSemiArcAcrossRiverOffsetCells"), new GUIContent("Across-River Offset Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectSemiArcRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactSemiArcInitialPresenceMin"),
@@ -1513,24 +1519,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Object Contact Fleck Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamObjectContactFleckFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Object Foam Base Reveal Speed across the complete Contact Fleck reveal."));
-                    DrawMinMaxMetreControls(
-                        "Fleck Length",
-                        Find("foamObjectContactFleckLengthMinMetres"),
-                        Find("foamObjectContactFleckLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Fleck Size",
-                        Find("foamObjectContactFleckWidthMinMetres"),
-                        Find("foamObjectContactFleckWidthMaxMetres"),
-                        "Fleck capsule size in metres inside the fixed one-cell contact shell. It changes the discrete fleck geometry, not contact-normal shell thickness.");
-                    DrawMinMaxMetreControls(
-                        "Contact Offset",
-                        Find("foamObjectContactFleckOffsetMinMetres"),
-                        Find("foamObjectContactFleckOffsetMaxMetres"));
+                    DrawMinMaxCellControls("Fleck Length", Find("foamObjectFleckLengthMinCells"), Find("foamObjectFleckLengthMaxCells"));
+                    DrawMinMaxCellControls("Fleck Width", Find("foamObjectFleckWidthMinCells"), Find("foamObjectFleckWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectFleckHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectFleckHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls("Contact Offset", Find("foamObjectFleckOffsetMinCells"), Find("foamObjectFleckOffsetMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamObjectFleckRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamObjectContactFleckInitialPresenceMin"),
@@ -1574,12 +1568,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     Find("foamFreeWaterMinimumPacketGapMetres"),
                     new GUIContent(
                         "Minimum Packet Gap (m)",
-                        "Minimum downstream clearance after a Free Water packet completes before the same deterministic source slot may emit again."));
-                EditorGUILayout.PropertyField(
-                    Find("foamFreeWaterFoamFormationSpeedMetresPerSecond"),
-                    new GUIContent(
-                        "Base Reveal Speed",
-                        "Base source-head reveal speed in metres per second for Lace, Cross-Lace, and Torn Fragment events. Activity and later Foam transport are separate."));
+                        "Minimum downstream clearance reserved after a Free Water packet completes. It rearms the same slot and extends shared cross-source packet separation."));
+                EditorGUILayout.HelpBox(
+                    "D8.2 cell geometry is staged only. Legacy metric Free-Water birth geometry remains active until D8.3 conversion.",
+                    MessageType.Info);
                 EditorGUILayout.PropertyField(
                     Find("foamFreeWaterFoamPattern"),
                     new GUIContent(
@@ -1622,19 +1614,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Free Water Lace Connector Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamFreeWaterLaceFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Free Water Base Reveal Speed for Lace Connector events only."));
-                    DrawMinMaxMetreControls(
-                        "Length",
-                        Find("foamFreeWaterLaceLengthMinMetres"),
-                        Find("foamFreeWaterLaceLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Width",
-                        Find("foamFreeWaterLaceWidthMinMetres"),
-                        Find("foamFreeWaterLaceWidthMaxMetres"));
+                    DrawMinMaxCellControls("Length", Find("foamFreeWaterLaceLengthMinCells"), Find("foamFreeWaterLaceLengthMaxCells"));
+                    DrawMinMaxCellControls("Width", Find("foamFreeWaterLaceWidthMinCells"), Find("foamFreeWaterLaceWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterLaceHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterLaceHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls("Bend Amplitude", Find("foamFreeWaterLaceBendMinCells"), Find("foamFreeWaterLaceBendMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterLaceRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamFreeWaterLaceInitialPresenceMin"),
@@ -1645,11 +1630,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamFreeWaterLaceInitialLifeMin"),
                         Find("foamFreeWaterLaceInitialLifeMax"),
                         "Initial normalized Remaining Life written exactly to newly occupied material. One writes the full life budget; only explicit Layer C aging changes it afterward.");
-                    DrawMinMaxUnitControls(
-                        "Curvature",
-                        Find("foamFreeWaterLaceCurvatureMin"),
-                        Find("foamFreeWaterLaceCurvatureMax"),
-                        "Signed by event seed at runtime. Higher values bend the lace connector more strongly across open water.");
                     EditorGUI.indentLevel--;
                 }
 
@@ -1658,19 +1638,12 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Free Water Cross-Lace Connector Pattern"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamFreeWaterCrossLaceFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Free Water Base Reveal Speed for Cross-Lace Connector events only."));
-                    DrawMinMaxMetreControls(
-                        "Lateral Length",
-                        Find("foamFreeWaterCrossLaceLengthMinMetres"),
-                        Find("foamFreeWaterCrossLaceLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Width",
-                        Find("foamFreeWaterCrossLaceWidthMinMetres"),
-                        Find("foamFreeWaterCrossLaceWidthMaxMetres"));
+                    DrawMinMaxCellControls("Length", Find("foamFreeWaterCrossLaceLengthMinCells"), Find("foamFreeWaterCrossLaceLengthMaxCells"));
+                    DrawMinMaxCellControls("Width", Find("foamFreeWaterCrossLaceWidthMinCells"), Find("foamFreeWaterCrossLaceWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterCrossLaceHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterCrossLaceHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls("Flow-Bend Amplitude", Find("foamFreeWaterCrossLaceBendMinCells"), Find("foamFreeWaterCrossLaceBendMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterCrossLaceRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamFreeWaterCrossLaceInitialPresenceMin"),
@@ -1686,22 +1659,17 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 if (DrawInlineFoldout(
                         InspectorSection.FoamBirthFreeWaterFragmentPattern,
-                        "Free Water Torn Fragment Pattern"))
+                        "Free Water Broken Filament (staged Torn identity)"))
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.PropertyField(
-                        Find("foamFreeWaterFragmentFormationSpeedMultiplier"),
-                        new GUIContent(
-                            "Reveal Speed Multiplier",
-                            "Multiplier applied to Free Water Base Reveal Speed for the complete Torn Fragment sweep."));
-                    DrawMinMaxMetreControls(
-                        "Length",
-                        Find("foamFreeWaterFragmentLengthMinMetres"),
-                        Find("foamFreeWaterFragmentLengthMaxMetres"));
-                    DrawMinMaxMetreControls(
-                        "Width",
-                        Find("foamFreeWaterFragmentWidthMinMetres"),
-                        Find("foamFreeWaterFragmentWidthMaxMetres"));
+                    DrawMinMaxCellControls("Broken Filament Length", Find("foamFreeWaterBrokenFilamentLengthMinCells"), Find("foamFreeWaterBrokenFilamentLengthMaxCells"));
+                    DrawMinMaxCellControls("Broken Filament Width", Find("foamFreeWaterBrokenFilamentWidthMinCells"), Find("foamFreeWaterBrokenFilamentWidthMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentHeadLengthCells"), new GUIContent("Head Length Cells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentHeadWidthCells"), new GUIContent("Head Width Cells"));
+                    DrawMinMaxCellControls("Bend Amplitude", Find("foamFreeWaterBrokenFilamentBendMinCells"), Find("foamFreeWaterBrokenFilamentBendMaxCells"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentBreakCountMin"), new GUIContent("Break Count Min"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentBreakCountMax"), new GUIContent("Break Count Max"));
+                    EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
                     DrawMinMaxUnitControls(
                         "Initial Presence",
                         Find("foamFreeWaterFragmentInitialPresenceMin"),

@@ -112,6 +112,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamObstacleSlowdownStrength("Foam Obstacle Slowdown Strength", Float) = 0.85
         [HideInInspector] _FoamObstacleMinimumDownstreamFactor("Foam Obstacle Minimum Downstream Factor", Float) = 0.12
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
+        [HideInInspector] _FoamPreviousBulkPhaseCells("Foam Previous Bulk Phase Cells", Float) = 0
+        [HideInInspector] _FoamCurrentBulkPhaseCells("Foam Current Bulk Phase Cells", Float) = 0
         [HideInInspector] _FoamGlobalStart("Foam Global Start", Float) = 0
         [HideInInspector] _FoamFieldLength("Foam Field Length", Float) = 1
         [HideInInspector] _FoamColour("Foam Colour", Color) = (0.94, 0.97, 0.94, 1)
@@ -301,6 +303,8 @@ Shader "PS3D/Stylized River Water"
 
                 float _FoamEnabled;
                 float _FoamInterpolation;
+                float _FoamPreviousBulkPhaseCells;
+                float _FoamCurrentBulkPhaseCells;
                 float _FoamGlobalStart;
                 float _FoamFieldLength;
                 half4 _FoamColour;
@@ -401,7 +405,15 @@ Shader "PS3D/Stylized River Water"
                         _FoamCurrent,
                         sampler_FoamCurrent),
                     saturate(fieldUV),
-                    _FoamInterpolation);
+                    _FoamInterpolation,
+                    float2(
+                        _FoamPreviousBulkPhaseCells *
+                            _FoamCurrent_TexelSize.x,
+                        0.0),
+                    float2(
+                        _FoamCurrentBulkPhaseCells *
+                            _FoamCurrent_TexelSize.x,
+                        0.0));
             }
 
             float ResolveCommittedFoamCoverageVisibility(
@@ -969,6 +981,14 @@ Shader "PS3D/Stylized River Water"
                     _FoamGlobalStart,
                     _FoamFieldLength,
                     _FoamInterpolation,
+                    float2(
+                        _FoamPreviousBulkPhaseCells *
+                            _FoamCurrent_TexelSize.x,
+                        0.0),
+                    float2(
+                        _FoamCurrentBulkPhaseCells *
+                            _FoamCurrent_TexelSize.x,
+                        0.0),
                     _FoamSharpness,
                     _FoamFinalVisibilityMode,
                     _FoamPresenceFootprintMode,

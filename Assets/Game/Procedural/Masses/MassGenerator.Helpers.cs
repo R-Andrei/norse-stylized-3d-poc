@@ -242,7 +242,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Vector3 c,
             Vector3 expectedNormal,
             PolygonFaceFeature feature = PolygonFaceFeature.Base,
-            float featureStrength = 0f)
+            float featureStrength = 0f,
+            PolygonFaceProvenanceKind provenanceKind =
+                PolygonFaceProvenanceKind.None,
+            int provenanceIndex = -1)
         {
             Vector3 ab = b - a;
             Vector3 ac = c - a;
@@ -284,7 +287,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 b,
                 c,
                 feature,
-                featureStrength);
+                featureStrength,
+                Vector3.zero,
+                -1,
+                provenanceKind,
+                provenanceIndex);
         }
 
         private static void AddPointIfDifferent(

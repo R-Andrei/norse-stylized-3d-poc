@@ -77,6 +77,12 @@ namespace ProgrammaticStylized3D.Rivers
 
         private void OnDisable()
         {
+#if UNITY_EDITOR
+            CancelCellSpawnerContractAuditForLifecycle(
+                "River Foam runtime disabled or Play Mode ended; partial report preserved.");
+            CancelShoreRibbonBehaviorAuditForLifecycle(
+                "River Foam runtime disabled or Play Mode ended; partial report preserved.");
+#endif
             if (river != null)
             {
                 river.DomainChanged -= HandleDomainChanged;
@@ -88,19 +94,23 @@ namespace ProgrammaticStylized3D.Rivers
 
             BindDisabled();
             ReleaseResources();
-            pendingInjections.Clear();
-            pendingMaterialBirths.Clear();
             pendingIsolatedLifeProbe = false;
             pendingIsolatedLifeProbeAbsoluteAging = false;
             isolatedLifeProbeAbsoluteAgingActive = false;
             isolatedLifeProbeWrittenAt = -1.0;
-            ClearFoamCompositionEvents();
+            ClearAutomaticFoamSourceEvents();
             steadyStateWorkAccountingActive = false;
         }
 
         private void OnDestroy()
         {
-            ClearFoamCompositionEvents();
+#if UNITY_EDITOR
+            CancelCellSpawnerContractAuditForLifecycle(
+                "River Foam runtime destroyed; partial report preserved.");
+            CancelShoreRibbonBehaviorAuditForLifecycle(
+                "River Foam runtime destroyed; partial report preserved.");
+#endif
+            ClearAutomaticFoamSourceEvents();
             BindDisabled();
             ReleaseResources();
         }
@@ -123,11 +133,9 @@ namespace ProgrammaticStylized3D.Rivers
             {
                 BindDisabled();
                 ReleaseResources();
-                pendingInjections.Clear();
-                pendingIsolatedLifeProbe = false;
-                ClearFoamCompositionEvents();
-                ResetManualInjectionSequence();
-                return;
+                    pendingIsolatedLifeProbe = false;
+                ClearAutomaticFoamSourceEvents();
+                    return;
             }
 
             surfaceRenderer = river.SurfaceRenderer;
@@ -157,11 +165,9 @@ namespace ProgrammaticStylized3D.Rivers
             bool fullyFrozen = river.FreezeAmount >= 0.999f;
             if (fullyFrozen)
             {
-                pendingInjections.Clear();
-                pendingIsolatedLifeProbe = false;
-                ClearFoamCompositionEvents();
-                ResetManualInjectionSequence();
-
+                    pendingIsolatedLifeProbe = false;
+                ClearAutomaticFoamSourceEvents();
+    
                 if (!fullyFrozenLastUpdate)
                 {
                     ClearFoam();
@@ -210,15 +216,18 @@ namespace ProgrammaticStylized3D.Rivers
             bool materialWork =
                 currentState != null ||
                 materialLifetimeAuthorityActive ||
-                pendingInjections.Count > 0 ||
-                pendingMaterialBirths.Count > 0 ||
                 pendingIsolatedLifeProbe ||
-                activeFoamCompositionEventCount > 0 ||
                 IsAutomaticSourcePopulationActive;
             bool hasWork = materialWork || topologyDebugActive ||
                 automaticBirthDebugActive || motionFieldDebugActive ||
                 shapeProductDebugActive ||
                 P12CandidateSweepForcesRuntimeWork;
+#if UNITY_EDITOR
+            hasWork |= CellSpawnerContractAuditForcesRuntimeWork;
+            hasWork |= ShoreRibbonBehaviorAuditForcesRuntimeWork;
+            AdvanceCellSpawnerContractAuditPlayMode(false);
+            AdvanceShoreRibbonBehaviorAuditPlayMode(false);
+#endif
 
             if (!hasWork && currentState == null &&
                 !HasTopologyTransitionVisibleHold)
@@ -239,6 +248,11 @@ namespace ProgrammaticStylized3D.Rivers
                 }
                 return;
             }
+
+#if UNITY_EDITOR
+            AdvanceCellSpawnerContractAuditPlayMode(true);
+            AdvanceShoreRibbonBehaviorAuditPlayMode(true);
+#endif
 
             if (river.FoamStateHeld)
             {
@@ -338,7 +352,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             DispatchPendingIsolatedLifeProbe();
 
-            bool manualInjectedThisUpdate = ProcessPendingInjections(now);
 
             float updateRate = ResolveUpdateRate();
             float stepDuration = 1f / Mathf.Max(1f, updateRate);
@@ -351,13 +364,6 @@ namespace ProgrammaticStylized3D.Rivers
             lastRequiredTransportSubsteps = requiredTransportSubsteps;
             lastUsedTransportSubsteps = usedTransportSubsteps;
             lastMaximumTransportCfl = maximumTransportCfl;
-
-            if (manualInjectedThisUpdate)
-            {
-                simulationAccumulator = Mathf.Max(
-                    simulationAccumulator,
-                    stepDuration);
-            }
 
             simulationAccumulator = Mathf.Min(
                 simulationAccumulator + deltaTime,
@@ -382,17 +388,13 @@ namespace ProgrammaticStylized3D.Rivers
                     BeginAutomaticBirthDebugStep();
                 }
 
-                bool foamCompositionDeposited =
-                    AdvanceFoamCompositionEvents(stepDuration, now);
                 bool automaticBirthDeposited =
                     AdvanceAutomaticBirthSources(stepDuration, now);
                 bool materialStepActive = currentState != null ||
                     materialLifetimeAuthorityActive ||
-                    foamCompositionDeposited || automaticBirthDeposited ||
-                    activeFoamCompositionEventCount > 0 ||
-                    activeAutomaticFoamSourceEventCount > 0 ||
-                    pendingMaterialBirths.Count > 0 ||
-                    IsAutomaticSourcePopulationActive;
+                    automaticBirthDeposited ||
+                        activeAutomaticFoamSourceEventCount > 0 ||
+                        IsAutomaticSourcePopulationActive;
 
                 bool measureTopology = false;
                 if ((materialStepActive || topologyDebugActive) &&
@@ -674,156 +676,13 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
-        public bool EmitNormalized(
-            float distanceNormalized,
-            float acrossNormalized,
-            float radius,
-            float amount,
-            float initialRemainingLife,
-            float elongation)
-        {
-            if (river == null)
-            {
-                river = GetComponent<StylizedRiver>();
-            }
-
-            if (river == null || !river.FoamEnabled ||
-                river.FreezeAmount >= 0.999f ||
-                !river.Domain.IsValid)
-            {
-                return false;
-            }
-
-            float globalDistance = Mathf.Lerp(
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum,
-                Mathf.Clamp01(distanceNormalized));
-            return QueueManualInjection(
-                globalDistance,
-                Mathf.Clamp(acrossNormalized, -1f, 1f),
-                0f,
-                false,
-                radius,
-                amount,
-                initialRemainingLife,
-                elongation);
-        }
-
-        public bool EmitMetric(
-            float globalDistance,
-            float lateralMetres,
-            float radius,
-            float amount,
-            float initialRemainingLife,
-            float elongation)
-        {
-            if (river == null)
-            {
-                river = GetComponent<StylizedRiver>();
-            }
-
-            if (river == null || !river.FoamEnabled ||
-                river.FreezeAmount >= 0.999f ||
-                !river.Domain.IsValid)
-            {
-                return false;
-            }
-
-            float clampedGlobalDistance = Mathf.Clamp(
-                globalDistance,
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum);
-            float acrossNormalized = ResolveSourceAcrossNormalized(
-                clampedGlobalDistance,
-                lateralMetres);
-            float clampedLateralMetres = ResolveSourceLateralMetres(
-                clampedGlobalDistance,
-                acrossNormalized);
-            return QueueManualInjection(
-                clampedGlobalDistance,
-                acrossNormalized,
-                clampedLateralMetres,
-                true,
-                radius,
-                amount,
-                initialRemainingLife,
-                elongation);
-        }
-
-        private bool QueueManualInjection(
-            float globalDistance,
-            float acrossNormalized,
-            float lateralMetres,
-            bool usesMetricLateral,
-            float radius,
-            float amount,
-            float initialRemainingLife,
-            float elongation)
-        {
-            float resolvedAmount = Mathf.Clamp01(amount);
-            if (resolvedAmount <= 0.0001f)
-            {
-                return false;
-            }
-
-            int injectionIndex = ++manualInjectionSequence;
-            float resolvedRemainingLife = Mathf.Clamp01(
-                initialRemainingLife);
-            float resolvedRadius = Mathf.Clamp(radius, 0.05f, 8f);
-            float shapeSeed = river.VisualSeed + injectionIndex * 17.371f;
-            float sourceFillSeed =
-                river.VisualSeed * 0.431f +
-                injectionIndex * 71.371f +
-                ManualSourceFillSeedSalt;
-            float sourceFillFeatureSize =
-                ResolveSourceFillFeatureSize(resolvedRadius);
-            float patternSeed =
-                river.VisualSeed * 0.613f +
-                injectionIndex * 109.731f +
-                ManualPatternSeedSalt;
-
-            pendingInjections.Add(
-                new PendingInjection(
-                    globalDistance,
-                    acrossNormalized,
-                    resolvedRadius,
-                    resolvedAmount,
-                    resolvedRemainingLife,
-                    patternSeed,
-                    Mathf.Clamp(elongation, 0.25f, 8f),
-                    true,
-                    sourceFillSeed,
-                    sourceFillFeatureSize,
-                    shapeSeed,
-                    ManualTestShapeVariety,
-                    false,
-                    false,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    0f,
-                    usesMetricLateral,
-                    lateralMetres,
-                    lateralMetres,
-                    lateralMetres));
-            idleSince = 0.0;
-            return true;
-        }
-
         public void ClearFoam()
         {
-            pendingInjections.Clear();
-            pendingMaterialBirths.Clear();
             pendingIsolatedLifeProbe = false;
             pendingIsolatedLifeProbeAbsoluteAging = false;
             isolatedLifeProbeAbsoluteAgingActive = false;
             isolatedLifeProbeWrittenAt = -1.0;
-            ClearFoamCompositionEvents();
-            ResetManualInjectionSequence();
+            ClearAutomaticFoamSourceEvents();
             lastInjectionBoundaryCoverage = -1f;
             lastInjectionStateSynchronized = false;
             simulationAccumulator = 0f;

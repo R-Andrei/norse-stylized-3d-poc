@@ -10,49 +10,6 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
-        private void ResetManualInjectionSequence()
-        {
-            manualInjectionSequence = 0;
-        }
-
-        private bool ProcessPendingInjections(float now)
-        {
-            if (pendingInjections.Count == 0)
-            {
-                return false;
-            }
-
-            bool manualQueued = false;
-            for (int index = 0; index < pendingInjections.Count; index++)
-            {
-                PendingInjection injection = pendingInjections[index];
-                QueueMaterialBirth(injection);
-                if (injection.IsManual)
-                {
-                    manualProofReferenceArea = 0f;
-                    manualProofReferencePending = true;
-                    manualQueued = true;
-                }
-
-                injectedLastUpdate++;
-            }
-
-            pendingInjections.Clear();
-            return manualQueued;
-        }
-
-        private void QueueMaterialBirth(PendingInjection injection)
-        {
-            isolatedLifeProbeAbsoluteAgingActive = false;
-            isolatedLifeProbeWrittenAt = -1.0;
-            pendingMaterialBirths.Add(injection);
-            RecordMaterialBirthCommand();
-            materialLifetimeAuthorityActive = true;
-            materialLifetimeEmptyMetricReadbacks = 0;
-            lifetimeAuthorityStatus =
-                "Remaining Life / full-field direct simulation";
-        }
-
         private void RecordMaterialBirthCommand()
         {
             double now = Time.realtimeSinceStartupAsDouble;
@@ -76,6 +33,40 @@ namespace ProgrammaticStylized3D.Rivers
 
             materialSimulatedSecondsSinceSession += Mathf.Max(0f, deltaTime);
             materialStepCountSinceSession++;
+        }
+
+        private void PrepareBulkTransportSubstep(
+            StylizedRiverFoamTransportScheme transportScheme,
+            float substepDelta)
+        {
+            bulkTransportIntegerShift = 0;
+            bool usesBulkPhase = transportScheme ==
+                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
+            if (!usesBulkPhase)
+            {
+                return;
+            }
+
+            float spacing = Mathf.Max(
+                0.0001f,
+                gridDescriptor.ResolvedDxMetres);
+            float flowSign = river.FlowDirection >= 0f ? 1f : -1f;
+            float speed = ResolveBaseFoamDownstreamSpeedMetresPerSecond();
+            bulkTransportPhaseCells +=
+                flowSign * speed * Mathf.Max(0f, substepDelta) / spacing;
+
+            if (bulkTransportPhaseCells >= 1f)
+            {
+                bulkTransportIntegerShift =
+                    Mathf.FloorToInt(bulkTransportPhaseCells);
+            }
+            else if (bulkTransportPhaseCells <= -1f)
+            {
+                bulkTransportIntegerShift =
+                    Mathf.CeilToInt(bulkTransportPhaseCells);
+            }
+
+            bulkTransportPhaseCells -= bulkTransportIntegerShift;
         }
 
         private void SimulateFullField(
@@ -106,8 +97,12 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            StylizedRiverFoamTransportScheme transportScheme =
+                river.FoamTransportScheme;
+
             Graphics.CopyTexture(currentState, presentationPreviousState);
             previousState = presentationPreviousState;
+            previousBulkTransportPhaseCells = bulkTransportPhaseCells;
             float transportMetricsInterval = 1f /
                 TransportMetricsUpdateRate;
             transportMetricsAccumulator += materialStepDuration;
@@ -132,6 +127,9 @@ namespace ProgrammaticStylized3D.Rivers
                 float lifecycleDeltaTime = finalSubstep
                     ? materialStepDuration
                     : 0f;
+                PrepareBulkTransportSubstep(
+                    transportScheme,
+                    substepDelta);
                 ConfigureSharedComputeParameters(
                     substepDelta,
                     lifecycleDeltaTime);
@@ -147,7 +145,6 @@ namespace ProgrammaticStylized3D.Rivers
             DispatchAutomaticFoamSourceEvents(
                 currentState,
                 materialStepDuration);
-            DispatchQueuedMaterialBirths(currentState);
             RecordMaterialSimulationStep(materialStepDuration);
 
             if (captureTransportMetrics)
@@ -164,23 +161,6 @@ namespace ProgrammaticStylized3D.Rivers
                     transportSubsteps);
             }
         }
-
-        private void DispatchQueuedMaterialBirths(RenderTexture target)
-        {
-            if (pendingMaterialBirths.Count == 0 || target == null)
-            {
-                pendingMaterialBirths.Clear();
-                return;
-            }
-
-            for (int index = 0; index < pendingMaterialBirths.Count; index++)
-            {
-                DispatchInjection(pendingMaterialBirths[index], target);
-            }
-
-            pendingMaterialBirths.Clear();
-        }
-
 
         private void DispatchAutomaticFoamSourceEvents(
             RenderTexture target,
@@ -449,8 +429,8 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.ObjectContactPoint1.x);
                 shoreData = new Vector4(
                     sourceEvent.ObjectContactPoint1.y,
-                    sourceEvent.ObjectWakeArmLengthMetres,
-                    materialStepProgress,
+                    sourceEvent.WakeLengthCells,
+                    sourceEvent.ContactWidthCells,
                     sourceEvent.ObjectContactPoint2.x);
                 variationData = new Vector4(
                     sourceEvent.ObjectContactNegativeFirstSegmentSplit,
@@ -460,13 +440,13 @@ namespace ProgrammaticStylized3D.Rivers
                 kinematicsData = new Vector4(
                     sourceEvent.ObjectContactPoint3.y,
                     sourceEvent.ObjectContactPoint4.x,
-                    sourceEvent.ObjectContactPathLengthMetres,
+                    sourceEvent.HeadLengthCells,
                     sourceEvent.ObjectContactPositiveFirstSegmentSplit);
                 objectData = new Vector4(
                     sourceEvent.ObjectCentreAcrossMetres,
                     sourceEvent.ObjectContactPoint4.y,
                     sourceEvent.ObjectContactFrontSplit,
-                    sourceEvent.ObjectSourceLateralCellSpacingMetres);
+                    sourceEvent.WakeWidthCells);
             }
             else
             {
@@ -475,35 +455,69 @@ namespace ProgrammaticStylized3D.Rivers
                     endStorageGlobal,
                     centreStorageGlobal,
                     river != null && river.FlowDirection >= 0f ? 1f : -1f);
-                shoreData = new Vector4(
-                    sourceEvent.ShoreInsetMetres,
-                    sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
-                        ? (descriptor.IsCreated &&
-                           descriptor.UsesFixedMetricLattice
-                            ? sourceEvent.ShoreRibbonThicknessMetres
-                            : sourceEvent.ShoreRibbonThicknessCells)
-                        : sourceEvent.WidthMetres,
-                    sourceEvent.InwardReachMetres,
-                    sourceEvent.FeatherMetres);
+                bool cellExactShoreSource =
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.InwardWash;
+                shoreData = cellExactShoreSource
+                    ? new Vector4(
+                        sourceEvent.ShoreInsetMetres,
+                        sourceEvent.WidthMetres,
+                        sourceEvent.InwardReachMetres,
+                        sourceEvent.FeatherMetres)
+                    : new Vector4(
+                        sourceEvent.ShoreInsetMetres,
+                        sourceEvent.Type == AutomaticFoamSourceEventType.ShoreRibbon
+                            ? (descriptor.IsCreated &&
+                               descriptor.UsesFixedMetricLattice
+                                ? sourceEvent.ShoreRibbonThicknessMetres
+                                : sourceEvent.ShoreRibbonThicknessCells)
+                            : sourceEvent.WidthMetres,
+                        sourceEvent.InwardReachMetres,
+                        sourceEvent.FeatherMetres);
+                bool d8CellRecipe = cellExactShoreSource ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.ObjectContactFleck ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterLaceConnector ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector ||
+                    sourceEvent.Type == AutomaticFoamSourceEventType.FreeWaterTornFragment;
+                if (d8CellRecipe && !cellExactShoreSource)
+                {
+                    shoreData = new Vector4(
+                        sourceEvent.ShoreInsetMetres,
+                        sourceEvent.BodyWidthCells,
+                        0f,
+                        sourceEvent.HeadWidthCells);
+                }
                 variationData = new Vector4(
                     sourceEvent.SourceFillSeed,
                     0f,
                     0f,
-                    sourceEvent.Curvature);
-                kinematicsData = new Vector4(
-                    sourceEvent.FormationSpeedMetresPerSecond,
-                    sourceEvent.HeadTrailMetres,
-                    Mathf.Sqrt(
-                        Mathf.Abs(endStorageGlobal - startStorageGlobal) *
-                        Mathf.Abs(endStorageGlobal - startStorageGlobal) +
-                        sourceEvent.InwardReachMetres *
-                        sourceEvent.InwardReachMetres),
-                    Mathf.Clamp01(sourceEvent.SourceFillBlend));
-                objectData = new Vector4(
-                    sourceEvent.ObjectCentreAcrossMetres,
-                    sourceEvent.ObjectAlongHalfLengthMetres,
-                    sourceEvent.ObjectAcrossHalfWidthMetres,
-                    sourceEvent.ObjectContactOffsetMetres);
+                    d8CellRecipe ? sourceEvent.BendAmplitudeCells : sourceEvent.Curvature);
+                kinematicsData = d8CellRecipe
+                    ? new Vector4(
+                        sourceEvent.FormationSpeedMetresPerSecond,
+                        sourceEvent.HeadLengthCells,
+                        sourceEvent.BodyLengthCells > 0f ? sourceEvent.BodyLengthCells : sourceEvent.RevealPathDistanceMetres,
+                        1f)
+                    : new Vector4(
+                        sourceEvent.FormationSpeedMetresPerSecond,
+                        sourceEvent.HeadTrailMetres,
+                        Mathf.Sqrt(
+                            Mathf.Abs(endStorageGlobal - startStorageGlobal) *
+                            Mathf.Abs(endStorageGlobal - startStorageGlobal) +
+                            sourceEvent.InwardReachMetres *
+                            sourceEvent.InwardReachMetres),
+                        Mathf.Clamp01(sourceEvent.SourceFillBlend));
+                objectData = d8CellRecipe && !cellExactShoreSource
+                    ? new Vector4(
+                        sourceEvent.ObjectCentreAcrossMetres,
+                        sourceEvent.BodyLengthCells,
+                        sourceEvent.BendAmplitudeCells,
+                        sourceEvent.ShoreInsetMetres)
+                    : new Vector4(
+                        sourceEvent.ObjectCentreAcrossMetres,
+                        sourceEvent.ObjectAlongHalfLengthMetres,
+                        sourceEvent.ObjectAcrossHalfWidthMetres,
+                        sourceEvent.ObjectContactOffsetMetres);
             }
 
             return new FoamSourceEventGpuData
@@ -519,7 +533,7 @@ namespace ProgrammaticStylized3D.Rivers
                     sourceEvent.SourceAmount,
                     sourceEvent.RemainingLife,
                     sourceEvent.PatternSeed,
-                    sourceEvent.SourceFillFeatureSize),
+                    objectContactCycle ? sourceEvent.HeadWidthCells : sourceEvent.SourceFillFeatureSize),
                 Variation = variationData,
                 Kinematics = kinematicsData,
                 ObjectData = objectData,
@@ -528,7 +542,7 @@ namespace ProgrammaticStylized3D.Rivers
                     previousProgress,
                     previousElapsed > 0.000001f ? 1f : 0f,
                     objectContactCycle
-                        ? sourceEvent.ObjectContactStrokePathLengthMetres
+                        ? sourceEvent.ContactSpanCells
                         : 0f)
             };
         }
@@ -572,6 +586,7 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStartY", startY);
             computeShader.SetInt("_FoamRangeCountY", countY);
             computeShader.SetInt("_FoamSourceEventIndex", eventIndex);
+            computeShader.SetInt("_FoamSourceEventDebugComponentMode", 0);
             computeShader.SetBuffer(
                 rasterKernel,
                 "_FoamMetricRows",
@@ -715,9 +730,7 @@ namespace ProgrammaticStylized3D.Rivers
             bool absoluteAgingProbe = pendingIsolatedLifeProbeAbsoluteAging;
             pendingIsolatedLifeProbe = false;
             pendingIsolatedLifeProbeAbsoluteAging = false;
-            pendingInjections.Clear();
-            pendingMaterialBirths.Clear();
-            ClearFoamCompositionEvents();
+            ClearAutomaticFoamSourceEvents();
 
             if (computeShader == null || currentState == null ||
                 writeState == null || presentationPreviousState == null ||
@@ -879,179 +892,5 @@ namespace ProgrammaticStylized3D.Rivers
             return globalDistance;
         }
 
-        private void DispatchInjection(PendingInjection injection, RenderTexture target)
-        {
-            ConfigureGridDescriptorComputeParameters();
-            float storageGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.GlobalDistance);
-            float storageSegmentStartGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.SegmentStartGlobalDistance);
-            float storageSegmentEndGlobalDistance =
-                WorldGlobalDistanceToFoamStorageGlobalDistance(
-                    injection.SegmentEndGlobalDistance);
-            if (!TryResolveManualInjectionDispatchRange(
-                    injection,
-                    out P7SourceDispatchRange dispatchRange))
-            {
-                return;
-            }
-
-            int startX = dispatchRange.StartX;
-            int countX = dispatchRange.CountX;
-            int startY = dispatchRange.StartY;
-            int countY = dispatchRange.CountY;
-
-            computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
-            computeShader.SetFloat("_FoamValidLength", validFieldLength);
-            computeShader.SetFloat(
-                "_FoamSimulationLength",
-                simulationFieldLength);
-            computeShader.SetInt("_FoamRangeStart", startX);
-            computeShader.SetInt("_FoamRangeCount", countX);
-            computeShader.SetInt("_FoamRangeStartY", startY);
-            computeShader.SetInt("_FoamRangeCountY", countY);
-            computeShader.SetFloat("_FoamGlobalStart", river.Domain.GlobalDistanceMinimum);
-            computeShader.SetFloat("_FoamFieldLength", fieldLength);
-            computeShader.SetFloat("_FoamInjectionGlobalDistance", storageGlobalDistance);
-            computeShader.SetFloat(
-                "_FoamInjectionAcrossNormalized",
-                injection.AcrossNormalized);
-            computeShader.SetFloat(
-                "_FoamInjectionUsesMetricLateral",
-                injection.UsesMetricLateral ? 1f : 0f);
-            computeShader.SetFloat(
-                "_FoamInjectionLateralMetres",
-                injection.LateralMetres);
-            computeShader.SetFloat("_FoamInjectionRadius", injection.Radius);
-            computeShader.SetFloat("_FoamInjectionAmount", injection.SourceAmount);
-            computeShader.SetFloat(
-                "_FoamInjectionRemainingLife",
-                injection.RemainingLife);
-            computeShader.SetFloat(
-                "_FoamInjectionPatternSeed",
-                injection.PatternSeed);
-            computeShader.SetFloat("_FoamInjectionElongation", injection.Elongation);
-            computeShader.SetFloat(
-                "_FoamInjectionSourceFillSeed",
-                injection.SourceFillSeed);
-            computeShader.SetFloat(
-                "_FoamInjectionSourceFillFeatureSize",
-                injection.SourceFillFeatureSize);
-            computeShader.SetFloat("_FoamInjectionShapeSeed", injection.ShapeSeed);
-            computeShader.SetFloat("_FoamInjectionShapeVariety", injection.ShapeVariety);
-            computeShader.SetFloat(
-                "_FoamInjectionCompound",
-                injection.CompoundShape ? 1f : 0f);
-            computeShader.SetFloat(
-                "_FoamInjectionSegment",
-                injection.SegmentShape ? 1f : 0f);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentStartGlobalDistance",
-                storageSegmentStartGlobalDistance);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentStartAcrossNormalized",
-                injection.SegmentStartAcrossNormalized);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentStartLateralMetres",
-                injection.SegmentStartLateralMetres);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentStartRadius",
-                injection.SegmentStartRadius);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentStartAmount",
-                injection.SegmentStartSourceAmount);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentEndGlobalDistance",
-                storageSegmentEndGlobalDistance);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentEndAcrossNormalized",
-                injection.SegmentEndAcrossNormalized);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentEndLateralMetres",
-                injection.SegmentEndLateralMetres);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentEndRadius",
-                injection.SegmentEndRadius);
-            computeShader.SetFloat(
-                "_FoamInjectionSegmentEndAmount",
-                injection.SegmentEndSourceAmount);
-            computeShader.SetBuffer(injectKernel, "_FoamMetricRows", metricBuffer);
-            computeShader.SetTexture(injectKernel, "_FoamBoundary", boundaryTexture);
-            computeShader.SetTexture(
-                injectKernel,
-                "_FoamObstacleExclusionRead",
-                obstacleExclusionTexture);
-
-            DispatchInjectionToState(target, countX, countY);
-
-            if (injection.IsManual)
-            {
-                lastInjectionStateSynchronized = true;
-                lastInjectionBoundaryCoverage = SampleInjectionBoundaryCoverage(injection);
-                simulationInterpolation = 1f;
-            }
-        }
-
-        private void DispatchInjectionToState(
-            RenderTexture target,
-            int countX,
-            int countY)
-        {
-            if (target == null)
-            {
-                return;
-            }
-
-            computeShader.SetTexture(injectKernel, "_FoamStateWrite", target);
-            Dispatch(injectKernel, countX, countY);
-        }
-
-        private float SampleInjectionBoundaryCoverage(PendingInjection injection)
-        {
-            if (boundaryTexture == null || fieldLength <= 0.0001f)
-            {
-                return -1f;
-            }
-
-            float u;
-            float v;
-            if (gridDescriptor.IsCreated &&
-                gridDescriptor.UsesFixedMetricLattice)
-            {
-                float localDistance = injection.GlobalDistance -
-                    river.Domain.GlobalDistanceMinimum;
-                u = Mathf.Clamp01(
-                    (localDistance -
-                        gridDescriptor.FieldOrStripStartMetres) /
-                    Mathf.Max(
-                        0.0001f,
-                        gridDescriptor.AllocatedLengthMetres));
-                float lateralMetres = injection.UsesMetricLateral
-                    ? injection.LateralMetres
-                    : ResolveSourceLateralMetres(
-                        injection.GlobalDistance,
-                        injection.AcrossNormalized);
-                v = Mathf.Clamp01(
-                    (lateralMetres -
-                        gridDescriptor.RepresentedLateralMinimumMetres) /
-                    Mathf.Max(
-                        0.0001f,
-                        gridDescriptor.RepresentedLateralMaximumMetres -
-                        gridDescriptor.RepresentedLateralMinimumMetres));
-            }
-            else
-            {
-                u = Mathf.Clamp01(
-                    (injection.GlobalDistance -
-                        river.Domain.GlobalDistanceMinimum) /
-                    fieldLength);
-                v = Mathf.Clamp01(
-                    injection.AcrossNormalized * 0.5f + 0.5f);
-            }
-
-            return Mathf.Clamp01(boundaryTexture.GetPixelBilinear(u, v).r);
-        }
     }
 }

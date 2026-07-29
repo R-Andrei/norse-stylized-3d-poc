@@ -60,7 +60,15 @@ TreeWindVertexResult ApplyTreeWindResponse(
         return result;
     }
 
-    float response = saturate(1.0 - stiffness);
+    float deadMask = isFoliage < 0.5
+        ? saturate(vertexColour.a)
+        : 0.0;
+    float branchStiffness = saturate(vertexColour.b);
+    float effectiveStiffness = lerp(
+        saturate(stiffness),
+        max(saturate(stiffness), branchStiffness),
+        deadMask);
+    float response = saturate(1.0 - effectiveStiffness);
     float2 bend = weather.bend;
     float bendMagnitude = length(bend);
     float2 bendDirection = bendMagnitude > 0.0001

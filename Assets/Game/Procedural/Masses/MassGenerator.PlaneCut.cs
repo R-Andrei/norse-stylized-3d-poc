@@ -117,7 +117,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             TriangleSoup planeCutPreviewSoup = null;
             if (edgeWearEvaluationMode !=
-                EdgeWearEvaluationMode.None)
+                EdgeWearEvaluationMode.BaseGeometryOnly)
             {
                 planeCutPreviewSoup = ApplyGeneratedEdgeWearBevels(
                     faces,
@@ -158,6 +158,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                  edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.BoundedSingleEdgePreview ||
                  (edgeWearEvaluationMode ==
+                    EdgeWearEvaluationMode.ProductionSurfaceFeatures ||
+                  edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBoundedPreview ||
                   edgeWearEvaluationMode ==
                     EdgeWearEvaluationMode.UnifiedBatchAudit ||

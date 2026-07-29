@@ -1,0 +1,589 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b5df453ceb343608d5b9cce25d7bb05, type: 3}
+  m_Name: TR_Dead_NorwaySpruce
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Trees.TreeGenerationRecipe
+  stableIdentity: tree-recipe-curated-dead-norway-spruce
+  recipeVersion: 3
+  recipeOnlyFoundationVersion: 1
+  recipeDisplayName: Dead Norway Spruce
+  recipeDescription: Leafless dead Norway spruce with sparse tiered branches angled
+    strongly downward.
+  recipeTags:
+  - dead
+  - norway-spruce
+  - spruce
+  - conifer
+  - leafless
+  - branches-down
+  barkMaterial: {fileID: 2100000, guid: 42305e67651e4db4bb00a4b267d1c19b, type: 2}
+  controlRanges:
+    schemaVersion: 1
+    height:
+      minimum: 8
+      maximum: 14
+    trunkBaseRadius:
+      minimum: 0.2
+      maximum: 0.42
+    trunkTaper:
+      minimum: 0.84
+      maximum: 0.96
+    bendAmount:
+      minimum: 0.02
+      maximum: 0.1
+    leanAmount:
+      minimum: 0
+      maximum: 0.035
+    leanDirection:
+      minimum: 0
+      maximum: 0
+    pathSpiralRadius:
+      minimum: 0
+      maximum: 0.008
+    signedPathSpiralTurns:
+      minimum: 0
+      maximum: 0.1
+    axialTwist:
+      minimum: -8
+      maximum: 8
+    rootCount:
+      minimum: 5
+      maximum: 5
+    rootReach:
+      minimum: 0.24
+      maximum: 0.38
+    rootThickness:
+      minimum: 0.28
+      maximum: 0.4
+    rootHeight:
+      minimum: 0.08
+      maximum: 0.14
+    primaryBranchCount:
+      minimum: 14
+      maximum: 26
+    branchStartHeight:
+      minimum: 0.18
+      maximum: 0.3
+    branchEndHeight:
+      minimum: 0.92
+      maximum: 0.99
+    branchSymmetry:
+      minimum: 0.82
+      maximum: 0.98
+    branchLength:
+      minimum: 0.28
+      maximum: 0.42
+    branchThickness:
+      minimum: 0.16
+      maximum: 0.28
+    branchElevation:
+      minimum: -30
+      maximum: -14
+    branchCurvature:
+      minimum: 0.04
+      maximum: 0.14
+    maximumBranchOrder:
+      minimum: 2
+      maximum: 2
+    secondaryDensity:
+      minimum: 0.4
+      maximum: 1.2
+    tertiaryDensity:
+      minimum: 0
+      maximum: 0
+    childScale:
+      minimum: 0.28
+      maximum: 0.4
+    missingBranchChance:
+      minimum: 0.18
+      maximum: 0.35
+    deadBranchChance:
+      minimum: 0.95
+      maximum: 1
+    brokenBranchChance:
+      minimum: 0.2
+      maximum: 0.45
+    barkTint:
+      minimum: {r: 1, g: 1, b: 1, a: 1}
+      maximum: {r: 1, g: 1, b: 1, a: 1}
+    bendFrequency:
+      minimum: 0.4
+      maximum: 1
+    trunkDrift:
+      minimum: 0
+      maximum: 0.03
+    trunkRoughness:
+      minimum: 0.01
+      maximum: 0.04
+    ridgeCount:
+      minimum: 4
+      maximum: 6
+    ridgeDepth:
+      minimum: 0.03
+      maximum: 0.08
+    directionalBias:
+      minimum: 0
+      maximum: 0.04
+    directionalBiasAngle:
+      minimum: 0
+      maximum: 0
+    tierSpacing:
+      minimum: 0.08
+      maximum: 0.13
+    branchArch:
+      minimum: -0.05
+      maximum: 0.05
+    lateSag:
+      minimum: 0.35
+      maximum: 0.6
+    tipUpturn:
+      minimum: 0
+      maximum: 0.04
+    sideSweep:
+      minimum: -0.03
+      maximum: 0.03
+    forkChance:
+      minimum: 0
+      maximum: 0
+  familyProfile: {fileID: 0}
+  referenceCalibration: {fileID: 0}
+  paletteOverride: {fileID: 0}
+  ageClass: 1
+  masterSeed: 7319
+  overrides:
+    height:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkBaseRadius:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownStartHeight:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownVolume:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownWidthScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownHeightScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownFill:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownAsymmetry:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownLobeCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    crownLobeRadius:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkControlPointCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkCurvature:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkBendCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkDirectionalDrift:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkLeanStrength:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkLeanDirectionDegrees:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkSurfaceTorsionDegrees:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkTwistRidgeCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkTwistRidgeDepth:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    rootButtressCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    rootButtressStrength:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    rootButtressHeight:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    rootFlareScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkSpiralStrength:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkSpiralTurns:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkSpiralDirection:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkIrregularity:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkTaper:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkForkProbability:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    trunkForkHeight:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchStartHeight:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchEndHeight:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    initialBranchElevationDegrees:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    branchArchDirection:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    branchArchStrength:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    lateBranchSag:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    azimuthSymmetry:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    directionalBiasAngleDegrees:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    directionalBiasStrength:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchCurvature:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchDroop:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchUpwardBias:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchSideSweep:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchTwistDegrees:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchIrregularity:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchEndCurl:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchLengthRatio:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    primaryBranchRadiusRatio:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    secondaryBranchesPerPrimary:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    tertiaryBranchesPerSecondary:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    maximumBranchOrder:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    secondaryLengthRatio:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    tertiaryLengthRatio:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    higherOrderCurvatureScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    clusterWidthScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    clusterHeightScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    clusterLengthScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    clusterRadialSpread:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    cardSizeScale:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    foliageClusterCount:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    cardsPerCluster:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    foliageEligibility:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    clusterOccupancy:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    terminalFoliageProbability:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    cardRetentionFraction:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    missingBranchProbability:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    deadBranchProbability:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    breakProbability:
+      mode: 0
+      exactValue: 0
+      range:
+        minimum: 0
+        maximum: 0
+    barkTint:
+      enabled: 0
+      value: {r: 0, g: 0, b: 0, a: 0}
+    foliageBaseColor:
+      enabled: 0
+      value: {r: 0, g: 0, b: 0, a: 0}
+    foliageHighlightColor:
+      enabled: 0
+      value: {r: 0, g: 0, b: 0, a: 0}
+    foliageShadowColor:
+      enabled: 0
+      value: {r: 0, g: 0, b: 0, a: 0}
+  seedLocks: []

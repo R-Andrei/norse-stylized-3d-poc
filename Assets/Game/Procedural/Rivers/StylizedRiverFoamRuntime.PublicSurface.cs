@@ -803,10 +803,7 @@ namespace ProgrammaticStylized3D.Rivers
             (currentState != null ||
              materialLifetimeAuthorityActive ||
              topologyMetricsReadbackPending ||
-             pendingInjections.Count > 0 ||
-             pendingMaterialBirths.Count > 0 ||
              pendingIsolatedLifeProbe ||
-             activeFoamCompositionEventCount > 0 ||
              IsTopologyDebugActive ||
              IsAutomaticBirthSourcesDebugActive ||
              (topologyMetricsLastCompletedAt >= 0.0 &&
@@ -817,20 +814,7 @@ namespace ProgrammaticStylized3D.Rivers
         public string LifetimeProofStatus => ResolveLifetimeProofStatus();
         public string TopologyAgingProofStatus => ResolveTopologyAgingProofStatus();
         public int ActiveChunkCount => 0;
-        public int PendingInjectionCount => pendingInjections.Count;
         public int ActiveReservationCount => 0;
-        public int FoamCompositionPoolCapacity =>
-            FoamCompositionEventCapacity;
-        public int ActiveFoamCompositionEventCount =>
-            activeFoamCompositionEventCount;
-        public int FoamCompositionBirthBudgetPerStep =>
-            ResolveFoamCompositionBirthBudgetPerStep();
-        public int FoamCompositionStartedCount =>
-            foamCompositionStartedCount;
-        public int FoamCompositionCompletedCount =>
-            foamCompositionCompletedCount;
-        public int FoamCompositionRejectedCount =>
-            foamCompositionRejectedCount;
         public int LatestFoamCompositionEventId =>
             latestFoamCompositionEventId;
         public float LatestFoamCompositionProgress =>
@@ -845,14 +829,6 @@ namespace ProgrammaticStylized3D.Rivers
             latestFoamCompositionPreviousAcrossNormalized;
         public float LastFoamCompositionSegmentLength =>
             lastFoamCompositionSegmentLength;
-        public int FoamCompositionEventUpdateCount =>
-            foamCompositionEventUpdateCount;
-        public int FoamCompositionSegmentDispatchAttemptCount =>
-            foamCompositionSegmentDispatchAttemptCount;
-        public int FoamCompositionSegmentDispatchSubmittedCount =>
-            foamCompositionSegmentDispatchSubmittedCount;
-        public float FoamCompositionCumulativeCentrelineDistance =>
-            foamCompositionCumulativeCentrelineDistance;
 
         public bool AutomaticBirthDebugReadbackAvailable =>
             automaticBirthDebugReadbackAvailable;
@@ -972,6 +948,12 @@ namespace ProgrammaticStylized3D.Rivers
             automaticFreeWaterBirthSubmittedTotal;
         public int AutomaticFreeWaterBirthBudgetPerTick =>
             AutomaticFreeWaterSourceMaximumStartsPerUpdate;
+        public int AutomaticPacketEnvelopeRejectedLastUpdate =>
+            automaticPacketEnvelopeRejectedLastUpdate;
+        public int AutomaticPacketEnvelopeRejectedTotal =>
+            automaticPacketEnvelopeRejectedTotal;
+        public int AutomaticPacketReservationActiveCount =>
+            automaticPacketReservationActiveCount;
         public int InjectedLastUpdate => injectedLastUpdate;
         public float LastInjectionBoundaryCoverage => lastInjectionBoundaryCoverage;
         public bool LastInjectionStateSynchronized =>
@@ -1183,10 +1165,7 @@ namespace ProgrammaticStylized3D.Rivers
             !IsMotionFieldDebugActive &&
             !IsShapeProductDebugActive &&
             !materialLifetimeAuthorityActive &&
-            pendingInjections.Count == 0 &&
             !pendingIsolatedLifeProbe &&
-            activeFoamCompositionEventCount == 0 &&
-            pendingMaterialBirths.Count == 0 &&
             !IsAutomaticSourcePopulationActive;
         public long EstimatedMemoryBytes =>
             EstimateTextureBytes(stateA) +

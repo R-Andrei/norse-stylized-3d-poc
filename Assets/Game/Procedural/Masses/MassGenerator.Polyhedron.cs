@@ -1386,7 +1386,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     cleanFaceVertices,
                     sourceFace.Normal,
                     sourceFace.Feature,
-                    sourceFace.FeatureStrength);
+                    sourceFace.FeatureStrength,
+                    sourceFace.ProvenanceKind,
+                    sourceFace.ProvenanceIndex);
 
                 if (density == SurfaceFacetDensity.Sparse ||
                     face.Feature == PolygonFaceFeature.ConvexEdgeWear)
@@ -1400,7 +1402,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             face.Vertices[i + 1],
                             face.Normal,
                             face.Feature,
-                            face.FeatureStrength);
+                            face.FeatureStrength,
+                            face.ProvenanceKind,
+                            face.ProvenanceIndex);
                     }
 
                     continue;
@@ -1433,7 +1437,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         next,
                         face.Normal,
                         face.Feature,
-                        face.FeatureStrength);
+                        face.FeatureStrength,
+                        face.ProvenanceKind,
+                        face.ProvenanceIndex);
                 }
             }
 

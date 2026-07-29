@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df2893d54e5347e1bf2ae7aad04c53ac, type: 3}
+  m_Name: WeatherLightRay_SunWarm
+  m_EditorClassIdentifier: 
+  displayName: Sun — Warm
+  sourceKind: 0
+  colourMultiplier: {r: 0.9811321, g: 0.9021989, b: 0.66180134, a: 1}
+  warmthContribution: 0.85
+  atmosphericIntensity: 0.2
+  softeningStrength: 0.55
+  cameraIntersectionFade: 0.92
+  screenSpaceSurfaceIntensity: 0
+  beamSpacingMetres: 0.95
+  beamWidthRatioRange: {x: 1, y: 1.25}
+  beamIntensityVariation: 0.6
+  beamEdgeSoftness: 0.45
+  beamSoftnessVariation: 0.45
+  upperFade: 0.49
+  groundFade: 0.2
+  contactPlaneOpacity: 0.15
+  surfaceSpotLightIntensity: 0.4
+  footprintEdgeSoftness: 1
+  accentLineIntensity: 0.4
+  vegetationAccentCoverage: 0.3
+  vegetationAccentSoftness: 0.45
+  evolutionPreset: 1
+  evolutionStrength: 0.35
+  evolutionSpeed: 0.25
+  defaultHeightMetres: 27.7
+  defaultMaximumVisualLeanDegrees: 25.2
+  defaultAreaDiameterMetres: 4.91

@@ -1,4 +1,80 @@
+## RIVER-FOAM-SPAWN-D8.4D — Object contact flat-head repair
+
+- Component-isolated Smoke evidence measured both Arc and Semi-Arc contact-only 1×1 heads at `1.438` cells while every isolated wake head measured exactly `1`.
+- The shared contact evaluator used bounded-segment distance against the complete profile and then gated by path distance. Samples beyond a moving reveal boundary could therefore remain inside the width radius of the boundary point, producing rounded head caps.
+- Moving contact-head intervals now clip each profile segment to the exact revealed path interval and require an unclamped projection inside the clipped segment before width testing. This removes reveal-boundary caps.
+- Full-body contact evaluation is intentionally unchanged to avoid redesigning accepted Arc/Semi-Arc body geometry. Wake geometry, component isolation, source-event ABI, serialized controls, scenes, transport and final rendering are unchanged.
+
+## RIVER-FOAM-SPAWN-D8.4C — Object Arc/Semi-Arc component isolation and head repair
+
+- Production Arc and Semi-Arc contact strokes now use `HeadWidthCells` uniformly whenever `HeadLengthCells` defines a moving-head interval; full-body intervals retain `ContactWidthCells`.
+- Their wake arms now use the authoritative head width uniformly during moving-head intervals instead of tapering from body width to head width.
+- The existing Smoke suite adds five diagnostic-only component rows: Arc contact, negative wake, positive wake, Semi-Arc contact, and the selected positive wake. Production dispatches explicitly reset component mode to the complete union.
+- No source-event ABI, scene, serialized control, transport, or final-rendering change is introduced.
+
+## RIVER-FOAM-SPAWN-D8.4C — Object Arc/Semi-Arc component isolation and head repair
+
+- Production Arc and Semi-Arc contact strokes now use `HeadWidthCells` uniformly whenever `HeadLengthCells` defines a moving-head interval; full-body intervals retain `ContactWidthCells`.
+- Their wake arms now use the authoritative head width uniformly during moving-head intervals instead of tapering from body width to head width.
+- The existing Smoke suite adds five diagnostic-only component rows: Arc contact, negative wake, positive wake, Semi-Arc contact, and the selected positive wake. Production dispatches explicitly reset component mode to the complete union.
+- No source-event ABI, scene, serialized control, transport, or final-rendering change is introduced.
+
 # River Foam Active Blockers and Next Patches
+
+## RIVER-FOAM-SPAWN-D8.4A — Cell-Exact Ribbon Caps and Progressive Heads
+
+Status: implemented in source; Unity compilation and runtime validation pending.
+
+### Objective
+
+Correct the production geometry defects demonstrated by the D8.3C11 Smoke and Exhaustive reports without changing the source-event ABI, serialized controls, scenes, prefabs, materials, transport, or final rendering. Correct the Shore/Inward diagnostic fixture so it supplies the same cell-valued legacy fields as production.
+
+### Approved files
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+
+### Reviewed evidence
+
+- Lace and Cross-Lace 1×1 integrated Coverage is approximately 1.75–1.875 and 1×3 is approximately 9.75–10.25. The shared bent-ribbon evaluator measures distance to bounded segments, creating semicircular endpoint extensions.
+- Object Fleck body areas track requested dimensions, but a 1×1 head on a 5×3 body produces approximately 10 cells because the evaluator always rasterizes the full body segment.
+- Broken Filament uses the same bent-ribbon evaluator and inherits endpoint expansion and body-to-head width interpolation.
+- The Shore/Inward audit fixture writes `WidthMetres = widthCells * dy` and `FeatherMetres = 0`, while the D8 packing path consumes those legacy-named fields as cell counts.
+
+### Implementation
+
+1. In `FoamEvaluateBentRibbonCoverage4x4`, reject samples whose raw projection lies outside each polyline segment, removing endpoint caps while preserving interior segment joins.
+2. Use body width only when the active interval spans the complete body; otherwise use the declared head width uniformly across the moving head.
+3. In `FoamEvaluateObjectContactFleckSource`, derive the revealed longitudinal interval from progress and head length, rasterize only that interval, and use the authoritative active body/head width.
+4. In `BuildCellSpawnerAuditEvent`, write Shore/Inward width and head width as cell values through the legacy-named fields.
+
+### Invariants and non-goals
+
+- No event ABI or struct-layout change.
+- No additional dispatch, texture, buffer, or persistent allocation.
+- No Arc/Semi-Arc correction in this update.
+- Broken Filament stochastic gating remains unchanged.
+- Existing 4×4 raster supersampling remains unchanged.
+
+### Acceptance criteria
+
+- Lace and Cross-Lace body cases approach integrated areas 1, 5, and 3 for requested 1×1, 5×1, and 1×3 footprints.
+- Lace, Cross-Lace, Broken Filament, and Fleck moving-head cases are bounded by the declared head dimensions.
+- Fleck retains correct body scaling and its 1×1 head case falls from approximately 10 cells toward 1 cell.
+- Corrected Shore/Inward fixtures supply three cells for the 1×3 width case and one cell for the head-width case.
+- Smoke remains asynchronous and Editor-responsive.
+
+### Performance
+
+The bent-ribbon evaluator retains the existing fixed 4×4 samples and seven path points. It adds a raw projection range test and can skip distance work outside a segment. Fleck adds constant scalar interval calculations. Runtime complexity, dispatch count, textures, buffers, and persistent memory remain unchanged.
+
+### Validation status
+
+- Static source audit: passed. Final diff is limited to the three approved files; shader delimiters are balanced; the shared bent-ribbon evaluator has exactly the intended Lace, Cross-Lace, and Broken Filament consumers; Arc/Semi-Arc evaluators and event ABI are unchanged.
+- Unity shader/C# compilation: pending in Unity 6000.5.0f1.
+- Smoke suite: pending.
+
 
 ## Current status
 
@@ -36,24 +112,290 @@ Weather cloud shading is integrated and user-tested. The post-Weather source aud
 
 During the Length/Gap work, Play Mode Foam entered `PreparationRequired / GridDescriptorMismatch` because the assigned topology cache predated the current structural river domain. Explicit Edit Mode cache preparation rebuilt the exact current descriptor and restored normal Foam startup. Length, Gap, profile evolution, shoreline accent, and other live motion/render controls remain outside the immutable Foam grid descriptor and must not invalidate the topology cache.
 
-The next active River issue is now Layer E rendering visibility: Final Foam appears to hide materially more of the existing Layer C material than raw `Material Presence` and `Material Remaining Life` suggest. The next investigation must locate the loss between packed material truth and final composition before changing source amount, lifecycle, transport, or cache ownership.
+`RIVER-FOAM-VIS-D1` is Unity-imported and exercised. Its held-state Coverage report and pipeline composite prove that `Concentration + Lifetime` suppresses broad low-Coverage support before later Pattern/life shaping, while `Lifecycle-Faithful` exposes substantially more coherent stored structure. That visibility result is diagnostic evidence, not the root correction: the newly exposed structure is too thick and blob-like because transported Coverage expands from thin source ribbons into broad fractional support. The active blocker is now Layer C ribbon-shape preservation during transport.
 
-## Current active blocker — Final Foam hides more material than Layer C evidence implies
+## RIVER-FOAM-TRANSPORT-D1 — Ribbon compactness diagnostic suite
 
-The next patch is diagnostic-first. Do not assume that source amount, Remaining Life, Presence, transport, or the topology cache is wrong merely because Final Foam looks sparse. Compare the same frame through the existing ownership chain:
+**Status:** Unity-completed. The one-button suite passed all formula self-checks, completed the 1D/2D/live matrices, resolved all three live anchor classes, and produced the accepted D1 baseline report in `72,032.246 ms`. This patch is diagnostic-only. Production births, persistent state, lifecycle, transport kernels, selected transport/visibility contracts, rendering, topology caches, and authored defaults remain unchanged.
+
+### Problem statement and rationale
+
+The current conservative finite-volume solve preserves integrated packed material but does not prove preservation of a thin ribbon footprint. A one-cell or subcell ribbon may spread into several lower-Coverage cells while decoded Presence and Remaining Life remain coherent. `Concentration + Lifetime` hid most of that spread; `Lifecycle-Faithful` exposed it. The project requirement is not to hide transported material after the fact. A ribbon may advect, bend, split, and age, but its local thickness should remain approximately invariant unless an explicit authored or lifecycle process changes thickness.
+
+The next implementation decision must therefore be based on measured shape transport, not only conservation or final-render appearance. The suite is intentionally broader than one scene observation: it separates intrinsic discretization diffusion from 2D orientation/CFL effects and from deformation caused by the live Motion Lane, obstacle routing, slowdown, valid-fluid clipping, and curvilinear metrics.
+
+### Objective
+
+Add one Play Mode Inspector action that executes a deterministic, source-free CPU mirror of the current Layer C scalar Coverage transport and writes one clipboard-ready report. The mirror must use the same Donor Cell/Superbee reconstruction, coherent Coverage capacity, fixed-metric cell/face geometry, canonical live velocity contract, and valid-fluid clipping as production. It must not mutate live Foam state or serialized River settings.
+
+### Acceptance criteria
+
+1. One button runs the complete matrix; one adjacent button copies the combined report.
+2. The suite records the live descriptor, spacing, metric-row, Motion Lane, obstacle-routing, slowdown, boundary, obstacle-exclusion, CFL, and selected contract inputs before testing.
+3. An exact 1D matrix covers both transport schemes, initial widths 1/2/4/8 cells, full-cell and quarter-cell Coverage, CFL values 0.10 through 0.90, and travel checkpoints 0.25/0.50/1/2/4 m.
+4. A 2D Cartesian matrix covers both schemes, flow-aligned and cross-flow ribbons, widths 1/2/4 cells, downstream/lateral/diagonal uniform velocity, CFL 0.25/0.50/0.75, and checkpoints 0.5/1/2 m.
+5. A live-field matrix uses automatically selected open, high-lateral-intent, and obstacle-influenced anchors. It compares anchor-resolved downstream-only frozen-local-uniform velocity, live downstream-only velocity, and complete live velocity for both schemes, both ribbon orientations, and widths 1/2/4 cells.
+6. Every checkpoint reports integrated Coverage conservation, peak Coverage, thresholded support at C=0.02/0.10/0.20/0.30/0.50, centroid displacement error, designated thickness and length, principal minor/major extent, connected components, and low-Coverage tail fractions.
+7. The report separates solver diffusion, lateral/shear deformation, obstacle/slowdown influence, resolution dependence, and subcell-amplitude dependence. It must not recommend a production correction automatically.
+8. The suite writes under `Library/RiverFoamDiagnostics`, updates the existing latest-report surface, restores no state because it never mutates live state, and fails explicitly when required live arrays are unavailable.
+
+### Reviewed evidence and constraints
+
+- `StylizedRiverFoamRuntime.P8Diagnostics.cs::ValidateP8ConservativeTransport` proves packed-moment conservation but does not measure ribbon shape.
+- `CS_RiverFoam.Simulation.hlsl::FoamTransportSuperbeeSlopeComponent` returns zero at isolated extrema; a one-cell ribbon therefore begins with first-order donor behavior.
+- `CS_RiverFoam.Simulation.hlsl::FoamResolveInteriorFaceDonor` reconstructs Coverage only and carries coherent intrinsic material.
+- `CS_RiverFoam.compute::SimulateFoam` applies conservative face flux, capacity clamp, valid-fluid clipping, then lifecycle aging.
+- `StylizedRiverFoamRuntime.Obstacles.cs` retains CPU copies of resolved Motion Lane, obstacle routing, obstacle exclusion, and readable boundary Coverage required for a no-mutation live-field mirror.
+- Fixed spacing remains `0.15 m`; automatic and Object spawning remain accepted and frozen.
+
+### Approved files
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RibbonTransportDiagnostics.cs` (new)
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RibbonTransportDiagnostics.cs.meta` (required Visible Meta Files companion)
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+
+### Invariants and non-goals
+
+- No compute shader, shader include, kernel, texture, buffer, render pass, source recipe, lifecycle formula, transport selection, visibility mode, Chipping, Strand, cache, scene, prefab, material, layer, or tag change.
+- No synchronous GPU readback and no per-frame runtime work. The suite runs only from one explicit user action.
+- The CPU mirror is diagnostic evidence. Any production solver/compression/interface design requires a separate reviewed patch after the report is analyzed.
+- The suite must preserve unrelated River state and use invariant-culture numeric output.
+
+### File-by-file sequence
+
+1. Record this plan and the architecture rationale.
+2. Add the isolated CPU transport mirror, matrix runner, measurements, anchor selection, report writer, and public status/report surface.
+3. Add one Run button and one Copy button to the active Foam diagnostic actions.
+4. Perform static formula parity, matrix cardinality, conservation self-check, scope, documentation, and package audits.
+5. Leave Unity 6000.5.0f1 execution pending for the user and request the complete copied report.
+
+### Risks and validation gates
+
+- A CPU mirror can diverge from HLSL through indexing, limiter, metric, or clipping differences. The suite therefore includes closed-form one-step donor checks, Superbee extremum checks, interior-plateau conservation checks, and explicit formula/version text in the report.
+- Live-field anchor selection may fail in narrow or obstructed rivers. `Open / Low-Lateral` requires `|lane| <= 0.10`; `Open / High-Lateral` requires `|lane| >= 0.25`; both require negligible routing/slowdown and a `0.90`-valid seed neighbourhood. `Obstacle-Influenced` requires a valid centre but intentionally permits clipped neighbouring seed cells so exclusion/boundary deformation can be measured. Missing classes are reported as skipped rather than silently substituted.
+- Large matrices can stall the Editor. The implementation uses compact arrays, bounded domains, deterministic cases, and a stopwatch; elapsed time is reported.
+- Unity compilation and one-button execution are mandatory before this diagnostic patch can be accepted.
+
+### Implementation status
+
+- [x] Review current transport, velocity, metric, valid-fluid, diagnostics, report, and canonical documentation surfaces.
+- [x] Record objective, rationale, scope, invariants, matrix, risks, and validation plan before code edits.
+- [x] Implement the one-button suite and copy action.
+- [x] Complete post-implementation parity/scope/documentation audits.
+- [x] Run in Unity and analyze the copied report.
+
+### Unity execution evidence
+
+- Unity `6000.5.0f1` ran the complete suite in `WindowsEditor` on `River_Strip` in `VisualFrameworkDemo.unity`.
+- All five formula/self-check groups passed: donor closed form, Superbee isolated-extremum fallback, limiter sign/monotone samples, interior-plateau conservation, and 2D diagonal conservation.
+- The report completed the full 1D and 2D matrices, resolved `3/3` live anchor classes, and ended with `Overall execution: PASS`.
+- The accepted D1 interpretation is transport compactness failure rather than material creation: integrated Coverage remains conserved while thin support broadens into lower-Coverage cells.
+
+### Post-implementation audit evidence
+
+- Exact baseline comparison against the supplied source archive plus `RIVER-FOAM-VIS-D1` overlay contains only the five approved delivered files: the new diagnostic partial and required `.meta`, the Inspector action file, this active plan, and the Stage 6 architecture document.
+- The CPU mirror preserves the production scalar Coverage contract from `CS_RiverFoam.Simulation.hlsl::FoamTransportSuperbeeSlopeComponent`, `FoamResolveInteriorFaceDonor`, `FoamResolveLongitudinalFaceFlux`, `FoamResolveLateralFaceFlux`, and `CS_RiverFoam.compute::SimulateFoam`: closed invalid faces, physical longitudinal outflow only, averaged interior face velocity, Donor/Superbee reconstruction, simultaneous x/y flux, metric-area mass update, `[0,1]` clamp, and valid-fluid capacity clip.
+- Live travel distance integrates Coverage-mass-weighted mean speed, while expected centroid displacement integrates the Coverage-mass-weighted velocity vector. The live input mirror reproduces the canonical Motion Lane scroll interpolation, signed obstacle routing, complete-vector slowdown, fixed-metric cell/face geometry, and downstream flow-direction sign. `FrozenLocalUniform` is intentionally synthetic and holds only the anchor-resolved downstream component spatially uniform; `LiveDownstreamOnly` adds captured downstream gradients/slowdown, and `CompleteLive` then adds captured lateral intent/routing.
+- The implemented matrix contains `144` one-dimensional parameter cases with `720` checkpoint rows, `108` Cartesian parameter cases with `324` checkpoint rows, and up to `108` live-field parameter cases with `324` checkpoint rows when all three anchor classes resolve.
+- Independent float32 formula checks reproduce the isolated-cell Donor update `[1-CFL, CFL]`, Superbee extremum fallback, monotone limiter slope `0.5`, interior-plateau conservation within `4.77e-7` cell units, and 2D diagonal conservation within `1.12e-8 m²`. The suite repeats equivalent checks in Unity before reporting success.
+- C# delimiter/preprocessor structure, owned symbol uniqueness, public Inspector call sites, report-writer availability, exact changed-file scope, and invariant-culture raw numeric output were checked offline. No Unity compiler is available in this environment; import and execution remain authoritative and pending.
+
+
+## RIVER-FOAM-TRANSPORT-D2 — Conservative compactness candidate tournament
+
+**Status:** Implemented offline and statically audited as a diagnostics-only follow-up to the Unity-completed D1 report. Unity 6000.5.0f1 import and one-button execution remain pending. No production transport, birth, lifecycle, visibility, rendering, cache, scene, prefab, material, layer, tag, or authored default changes are included.
+
+### D1 evidence and problem statement
+
+The Unity D1 suite completed all formula checks and synthetic/live matrices. It proved that integrated Coverage is conserved while thin support broadens:
+
+- one-cell cross-flow ribbons widen by roughly `5.5×` after `1 m` under the current fixed-metric TVD Superbee transport even with frozen uniform downstream velocity;
+- flow-aligned ribbons remain exactly one-cell thick under uniform downstream velocity, but the complete live lateral field widens them substantially;
+- 4–8-cell ribbons are materially more stable, confirming that the present `0.15 m` lattice under-resolves the intended thin features;
+- `Lifecycle-Faithful` exposes the transported state honestly, while `Concentration + Lifetime` only hides its low-Coverage tails.
+
+The required correction must therefore compact the transported Layer C state conservatively. It must not erase Coverage, shorten lifetime, weaken Presence, reduce births, or hide the result in Layer E.
+
+### Historical transport audit
+
+The supplied repository contains only tombstones for the removed `4.11C.5.4c` predictor/corrector/compression path:
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Transport.hlsl`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamSimulation.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthTransfer.cs`
+
+No recoverable implementation, validation report, failure rationale, or version-control history is present in the supplied archive. D2 must not restore or infer that deleted design. Every candidate is an isolated new CPU diagnostic model with explicit formulas, bounds, and evidence.
+
+### Objective
+
+Add one Play Mode Inspector action that runs a deterministic conservative compactness tournament over the trusted D1 CPU transport mirror. Compare the current TVD Superbee baseline with bounded interface-compression and flux-corrected anti-diffusive candidates, exact geometric translation references, and higher-resolution Superbee references. Produce one clipboard-ready report that ranks evidence but does not alter production selection.
+
+### Candidate families
+
+1. **Baseline TVD Superbee:** exact D1 transport with no compactness correction.
+2. **Normal interface compression:** after each transport substep, move Coverage mass from lower normalized fill `q=C/V` toward the adjacent higher-fill cell using a bounded face transfer proportional to `q(1-q)` and a dimensionless compression Courant.
+3. **Flux-corrected anti-diffusion:** after each transport substep, move Coverage mass up the local normalized-fill gradient using a bounded face transfer proportional to `|Δq|`.
+4. **Combined conservative correction:** apply a weak normal-compression pass followed by a weak anti-diffusive pass to test whether the two mechanisms complement rather than destabilize each other.
+5. **Exact geometric rectangle reference:** analytically translate the original axis-aligned ribbon under uniform velocity and rasterize exact cell-overlap Coverage. This is the zero-diffusion shape target for synthetic cases.
+6. **Higher-resolution Superbee references:** rerun selected synthetic cases at `2×` and `4×` linear resolution and downsample conservatively to the base lattice. These are cost/quality references, not proposed runtime defaults.
+
+All conservative candidates operate in physical mass units, normalize interface decisions by valid-fluid capacity, accumulate equal-and-opposite face transfers, globally limit donor outflow and receiver capacity before application, and preserve `0 <= C <= V`.
+
+### Acceptance criteria
+
+1. One button runs the complete D2 suite; one adjacent button copies the latest report.
+2. The suite reuses the D1 live descriptor, metric, boundary, obstacle, Motion Lane, routing, slowdown, cadence, and velocity capture without mutating live Foam.
+3. Candidate self-checks prove conservation, capacity bounds, uniform-field invariance, binary-interface invariance, zero-gap non-bridging, partial-valid-fluid safety, and deterministic repeatability.
+4. A synthetic tournament covers both ribbon orientations, widths `1/2/4`, initial Coverage `1.00/0.25`, downstream/lateral/diagonal uniform velocity, production CFL plus low/high comparison CFLs, and `0.5/1/2 m` checkpoints.
+5. An adversarial topology suite covers two parallel ribbons with multiple gaps, two detached blobs, an L bend, a Y split, a hollow ring, a checkerboard field, and a smooth fractional hump. It reports unintended merging, component loss/creation, hole filling, oscillation, and bound violations.
+6. A live-field tournament covers the D1 open-low-lateral, open-high-lateral, and obstacle-influenced anchors, both orientations, widths `1/2/4`, frozen downstream-only, live downstream-only, and complete live velocity modes.
+7. Every checkpoint retains D1 mass, centroid, covariance, support, component, and tail metrics and adds support compactness plus local branch-thickness median, 95th percentile, maximum, and global-separation excess at `C >= 0.10`.
+8. Synthetic uniform cases are compared against the exact geometric reference; selected cases also compare against `2×/4×` Superbee references.
+9. The report applies provisional evidence thresholds—open-field mass error `<0.1%`, no bounds violation, centroid error `<0.5` cell, and target thickness growth `<=1.5× / 1.25× / 1.15×` for initial widths `1/2/4` after `1 m`—but must label the ranking diagnostic rather than changing production.
+10. The suite writes under `Library/RiverFoamDiagnostics`, updates the latest diagnostic report surface, performs no GPU readback, and adds no per-frame work.
+
+### Approved files
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentDiagnostics.cs` (new)
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentDiagnostics.cs.meta` (new required companion)
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+
+The existing D1 diagnostic file may be read and reused but is not approved for modification unless a compile-level sharing defect is discovered. Any such deviation requires plan revision before editing.
+
+### Invariants and non-goals
+
+- No production compute shader or shader edit.
+- No serialized field or authoring control.
+- No runtime candidate selection or default change.
+- No source, lifetime, Presence, Pattern, Chipping, Strand, or final-composition tuning.
+- No attempt to reconstruct the deleted `4.11C.5.4c` implementation from its tombstone.
+- No claim that a CPU candidate is production-ready without a later GPU parity and runtime-performance patch.
+
+### File-by-file sequence
+
+1. Record this plan and the historical-audit limitation.
+2. Add the D2 candidate solver, conservative limiter, local-thickness measurement, synthetic/adversarial/live matrices, exact/high-resolution references, scoring, report writer, and public status surface.
+3. Add the Run and Copy controls beside D1 in the active Inspector diagnostics panel.
+4. Document the formulas, interpretation contract, provisional thresholds, and non-production status in Stage 6 architecture.
+5. Run offline deterministic self-checks, candidate-bound tests, matrix-cardinality checks, delimiter/preprocessor checks, changed-file scope audit, and package-byte audit.
+6. Leave Unity 6000.5.0f1 compilation and execution pending for the user; request the complete copied D2 report.
+
+### Risks and validation gates
+
+- Anti-diffusion can generate oscillation, checkerboarding, topology merging, or capacity overshoot. The common face-transfer limiter must scale all outgoing and incoming transfers before simultaneous application, and the adversarial suite must fail these pathologies explicitly.
+- Global covariance can confuse branch separation with branch thickening. D2 therefore adds thresholded four-axis directional-run local thickness and reports separation excess independently.
+- Compression may oppose physically authored divergence. Live-field results must be reported separately from uniform-shape preservation; no candidate may be promoted solely because it forces all live cases toward the original global covariance.
+- CPU evidence cannot prove HLSL parity or performance. A selected candidate requires a separate reviewed GPU experiment.
+- Unity compilation and one-button execution are mandatory before D2 can be accepted.
+
+### Implementation status
+
+- [x] Review D1 report, current transport formulas, D1 CPU mirror, live-field capture, Inspector report plumbing, canonical docs, and removed-path tombstones.
+- [x] Record D2 objective, candidates, matrix, metrics, invariants, risks, and approved files before code edits.
+- [x] Implement the candidate tournament and Inspector controls.
+- [x] Complete offline audit and package the changed files.
+- [ ] Run in Unity and analyze the copied report.
+
+### Post-implementation audit evidence
+
+- Exact changed-file scope is limited to the two new diagnostic files, the Inspector action surface, this active plan, and the Stage 6 architecture document. D1, production compute/shader files, runtime simulation, births, lifecycle, visibility, caches, scenes, prefabs, materials, layers, tags, and serialized defaults remain byte-identical to the supplied D1-overlaid baseline.
+- The tournament contains eight candidates: the unchanged TVD Superbee baseline, three normal-compression strengths, three anti-diffusion strengths, and one weak hybrid. Candidate ranking only selects baseline plus the strongest two non-baseline candidates for live evidence; it cannot change production.
+- Offline parser/delimiter scans pass with no merge markers, TODO/FIXME markers, unbalanced braces, or duplicate method declarations. Referenced D1 helper types/methods and current runtime properties were resolved against their declarations.
+- An independent numerical mirror passed all eight candidate invariant checks and `800` randomized partial-capacity conservation/bounds cases. This verifies the limiter arithmetic independently of the embedded Unity self-checks; it does not replace Unity compilation or execution.
+- Candidate correction uses physical mass, normalized valid fill, equal-and-opposite interior-face transfer, global donor/receiver limiting, simultaneous application, and final `0 <= C <= V` enforcement. Uniform, binary, fractional-ramp, zero-gap, partial-capacity, conservation, and deterministic-repeatability checks are embedded in the Unity report.
+- Synthetic cardinality is deterministic: up to `2,592` exact-reference checkpoints for eight candidates, plus nine adversarial patterns, selected `2x/4x` resolution references, and up to `486` live-field checkpoints for baseline plus two ranked candidates across three anchors.
+- No Unity compiler is available in the delivery environment. Unity import, execution time, candidate self-check results, complete ranking, and live-anchor evidence remain authoritative and pending.
+
+## Superseded visibility blocker — diagnostic finding retained for provenance
+
+`RIVER-FOAM-VIS-D1` completed this diagnostic chain. Chipping was not the primary loss; the held-state evidence showed that the selected scalar visibility base rejected broad low-Coverage support before later Pattern/life shaping:
 
 ```text
+Layer C Material Coverage
 Layer C Material Presence
 Layer C Material Remaining Life
-Layer C Material Pattern
-Foam Evaluated Shape / evaluated preview
-Foam Chip And Strand Probe
+Layer C Material Amount
+Layer C Material State Composite
+Layer E Visibility Pipeline Composite
 Final Foam
 ```
 
-The investigation must identify the first stage where expected visible support disappears. Candidate causes include Presence Footprint mapping, lifecycle visibility policy, patterned erosion/hardening, Layer D shape authority, Chipping, Strands, final opacity/colour composition, shoreline coverage blending, or another Layer E gate. The cache is implicated only if startup is not `Exact` with `hit:1/install:1`; the recent stale-grid miss was rebuilt successfully and is not an open defect.
+Interpret the pipeline composite explicitly:
 
-Do not retune automatic-source birth amount or lifetime until this render-path comparison proves that Layer C material itself is insufficient.
+- red without green: meaningful Coverage exists, but the selected scalar visibility-policy base rejects it;
+- green without blue: later pre-Chip Pattern/life shaping, surface coupling, or Presence-footprint selection removes it;
+- blue support absent from Final Foam: only then inspect Chipping, Strands, final opacity/colour composition, or shoreline coverage blending.
+
+The Coverage report measured `4,634` nonzero material cells, of which `2,428` reached `C >= 0.02`; only `526` received any meaningful `Concentration + Lifetime` base support. `Lifecycle-Faithful` restored coherent structure but exposed the actual transport defect: thin source ribbons had expanded into broad fractional-Coverage support. The stale cache was rebuilt and is not an open defect. This section is superseded by `RIVER-FOAM-TRANSPORT-D1`; do not use visibility suppression, birth reduction, Presence decay, or lifetime reduction as a substitute for compactness evidence.
+
+## RIVER-FOAM-VIS-D1 — Coverage and visibility diagnostics
+
+**Status:** Unity-imported and exercised. The held-state Coverage report, Material State Composite, and Visibility Pipeline Composite were accepted as authoritative evidence. This diagnostic patch does not change birth, lifecycle, transport, cache, visibility, Chipping, Strands, composition, or authored defaults.
+
+### Objective
+
+Expose the missing geometric Coverage evidence and the exact production visibility stages required to determine why strong, living Layer C material is not becoming Final Foam. Preserve the current `TVD Superbee / Concentration + Lifetime / Coverage-Only` production contract while gathering evidence.
+
+### Acceptance criteria
+
+1. Add a literal linear `Material Coverage` view sampled from the same temporally interpolated committed Layer C state as Presence and Remaining Life.
+2. Add a literal linear `Material Amount` view showing packed `Coverage × Presence`.
+3. Add a `Material State Composite` with red = Coverage, green = decoded Presence, blue = decoded Remaining Life; Presence and Life remain black below the existing meaningful-Coverage authority threshold.
+4. Add a `Visibility Pipeline Composite` with red = meaningful raw Coverage footprint, green = the selected visibility-policy base mask before pattern/life shaping, and blue = the exact production pre-Chip Foam mask after pattern/life shaping, surface coupling, and Presence-footprint selection.
+5. Add one explicit Play Mode Coverage Distribution report. It must read the same previous/current committed state pair and captured interpolation alpha, decode Coverage/Presence/Life, print Coverage buckets, integrated Coverage, Material Amount, life-weighted Material Amount, and the selected visibility-policy base response. The report must state that exact pre-Chip visibility remains fragment/pixel dependent and is inspected through the blue channel of `Visibility Pipeline Composite`, not approximated on CPU.
+6. Keep all new enum values explicit and outside existing serialized values. Existing debug identities and production arithmetic remain unchanged.
+7. Inspector descriptions must define every channel mathematically and must not imply that Presence or Remaining Life represent occupied cell area.
+
+### Reviewed evidence
+
+- `Game/Procedural/Rivers/StylizedRiver.cs::StylizedRiverFoamDebugView` and `ResolveFoamDebugView` own serialized debug identities and validation.
+- `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs` owns Layer C labels, descriptions, and debug-specific Inspector actions.
+- `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader::SampleCommittedFoamState` samples the same previous/current Layer C pair used by Final Foam; existing Presence and Remaining Life views apply only a binary Coverage authority gate.
+- `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamResolveStateMask` computes the selected base visibility mask before `RiverWaterFoamPatternedMask`; `RiverWaterEvaluateFoam` later produces the exact coupled pre-Chip production mask in `RiverWaterFoamResult.mask`.
+- `Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`, `.Resources.cs`, `.Lifecycle.cs`, and `.Binding.cs` establish the ARGBHalf committed-state resources, dimensions, interpolation alpha, fixed `MaterialContourSharpness = 0.78`, and renderer bindings.
+- Existing Async GPU readback patterns in `StylizedRiverFoamRuntime.BirthDiagnostics.cs` and `.Compute.cs` establish the non-blocking diagnostic ownership pattern.
+
+### Approved file scope
+
+Modify exactly:
+
+1. `Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Game/Procedural/Rivers/StylizedRiver.cs`
+3. `Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+4. `Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs` — new diagnostic-only partial file
+5. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+6. `Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+Create exactly one C# partial file. No scene, prefab, material, cache, metadata, layer, tag, component, texture allocation, compute resource, kernel, dispatch, render pass, or draw-call change is authorized.
+
+### Implementation sequence
+
+1. Record this plan before implementation.
+2. Extend the explicit serialized debug enum and resolver.
+3. Expose the selected pre-pattern base visibility through `RiverWaterFoamResult` without changing mask calculations.
+4. Implement the four shader debug substitutions from already-available state/result values.
+5. Add Layer C selector labels, mathematical descriptions, and the Play Mode report actions.
+6. Implement asynchronous previous/current ARGBHalf readback, exact CPU decode/interpolation, Coverage buckets, and clipboard-ready reporting.
+7. Run exact-scope diff, serialized-value uniqueness, C#/HLSL delimiter and call-arity checks, production-arithmetic comparison, shared-shader consumer audit, and package reproduction. Unity import and visual validation remain authoritative.
+
+### Invariants and risks
+
+- Final Foam, `foam.mask`, Chipping, Strands, lighting, opacity, transport, lifecycle, source deposition, and topology cache state remain byte-for-byte behaviorally unchanged except for carrying one diagnostic `baseVisibility` value through the existing result structure.
+- The CPU report measures committed Layer C state and the scalar visibility-policy base function. Procedural pattern erosion, screen derivatives, surface warp/wake coupling, and Presence-footprint selection are pixel-space operations; the report must not claim to reproduce them. The Visibility Pipeline Composite is the authoritative visual comparison for those later stages.
+- Async readback is explicit user action only and adds no steady-state runtime work.
+
+### Implementation result and post-edit audit
+
+- Added explicit serialized debug values `27` through `30` for Material Coverage, Material Amount, Material State Composite, and Visibility Pipeline Composite; all 24 Foam debug enum values remain unique and the resolver accepts each new value.
+- Added an explicit Play Mode `Capture Coverage Report` action. It asynchronously reads the committed previous/current `ARGBHalf` state pair, captures interpolation and contract settings including Hold Foam State, and reports Coverage buckets, integrated `C`, `C×P`, `C×P×L`, weighted Presence/Life, and the selected scalar base response.
+- Exposed only the already-computed selected base mask as `RiverWaterFoamResult.baseVisibility`. The HLSL signature and all four call sites use 19 arguments; existing mask, Pattern/life shaping, coupling, Chipping, Strand, composition, resource, kernel, dispatch, property, and pass arithmetic is unchanged.
+- Exact-scope comparison contains six files: five approved modifications and one approved diagnostic-only partial file. C#/HLSL/shader delimiter checks pass; HLSL preprocessor directives balance; Layer C and Layer E label/value arrays remain paired; the shared Foam include has one shader consumer, `SH_CleanStylizedRiver.shader`.
+- The CPU concentration-base implementation reproduces the shader formula at fixed sharpness `0.78`: `low = 0.1674`, `high = 0.5288`, exponent `2.04`. The six-file delivery archive reproduces the audited working tree byte-for-byte when overlaid on the supplied baseline.
+- Unity shader compilation, render-view correctness, `ARGBHalf` readback/channel sanity, and report generation passed in the user scene. The captured report measured strong Presence (`0.936749` Coverage-weighted), substantial Remaining Life (`0.746135` material-weighted), and broad low-Coverage support rejected by the concentration base. `Lifecycle-Faithful` exposed that support as coherent but excessively thick foam, transferring the active blocker from visibility to transport compactness.
 
 The detailed patch records below preserve their original patch-time status and terminology for provenance. Where those historical records conflict with the Current status or Current active blocker above, the current sections govern.
 
@@ -2682,3 +3024,1242 @@ Historical rejected attempt: `RIVER-MOTION-S3.1E.1` tried to correct the incompl
 `RIVER-MOTION-S3.1E.2 — Independent Shore-Wave Length and Gap` is Unity-rejected. Although its period was `Length + Gap`, each packet still evaluated one complete signed `2π` cycle. The positive half appeared as overflow while the negative half appeared as additional calm space, so increasing Length also increased the visible gap. Its packet-edge fade, signed-height zero-crossing fade, and Length-normalized reach activation compounded that coupling.
 
 `RIVER-MOTION-S3.1E.3 — Positive-Lobe Length/Gap Decoupling` replaces the rejected signed cycle with one nonnegative zero-slope lobe spanning the complete authored Length. Gap is the only finite calm interval between packets; Gap zero makes adjacent lobes meet at a shared zero-slope point. Transition Length now shapes shoulders only inside the packet, and positive reach no longer normalizes against Length. The shared evaluator remains authoritative for displacement, normals/detail, refraction, rendered shoreline, Shoreline Accent, edge blending, and Foam shoreline support. Length and Gap remain dynamic motion inputs outside the immutable Foam grid descriptor. The stale Foam cache observed during S3.1E testing was explicitly rebuilt and restored normal Play Mode Foam startup.
+
+## RIVER-FOAM-TRANSPORT-D3 — Transport-integrated FCT experiment and responsive diagnostics
+
+**Status:** implementation and offline audit complete; Unity 6000.5.0f1 compilation, D3D11 import, Play Mode behavior, responsiveness, and GPU profiling remain pending. Production defaults remain unchanged until Unity evidence accepts a candidate.
+
+### Objective
+
+Implement a bounded, conservative, transport-integrated Flux-Corrected Transport (FCT) experiment for Layer C Coverage and make the existing D2 compactness tournament cooperative, cancellable, resumable, checkpointed, and continuously observable. The patch must test whether a limited high-order correction can preserve thin ribbon thickness without hiding material in Layer E, shifting the ribbon by whole cells, violating valid-fluid capacity, or severing legitimate topology.
+
+### Reviewed evidence and constraints
+
+- D1 proves the current scalar finite-volume transport preserves integrated material but broadens one- and two-cell ribbons severely.
+- D2 proves isotropic post-transport sharpening is the wrong production design. `AntiDiffusion-0.15` improves compactness but still shifts centroids and can fragment topology; normal compression and the hybrid are rejected.
+- The production runtime already resolves the multidimensional transport CFL as `downstreamCfl + lateralCfl` in `StylizedRiverFoamRuntime.Lifecycle.cs::ResolveTransportCflContract`. D3 must preserve that contract; the D2 synthetic diagonal stress does not justify replacing it.
+- Packed state remains `R=C×P`, `G=C×P×L`, `B=C×P×M`, `A=C`. Every accepted correction must move all packed moments coherently using one limiter derived from Coverage.
+- No long-running diagnostic may monopolize the Unity main thread. Any diagnostic exceeding a brief action must run incrementally across frames, expose stage/progress/elapsed/ETA, remain cancellable, preserve partial results, and write checkpoint reports throughout execution.
+
+### Approved files
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentDiagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentJob.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentJob.cs.meta
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+No scene, prefab, material, cache asset, layer, tag, folder, runtime component, or authored default change is approved.
+
+Scope clarification recorded before implementation of the diagnostic label change: `StylizedRiverFoamRuntime.VisibilityDiagnostics.cs` is a direct consumer of the transport enum and must name the two experimental FCT modes accurately in copied Coverage reports. The change is label-only; report formulas, readback, buckets, and production behavior remain unchanged.
+
+### FCT experiment contract
+
+D3 adds two explicit experimental transport selections while retaining `Donor Cell` and `TVD Superbee` byte-for-byte in their selected execution paths:
+
+```text
+Experimental FCT — Low
+Experimental FCT — Medium
+```
+
+Both use the same three-stage conservative substep:
+
+1. **Low-order transport and candidate correction generation**
+   - Compute the bounded Donor Cell update into an intermediate packed state.
+   - Compute one signed anti-diffusive correction mass per interior east/north face from a Lax-Wendroff target minus the Donor Cell flux.
+   - A positive face correction moves material from the negative-side cell to the positive-side cell; a negative value moves it in the opposite direction.
+   - Correction packed moments use the intensive material state of the actual correction donor.
+
+2. **Per-cell limiter construction**
+   - Derive lower/upper Coverage bounds from the current cell plus open valid neighbours and clamp the upper bound to resolved valid-fluid capacity.
+   - Accumulate all requested positive and negative correction contributions for the cell.
+   - Compute bounded `R+` and `R-` acceptance ratios. Uniform fields, closed faces, empty gaps, negative Coverage, and capacity overflow must remain impossible.
+
+3. **Limited correction and lifecycle**
+   - Each face uses one shared limiter coefficient based on donor removal and receiver addition capacity.
+   - Apply equal-and-opposite packed correction mass to the low-order state.
+   - Clamp only as a final numerical guard, then execute the existing lifecycle/topology evaluation once on the final substep.
+
+The Low and Medium modes differ only in a fixed diagnostic correction scale. They are not new authoring controls and do not alter the serialized default. The experiment allocates temporary FCT textures only while one of those modes is selected.
+
+### Responsive D2 tournament contract
+
+Replace the synchronous `RunConservativeCompactnessTournament()` body with a cooperative job:
+
+- Start returns immediately after validation and immutable input capture.
+- Work advances from `StylizedRiverFoamRuntime` once per frame with a strict time budget of approximately `4 ms`.
+- Public state exposes active/paused status, normalized progress, current stage/case, elapsed time, and ETA.
+- Inspector actions provide Start, Pause/Resume, Cancel, Copy Partial/Final Report, and Open Report Folder.
+- Completed units append to the in-memory report and rewrite a checkpoint file under `Library/RiverFoamDiagnostics`; cancellation retains that partial report and completed-case ledger.
+- Play Mode exit, disable, destruction, or resource invalidation must cancel safely rather than leave callbacks or stale state.
+- D1 remains historical evidence and is not rerun by D3. Its legacy synchronous Inspector launch is retired/disabled rather than leaving another blocking diagnostic available.
+
+### Acceptance criteria
+
+1. Existing Donor Cell and TVD Superbee execution, allocations, bindings, and serialized defaults remain unchanged when selected.
+2. FCT substeps conserve packed material across interior faces to floating-point tolerance, respect open longitudinal outflow, and enforce `0 <= C <= validFluid`.
+3. One limiter coefficient applies to all four packed moments so decoded Presence, Remaining Life, and Pattern are not independently distorted.
+4. Selecting either FCT mode allocates and binds temporary resources deterministically; leaving FCT releases them without changing the persistent state.
+5. The D2 tournament Start action returns within one frame, the Inspector remains interactive, progress and ETA update, Pause halts work, Resume continues, Cancel completes promptly, and partial reports remain copyable.
+6. No diagnostic frame performs more than the configured cooperative time slice except one indivisible case; the report records the slowest slice and case.
+7. Documentation records the rejected D2 post-pass, the exact D3 algorithm, the nonblocking diagnostic rule, performance cost, and pending Unity validation.
+
+### File-by-file sequence
+
+1. Update this canonical plan before code.
+2. Extend transport enum/tooltip and validation without changing the default.
+3. Add FCT temporary resources and kernel handles with conditional allocation/release.
+4. Add HLSL resources, face-correction helpers, limiter construction, and three compute kernels.
+5. Dispatch FCT kernels from the existing material substep loop only for the two experimental modes.
+6. Convert D2 to an incremental state machine and expose progress/cancellation controls in the Inspector.
+7. Update Stage 6 architecture and record exact production/non-production boundaries.
+8. Run scope, delimiter, shader-resource, kernel-binding, enum/default, lifecycle-once, ping-pong, cancellation, checkpoint, and package-reproduction audits.
+
+### Risks and non-goals
+
+- FCT may still fail one-cell thickness or may create grid-aligned artifacts. This patch is an experiment, not approval of the algorithm.
+- Three FCT compute passes and temporary textures increase work while an experimental mode is selected. Donor/Superbee cost must remain unchanged.
+- The patch does not change births, source geometry, lifecycle settings, visibility modes, Presence Footprint, Chipping, Strands, topology caches, or rendering.
+- The patch does not restore the removed historical predictor/corrector implementation; no recoverable implementation exists in the supplied repository.
+
+### D3 implementation record
+
+Implemented behavior:
+
+- `StylizedRiverFoamTransportScheme` now exposes `Experimental FCT — Low` and `Experimental FCT — Medium`; the serialized field still initializes to `DonorCell` and the existing Donor/TVD enum values remain `0/1`.
+- FCT selection conditionally creates four full-field `ARGBHalf` temporary textures: low-order packed state, east correction mass, north correction mass, and per-cell limiter. Leaving either experimental mode releases them without clearing, remapping, or replacing the persistent state.
+- `BuildFctLowOrder`, `BuildFctLimiter`, and `ApplyFctCorrection` implement the recorded three-stage substep. The Low/Medium fixed correction scales are `0.35 / 0.70`. Standard Donor/TVD selection still dispatches only `SimulateFoam`; the FCT textures are not bound and the FCT strength is not set while a standard mode is selected.
+- The final FCT transport accounting reconstructs the unclamped Donor raw mass before adding accepted correction mass, so any low-order capacity clip remains visible in the existing clamp-loss and Presence-attribution diagnostics rather than being concealed by the intermediate texture.
+- The former synchronous D2 entry point is replaced by an `IEnumerator<int>` state machine advanced from `LateUpdate` under `UNITY_EDITOR` with a `4 ms` target slice. Start captures immutable inputs and returns; Pause/Resume update the state immediately; explicit Cancel finalizes immediately between slices; lifecycle cancellation preserves a partial report.
+- Inspector state now shows progress, current stage/case, elapsed time, ETA, checkpoint errors, Pause/Resume, Cancel, Copy Partial/Final Report, and Reveal Report. Checkpoints are written from completed rows throughout execution, and the final ledger records the slowest observed slice and its case.
+- The old D1 synchronous launch button is disabled and labelled `D1 Runner Retired`; the accepted D1 report remains the fixed baseline instead of exposing another potentially blocking Inspector action.
+- `River_Foam_Stage6_Architecture.md` now records the rejected D2 post-pass, exact D3 equations/pass ownership, conditional resource/dispatch cost, packed-moment contract, responsive diagnostic rule, and pending acceptance boundary.
+
+Intentional changed-file set:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentDiagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentJob.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CompactnessTournamentJob.cs.meta
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+### D3 offline audit evidence
+
+- Final changed-file scope versus the supplied D2 baseline: `17/17` approved files, no deletion, no scene/prefab/material/cache/layer/tag edit.
+- Changed C#/HLSL delimiter, string/comment, and preprocessor balance: `PASS`, `0` errors.
+- Tournament blocking/thread-wait scan: `PASS`; no `Task.Run`, sleep, wait handle, cancellation-token worker, synchronous task wait, or persistent Editor callback was introduced.
+- Responsive contract scan: `PASS`; the `4 ms` target slice, iterator yields, progress state, Pause/Resume, immediate inter-slice Cancel, checkpoints, lifecycle cancellation, and responsive execution ledger are all present.
+- Kernel parity: all three FCT kernels have matching pragma, HLSL definition, C# `FindKernel`, and dispatch sites.
+- FCT resource parity: all eight read/write resource names have matching HLSL declaration, kernel use, and C# binding.
+- Shared-include impact: `CS_RiverFoam.Resources.hlsl` and `CS_RiverFoam.Simulation.hlsl` are consumed only by `CS_RiverFoam.compute` in PS3DRiver.
+- Serialized default audit: `DonorCell` remains the initializer; the TVD HLSL branch remains exact value `1`.
+- Standard lifecycle audit: the extracted `FoamApplyLifecycleAndWrite` body is whitespace/comment-normalized identical to the D2 `SimulateFoam` lifecycle tail.
+- New `.meta` GUID `93fd42881a8f49ce969a218aa7084ec5`: unique across `Assets`.
+- Legacy D1 launch audit: `PASS`; the old synchronous Inspector action is retired/disabled, while its accepted report remains the fixed baseline.
+- Independent randomized packed-correction mirror: `2,000/2,000 PASS`; maximum four-moment conservation error `1.066e-14`, maximum Coverage-capacity excess `1.110e-16`, maximum packed invariant excess `0`.
+- Independent one-cell 1D pulse sanity at production CFL over one metre equivalent travel conserves total mass for all modes. Effective width is `6.839472` cells for the Donor low-order baseline, `5.915613` for FCT Low, and `5.138264` for FCT Medium; centroids are `36.666667`, `36.564692`, and `36.399958`. This proves only that the candidate direction reduces mirror diffusion; it also predicts remaining over-width and backward phase error, so neither strength is accepted.
+- Final delivery archive audit: the archive contains exactly the `17` approved changed/new files; overlaying it on the supplied D2 baseline reproduces the complete final `Assets` tree byte-for-byte; archive traversal and unexpected-entry scans pass.
+- Unity compiler and shader compiler are unavailable in the patch environment. C# compilation, D3D11 compute import, actual resource creation/binding, GPU transport accounting, visual thickness/centroid/topology behavior, runtime cost, and the nonblocking Inspector workflow remain explicitly pending.
+
+### D3 acceptance status
+
+- Criteria 1–4 and 7: offline structure/invariant evidence passed; Unity parity remains pending.
+- Criteria 5–6: implementation is present, but actual Editor responsiveness, Pause/Resume, cancellation latency, checkpoint persistence, and slowest-slice evidence require direct Unity execution.
+- No FCT candidate is approved as production behavior by this patch. Donor Cell remains the serialized default and `Lifecycle-Faithful` remains the honest visibility mode for transport evaluation.
+
+
+
+## RIVER-FOAM-TRANSPORT-D4 — single-pass compactness/performance candidate patch (historical; superseded by D5)
+
+### Decision basis
+
+The D3 FCT Low/Medium runtime candidates are rejected. Direct Material Coverage review showed continued footprint expansion with lower intensity, and their three-dispatch/four-temporary-texture cost cannot satisfy the project's zero-regression performance ceiling. Do not strengthen FCT, hide its spread in Layer E, or retain its resources as dormant production alternatives.
+
+D4 tests two replacements simultaneously while preserving the accepted maximum structural budget:
+
+```text
+one material dispatch per CFL substep
+zero additional full-field transport textures
+no cache/topology/source/lifecycle/render-pass expansion
+```
+
+### Implemented candidate selections
+
+```text
+Donor Cell
+TVD Superbee
+Bulk-Phase Residual TVD — Experimental
+```
+
+Enum values `0/1` remain Donor/TVD. Rejected D3 values `2/3` are reused by the two D4 experiments so existing serialized experimental selections resolve to a current experiment rather than an invalid enum. The serialized initializer remains `DonorCell`.
+
+#### Bulk-Phase Residual TVD
+
+- Accumulates base downstream displacement as signed subcell phase.
+- Extracts whole-cell shifts per CFL substep and applies them by offsetting the existing state read coordinate inside `SimulateFoam`.
+- Subtracts the same base component from longitudinal transport velocity, leaving slowdown residuals and lateral/routing velocity for the existing Superbee reconstruction.
+- Binds previous/current fractional phases separately and shifts each committed state sample before interpolation.
+- Evaluates manual and automatic birth positions with the active phase.
+- Uses centre-row Motion Lane intent across the river width only while this candidate is selected; obstacle routing remains local.
+- Adds no kernel, dispatch, buffer, or texture.
+
+#### Nearest-Characteristic
+
+- Uses the same scalar bulk downstream phase as Bulk-Phase Residual TVD.
+- Converts residual/lateral subcell displacement into deterministic temporally rounded integer crossings through a scalar low-discrepancy sequence.
+- Selects one source cell and copies its complete packed material state.
+- Explicitly avoids the naive nearest-sample failure where production displacement below half a cell would never move.
+- Applies valid-fluid clipping and the existing lifecycle write once.
+- Records before/after/clamp accounting; conservation is intentionally not guaranteed.
+- Adds no kernel, dispatch, buffer, or texture and removes the neighbour/face reconstruction work from the selected hot path.
+
+### Rejected D3 removal
+
+- FCT enum labels and runtime selection logic are removed.
+- FCT kernel lookups and dispatches are removed.
+- FCT temporary RenderTextures and conditional allocation/release are removed.
+- FCT HLSL resources, helper functions, and compute entry points are removed.
+- Historical D3 documentation remains as a rejected record; current architecture and Inspector text point only to D4 candidates.
+
+### Diagnostic workflow correction
+
+A new `Transport Quick Gate` is the default D4 action:
+
+1. User selects one transport mode.
+2. One click starts ten seconds of existing steady-state work accounting and returns immediately.
+3. The Inspector remains interactive; explicit Cancel preserves a partial report.
+4. Completion requests the established Coverage/Visibility report asynchronously.
+5. Copy returns one combined report for comparison with the other modes.
+
+It does not silently cycle serialized settings and does not claim GPU timing. Exact GPU acceptance remains a direct identical-state Profiler comparison. The old D2 exhaustive tournament is relabelled `Legacy D2 Exhaustive Tournament — Optional`, explicitly states that it does not test D4, and remains cooperative/cancellable only for historical use.
+
+### Required Unity validation
+
+1. Compilation and shader import with no missing kernel/property/binding error.
+2. Material Coverage captures for TVD, Bulk-Phase, and Nearest at birth/1 m/2 m for one-cell horizontal and vertical ribbons.
+3. Forward/reverse flow and nonzero-phase birth alignment.
+4. Mode switching without state clear, coordinate jump, or birth misregistration.
+5. Nearest gain/loss and obstacle-hole review through existing transport accounting.
+6. Quick Gate start/cancel/complete/copy behavior with no blocking frame.
+7. Identical-state GPU mean and P95; any candidate above TVD is rejected.
+
+### Non-goals
+
+- No Presence×Life state rewrite.
+- No Lagrangian ribbon system.
+- No resolution increase.
+- No visibility threshold compensation.
+- No new authoring slider.
+- No production-default change.
+
+### D4 unresolved decision — closed by D5 evidence
+
+Select at most one candidate only after visual compactness and GPU evidence. If Bulk-Phase fails due phase/boundary artifacts and Nearest fails due loss/duplication, return to architecture assessment under the same zero-regression performance ceiling rather than adding corrective passes.
+
+
+## RIVER-FOAM-TRANSPORT-D6 — accepted transport and active spawn-pack blocker
+
+### Closed transport decision
+
+`Bulk-Phase Residual TVD` is accepted and promoted as the production/default material transport. It retains enum value `2`, one material dispatch per CFL substep, and no additional full-field transport resource. D5 measured `+0.064%` aggregate GPU mean and `+0.491%` aggregate GPU P95 against TVD; the upper approximate 95% mean-regression bound was `+0.461%`, below the hard 1% ceiling. Bulk accounting was no worse than TVD and its Capacity/Clamp loss was lower in both paired blocks.
+
+The completed D5 acceptance suite is removed from the Inspector and retired to a code tombstone. Nearest-Characteristic, FCT, D1, and D2 remain rejected/retired and must not be restored.
+
+### Active blocker: automatic packets are too large and can coalesce
+
+The user wants many small thin pockets, not a small number of gigantic connected packs. Current evidence and code audit identify three independent contributors:
+
+- **Oversized authored packets:** default Shore Ribbon events resolve to approximately `3.58–4.18 m` at Patch Size `0.35`; Free-Water Lace reaches `5.80 m`; object Arc packets can emit two `1.80 m` wake arms.
+- **No cross-source separation authority:** clearance is per deterministic slot or object anchor, so neighbouring slots and different source families can create paths that overlap or merge.
+- **Overlap rejuvenation:** `FoamMergeBornMaterial` refreshes Presence and Remaining Life with `max` even when a birth adds no new Coverage, allowing repeated overlap to keep a large connected pack alive.
+
+### Approved next investigation order
+
+1. Implement and test added-Coverage-only birth merging so overlap cannot refresh existing cells without extending geometry.
+2. Add a bounded active-event envelope separation gate shared by shore, object, and free-water starts; no GPU readback or new full-field resource.
+3. Re-author source length envelopes downward while retaining thin width, strong material, and comparable event population. Start with Shore Ribbon and Free-Water Lace.
+4. Review lateral Motion Lane divergence and obstacle velocity gradients only after spawn packets remain independent.
+
+## RIVER-FOAM-SPAWN-D7 — active validation and authoring recalibration
+
+### Implemented code correction
+
+- `Bulk-Phase Residual TVD` remains the accepted production transport.
+- Birth overlap can no longer refresh Presence, Remaining Life, or Pattern unless it genuinely adds Coverage.
+- Automatic Shore, Object, and Free-Water packets share one bounded active/recent envelope reservation, preventing intersecting prepared packets from starting as one welded pack.
+- Same-anchor contact-only reinforcement remains intentionally permitted; the new merge prevents age rejuvenation where it adds no Coverage.
+- No scene, prefab, serialized value, GPU resource, kernel, dispatch, simulation cadence, or render path changed.
+
+### Required focused validation
+
+1. Confirm Unity C# and compute compilation.
+2. In `Runtime Diagnostics > Foam > Birth Activity`, verify `Shared Packet Separation` reports reservations and occasional overlap rejections without permanently saturating all `64` slots.
+3. Observe Shore, Object, and Free-Water births separately and together. Multiple small packets should remain spatially independent instead of beginning as one connected pack.
+4. Verify old material does not visibly brighten or regain life when an overlapping source writes no new Coverage.
+5. Confirm same-anchor Object contact reinforcement still runs when enabled and does not recreate a giant persistent reservoir.
+
+### Manual authoring recalibration after code validation
+
+Do not reduce Coverage, Activity, ribbon thickness, initial Presence, or global lifetime first. Reduce individual prepared packet dimensions and compensate packet spacing so the river may retain many small identities rather than a few long connectors.
+
+Initial recommended trial values are recorded in the delivery message rather than serialized by D7. Reassess motion/velocity only after these packet-size changes, so source geometry and transport deformation remain separable.
+
+### Remaining work
+
+- Validate D7 packet independence in Unity.
+- Apply the recommended Shore/Free-Water length and mix values manually to the existing river instance.
+- Reassess residual Motion Lane and obstacle-routing divergence only if small independent packets still merge or stretch after birth.
+
+## RIVER-FOAM-SPAWN-D8 — cell-exact source geometry contract
+
+### Status
+
+- D8.1 baseline and ABI freeze: **COMPLETE — STATIC AUDIT; UNITY VALIDATION PENDING**
+- D8.2 cell-authoritative serialized controls: **NOT STARTED**
+- D8.3 shared exact primitives: **NOT STARTED**
+- D8.4 Shore conversion and continuation scheduling: **NOT STARTED**
+- D8.5 Object-source conversion: **NOT STARTED**
+- D8.6 Free-water conversion: **NOT STARTED**
+- D8.7 manual/scripted injection conversion: **NOT STARTED**
+- D8.8 rendering-footprint correction: **NOT STARTED**
+- D8.9 full contract and performance acceptance: **NOT STARTED**
+
+### Objective
+
+Replace metric-authored and source-specific birth geometry with a shared cell-authoritative contract. Every automatic and manual source must obey explicit Length, Width, progressive-head, bend, offset, contact-span, and wake-arm dimensions expressed in Foam cells. `Min = Max = 1` must resolve to exactly one cell. Fractional Coverage caused by subcell placement or rotation is valid; hidden width, feather, cap, jitter, or rendering expansion is not.
+
+### Acceptance criteria
+
+- Every automatic and manual source uses cell-authoritative resolved dimensions.
+- `Min = Max = 1` resolves to exactly `1` for every seed.
+- Isolated one-cell births integrate to `1.00 ± 0.02` cells in the applicable local dimension.
+- A one-cell source never produces two fully occupied adjacent rows or columns.
+- Coverage is written only where the texel square geometrically overlaps the authored envelope.
+- Length and Width remain independent, including `Length < Width`; no universal capsule rule is permitted.
+- Curvature, breakup, and irregularity may remove Coverage inside an envelope but may not expand it.
+- The full morphological Object contact ring is removed from Arc and Semi-Arc authored footprints.
+- Shore Ribbon uses deterministic same-bank continuation rather than sparse packet-only scheduling.
+- Final visual support is bounded by sampled Coverage.
+- Bulk-Phase Residual TVD remains production transport.
+- No additional Foam simulation pass, persistent texture, persistent buffer, per-cell stage, or grid-resolution increase.
+- Total River GPU regression remains below `1%` under identical-state comparison.
+- `Assets/Game/Demo/Scenes/VisualFrameworkDemo.unity` remains untouched.
+
+### Approved files and review surface
+
+Canonical documentation:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Grid_Upgrade_Plan.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+
+Primary C# contracts and producers/consumers:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthTransfer.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RuntimeUpdates.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+GPU contracts and evaluators:
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Rendering/Water/Shaders/Includes/RiverWaterFoam.hlsl`
+
+A temporary diagnostic partial may be added only under the approved path:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.CellSpawnerContractDiagnostics.cs`
+
+### Reviewed evidence and current constraints
+
+- `StylizedRiverFoamRuntime.State.cs::AutomaticFoamSourceEventType` declares eight automatic recipes.
+- `StylizedRiverFoamRuntime.State.cs::AutomaticFoamPacketReservation` stores metric global/lateral bounds and therefore cannot remain the sole authority for cell-authored source separation.
+- `StylizedRiverFoamRuntime.State.cs::AutomaticFoamSourceEvent` remains metric-authoritative for source width, reach, feather, reveal path, head trail, object wake length, and object contact path length.
+- `StylizedRiverFoamRuntime.State.cs::FoamSourceEventGpuData` and `CS_RiverFoam.Structs.hlsl::FoamSourceEventData` are fixed eight-`float4` CPU/GPU structures with source-dependent lane reuse. Repacking feasibility must be proven before preserving the current stride is promised.
+- `River_Foam_Active_Blockers_and_Next_Patches.md` records Bulk-Phase Residual TVD as accepted transport and D7 added-Coverage-only merging plus bounded packet reservations as the current baseline.
+- Existing source evaluators use metric dimensions, hidden raster floors, and source-specific expansion. D8 must replace them rather than tune defaults.
+- The exact raster implementation must be validated numerically. A simple projected linear feather is not accepted as exact for arbitrary orientation.
+- Length and Width require independent bounded-patch and bounded-ribbon semantics. A capsule formula cannot represent `Length < Width` without violating the authored envelope.
+
+### Invariants
+
+- Preserve Layer C packed-state meaning and added-Coverage-only birth merging.
+- Preserve transport, lifecycle cadence, support/lifetime capture, and existing accepted obstacle motion behavior during source-contract work.
+- Preserve source identities and serialized tombstones long enough to avoid breaking existing scenes.
+- Preserve one bounded source-event buffer unless the ABI audit proves a stride change is unavoidable; no second source-event buffer is permitted.
+- Preserve Editor responsiveness. Any diagnostic uses incremental Editor updates and asynchronous GPU readback only; unsupported async readback reports `UNSUPPORTED` and stops.
+
+### Non-goals
+
+- No obstacle slowdown/routing redesign in D8.
+- No new Foam transport scheme.
+- No grid-resolution change.
+- No scene/prefab/material tuning or migration.
+- No unrelated diagnostic cleanup.
+- No production-default authoring change before the user manually validates a supplied value block.
+
+### File-by-file implementation sequence
+
+1. D8.1: record baseline symbols, enum consistency, kernel/property/stride inventory, source-event lane map, resource counts, and current dispatch ownership in this plan; no runtime behavior change.
+2. D8.2: add hidden metric tombstones and cell-authoritative serialized controls; update Inspector bindings; keep old raster path temporarily.
+3. D8.3: implement shared bounded-patch and bounded-path-ribbon texel-overlap primitives plus isolated primitive diagnostics.
+4. D8.4: convert Shore Ribbon and Inward Wash; add per-bank Ribbon continuation state and bypass same-run packet rejection.
+5. D8.5: convert Object Arc, Semi-Arc, Fleck; remove the full morphological ring; crop contact paths and audit each component independently.
+6. D8.6: convert Lace and Cross-Lace; replace Torn Fragment runtime geometry with a bounded broken filament while retaining serialized identity if required.
+7. D8.7: add cell APIs and route legacy metric manual injection through local metric-to-cell conversion and shared primitives.
+8. D8.8: make final visual geometric support proportional to Coverage and clip detail masks by Coverage.
+9. D8.9: run full source-contract, packing, symbol, kernel, serialized-property, package-overlay, and identical-state GPU acceptance audits.
+
+### Risks and required responses
+
+- **ABI capacity risk:** eight `float4` lanes may be insufficient after explicit head/contact/wake controls. Produce a complete per-source lane map before editing structures. Stop and update this plan before any stride increase.
+- **Raster accuracy risk:** arbitrary-angle overlap may fail the `±0.02` target. Treat numeric audit results as authority; do not hide error with a wider tolerance without approval.
+- **Shore scheduling risk:** allowing overlap alone will not create continuous ribbons. Implement explicit same-bank run continuation.
+- **Rendering risk:** replacing the Coverage threshold may expose weaknesses in chips/strands or visual warp. Enforce `final geometric alpha <= sampled Coverage support` and audit shared shader/include impact.
+- **Serialization risk:** existing scene values include temporary D7 tuning. Do not auto-migrate or edit the scene; provide manual values after acceptance.
+- **Performance risk:** exact overlap may cost more than source-specific distance fields. Measure source raster and total River cost; reject a `>=1%` total regression.
+
+### Validation and compliance checks
+
+- Full cross-partial C# symbol audit.
+- Transport enum audit against `StylizedRiverFoamTransportScheme`.
+- CPU/GPU structure layout and stride equality audit.
+- Shader-property ID declaration/use audit.
+- Compute kernel pragma/lookup/binding audit.
+- Inspector `SerializedProperty` declaration audit.
+- No retired enum or lifecycle diagnostic references.
+- No new dispatch, persistent texture, persistent buffer, or per-cell state.
+- Async-only focused diagnostic behavior with cancel, progress, ETA, and partial report.
+- Exact source tests at axis-aligned, fractional-offset, diagonal, curved, and boundary placements.
+- Identical-state GPU mean/P95 comparison against Bulk-Phase baseline.
+- Final package contains changed source and Markdown files only.
+
+### D8.1 recorded baseline
+
+Static audit completed against the supplied `Assets-Code-Archive(28).zip` source tree. The archive contains no Git metadata, so no repository commit SHA or diff-against-HEAD proof is available.
+
+#### Transport and retired-symbol consistency
+
+- Active transport references resolve only to `DonorCell`, `TvdSuperbee`, and `BulkPhaseResidualTvd`.
+- `ExperimentalBulkPhaseResidualTvd`, `CancelTransportAcceptanceSuiteForLifecycle`, and `AdvanceTransportAcceptanceSuiteFrame` are absent from the River Foam C#/HLSL tree.
+- `RasterizeFoamSourceEvent` and `RasterizeFoamSourceEventDebug` each have matching compute pragmas, kernel bodies, and C# `FindKernel` lookups.
+
+#### Source-event allocation baseline
+
+- Source-event capacity: `32` records (`StylizedRiverFoamRuntime.Constants.cs::AutomaticFoamSourceEventCapacity`).
+- Packet-reservation capacity: `64` CPU records (`AutomaticFoamPacketReservationCapacity`).
+- GPU event structure: eight `Vector4`/`float4` lanes = `128` bytes per record.
+- Source-event GPU allocation: one structured buffer created in `StylizedRiverFoamRuntime.Resources.cs` with `Marshal.SizeOf<FoamSourceEventGpuData>()`.
+- Foam runtime buffer allocations in the reviewed resource allocator: topology metrics, transport metrics, and automatic source events. D8 must not add another source buffer.
+- Production and debug raster kernels share the same event buffer and source evaluator path; debug adds its existing debug UAV/counter path only when active.
+
+#### Current CPU-to-GPU lane map
+
+| Lane | Non-Arc/Semi-Arc meaning | Arc/Semi-Arc meaning |
+|---|---|---|
+| `Header.x` | source type | source type |
+| `Header.y` | side sign | finite stroke phase |
+| `Header.z` | current reveal progress | current per-stroke reveal progress |
+| `Header.w` | shape seed | shape seed |
+| `Distance.xy` | start/end storage-global distance | contact point 0 xy |
+| `Distance.z` | centre storage-global distance | object-centre storage-global distance |
+| `Distance.w` | flow direction | contact point 1 x |
+| `Shore.x` | shore inset | contact point 1 y |
+| `Shore.y` | width metres; Shore Ribbon may pack thickness metres/cells | straight wake-arm length metres |
+| `Shore.z` | inward reach | normalized material-step progress |
+| `Shore.w` | feather metres | contact point 2 x |
+| `Material.x` | intrinsic Presence | intrinsic Presence |
+| `Material.y` | normalized Remaining Life | normalized Remaining Life |
+| `Material.z` | pattern seed | pattern seed |
+| `Material.w` | pattern feature size | pattern feature size |
+| `Variation.x` | source-fill seed | negative-half first-segment split |
+| `Variation.y` | zero/reserved | contact point 2 y |
+| `Variation.z` | zero/reserved | contact point 3 x |
+| `Variation.w` | curvature / selected recipe rotation or side | curvature / selected Semi-Arc side |
+| `Kinematics.x` | formation speed metres/second | contact point 3 y |
+| `Kinematics.y` | moving-head trail metres | contact point 4 x |
+| `Kinematics.z` | derived source path length metres | initial contact-path length metres |
+| `Kinematics.w` | source-fill blend tombstone | positive-half first-segment split |
+| `ObjectData.x` | object/free-water centre lateral metres | object-centre lateral metres |
+| `ObjectData.y` | object half-length / free-water half-length | contact point 4 y |
+| `ObjectData.z` | object half-width / free-water half-width | front split |
+| `ObjectData.w` | contact offset / free-water recipe parameter | source-local lateral cell spacing metres |
+| `Deposit.x` | previous side/phase | previous stroke phase |
+| `Deposit.y` | previous progress | previous stroke progress |
+| `Deposit.z` | previous-state-valid flag | previous-state-valid flag |
+| `Deposit.w` | zero | reinforcement contact-stroke path length metres |
+
+#### ABI conclusion
+
+- **Proven:** the existing stride is exactly `128` bytes and is mirrored by CPU/HLSL declarations.
+- **Proven:** Arc/Semi-Arc consume all 32 scalar components except that some material semantics are shared rather than geometry-specific.
+- **Proven:** non-Arc recipes have several nominally reserved components, but those lanes are not uniformly free across all recipes.
+- **Inference — High confidence:** preserving one eight-`float4` structure remains feasible only through source-specific repacking and reconstruction; it is not yet proven for the complete D8 control set.
+- **Gate for D8.2/D8.3:** define the replacement per-recipe packing table before changing `FoamSourceEventGpuData` or `FoamSourceEventData`. Any stride increase or second buffer requires a plan update and approval.
+
+#### Static limitations
+
+- Unity C# compilation, compute shader import, Inspector serialization binding, runtime dispatch counts, and GPU timing were not executable in this environment.
+- The supplied archive includes serialized assets, but D8.1 changed only this canonical Markdown plan.
+- D8.1 is complete as a static baseline/ABI freeze; Unity validation remains required before treating the supplied archive as a compiled baseline.
+
+
+## D8.2 implementation record — cell controls and packing design
+
+Status: **IN PROGRESS — SOURCE EDITS PENDING STATIC AUDIT**
+
+Objective:
+
+- Add the complete cell-authored source-control surface without changing source raster behavior in this patch.
+- Preserve all legacy metric fields as runtime-authoritative migration tombstones until D8.3 converts each recipe.
+- Record a replacement eight-`float4` packing design before any CPU/HLSL ABI edit.
+
+Approved files for D8.2:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+
+Reviewed direct surface:
+
+- `StylizedRiver.cs`: complete automatic Shore, Object, and Free-Water serialized source fields, public accessors, defaults, and `OnValidate` clamps.
+- `StylizedRiverEditor.Foam.cs`: complete source recipe Inspector sections and all `SerializedProperty` lookups for the legacy metric controls.
+- `StylizedRiverFoamRuntime.State.cs`: current CPU source-event record and packet-reservation contracts.
+- `CS_RiverFoam.Structs.hlsl`: current eight-`float4` source-event record.
+- `StylizedRiverFoamRuntime.BirthEvents.cs`: all producers and per-recipe lane assignments.
+- `CS_RiverFoam.compute`: all automatic-source lane consumers.
+
+D8.2 invariants:
+
+1. No automatic or manual birth geometry changes.
+2. No CPU/GPU event stride change.
+3. No compute or shader edits.
+4. No scene, prefab, material, or serialized asset edits.
+5. New cell fields are serialized and Inspector-visible but explicitly staged; legacy metric values remain runtime-authoritative through D8.2.
+6. Every Min/Max pair is clamped to `>= 1` and ordered in `OnValidate`.
+7. Every head dimension is independently clamped to `>= 1`.
+8. Every cell reveal speed is independently clamped to the documented cell-speed range.
+
+Replacement event packing design for D8.3:
+
+- Keep the existing `128-byte` / eight-`float4` record.
+- Preserve lanes 0–1 for common identity, progress, amount, presence, life, and recipe selection.
+- Preserve lanes 2–6 as recipe-union payload rather than assigning one universal meaning.
+- Preserve lane 7 for common progression and compact auxiliary values.
+- Reconstruct local cell spacing from the bound Foam-grid descriptor in the kernel; do not transmit per-event spacing after D8.3.
+- Reconstruct deterministic source-local noise from `stableId` and recipe; do not transmit random variation lanes.
+- For Shore, Inward Wash, Fleck, Lace, Cross-Lace, and Broken Filament, lanes 2–4 hold start/end or patch basis plus body/head dimensions; lanes 5–6 remain available for bend, offset, and source-specific bounds.
+- For Arc/Semi-Arc, retain five prepared contact points in lanes 2–6. Pack authored contact width/span, wake width/length, and head dimensions into lane 7 plus currently redundant common components after D8.3 removes metric spacing and hidden source-scale data. If the final producer/consumer audit cannot fit these values without precision loss, stop before ABI edits and revise this plan; a stride increase remains unapproved.
+
+File-by-file sequence:
+
+1. Add staged serialized cell controls and public accessors in `StylizedRiver.cs`.
+2. Add defaults and `OnValidate` clamps in `StylizedRiver.cs`.
+3. Replace visible metric geometry controls with a clearly labelled staged Cell Geometry block in `StylizedRiverEditor.Foam.cs`; retain legacy metric fields hidden from the custom Inspector.
+4. Run static serialized-property, duplicate-symbol, brace, and source-tree consistency checks.
+5. Record final diff, unchanged runtime authority, and pending Unity validation here.
+
+Acceptance for D8.2:
+
+- C# source is syntactically balanced.
+- Every new Inspector property resolves to exactly one serialized field.
+- No existing runtime getter or birth-event producer is redirected to the new fields.
+- No HLSL or compute file changes.
+- No serialized asset changes.
+- Existing source visuals remain unchanged by construction.
+
+### D8.2 completion audit
+
+Status: **SOURCE COMPLETE — STATIC AUDIT PASS; UNITY COMPILATION/INSPECTOR VALIDATION PENDING**
+
+Implemented:
+
+- Added staged cell controls for Shore Ribbon, Inward Wash, Object Arc, Object Semi-Arc, Object Fleck, Free-Water Lace, Free-Water Cross-Lace, and the future Broken Filament replacement.
+- Added independent body/contact/wake/head dimensions, cell offsets or bend amplitudes, and reveal speed in cells per second.
+- Added public sanitized accessors and one centralized `OnValidate` sanitizer.
+- Added a shared Cell Min/Max Inspector helper and replaced visible legacy metric geometry controls with staged cell controls.
+- Preserved all legacy fields and all runtime birth producers unchanged.
+- Preserved the CPU/GPU source-event ABI and all compute/shader files unchanged.
+
+Static evidence:
+
+- `StylizedRiver.cs`: balanced `{}` and `()` counts; no duplicate serialized field names.
+- `StylizedRiverEditor.Foam.cs`: balanced `{}` and `()` counts.
+- All `Find("...")` references in `StylizedRiverEditor.Foam.cs` resolve to serialized fields in `StylizedRiver.cs`; missing count `0`.
+- Representative staged controls occur only in `StylizedRiver.cs` and `StylizedRiverEditor.Foam.cs`; no runtime birth producer consumes them.
+- `CS_RiverFoam.Structs.hlsl` is byte-identical to the D7C archive baseline.
+- `CS_RiverFoam.compute` is byte-identical to the D7C archive baseline.
+- Changed files are restricted to the three D8.2-approved files.
+
+Intentional behavior difference:
+
+- The custom Inspector now presents staged cell geometry instead of legacy metric geometry for automatic source recipes.
+
+Intentionally unchanged behavior:
+
+- Automatic source event preparation, GPU packing, raster geometry, packet scheduling, transport, lifecycle, and final rendering are unchanged.
+- Existing D7C metric values remain runtime-authoritative until D8.3.
+
+Pending verification:
+
+- Unity C# compilation under `6000.5.0f1`.
+- Inspector rendering with zero missing-property or layout errors.
+- Visual parity check confirming unchanged births despite editing staged values.
+
+---
+
+# D8.3A implementation record — shared bounded ribbon foundation and Shore conversion
+
+Patch: `RIVER-FOAM-SPAWN-D8.3A_Cell_Exact_Shore_Primitives`
+
+## Implemented
+
+- Added a source-longitudinal cell-spacing resolver alongside the existing lateral resolver.
+- Converted Shore Ribbon event preparation to use only the D8 cell controls for:
+  - resolved segment length;
+  - resolved width;
+  - head length;
+  - head width;
+  - bank offset;
+  - reveal speed.
+- Converted Inward Wash event preparation to use only the D8 cell controls for:
+  - along-bank length;
+  - stroke width;
+  - inward reach;
+  - head length;
+  - head width;
+  - bank offset;
+  - bend amplitude;
+  - reveal speed.
+- Removed Patch Size, metric length/width/reach interpolation, post-resolution size jitter, width/length coupling, fixed metric feather, and hidden metric head-trail authority from these two recipes.
+- Repacked Shore Ribbon and Inward Wash recipe-local GPU lanes without changing the fixed eight-float4 / 128-byte event ABI:
+  - `shore.x` = offset cells;
+  - `shore.y` = body width cells;
+  - `shore.z` = inward reach cells;
+  - `shore.w` = head width cells;
+  - `variation.w` = bend amplitude cells;
+  - `kinematics.x` = reveal speed cells/second;
+  - `kinematics.y` = head length cells;
+  - `kinematics.z` = path length cells;
+  - `kinematics.w` = D8 cell-source contract marker.
+- Added shared HLSL bounded-ribbon helpers.
+- Shore Ribbon uses analytic one-dimensional texel interval overlap in the longitudinal and lateral cell axes. It has no feather or cap enlargement.
+- Inward Wash uses a bounded four-by-four texel-area estimator over a square-capped finite path segment. Samples outside the finite longitudinal path domain are rejected, preventing capsule-cap extension.
+- Updated fixed-metric dispatch bounds and automatic packet envelopes so Shore/Inward cell values are converted through local cell spacing rather than interpreted as metres.
+
+## Deliberately not included
+
+- Same-bank Shore Ribbon continuation scheduling is not implemented yet. Existing candidate-slot cadence and packet scheduling remain active.
+- Object Arc, Semi-Arc, Fleck, Free-Water, and manual injection remain on their previous metric raster paths.
+- The final Lifecycle-Faithful rendering footprint remains unchanged.
+- The focused cell-contract audit is not yet exposed. D8.3A must first compile and receive direct visual validation before the diagnostic is built around the final primitive behavior.
+- The old P7 metric probe diagnostics have not yet been rewritten for the D8 Shore lane semantics and must not be used as acceptance evidence for these recipes.
+
+## Static verification performed
+
+- No new compute kernel or dispatch.
+- No new texture or buffer.
+- `FoamSourceEventGpuData` remains eight `Vector4` values / 128 bytes.
+- Object Arc/Semi-Arc packing path is unchanged.
+- Changed C# and HLSL files have balanced braces and parentheses.
+- The supplied package contains source and documentation files only.
+
+## Required next phase
+
+1. Compile and visually validate D8.3A in Unity.
+2. Add the incremental Cell-Exact Spawner Contract Audit for the shared primitive and Shore/Inward recipes.
+3. Replace sparse Shore Ribbon packet scheduling with deterministic same-bank continuation.
+4. Only after those pass, reuse the primitive for Object sources.
+
+
+## D8.3B — Remaining cell geometry conversion
+
+Implemented after D8.3A:
+
+- Object Arc/Semi-Arc/Fleck recipe-local dimensions are union-packed as Foam-cell values without changing the 128-byte event stride.
+- Free-Water Lace, Cross-Lace, and the serialized Torn identity now consume the staged cell Length, Width, Head, and Bend controls.
+- Final geometric support is proportional to Coverage rather than `smoothstep(0.02, 0.10, C)`.
+- The known Shore Ribbon scheduling/orientation/transport defect is deliberately unchanged and remains the immediate post-conversion blocker.
+- Legacy metric fields remain serialization tombstones; they are no longer geometry authority for the converted GPU recipes.
+
+
+## D8.3C — Automatic-only contract audit and obsolete manual-source removal
+
+The obsolete manual Foam spawning surface is removed rather than hidden. This includes its serialized controls, public normalized/metric emission APIs, moving manual composition producer, pending manual/material-birth queues, dispatch-range helpers, Inspector section, `InjectFoam` kernel, C# kernel lookup, and closed P7 manual-source report. The surviving `WriteIsolatedLifeProbe` path is a diagnostic state writer, not a gameplay/authoring spawner.
+
+The replacement `Cell-Exact Spawner Contract Audit` covers only the eight surviving automatic recipes. It runs 672 deterministic cases incrementally across Editor updates: 8 recipes × 7 geometry scenarios × 12 seeds. It exposes Run, Cancel, progress/ETA through the shared diagnostic status, preserves partial reports on cancellation, and writes TXT/CSV reports under `Library/RiverFoam`. No scene, prefab, material, cache, or serialized river state is mutated.
+
+## D8.3C8 plan — Play Mode cell-exact GPU audit replacement
+
+Status: IMPLEMENTATION IN PROGRESS
+
+### Objective
+
+Replace the rejected Edit Mode `EditorApplication.update` audit runner with a Play Mode-only runner that advances from the live `StylizedRiverFoamRuntime.LateUpdate` lifecycle after the production Foam runtime is ready. Preserve isolated diagnostic render targets and asynchronous GPU readback; do not write the visible river's persistent Foam state.
+
+### Acceptance criteria
+
+- Two explicit actions exist: `Run Cell-Exact Smoke Suite` and `Run Cell-Exact Exhaustive Suite`.
+- Both actions are disabled outside Play Mode and report `PLAY MODE REQUIRED` when invoked incorrectly.
+- Smoke suite covers all eight recipes plus half-cell, diagonal, 1x5, 3x1, and one-cell-head cases in no more than 40 cases.
+- Exhaustive suite retains the 672-case matrix.
+- Runner advances only from `LateUpdate`; no `EditorApplication.update`, play-mode callback, assembly-reload callback, or shutdown callback remains for this audit.
+- Runtime readiness is observed, not driven by the diagnostic. The audit never calls `EnsureResources()`.
+- Readiness wait has a hard timeout and reports the exact initialization/resource state.
+- Live Inspector state includes suite type, runtime readiness, current phase, case, readback state, completed/total, pass/fail, elapsed time, ETA, latest measurement, and report paths.
+- Cancellation preserves partial TXT/CSV reports and invalidates pending readback callbacks safely.
+- Audit resources are isolated per case and released without `DestroyImmediate` from `OnValidate` or runtime callbacks.
+- No runtime source geometry, transport, scene, prefab, material, or serialized asset is changed.
+
+### Approved files
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+### Reviewed evidence and constraints
+
+- The rejected runner starts from `RunCellSpawnerContractAudit`, subscribes to `EditorApplication.update`, and calls `EnsureResources()` while still in Edit Mode.
+- `StylizedRiverFoamRuntime.Lifecycle.LateUpdate` already owns Play Mode runtime initialization and calls `EnsureResources()` before normal Foam work.
+- `P12Diagnostics` and `P12Sweep` establish the existing Play Mode diagnostic convention and readiness condition: `initializationPhase == Ready && AreResourcesCompleteAndCurrent()`.
+- The existing GPU case dispatcher already writes to temporary `DebugTexture` and `StateTexture` targets and reads only the temporary debug target through `AsyncGPUReadback`.
+- The eight-float4 / 128-byte automatic source ABI remains unchanged.
+
+### File-by-file sequence
+
+1. Replace the audit state machine in `P7Diagnostics` with Play Mode smoke/exhaustive suite selection, readiness timeout, LateUpdate advancement, live state properties, cancellation, and report ownership.
+2. Add one editor-guarded audit advancement call to `Lifecycle.LateUpdate` after runtime resources are confirmed ready; include the active audit in the runtime-work predicate.
+3. Replace the old Edit Mode Inspector block with Play Mode smoke/exhaustive controls and complete live status rows.
+4. Audit the final diff for stale Edit Mode hooks, stale action labels, missing method/property references, delimiter/preprocessor balance, and unintended runtime changes.
+
+### Non-goals
+
+- No source raster behavior changes.
+- No Shore Ribbon scheduling, orientation, or transport fix.
+- No performance acceptance run in this patch.
+- No changes to other historical diagnostics.
+
+### Risks and mitigations
+
+- Pending readback after cancellation: generation token invalidates the callback; resources are released by the callback or immediate cancellation path when no readback is pending.
+- Play Mode exit during a run: `OnDisable` cancels the suite and preserves a partial report before runtime resources are released.
+- Runtime not ready: hard timeout fails with initialization phase and resource-completeness evidence instead of waiting indefinitely.
+- Repaint overhead: Inspector repaint is throttled and active only while a suite is running.
+
+### D8.3C8 implementation and audit record
+
+Status: IMPLEMENTED; UNITY PLAY MODE VALIDATION PENDING
+
+Implemented exactly within the approved four-file scope:
+
+- Replaced the single Edit Mode action with Play Mode-only Smoke and Exhaustive actions.
+- Smoke suite contains 48 cases: six high-value scenarios for each of eight automatic recipes.
+- Exhaustive suite retains 672 cases: eight recipes × seven scenarios × twelve seeds.
+- Removed all Cell-Exact audit subscriptions to `EditorApplication.update` and all audit-specific play-mode, assembly-reload, and editor-shutdown callbacks.
+- The audit now advances only through editor-guarded calls from `StylizedRiverFoamRuntime.LateUpdate`.
+- The diagnostic observes normal runtime initialization and never calls `EnsureResources()` itself.
+- Added a 15-second runtime-readiness timeout with exact phase/resource evidence.
+- Added separate Smoke and Exhaustive TXT/CSV report names under `Library/RiverFoam`.
+- Added complete live Inspector state: suite, runtime readiness, runner phase, current case, pass/fail, readback, elapsed/ETA, latest result, and report path.
+- Replaced use of the production automatic-source event buffer with a dedicated one-record diagnostic event buffer per case.
+- Temporary State and Debug textures remain isolated diagnostic targets; visible persistent Foam state is not bound as the write target.
+- Play Mode exit or component disable cancels the active suite and preserves a partial report before normal runtime resources are released.
+
+Static compliance evidence:
+
+- No `EditorApplication.update` Cell-Exact audit subscription remains.
+- No Cell-Exact audit `playModeStateChanged`, `AssemblyReloadEvents`, or `EditorApplication.quitting` hook remains.
+- No old `RunCellSpawnerContractAudit` method or old single-action label remains.
+- New runtime/Inspector method and property references resolve one-to-one across the changed partial and editor files.
+- Changed C# files pass comment/string-aware brace, bracket, parenthesis, and preprocessor-balance checks.
+- No compute shader, source raster behavior, transport code, scene, prefab, material, or serialized asset changed.
+
+Pending proof:
+
+- Unity C# compilation in 6000.5.0f1.
+- Play Mode runtime readiness and Smoke-suite execution.
+- Exhaustive suite execution only after Smoke passes.
+
+## D8.3C9 plan — GPU audit fixture and measurement correction
+
+Status: IMPLEMENTED; UNITY PLAY MODE VALIDATION PENDING
+
+### Objective
+
+Correct the Play Mode GPU audit harness so body tests measure complete bodies, head tests measure only the one-cell moving head, Object recipes receive valid synthetic prerequisites, Inward Wash receives real geometry assertions, and the exhaustive readiness watchdog cannot expire while the production runtime is already ready.
+
+### Acceptance criteria
+
+- Runtime source geometry, transport, rendering, scene data, serialized river values, and the eight-float4 automatic-source ABI remain unchanged.
+- `1 × 5 Body` and `3 × 1 Body` cases reveal the complete body rather than a one-cell head window.
+- `Head = 1 × 1` runs on a larger `5 × 3` body and reports head-specific expected dimensions.
+- Report and CSV distinguish Body versus Head measurements and include expected dimensions.
+- Inward Wash body cases receive a real area assertion; curvature is not used as a blanket exemption.
+- Object Arc/Semi-Arc fixtures use source-local contact-profile offsets and produce a valid non-degenerate profile.
+- Object Fleck receives an isolated synthetic object-contact field with non-zero support and a valid normal.
+- The readiness timeout measures only one continuous not-ready interval and is reset immediately when resources are ready.
+- Exhaustive execution may exceed fifteen seconds without a false readiness failure.
+- Broken Filament remains exempt from full-rectangle area equality because authored breakup may remove interior Coverage; all measured support remains reported.
+- All per-case temporary textures and buffers are released after readback, cancellation, or completion.
+
+### Approved files
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+
+### Reviewed evidence
+
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs`: current suite constructs every scenario with `HeadLengthCells = 1` and `HeadWidthCells = 1`, so body tests measure only the active one-cell head.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs`: current Object contact points are populated with absolute global positions, while the D8 HLSL interprets them as source-local metric offsets before converting them to cells.
+- `CS_RiverFoam.compute`: Object Fleck multiplies geometry by `_FoamObjectContactFieldRead.r * .a`; the current harness binds a black neutral texture, guaranteeing zero output.
+- `StylizedRiverFoamRuntime.Lifecycle.cs`: the audit is advanced once with `runtimeReady=false` before the resource-ready branch and again with `true` afterward. Direct resource readiness must therefore be authoritative inside the audit runner.
+- The Smoke and partial Exhaustive reports show one-cell Shore/Inward success, body cases collapsing to approximately one cell, all Object fixtures returning zero, and the exhaustive run aborting after fifteen seconds despite `phase=Ready; complete=True`.
+
+### File-by-file sequence
+
+1. Extend per-case capture metadata with expected body/head dimensions and isolated object-contact texture ownership.
+2. Correct readiness handling and timeout reset.
+3. Correct body/head scenario construction.
+4. Replace invalid Object fixture coordinates and bind a valid synthetic Object Fleck contact field.
+5. Apply area assertions to Inward Wash and expected-width adjacency checks to head cases.
+6. Extend TXT/CSV evidence and release all new temporary resources.
+7. Run complete static delimiter, preprocessor, symbol, diff-scope, and stale-runner checks.
+8. Record implementation and pending Unity proof in this plan.
+
+### Non-goals
+
+- No source raster changes.
+- No Lace, Cross-Lace, Broken Filament, Shore scheduling, Object runtime, transport, or rendering correction.
+- No scene, prefab, material, cache, or serialized asset changes.
+- No new compute kernel, dispatch, persistent texture, or persistent buffer.
+
+
+### D8.3C9 implementation and audit record
+
+Implemented within the approved two-file scope.
+
+- No runtime source preparation, source raster HLSL, transport, lifecycle, Editor action, scene, prefab, material, cache, or serialized asset changed.
+- The diagnostic body scenarios now set Head Length/Width equal to Body Length/Width, revealing the full body.
+- The dedicated head scenario now uses a `5 × 3` body with a `1 × 1` head and reports `ExpectedLength/ExpectedWidth = 1 × 1`.
+- The readiness path directly checks `AreCellSpawnerAuditResourcesReady`; the earlier `LateUpdate(false)` hint cannot start or expire the watchdog while resources are complete.
+- Object Arc/Semi-Arc contact points are source-local metric offsets.
+- Object Fleck receives a temporary ARGBHalf contact field cleared to `(support=1, normal=(-1,0), alpha=1)`.
+- Inward Wash joins the singular-recipe area assertion after its audit fixture separates path Length from Inward Reach.
+- Broken Filament remains measurement-only for area because its authored internal breakup intentionally removes Coverage.
+- New object-contact textures are owned by the per-case capture and released through the existing readback/cancellation cleanup path.
+
+Static evidence completed:
+
+- Comment/string-aware brace, bracket, and parenthesis scan: PASS.
+- Preprocessor balance: PASS.
+- New field, helper, binding, expected-dimension, readiness-reset, and resource-release invariants: PASS.
+- Final diff scope: only the approved canonical Markdown plan and `StylizedRiverFoamRuntime.P7Diagnostics.cs`.
+- No compute-shader or automatic-source ABI diff.
+
+Pending proof:
+
+- Unity C# compilation in `6000.5.0f1`.
+- Corrected 48-case Smoke execution.
+- Exhaustive execution beyond fifteen seconds without false readiness failure.
+
+## D8.3C10 — Deterministic replay and oriented footprint evidence
+
+Status: IMPLEMENTED; UNITY PLAY MODE VALIDATION PENDING
+
+### Objective
+
+Make the Play Mode GPU audit reject suite-order-dependent evidence, report independent oriented Length and Width measurements, measure Coverage outside the authored envelope, and stop treating non-zero composite output as an automatic pass.
+
+### Implementation
+
+- One unreported GPU warm-up dispatch now completes before case 001.
+- Smoke contains the existing 48 measured cases plus six deterministic replay cases for cases 001–006.
+- Replay compares Coverage area, projected Length, projected Width, and outside-envelope Coverage within `0.01`; a mismatch fails the suite immediately.
+- Every measured row now reports:
+  - integrated Coverage area;
+  - oriented projected Length;
+  - oriented projected Width;
+  - Coverage outside the authored oriented envelope;
+  - support bounds and fully occupied row/column runs.
+- Head measurements are strict for every recipe, including Broken Filament.
+- Broken Filament full-body area may be lower than the filled rectangle because authored breakup can remove Coverage, but it may not exceed the envelope or dimensions.
+- Object Arc and Semi-Arc total-union cases are explicitly non-accepting until contact and wake components can be isolated. Non-zero composite output is never promoted to PASS.
+- CSV evidence includes replay identity and individual readback, adjacency, Length, Width, area, envelope, and replay verdicts.
+
+### Scope
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+
+### Non-goals
+
+- No compute shader changes.
+- No automatic-source geometry correction.
+- No transport, rendering, scene, prefab, material, cache, or serialized-data change.
+- No claim that Arc/Semi-Arc components are validated by their current total-union fixture.
+
+## D8.4B — Shore/Inward production footprint repair
+
+Implemented scope:
+
+- Shore Ribbon width is now interpreted as an inward cell interval beginning at
+  the authored bank inset, rather than a radius centred on the shoreline. This
+  prevents the valid-fluid clip from discarding approximately half the source.
+- Shore Ribbon selects Head Width whenever Head Length is shorter than Body
+  Length, including at progress 1. Full-body cases continue to use Body Width.
+- Inward Wash offsets its active centreline inward by half the active width so
+  its complete footprint lies in valid fluid.
+- Inward Wash uses one authoritative active width across the interval: Body
+  Width for a full-body interval, Head Width for a progressive-head interval.
+- Deterministic replay mismatches remain reported failures but no longer abort
+  Smoke before the remaining cases execute.
+
+Unchanged:
+
+- Arc and Semi-Arc contact/wake geometry.
+- Lace, Cross-Lace, Object Fleck and Broken Filament production evaluators.
+- Source-event ABI, serialized controls, scenes, prefabs and materials.
+
+
+## D8.4D1 — Audit readiness preflight and non-destructive cache-required handling
+
+Status: implemented, Unity validation pending.
+
+The Cell-Exact Smoke/Exhaustive actions must not start a suite when the production Foam runtime is already in the terminal `CachePreparationRequired` phase. That phase cannot resolve in Play Mode because production topology generation is intentionally disabled there. The Inspector now reports the exact corrective action instead of creating a zero-readback failure report:
+
+`Actions → Foam Cache & Validation → Prepare / Rebuild Foam Topology Cache`
+
+If the runtime transitions to `CachePreparationRequired` after a suite has begun waiting, the suite preserves a precondition/cancelled report and releases only audit-owned state. It no longer records the missing cache as a failed GPU footprint case. Other transient initialization phases continue waiting under the existing bounded readiness timeout; `InitializationPhase.Failed` and a real timeout remain failures.
+
+D8.4D contact-head shader behavior is unchanged by this update.
+
+
+## D8.5 — Cell-Exact Audit Stabilization and Closure
+
+Status: implemented in source; Unity validation pending.
+
+- Smoke replay cases now reuse the exact captured `AutomaticFoamSourceEvent`, packed GPU data, and dispatch range from cases 001–006.
+- Replay compares the complete raw ARGBHalf payload. Raw mismatches are reported with differing-value count and maximum decoded delta, but do not redefine geometry acceptance.
+- Support-projected length/width and the legacy centre-classified outside value are informational only. They no longer fail fractionally rasterized one-cell footprints.
+- Solid recipes pass by integrated area. Broken Filament body cases require non-empty bounded area. Arc/Semi-Arc composite rows use three-component and two-component area contracts respectively; isolated component rows use one primitive area.
+- Production compute-shader behavior is unchanged by D8.5.
+- The existing Smoke/Exhaustive actions, copied report, and report folder remain the only user workflow.
+
+## D8.6 — Arc/Semi-Arc Body Component Isolation
+
+Status: implemented in source; static audit passed; Unity validation pending.
+
+Objective:
+
+- Resolve the five remaining D8.5 composite-body failures without changing production geometry speculatively.
+- Measure Object Arc contact, negative wake, and positive wake bodies independently.
+- Measure Object Semi-Arc contact and selected positive wake bodies independently.
+
+Approved files:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+
+Acceptance criteria:
+
+- Existing 59 Smoke cases remain unchanged.
+- Add 25 component-isolated body cases: five body scenarios for three Arc components and two Semi-Arc components.
+- Every isolated body row uses the existing one-primitive integrated-area contract.
+- No production compute shader, event ABI, source packing, scene, prefab, material, or serialized control changes.
+- The existing Smoke action, copied report, and report-folder workflow remain the only user workflow.
+- Suite remains incremental, cancellable, asynchronous, and Editor-responsive.
+
+Implementation sequence:
+
+1. Append component-isolated Object Arc body cases for scenarios 0–4 and component modes 1–3.
+2. Append component-isolated Object Semi-Arc body cases for scenarios 0–4 and component modes 1 and 3.
+3. Update the existing Smoke tooltip from 59 to 84 cases.
+4. Audit final scope and static structure; Unity runtime validation remains pending.
+
+Invariants and non-goals:
+
+- Production shader/runtime geometry is unchanged.
+- Existing progressive component rows 055–059 remain present.
+- Composite rows remain informational evidence until isolated body results establish the correct union contract.
+- No new Inspector action, secondary suite, or report file is added.
+
+Risks:
+
+- Smoke grows by 25 asynchronous readbacks. Expected duration remains only a few seconds based on the measured 59-case duration of 1.808 seconds.
+- Component overlap cannot be inferred from isolated area alone; final composite acceptance may require replacing multiplication with an observed-union contract after evidence is collected.
+
+D8.6 implementation audit:
+
+- Final changed-file scope matches the approved three files.
+- Smoke case count is 84: 48 base cases + 6 immutable replays + 5 isolated progressive heads + 25 isolated body components.
+- The 25 new rows cover scenarios 0–4 for Arc contact/negative wake/positive wake and Semi-Arc contact/positive wake.
+- Existing component modes and one-primitive isolated-area acceptance are reused; no shader/runtime production path changes were made.
+- Existing Inspector workflow and report files are unchanged; only the Smoke tooltip count was updated.
+- Static diff review completed. Unity C# compilation and Play Mode execution remain pending.
+
+## D8.7 — Contact-Profile and Composite-Union Contract Repair (2026-07-28)
+
+### Scope
+
+Diagnostic closure only. Production Foam shaders, runtime source geometry, event packing, serialized controls, scenes, prefabs, and materials are unchanged.
+
+### Evidence resolved
+
+D8.6 isolated all Object Arc and Object Semi-Arc body components. Every wake-only body matched its direct cell-area contract exactly. Contact-only bodies formed a coherent curved profile rather than a rectangular ribbon:
+
+- Object Arc contact is the full two-sided profile.
+- Object Semi-Arc contact is the selected half-profile.
+- Composite output is a union with dimension-dependent overlap, so `component count × rectangular primitive area` is not a valid expected area.
+
+### D8.7 contract
+
+The 84-case Smoke suite is reordered without adding cases:
+
+1. Shore and Inward cases remain first so immutable replay references 001–006 remain stable.
+2. Arc/Semi-Arc isolated body and head components run before their composite rows.
+3. Remaining recipe rows run after the evidence required by union validation exists.
+
+Acceptance now uses:
+
+- wake-only components: direct integrated area;
+- Semi-Arc contact body: bounded non-empty half-profile anchor;
+- Arc contact body: approximately twice the matching Semi-Arc half-profile, with raster tolerance;
+- Arc/Semi-Arc composites: mathematically valid measured union bounds, `max(component areas) <= union area <= sum(component areas)`, with a small half-float/raster tolerance;
+- progressive isolated heads: unchanged direct one-primitive contract;
+- Broken Filament: unchanged non-empty fragmented-envelope contract.
+
+Support projection, legacy outside Coverage, and raw replay differences remain informational and do not override integrated production geometry.
+
+### Expected closure result
+
+The 11 D8.6 failures should resolve without any production geometry change. All 84 Smoke rows should pass if the measured component relationship and union bounds remain consistent.
+
+### Next work items
+
+- Run the 84-case Smoke suite once.
+- If all rows pass, close the automatic-spawner cell-exact footprint work and retain raw replay mismatch as a documented diagnostic limitation.
+- Do not reopen production geometry unless a component-specific integrated-area contract regresses.
+
+## RIVER-FOAM-SPAWN-D8.8 — Shore/Inward Domain-Fixture Isolation
+
+Status: implemented; Unity compilation and runtime validation pending.
+
+The cell-exact geometry audit no longer evaluates Shore Ribbon and Inward Wash against mutable production river-domain masks. Their existing Smoke cases now bind audit-owned temporary resources to the unchanged production debug kernel:
+
+- Boundary coverage: uniformly valid (`1`).
+- Obstacle exclusion: uniformly absent (`0`).
+- Current shore edges: fixed left edge far outside the fixture and right edge at lateral metre `0`.
+- Grid metric rows: unchanged production fixed-metric descriptor/buffer, preserving the exact cell spacing used to pack the source event.
+
+The synthetic resources are created per dispatch, cleared deterministically, retained through asynchronous GPU readback, and released with the rest of the capture. They cannot leak into normal runtime rendering. Report rows are marked `synthetic-domain-fixture`.
+
+This separates source-shape geometry from production environmental clipping. No production compute shader, source evaluator, event ABI, serialized asset, scene, prefab, or material changed.
+
+### Acceptance
+
+Shore and Inward geometry rows continue to use their declared integrated cell-area contracts, but those contracts are now measured under deterministic valid-fluid conditions. Production-domain shoreline clipping remains a separate visual/runtime concern and is not used to decide whether the authored source primitive is cell-exact.
+
+### Next work items
+
+- Run the 84-case Smoke suite and confirm Shore/Inward return to approximately `1`, `5`, `3`, and `1` under `synthetic-domain-fixture`.
+- Confirm Arc/Semi-Arc contact-profile and union contracts remain unchanged.
+- If synthetic Shore/Inward still underfill, investigate only the source evaluator or fixed metric packing; do not attribute the result to production boundary/shore masks.
+
+## RIVER-FOAM-SPAWN-D8.8A — Shore/Inward Synthetic Domain Coordinate Alignment
+
+Status: validated and closed on 2026-07-28.
+
+D8.8 bound a fixed synthetic right shore at lateral metre `0`, but retained the
+production fixed-metric lattice and the production dispatch-range resolver. Shore
+Ribbon and Inward Wash ranges are resolved around the geometric river bank, so
+ordinary dispatched rows were not near the synthetic zero-metre shore and were
+rejected by the debug kernel before source-shape evaluation. This produced the
+observed deterministic zero area and zero support for all 18 Shore/Inward rows.
+
+D8.8A keeps the repair diagnostic-only:
+
+- Boundary coverage remains audit-owned and uniformly valid (`1`).
+- Obstacle exclusion remains audit-owned and uniformly absent (`0`), now using
+  the production-compatible `RHalf` field resource.
+- Shore edges remain audit-owned, now using the production-compatible `RGHalf`
+  one-row resource.
+- Each synthetic shore column is populated from the stable geometric left/right
+  shore values already stored in the production metric row. This aligns the
+  synthetic shore with the unchanged metric lattice and dispatch range while
+  excluding mutable current-shore mask state.
+- A CPU spatial preflight verifies that the dispatched lateral range reaches the
+  selected synthetic shore. A mismatch now records an explicit fixture failure
+  instead of dispatching another set of meaningless zero-coverage cases.
+
+No production compute shader, automatic-source evaluator, event ABI, serialized
+asset, scene, prefab, material, Inspector action, or gameplay runtime path changed.
+
+### Validation result
+
+`CellExactSpawnerSmokeSuite(8)` completed all `84/84` asynchronous GPU
+readbacks in `2.672 s` with `84 PASS`, `0 FAIL`. Shore Ribbon and Inward Wash
+returned approximately `1`, `1`, `1`, `5`, `3`, and `1` integrated cells under
+the aligned synthetic fixture. Arc/Semi-Arc profile and union rows, Fleck, Lace,
+Cross-Lace, and Broken Filament all remained PASS. The D8.8 synthetic-domain
+blocker and the automatic-spawner cell-exact production geometry contract are
+therefore closed.
+
+## RIVER-FOAM-SPAWN-D8.9 — Cell-Exact Audit Reporting Closure
+
+Status: implemented in source; final Unity validation pending.
+
+D8.9 changes diagnostic reporting only:
+
+- Broken Filament body rows now print the actual non-empty bounded-envelope
+  acceptance interval used by their pass logic, instead of displaying the solid
+  primitive's incompatible generic lower bound.
+- Replay rows label unequal raw half-float payloads as informational evidence.
+  Raw equality remains available in TXT/CSV output, but does not override the
+  integrated geometry result or contribute to suite pass/fail.
+- The production compute shader, source evaluators, event ABI, runtime dispatch,
+  serialized assets, scenes, prefabs, materials, and Inspector workflow remain
+  unchanged.
+
+### Final validation gate
+
+Run the existing 84-case Smoke suite once. Required evidence:
+
+- `84/84` asynchronous GPU readbacks complete;
+- `84 PASS`, `0 FAIL`;
+- Broken Filament rows show `fragmented-envelope-contract` with a lower bound of
+  `0.001` as an exclusive lower bound and the correct bounded upper value;
+- replay differences, if present, are labeled `raw-mismatch informational`;
+- all integrated areas and recipe contracts remain unchanged from
+  `CellExactSpawnerSmokeSuite(8)`.
+
+## RIVER-FOAM-SPAWN-D8.11 — Dedicated Shore Ribbon Behavior Suite
+
+Status: implemented; Unity validation pending.
+
+D8.10 was reverted because its single-dispatch temporal rows did not measure the requested multi-tick persistent trail and the primary 1 cell/s case failed. The broad Cell-Exact Spawner Contract Audit is restored to its 84-case geometry/regression role.
+
+A separate Play Mode suite now owns Shore Ribbon behavior validation. It does not mutate the visible persistent Foam field or serialized scene state. It uses audit-owned boundary, obstacle, shore, birth-debug, and persistent material textures while dispatching the production `RasterizeFoamSourceEventDebug` path repeatedly at the real 8 Hz material cadence.
+
+The suite begins with a hard control-authority preflight:
+
+- automatic Shore birth must be active;
+- Object and Free-Water automatic birth must be inactive;
+- the Shore recipe must resolve exclusively to Shore Ribbon;
+- every currently active automatic source event must be Shore Ribbon.
+
+It then runs deterministic right- and left-bank cases covering:
+
+- 1 cell/s at 8-cell and 20-cell lengths;
+- 2 cells/s at 8-cell and 20-cell lengths;
+- both banks;
+- one explicit delayed 3.5-cell material tick as stall robustness, not as a normal reveal speed.
+
+Every production material tick is dispatched. At each crossed-cell checkpoint, asynchronous GPU readback measures the cumulative audit-owned packed material state and reports:
+
+- resolved progress and completion boundary;
+- integrated Coverage;
+- integrated intrinsic Presence;
+- integrated Remaining Life;
+- longitudinal and lateral support bounds;
+- longitudinal-to-lateral direction ratio;
+- empty longitudinal columns inside the accumulated trail;
+- monotonic head/trail progression.
+
+Hard contracts:
+
+1. Shore Ribbon length and head travel grow along field/global-distance X.
+2. One-cell width remains lateral/across-shore.
+3. No complete longitudinal cell column may be absent between the accumulated trail endpoints.
+4. Coverage, Presence, and Remaining Life must all be written to the audit-owned persistent state.
+5. The event reaches its resolved finite length and completion boundary.
+6. The runner remains incremental, cancellable, Editor-responsive, and asynchronous.
+
+The dedicated report is preserved as:
+
+```text
+Library/RiverFoam/ShoreRibbonBehaviorSuite.txt
+Library/RiverFoam/ShoreRibbonBehaviorSuite.csv
+```
+
+No production source scheduler, source geometry, transport, lifecycle, scene, prefab, material, or serialized River value is changed by D8.11. The first report must identify whether the defect is already present in repeated production birth/merge or lies later in the visible runtime pipeline.
+
+
+## RIVER-FOAM-SPAWN-D8.12 — Shore Ribbon Production-Pipeline Localization
+
+Status: implemented; Unity validation pending.
+
+D8.12 upgrades the dedicated Shore Ribbon Behavior Suite instead of changing production spawning behavior. The D8.11 report proved that Shore-only controls were authoritative, that ordinary 1–2 cells/s repeated births contained no complete longitudinal gaps, and that the delayed 3.5-cell tick did create a persistent gap. It did not independently execute lifecycle and transport, and its raw X/Y bounding-box direction ratio produced misleading failures on short curved footprints.
+
+Every checkpoint now captures four audit-owned stages from the same accumulated Shore Ribbon state:
+
+1. `BIRTH` — repeated production source raster accumulated through the current head progress.
+2. `LIFECYCLE_ONLY` — one 8 Hz `SimulateFoam` step with transport delta zero.
+3. `TRANSPORT_ONLY` — one 8 Hz `SimulateFoam` step with lifecycle delta zero.
+4. `COMBINED` — one ordinary 8 Hz simulation step, matching the production simulation-before-next-birth order.
+
+The simulation branches reuse the production metric buffer, topology, motion, routing, transport scheme, and lifecycle configuration, but bind audit-owned state, valid boundary, and zero-obstacle resources. They never swap or overwrite the visible persistent Foam textures.
+
+For each stage, TXT and CSV now report:
+
+- integrated Coverage, intrinsic Presence, and Remaining Life;
+- support bounds and internal empty longitudinal columns;
+- metric longitudinal span and metric lateral span;
+- along/across direction ratio in metres rather than raw texture dimensions;
+- Coverage, Presence, and Life retention relative to the birth snapshot;
+- explicit stage pass/fail.
+
+The hard localization gates are intentionally stage-specific:
+
+- Birth must remain continuous, predominantly along-shore after the initial short footprint, material-bearing, and monotonic.
+- Lifecycle-only must not erase Coverage or Presence in one 8 Hz step and must retain nonzero life.
+- Transport-only must not create a complete internal gap and must retain at least 80% of integrated Presence in one step.
+- Combined simulation must not create a complete internal gap and must retain at least 75% of integrated Presence in one step.
+
+The delayed-tick case remains a robustness case rather than a normal reveal-speed case. The report-access controls remain `Copy Shore TXT + CSV` and `Open Shore Reports Folder`.
+
+No production source scheduler, source geometry, lifecycle, transport, shader, scene, prefab, material, or serialized River value is changed by D8.12. The first D8.12 report is expected to localize the sparse live ribbon result to birth, lifecycle, transport, combined simulation, or a later visual-shape/final-render stage.

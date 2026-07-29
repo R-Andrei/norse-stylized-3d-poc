@@ -362,7 +362,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const int StandardFeatureAtlasResolution = 256;
         private const int DetailedFeatureAtlasResolution = 256;
         private const int HeroFeatureAtlasResolution = 512;
-        private const int ProductionGenerationContractVersion = 2;
+        private const int ProductionGenerationContractVersion = 3;
         private const int FeatureAtlasGenerationContractVersion = 1;
         private const string GeneratedMeshNamePrefix = "GeneratedMass_";
         private const string PlaneCutPreviewMeshNameSuffix =
@@ -453,6 +453,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassOverallRockTintStrength");
         private static readonly int GeneratedMassLightingTintInfluenceId =
             Shader.PropertyToID("_GeneratedMassLightingTintInfluence");
+        private static readonly int GeneratedMassSurfaceNormalStrengthId =
+            Shader.PropertyToID("_GeneratedMassSurfaceNormalStrength");
+        private static readonly int GeneratedMassSurfaceNormalScaleId =
+            Shader.PropertyToID("_GeneratedMassSurfaceNormalScale");
         private static readonly int GeneratedMassFeatureAtlas0Id =
             Shader.PropertyToID("_GeneratedMassFeatureAtlas0");
         private static readonly int GeneratedMassFeatureAtlas0EnabledId =
@@ -522,7 +526,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float EdgeWearTintStrength;
             public float EdgeWearMacroVariationCoverage;
             public float EdgeWearMacroVariation;
-            public bool CornerChippingEnabled;
+            public int CornerChipCount;
             public float CornerChipDepth;
             public float CornerChipDepthVariation;
             public float CornerChipTopFacingPreference;
@@ -554,6 +558,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float HeightBias;
             public float DepthBias;
             public float SurfaceVariation;
+            public float EdgeWearAmount;
+            public float EdgeWearWidth;
+            public float EdgeWearCoverage;
+            public float EdgeWearMacroVariationCoverage;
+            public float EdgeWearMacroVariation;
+            public float EdgeWearSoftness;
+            public int CornerChipCount;
+            public float CornerChipDepth;
+            public float CornerChipDepthVariation;
+            public float CornerChipTopFacingPreference;
+            public float CornerChipCapRingWidthScale;
+            public float CornerChipCapRingWearStrength;
 
             public bool Matches(ProductionGenerationState other)
             {
@@ -572,7 +588,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                        WidthBias == other.WidthBias &&
                        HeightBias == other.HeightBias &&
                        DepthBias == other.DepthBias &&
-                       SurfaceVariation == other.SurfaceVariation;
+                       SurfaceVariation == other.SurfaceVariation &&
+                       EdgeWearAmount == other.EdgeWearAmount &&
+                       EdgeWearWidth == other.EdgeWearWidth &&
+                       EdgeWearCoverage == other.EdgeWearCoverage &&
+                       EdgeWearMacroVariationCoverage ==
+                           other.EdgeWearMacroVariationCoverage &&
+                       EdgeWearMacroVariation == other.EdgeWearMacroVariation &&
+                       EdgeWearSoftness == other.EdgeWearSoftness &&
+                       CornerChipCount == other.CornerChipCount &&
+                       CornerChipDepth == other.CornerChipDepth &&
+                       CornerChipDepthVariation ==
+                           other.CornerChipDepthVariation &&
+                       CornerChipTopFacingPreference ==
+                           other.CornerChipTopFacingPreference &&
+                       CornerChipCapRingWidthScale ==
+                           other.CornerChipCapRingWidthScale &&
+                       CornerChipCapRingWearStrength ==
+                           other.CornerChipCapRingWearStrength;
             }
         }
 
@@ -788,6 +821,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float lightingTintInfluence = 0.35f;
 
+        [Tooltip("Whole-rock procedural normal intensity. This affects every generated-mass surface using one shared object-space field; it does not allocate per-rock textures.")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float surfaceNormalStrength = 0.18f;
+
+        [Tooltip("Object-space frequency of the shared whole-rock normal field. Higher values create smaller stone detail.")]
+        [Range(0.1f, 8f)]
+        [SerializeField]
+        private float surfaceNormalScale = 1.6f;
+
         [Tooltip("Convex edge-wear amount. For EW-4 plane-cut masses, this enables generated bevel/chamfer edge wear and controls worn-face material strength, not physical bevel width.")]
         [Range(0f, 2f)]
         [SerializeField]
@@ -838,11 +881,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [FormerlySerializedAs("edgeWearBreakup")]
         private float edgeWearMacroVariation;
 
-        [Tooltip("Enables one deterministic corner chip. Corner-chip preview shows the raw cut; the normal edge-wear preview applies the cut before rebuilding bevels from the current settings.")]
-        [SerializeField]
+        [SerializeField, HideInInspector]
         private bool cornerChippingEnabled;
 
-        [Tooltip("Requested corner-chip depth as a fraction of the shortest edge incident to the selected corner.")]
+        [SerializeField, HideInInspector]
+        private bool cornerChipCountMigrated;
+
+        [Tooltip("Target number of deterministic corner chips. Zero disables corner chipping. The generator commits up to this many separated, certifiable upper or side corners and stops early rather than forcing bottom-side or overlapping cuts.")]
+        [Range(0, 16)]
+        [SerializeField]
+        private int cornerChipCount;
+
+        [Tooltip("Requested corner-chip depth as a fraction of the shortest edge incident to each selected corner.")]
         [Range(0.04f, 0.35f)]
         [SerializeField]
         private float cornerChipDepth = 0.18f;
@@ -852,7 +902,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float cornerChipDepthVariation = 0.15f;
 
-        [Tooltip("How strongly corner selection favours upward-exposed corners. 0.5 preserves the original C1A.1 score balance; higher values favour visible upper corners.")]
+        [Tooltip("How strongly corner selection favours upward-exposed corners. Convexity remains the primary rank signal; higher values give more weight to normalized height and upward incident-face orientation.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float cornerChipTopFacingPreference = 0.65f;
@@ -1098,7 +1148,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public float EdgeWearMacroVariationCoverage =>
             edgeWearMacroVariationCoverage;
         public float EdgeWearMacroVariation => edgeWearMacroVariation;
-        public bool CornerChippingEnabled => cornerChippingEnabled;
+        public bool CornerChippingEnabled => cornerChipCount > 0;
+        public int CornerChipCount => cornerChipCount;
         public float CornerChipDepth => cornerChipDepth;
         public float CornerChipDepthVariation => cornerChipDepthVariation;
         public float CornerChipTopFacingPreference =>
@@ -1738,6 +1789,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 recipe = new MassRecipe();
             }
 
+            if (!cornerChipCountMigrated)
+            {
+                cornerChipCount = cornerChippingEnabled ? 1 : 0;
+                cornerChipCountMigrated = true;
+            }
+            cornerChipCount = Mathf.Clamp(cornerChipCount, 0, 16);
+            cornerChippingEnabled = cornerChipCount > 0;
+
             riverInteraction ??= new GeneratedRiverInteractionSettings();
             riverInteraction.Validate();
             customFeatureAtlasResolution = QuantizeFeatureAtlasResolution(
@@ -1914,6 +1973,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return default;
             }
 
+            MassSurfaceFeatureSettings featureSettings =
+                CreateSurfaceFeatureSettings();
             return new ProductionGenerationState
             {
                 ContractVersion = ProductionGenerationContractVersion,
@@ -1931,7 +1992,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 WidthBias = recipe.WidthBias,
                 HeightBias = recipe.HeightBias,
                 DepthBias = recipe.DepthBias,
-                SurfaceVariation = recipe.SurfaceVariation
+                SurfaceVariation = recipe.SurfaceVariation,
+                EdgeWearAmount = featureSettings.EdgeWearAmount,
+                EdgeWearWidth = featureSettings.EdgeWearWidth,
+                EdgeWearCoverage = featureSettings.EdgeWearCoverage,
+                EdgeWearMacroVariationCoverage =
+                    featureSettings.EdgeWearMacroVariationCoverage,
+                EdgeWearMacroVariation =
+                    featureSettings.EdgeWearMacroVariation,
+                EdgeWearSoftness = featureSettings.EdgeWearSoftness,
+                CornerChipCount = featureSettings.CornerChipCount,
+                CornerChipDepth = featureSettings.CornerChipDepth,
+                CornerChipDepthVariation =
+                    featureSettings.CornerChipDepthVariation,
+                CornerChipTopFacingPreference =
+                    featureSettings.CornerChipTopFacingPreference,
+                CornerChipCapRingWidthScale =
+                    featureSettings.CornerChipCapRingWidthScale,
+                CornerChipCapRingWearStrength =
+                    featureSettings.CornerChipCapRingWearStrength
             };
         }
 
@@ -2394,6 +2473,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             }
 #endif
 
+            MassGenerator.MarkBevelShadingDiagnosticAcceptedMesh(
+                sourceMeshData,
+                meshName);
             MeshBuilder.ApplyToMesh(
                 sourceMeshData,
                 generatedMesh,
@@ -2426,12 +2508,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<Vector4> tangents = new List<Vector4>();
             List<Vector2> uv0 = new List<Vector2>();
             List<Vector4> uv2 = new List<Vector4>();
+            List<Vector4> structuralFeatures = new List<Vector4>();
             List<Color> colors = new List<Color>();
             mesh.GetVertices(vertices);
             mesh.GetNormals(normals);
             mesh.GetTangents(tangents);
             mesh.GetUVs(0, uv0);
             mesh.GetUVs(2, uv2);
+            mesh.GetUVs(4, structuralFeatures);
             mesh.GetColors(colors);
 
             int vertexCount = vertices.Count;
@@ -2440,6 +2524,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 tangents.Count != vertexCount ||
                 uv0.Count != vertexCount ||
                 uv2.Count != vertexCount ||
+                structuralFeatures.Count != vertexCount ||
                 colors.Count != vertexCount)
             {
                 throw new InvalidOperationException(
@@ -2456,6 +2541,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 Vector4 tangent = tangents[vertexIndex];
                 Vector2 uv = uv0[vertexIndex];
                 Vector4 secondaryUv = uv2[vertexIndex];
+                Vector4 structuralFeature =
+                    structuralFeatures[vertexIndex];
                 Color color = colors[vertexIndex];
                 float normalMagnitudeSqr = normal.sqrMagnitude;
                 float tangentMagnitudeSqr =
@@ -2485,6 +2572,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !IsFiniteGeneratedRenderValue(secondaryUv.y) ||
                     !IsFiniteGeneratedRenderValue(secondaryUv.z) ||
                     !IsFiniteGeneratedRenderValue(secondaryUv.w) ||
+                    !IsValidGeneratedStructuralFeatureChannel(
+                        structuralFeature) ||
                     !IsFiniteGeneratedRenderValue(color.r) ||
                     !IsFiniteGeneratedRenderValue(color.g) ||
                     !IsFiniteGeneratedRenderValue(color.b) ||
@@ -2496,6 +2585,40 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         vertexIndex + ".");
                 }
             }
+        }
+
+
+        private static bool IsValidGeneratedStructuralFeatureChannel(
+            Vector4 value)
+        {
+            const int MaximumSurfaceFeatureType = 6;
+            if (!IsFiniteGeneratedRenderValue(value.x) ||
+                !IsFiniteGeneratedRenderValue(value.y) ||
+                !IsFiniteGeneratedRenderValue(value.z) ||
+                !IsFiniteGeneratedRenderValue(value.w))
+            {
+                return false;
+            }
+
+            bool primaryTypeValid =
+                Mathf.Abs(value.x - Mathf.Round(value.x)) <= 0.0001f &&
+                value.x >= 0f &&
+                value.x <= MaximumSurfaceFeatureType;
+            bool secondaryTypeValid =
+                Mathf.Abs(value.z - Mathf.Round(value.z)) <= 0.0001f &&
+                value.z >= 0f &&
+                value.z <= MaximumSurfaceFeatureType;
+            bool strengthsValid =
+                value.y >= 0f && value.y <= 1f &&
+                value.w >= 0f && value.w <= 1f;
+            bool emptySlotsAreZero =
+                (value.x != 0f || value.y == 0f) &&
+                (value.z != 0f || value.w == 0f);
+
+            return primaryTypeValid &&
+                secondaryTypeValid &&
+                strengthsValid &&
+                emptySlotsAreZero;
         }
 
         private static bool IsFiniteGeneratedRenderValue(float value)
@@ -2656,7 +2779,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             edgeWearMacroVariationCoverage =
                 values.EdgeWearMacroVariationCoverage;
             edgeWearMacroVariation = values.EdgeWearMacroVariation;
-            cornerChippingEnabled = values.CornerChippingEnabled;
+            cornerChipCount = Mathf.Clamp(values.CornerChipCount, 0, 16);
+            cornerChippingEnabled = cornerChipCount > 0;
+            cornerChipCountMigrated = true;
             cornerChipDepth = values.CornerChipDepth;
             cornerChipDepthVariation = values.CornerChipDepthVariation;
             cornerChipTopFacingPreference =
@@ -2746,8 +2871,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                    FloatApproximately(
                        edgeWearMacroVariation,
                        values.EdgeWearMacroVariation) &&
-                   cornerChippingEnabled ==
-                       values.CornerChippingEnabled &&
+                   cornerChipCount == values.CornerChipCount &&
                    FloatApproximately(
                        cornerChipDepth,
                        values.CornerChipDepth) &&
@@ -2895,7 +3019,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 EdgeWearTintStrength = 0.18f,
                 EdgeWearMacroVariationCoverage = 1f,
                 EdgeWearMacroVariation = 0.32f,
-                CornerChippingEnabled = false,
+                CornerChipCount = 0,
                 CornerChipDepth = 0.18f,
                 CornerChipDepthVariation = 0.15f,
                 CornerChipTopFacingPreference = 0.65f,
@@ -3004,18 +3128,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearSoftnessId,
                 Mathf.Clamp01(edgeWearSoftness));
+            // GM-SURFACE.5E baseline parity quarantines the old bevel-specific
+            // pre-light albedo response. Keep serialized authoring values intact,
+            // but do not publish them to the production renderer.
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearResponseStrengthId,
-                Mathf.Clamp01(edgeWearResponseStrength));
+                0f);
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearBrightnessLiftId,
-                Mathf.Clamp01(edgeWearBrightnessLift));
+                0f);
             materialProperties.SetColor(
                 GeneratedMassEdgeWearTintId,
                 edgeWearTint);
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearTintStrengthId,
-                Mathf.Clamp01(edgeWearTintStrength));
+                0f);
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearMacroVariationId,
                 Mathf.Clamp01(edgeWearMacroVariation));
@@ -3116,6 +3243,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassLightingTintInfluenceId,
                 Mathf.Clamp01(lightingTintInfluence));
+            materialProperties.SetFloat(
+                GeneratedMassSurfaceNormalStrengthId,
+                Mathf.Clamp01(surfaceNormalStrength));
+            materialProperties.SetFloat(
+                GeneratedMassSurfaceNormalScaleId,
+                Mathf.Clamp(surfaceNormalScale, 0.1f, 8f));
 
             meshRenderer.SetPropertyBlock(materialProperties);
         }
@@ -3294,12 +3427,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 creaseWidth,
                 creaseLength,
                 creaseBranching,
-                cornerChippingEnabled,
+                cornerChipCount > 0,
                 cornerChipDepth,
                 cornerChipDepthVariation,
                 cornerChipTopFacingPreference,
                 cornerChipCapRingWidthScale,
-                cornerChipCapRingWearStrength);
+                cornerChipCapRingWearStrength,
+                cornerChipCount);
         }
 
         private void EnsureGeneratedMesh()

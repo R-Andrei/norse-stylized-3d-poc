@@ -22,7 +22,7 @@ Render pipeline: URP
 Gameplay camera: constrained top-down isometric
 Primary wind spatial domain: world-space XZ
 Current implemented Weather features: shared wind domain, vegetation response field, stylized wind trails, and a frozen V0 native directional-cookie cloud-shadow system with universal receiver integration, diagnostics, low-frequency seed evolution, and automated benchmarking
-Active Weather feature: LightRay V1.0 nonvisual source patch prepared; Unity validation is pending and mandatory hybrid visual rendering remains pending V1.1
+Active Weather feature: LightRay `WEATHER-LIGHT-RAY-V1.2E` separates visual presets, normalized-cycle selection, explicit runtime dependencies, and reusable population policies while retaining the accepted hybrid atmospheric-ribbon and real-Spot renderer; curated profile assets and scene migration remain deferred
 Active Weather authoring patch: `WEATHER-INSPECTOR-CLEANUP-V1.0` reorganizes the four Weather custom Inspectors under collapsed sections without changing runtime behavior or serialized values
 Current pending Weather validation: standalone Player, low-end-PC, release-stripping, and broad lifecycle confirmation during the future project-wide Weather testing sprint; none blocks the accepted cloud-shadow V0.4 freeze
 ```
@@ -59,21 +59,30 @@ The earlier Ground-only and unresolved-candidate scopes are superseded. The froz
 
 Cloud transmission modifies environmental sunlight only unless a separately approved global overcast response also changes ambient/sky lighting. Weather cloud shading must not mutate receiver geometry, collision, hydrology, River simulation, Vegetation interaction, Generated Mass generation, actor gameplay, or material ownership.
 
-### 2.2 LightRay ownership and hybrid V1 architecture — V1.0 source patch prepared
+### 2.2 LightRay ownership and hybrid V1 architecture — continuous-beam replacement documented
 
-Weather owns the approved LightRay subsystem: persistent world-space Sun/Moon ray zones, procedural placement, authored and gameplay-requested registration, lifecycle, cloud eligibility, renderer-facing data, and gameplay influence queries. Time of Day remains authoritative for celestial source direction, colour, intensity, and availability. The cloud system remains authoritative for cloud transmission and seed evolution. Gameplay systems consume LightRay influence but own healing, damage, buffs, quests, and all other effects.
+Weather owns the LightRay subsystem: persistent world-space source-dependent or source-independent ray zones, procedural placement, authored and gameplay-requested registration, lifecycle, normalized-cycle preset selection, explicit dependency resolution, cloud eligibility, renderer-facing data, and gameplay influence queries. Time of Day may provide the normalized `0..1` activation cycle and the current Controller directional source, but visual presets never infer source ownership or active period. The cloud system remains authoritative for cloud transmission, measured global cloud cover, movement, and seed evolution. Gameplay systems consume LightRay influence but own healing, damage, buffs, quests, and all other effects.
 
-The canonical architecture and implementation plan are defined in:
+The canonical architecture and current implementation order are defined in:
 
 - `Assets/Docs/Weather_Light_Ray_Architecture.md`
 
-The V1 visual target is mandatory hybrid rendering: world-space analytic zones and coarse proxy volumes bound the work, while Unity 6 URP Render Graph passes produce depth-aware shaft atmosphere, visible-surface brightening, ground footprints, and cloud-bypass compensation. A directly visible low-poly prism is not an accepted sole visual path or quality tier.
+The V1.0C source-neutral controller, Sun binding, CPU cloud query, and projection-focus validation remain accepted. The sampled-volume renderer and subsequent failed sparse/per-beam-impact/contact-cell presentations remain rejected by Unity evidence.
 
-Normal procedural Sun and Moon populations are mutually exclusive. Sun rays belong to the day window, Moon rays belong to the future night window, and both are disabled through their horizon transition dead zones. The current project has no authoritative Moon source, so the runtime implementation begins with source-neutral types and Sun binding only.
+The current AF4 authored proof uses the mandatory hybrid continuous-beam architecture:
 
-Cloud-respecting rays use stable clearings and suspend during cloud seed evolution. Cloud-ignoring rays remain available for full-overcast artistic compositions, divine authored rays, and gameplay requests without changing the frozen cloud cookie. Timed, permanent, and externally controlled lifetimes are approved.
+- one authoritative LightRay zone owns `2–12` complete parallel atmospheric ribbons derived from one Area Diameter;
+- the ribbons use one combined mesh, a full-resolution mask, and restrained screen-space edge softening;
+- one lazy pooled shadowless realtime URP Spot Light per active zone is the primary surface response, allowing Vegetation, Ground, masses, actors, props, and other additional-light-aware receivers to execute their normal material lighting;
+- the prior full-resolution screen-space circular lift remains an optional complement and defaults to zero;
+- one shared edge-softness value derives the real Spot inner/outer cone and optional complement boundary;
+- no per-beam Unity Lights, broad visible envelope, sampled ellipse field, capsule cluster, or ribbon-only final tier is approved.
 
-`WEATHER-LIGHT-RAY-V1.0` prepares the nonvisual source contract in source files only; Unity compilation and Scene-view projection validation remain pending. `WeatherLightRayController` owns a fixed 16-slot capacity with no registration surface, so active count remains zero. The current Sun resolves from an override or `RenderSettings.sun`; Moon is a reserved unavailable source. `WeatherCloudShadowController.TrySampleCloudTransmission` samples the existing readable cookie using the source light's local cookie plane, current world phase, repeat period, and bilinear filtering. The Scene-view probe markers are intended to be compared against the existing shader-sampled Cloud / Opening Map. No Renderer Feature, visible shaft, scene attachment, gameplay effect, receiver change, cloud-generation change, or serialized render asset change is part of V1.0.
+Normal procedural Sun and Moon populations remain mutually exclusive. Sun rays belong to the day window, Moon rays belong to the future night window, and both are disabled through horizon transition dead zones. The project still has no authoritative Moon source, so Moon runtime work remains blocked.
+
+Cloud-respecting rays use the existing cloud field. Cloud-ignoring rays may imply divine light through complete cloud cover without changing the directional cookie. Timed, permanent, and externally controlled lifetimes remain approved.
+
+`WEATHER-LIGHT-RAY-V1.1D-AF4` is source-implemented but not accepted or frozen. The real Spot Light, optional complement migration, material response, four-additional-light interaction, and 1440p cost still require Unity proof. Procedural population remains blocked until the authored proof passes.
 
 ### 2.3 Weather Inspector organization — `WEATHER-INSPECTOR-CLEANUP-V1.0`
 
@@ -85,9 +94,27 @@ The cleanup is presentation-only. Runtime fields, serialized field names, author
 
 Cloud debug visualization is controlled only by the serialized `Debug View` dropdown. The duplicate Show Cloud Areas, Show Cloud / Opening Map, Hide Cloud Debug Overlay, and Refresh Debug Focus buttons are removed. The conditional runtime-focus-clear action remains.
 
-The LightRay Inspector states that V1.0 is nonvisual and that active count zero is expected. Future-only `Light Rays Enabled` and `Cloud Evolution Resume Threshold` serialized fields remain preserved but are hidden until the V1 lifecycle and hybrid renderer give them an active consumer.
+The LightRay Inspector organization remains governed by the cleanup patch. The current authored-anchor and renderer controls exist, but visual authority comes from `Weather_Light_Ray_Architecture.md`; the rejected V1.1C renderer controls must be replaced or redefined only through the approved continuous-beam source sequence.
 
 ---
+
+
+## 2.3 LightRay preset selection and population-policy boundary — V1.2E
+
+`WEATHER-LIGHT-RAY-V1.2E` separates four authorities:
+
+- `WeatherLightRayPreset`: appearance only;
+- `WeatherLightRaySelectionProfile`: normalized `0..1` eligibility, priority, transition stability, and explicit direction/source/cloud dependencies;
+- `WeatherLightRayPopulationProfile`: reusable instance counts, spacing, cloud-data requirement, spatial cloud policy, and cloud-cover activation;
+- `WeatherLightRayController`: scene bindings, cycle provider, focus/ground controls, shared storage, global automatic-ray budget, and execution.
+
+Selection curves are normalized and are not interpreted as hours or named dayparts. A source-dependent entry is eligible only through its explicit source-availability policy. Vertical and fixed-world entries use the independent source contract and do not require a Sun or Moon light. A visual preset's legacy `SourceKind` metadata is not production authority.
+
+Population rules independently choose whether cloud data is ignored, optional, or required and whether placement is unrestricted, clear-footprint-qualified, or a distinct cloud opening. `Optional + Clear Footprint` is the ordinary sunlight contract: cloudless or disabled cloud state behaves as clear sky, while an enabled cloud field restricts candidates to clear footprints. An enabled but invalid/unready cloud producer is never silently treated as clear.
+
+Several rules may coexist under one selected entry and share one Controller automatic-ray budget. Authored and gameplay-created rays are never evicted. Compatible visual-preset changes preserve population handles; incompatible dependency contexts retire old automatic rays before replacement qualification.
+
+The cloud producer remains frozen. V1.2E adds only dirty-time measured cloud cover from already generated CPU cookie pixels and consumes the existing current/future transmission queries. No GPU readback, duplicate cloud simulation, per-frame cookie scan, or receiver-path change is introduced.
 
 ## 3. Authoritative wind and visual response are separate
 
@@ -292,22 +319,34 @@ The accepted cloud-shadow baseline is:
 
 No additional cloud-shadow implementation is currently planned. The system may reopen only for a concrete defect or materially adverse Player/low-end benchmark evidence.
 
-### LightRay V1 architecture — V1.0 source patch prepared
+### LightRay V1 architecture — AF4 hybrid real-light authored proof
 
 The former undefined godrays boundary is superseded by `Assets/Docs/Weather_Light_Ray_Architecture.md`. The subsystem is named LightRay and supports shared Sun/Moon architecture, procedural Weather rays, permanent authored rays, and timed or externally controlled gameplay requests.
 
-Approved boundaries:
+Current authoritative boundaries:
 
 - `TimeOfDayController` remains authoritative for the current Sun and any future approved Moon source;
-- Weather owns LightRay placement, lifecycle, cloud policy, rendering data, authored/runtime registration, and analytical gameplay influence;
+- Weather owns LightRay placement, lifecycle, cloud policy, renderer data, authored/runtime registration, analytical gameplay influence, and the pooled per-zone surface-light proxy;
 - cloud-respecting rays consume the existing cloud field and suspend during seed evolution;
-- cloud-ignoring rays may imply divine light through complete cloud cover without modifying the directional cookie;
-- Sun and Moon procedural groups are mutually exclusive and excluded near horizon transitions;
-- the V1 renderer is hybrid from its first visible slice: world-space zones plus mandatory depth-aware screen-space mask, scattering, surface-light, and ground-footprint presentation;
-- no directly visible low-poly-prism-only fallback is approved;
-- the frozen cloud receiver-cookie path and Ground/Generated Mass/Vegetation/River simulation remain unchanged;
-- V1.0 prepares source-neutral types, central fixed-capacity ownership, Sun binding, explicit Moon unavailability, CPU cloud-transmission sampling, and a controlled projection diagnostic; Unity compilation and projection validation remain pending application.
-- V1.1 remains the first visible patch and must implement the mandatory hybrid renderer after the installed URP package is reviewed in the live Unity project.
+- cloud-ignoring rays may remain active through complete cloud cover without modifying the directional cookie;
+- Sun and Moon procedural groups remain mutually exclusive and excluded near horizon transitions;
+- one LightRay zone renders several separate complete parallel beams, not one segmented line;
+- atmospheric presentation uses one combined mesh of complete world-X dense-overlap ribbons plus bounded screen-space finishing;
+- primary receiver illumination uses at most one pooled shadowless realtime URP Spot Light per active zone, never one Light per beam;
+- the prior full-resolution screen-space circular lift is retained only as an optional complement and defaults to zero;
+- one shared surface softness derives both the Spot inner/outer cone and optional complement boundary;
+- the sampled frustum/tube/ellipse renderer, broad envelope, per-beam impact lights, and screen-space-only primary surface response are rejected;
+- the frozen cloud receiver-cookie path and Ground, Generated Mass, Vegetation, River, actor, and gameplay ownership remain unchanged;
+- AF4 source is implemented but Unity material-response proof and profiling remain pending.
+
+Continuation order:
+
+```text
+AF4 compile and real-Spot material-response proof
+AF4 additional-light interaction and 1440p profiling
+Authored-proof freeze
+Procedural population only after freeze
+```
 
 ---
 
@@ -413,3 +452,20 @@ The one-time vegetation-owned compatibility publisher and migration utility were
 ### WEATHER-V0A final cleanup
 
 `VEG-V2-INFRA.3A` was superseded before application. `VEG-V2-INFRA.3` directly removes the obsolete compatibility subclass and migration utility while leaving `WeatherWindDomain` and all runtime Weather behavior unchanged. If a live scene still contains the obsolete test object, it is deleted manually in Unity rather than supported by additional transitional code.
+
+## 2.4 Automatic LightRay population — `WEATHER-LIGHT-RAY-V1.2D`
+
+The active LightRay implementation now includes a source-prepared deterministic automatic Sun population layer owned by the existing `WeatherLightRayController`. The canonical contract remains `Assets/Docs/Weather_Light_Ray_Architecture.md`.
+
+The population layer:
+
+- evaluates stable hashed world-space cells around the resolved Base Game camera ground footprint or an explicit focus override;
+- acquires ground through an explicit user-assigned physics mask;
+- samples the complete preset-sized footprint against the exact CPU-readable cloud cookie at present and bounded future times;
+- uses bounded qualification, invalid grace, cooldown, and graceful procedural-handle retirement;
+- keeps individual V1.2D rays static rather than making ground lights chase cloud openings;
+- suspends automatic spawning and retires automatic rays during cloud seed evolution below the established resume threshold;
+- protects authored and caller-created procedural rays from eviction;
+- adds no cloud generator, GPU readback, scene component, shader path, material path, layer, tag, or serialized scene edit.
+
+Automatic population is disabled by default and its Ground Mask defaults to Nothing. Project-side Unity configuration, compilation, visual validation, allocation measurement, and 0/1/3/6-ray CPU/GPU profiling remain required before production density is accepted.

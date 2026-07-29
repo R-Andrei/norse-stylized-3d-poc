@@ -5,114 +5,6 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
-        private readonly struct PendingInjection
-        {
-            public PendingInjection(
-                float globalDistance,
-                float acrossNormalized,
-                float radius,
-                float sourceAmount,
-                float remainingLife,
-                float patternSeed,
-                float elongation,
-                bool isManual,
-                float sourceFillSeed,
-                float sourceFillFeatureSize,
-                float shapeSeed = 0f,
-                float shapeVariety = 0f,
-                bool compoundShape = false,
-                bool segmentShape = false,
-                float segmentStartGlobalDistance = 0f,
-                float segmentStartAcrossNormalized = 0f,
-                float segmentStartRadius = 0f,
-                float segmentStartAmount = 0f,
-                float segmentEndGlobalDistance = 0f,
-                float segmentEndAcrossNormalized = 0f,
-                float segmentEndRadius = 0f,
-                float segmentEndAmount = 0f,
-                bool usesMetricLateral = false,
-                float lateralMetres = 0f,
-                float segmentStartLateralMetres = 0f,
-                float segmentEndLateralMetres = 0f)
-            {
-                GlobalDistance = globalDistance;
-                AcrossNormalized = acrossNormalized;
-                Radius = radius;
-                SourceAmount = sourceAmount;
-                RemainingLife = remainingLife;
-                PatternSeed = patternSeed;
-                Elongation = elongation;
-                IsManual = isManual;
-                SourceFillSeed = sourceFillSeed;
-                SourceFillFeatureSize = sourceFillFeatureSize;
-                ShapeSeed = shapeSeed;
-                ShapeVariety = shapeVariety;
-                CompoundShape = compoundShape;
-                SegmentShape = segmentShape;
-                SegmentStartGlobalDistance = segmentShape
-                    ? segmentStartGlobalDistance
-                    : globalDistance;
-                SegmentStartAcrossNormalized = segmentShape
-                    ? segmentStartAcrossNormalized
-                    : acrossNormalized;
-                SegmentStartRadius = segmentShape
-                    ? segmentStartRadius
-                    : radius;
-                SegmentStartSourceAmount = segmentShape
-                    ? segmentStartAmount
-                    : sourceAmount;
-                SegmentEndGlobalDistance = segmentShape
-                    ? segmentEndGlobalDistance
-                    : globalDistance;
-                SegmentEndAcrossNormalized = segmentShape
-                    ? segmentEndAcrossNormalized
-                    : acrossNormalized;
-                SegmentEndRadius = segmentShape
-                    ? segmentEndRadius
-                    : radius;
-                SegmentEndSourceAmount = segmentShape
-                    ? segmentEndAmount
-                    : sourceAmount;
-                UsesMetricLateral = usesMetricLateral;
-                LateralMetres = usesMetricLateral
-                    ? lateralMetres
-                    : 0f;
-                SegmentStartLateralMetres = usesMetricLateral && segmentShape
-                    ? segmentStartLateralMetres
-                    : LateralMetres;
-                SegmentEndLateralMetres = usesMetricLateral && segmentShape
-                    ? segmentEndLateralMetres
-                    : LateralMetres;
-            }
-
-            public float GlobalDistance { get; }
-            public float AcrossNormalized { get; }
-            public float Radius { get; }
-            public float SourceAmount { get; }
-            public float RemainingLife { get; }
-            public float PatternSeed { get; }
-            public float Elongation { get; }
-            public bool IsManual { get; }
-            public float SourceFillSeed { get; }
-            public float SourceFillFeatureSize { get; }
-            public float ShapeSeed { get; }
-            public float ShapeVariety { get; }
-            public bool CompoundShape { get; }
-            public bool SegmentShape { get; }
-            public float SegmentStartGlobalDistance { get; }
-            public float SegmentStartAcrossNormalized { get; }
-            public float SegmentStartRadius { get; }
-            public float SegmentStartSourceAmount { get; }
-            public float SegmentEndGlobalDistance { get; }
-            public float SegmentEndAcrossNormalized { get; }
-            public float SegmentEndRadius { get; }
-            public float SegmentEndSourceAmount { get; }
-            public bool UsesMetricLateral { get; }
-            public float LateralMetres { get; }
-            public float SegmentStartLateralMetres { get; }
-            public float SegmentEndLateralMetres { get; }
-        }
-
         private enum AutomaticFoamSourceEventType
         {
             None = 0,
@@ -147,6 +39,19 @@ namespace ProgrammaticStylized3D.Rivers
             public float ResolvedDurationSeconds;
             public float ActualSpeedMetresPerSecond;
             public bool CadenceLimited;
+        }
+
+        private struct AutomaticFoamPacketReservation
+        {
+            public bool Active;
+            public int EventId;
+            public AutomaticFoamSourceEventType Type;
+            public EntityId ObjectSourceId;
+            public float MinimumGlobalDistance;
+            public float MaximumGlobalDistance;
+            public float MinimumLateralMetres;
+            public float MaximumLateralMetres;
+            public float ExpiresAtRealtime;
         }
 
         private struct AutomaticFoamSourceEvent
@@ -208,6 +113,17 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectContactPositiveFirstSegmentSplit;
             public float CentreAcrossNormalized;
             public float LateralPaddingMetres;
+            // D8 cell-authoritative recipe-local geometry. These CPU fields are
+            // union-packed into the existing eight-float4 GPU event record.
+            public float BodyLengthCells;
+            public float BodyWidthCells;
+            public float HeadLengthCells;
+            public float HeadWidthCells;
+            public float BendAmplitudeCells;
+            public float ContactSpanCells;
+            public float ContactWidthCells;
+            public float WakeLengthCells;
+            public float WakeWidthCells;
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -221,10 +137,10 @@ namespace ProgrammaticStylized3D.Rivers
             // contact point 0; z = centre storage global; w = flow direction
             // except Object Arc/Semi-Arc contact point 1.x.
             public Vector4 Distance;
-            // x = shore inset except Object Arc/Semi-Arc contact point 1.y;
-            // y = width metres except Shore Ribbon thickness cells and Object
-            // Arc/Semi-Arc straight wake-arm length metres; z = inward reach or
-            // Arc/Semi-Arc normalized material-step duration; w = feather metres
+            // x = shore offset cells for D8 Shore/Inward except Object Arc/Semi-Arc contact point 1.y;
+            // y = width cells for D8 Shore/Inward and Object
+            // Arc/Semi-Arc straight wake-arm length metres; z = inward reach cells for D8 Inward Wash or
+            // Arc/Semi-Arc normalized material-step duration; w = head width cells for D8 Shore/Inward
             // except Object Arc/Semi-Arc contact point 2.x.
             public Vector4 Shore;
             // x = authored intrinsic Presence, y = authored normalized
@@ -253,42 +169,6 @@ namespace ProgrammaticStylized3D.Rivers
             // nonpersistent source families; Object Arc/Semi-Arc use their
             // finite object burst uses phase changes to reset one-shot permission.
             public Vector4 Deposit;
-        }
-
-        private struct FoamCompositionEvent
-        {
-            public bool Active;
-            public bool UsesMetricLateral;
-            public int EventId;
-            public float StartGlobalDistance;
-            public float StartAcrossNormalized;
-            public float StartLateralMetres;
-            public float Duration;
-            public float TravelDistance;
-            public float FlowDirection;
-            public float AcrossDrift;
-            public float AcrossDriftMetres;
-            public float PathWander;
-            public float PathWanderMetres;
-            public float BaseRadius;
-            public float SourceAmount;
-            public float RemainingLife;
-            public float AmountEnvelopeFloor;
-            public float RadiusEnvelopeFloor;
-            public float PatternSeed;
-            public float ShapeSeed;
-            public float SourceFillSeed;
-            public float SourceFillFeatureSize;
-            public float BendSign;
-            public float WidthPhase;
-            public float StrokeAspect;
-            public float WidthVariation;
-            public float Elapsed;
-            public float PreviousGlobalDistance;
-            public float PreviousAcrossNormalized;
-            public float PreviousLateralMetres;
-            public float PreviousRadius;
-            public float PreviousEmissionAmount;
         }
 
         [StructLayout(LayoutKind.Sequential)]

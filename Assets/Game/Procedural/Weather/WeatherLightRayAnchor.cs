@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace ProgrammaticStylized3D.Weather
 {
@@ -7,6 +8,32 @@ namespace ProgrammaticStylized3D.Weather
     [AddComponentMenu("PS3D/Weather/Weather LightRay Anchor")]
     public sealed class WeatherLightRayAnchor : MonoBehaviour
     {
+        private const int CurrentIntensityDefaultsVersion = 2;
+        private const int CurrentSurfaceControlsVersion = 2;
+        private const float DefaultSurfaceSpotLightIntensity = 0.20f;
+        private const float DefaultScreenSpaceSurfaceIntensity = 0f;
+
+        private const float LegacyDefaultAtmosphericIntensity = 0.28f;
+        private const float LegacyDefaultGroundLightIntensity = 0.42f;
+        private const float LegacyDefaultSurfaceLightIntensity = 0.28f;
+        private const float LegacyDefaultCloudCompensationIntensity = 0.45f;
+
+        private const float PreviousDefaultAtmosphericIntensity = 0.12f;
+        private const float PreviousDefaultGroundLightIntensity = 0.05f;
+        private const float PreviousDefaultSurfaceLightIntensity = 0.08f;
+        private const float PreviousDefaultCloudCompensationIntensity = 0.05f;
+
+        private const float DefaultAtmosphericIntensity = 0.09f;
+        private const float DefaultGroundLightIntensity = 0.015f;
+        private const float DefaultSurfaceLightIntensity = 0.025f;
+        private const float DefaultCloudCompensationIntensity = 0.01f;
+
+        [SerializeField, HideInInspector]
+        private int intensityDefaultsVersion;
+
+        [SerializeField, HideInInspector]
+        private int surfaceControlsVersion;
+
         [Header("Binding and Policy")]
         [SerializeField]
         private WeatherLightRayController controllerOverride;
@@ -43,52 +70,58 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField]
         private bool externallyControlledVisible = true;
 
-        [Header("Shape")]
-        [SerializeField, Min(0.1f)]
-        private float radiusMetres = 3f;
-
-        [SerializeField, Range(0.05f, 2f)]
-        private float topRadiusScale = 0.8f;
-
+        [Header("Continuous Beam Shape")]
         [SerializeField, Min(0.5f)]
         private float heightMetres = 18f;
-
-        [SerializeField, Range(0.1f, 2f)]
-        private float visualEnvelopeRadiusScale = 1f;
-
-        [SerializeField, Range(0.01f, 1f)]
-        private float visualEnvelopeEdgeSoftness = 0.65f;
 
         [SerializeField, Range(0f, 75f)]
         private float maximumVisualLeanDegrees = 25f;
 
-        [Header("Internal Ray Structure")]
-        [SerializeField, Range(1, 8)]
-        private int strandCount = 5;
+        [SerializeField, Min(
+            WeatherLightRayAreaLayout.MinimumDiameterMetres)]
+        private float areaDiameterMetres = 4.8f;
 
         [SerializeField]
-        private Vector2 strandWidthRange = new Vector2(0.07f, 0.16f);
+        private Vector2 beamWidthRatioRange = new Vector2(1f, 1.25f);
 
-        [SerializeField, Range(0f, 1f)]
-        private float strandSpread = 0.72f;
+        [SerializeField, HideInInspector,
+            FormerlySerializedAs("beamCount"),
+            FormerlySerializedAs("strandCount")]
+        private int legacyBeamCount = 5;
 
-        [SerializeField, Range(0f, 1f)]
-        private float strandPositionVariation = 0.45f;
+        [SerializeField, HideInInspector,
+            FormerlySerializedAs("beamWidthRangeMetres")]
+        private Vector2 legacyBeamWidthRangeMetres =
+            new Vector2(0.45f, 0.75f);
 
-        [SerializeField, Range(0f, 1f)]
-        private float strandIntensityVariation = 0.32f;
+        [SerializeField, Range(
+            WeatherLightRayAreaLayout.MinimumBeamSpacingMetres,
+            WeatherLightRayAreaLayout.MaximumBeamSpacingMetres),
+            FormerlySerializedAs("legacyBeamSpacingMetres")]
+        private float beamSpacingMetres =
+            WeatherLightRayAreaLayout.DefaultBeamSpacingMetres;
 
-        [SerializeField, Range(0f, 1f)]
-        private float strandLengthVariation = 0.28f;
+        [SerializeField, HideInInspector,
+            FormerlySerializedAs("beamPacking")]
+        private float legacyBeamPacking = 0.3f;
 
-        [SerializeField, Range(0f, 1f)]
-        private float strandTaper = 0.35f;
+        [SerializeField, Range(0f, 0.75f)]
+        private float beamIntensityVariation = 0.18f;
 
         [SerializeField, Range(0.01f, 1f)]
-        private float strandEdgeSoftness = 0.42f;
+        private float beamEdgeSoftness = 0.55f;
+
+        [SerializeField, Range(0f, 0.75f)]
+        private float beamSoftnessVariation = 0.35f;
+
+        [SerializeField, Range(0.001f, 0.49f)]
+        private float upperFade = 0.1f;
+
+        [SerializeField, Range(0.001f, 0.49f)]
+        private float groundFade = 0.12f;
 
         [SerializeField, Range(0f, 1f)]
-        private float strandClusterBias = 0.38f;
+        private float contactPlaneOpacity = 0.35f;
 
         [Header("Atmospheric Appearance")]
         [SerializeField]
@@ -98,64 +131,71 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField, Range(0f, 1f)]
         private float warmthContribution = 0.35f;
 
-        [SerializeField, Min(0f)]
-        private float shaftIntensity = 0.28f;
+        [SerializeField, FormerlySerializedAs("shaftIntensity"), Min(0f)]
+        private float atmosphericIntensity = DefaultAtmosphericIntensity;
 
-        [SerializeField, Min(0f)]
-        private float envelopeHazeIntensity = 0.025f;
-
-        [SerializeField, Range(0f, 8f)]
-        private float scatterLength = 2.2f;
-
-        [SerializeField, Range(0f, 1f)]
-        private float scatterSoftness = 0.35f;
-
-        [SerializeField, Range(0.001f, 0.49f)]
-        private float heightFade = 0.08f;
+        [SerializeField, FormerlySerializedAs("scatterSoftness"), Range(0f, 1f)]
+        private float softeningStrength = 0.35f;
 
         [SerializeField, Range(0f, 1f)]
         private float cameraIntersectionFade = 0.9f;
 
         [Header("Surface Illumination")]
-        [SerializeField, Min(0f)]
-        private float groundLightIntensity = 0.42f;
+        [SerializeField, Range(0f, 1f)]
+        private float surfaceSpotLightIntensity =
+            DefaultSurfaceSpotLightIntensity;
 
-        [SerializeField, Min(0f)]
-        private float surfaceLightIntensity = 0.28f;
+        [SerializeField, FormerlySerializedAs("surfaceIlluminationIntensity"),
+            Range(0f, 1f)]
+        private float screenSpaceSurfaceIntensity =
+            DefaultScreenSpaceSurfaceIntensity;
 
-        [SerializeField, Min(0f)]
-        private float cloudCompensationIntensity = 0.45f;
+        [SerializeField, HideInInspector]
+        private float groundLightIntensity = DefaultGroundLightIntensity;
 
-        [SerializeField, Range(0.01f, 1f)]
+        [SerializeField, HideInInspector]
+        private float surfaceLightIntensity = DefaultSurfaceLightIntensity;
+
+        [SerializeField, HideInInspector]
+        private float cloudCompensationIntensity =
+            DefaultCloudCompensationIntensity;
+
+        [SerializeField, HideInInspector,
+            FormerlySerializedAs("footprintRadiusMetres")]
+        private float legacyFootprintRadiusMetres = 2.4f;
+
+        [SerializeField, Range(0f, 1f)]
         private float edgeSoftness = 0.42f;
 
-        [SerializeField, Range(0f, 1f)]
-        private float footprintIrregularity = 0.2f;
+        [SerializeField, HideInInspector, FormerlySerializedAs("footprintIrregularity")]
+        private float legacyFootprintIrregularity = 0.2f;
 
-        [SerializeField, Min(0f)]
+        [SerializeField, HideInInspector]
         private float coreEmphasis = 0.2f;
 
-        [Header("Subtle Evolution")]
-        [SerializeField, Range(0f, 0.5f)]
-        private float fluctuationStrength = 0.06f;
+        [Header("Seeded Beam Evolution")]
+        [SerializeField]
+        private bool overrideControllerEvolution;
 
-        [SerializeField, Min(0f)]
-        private float fluctuationSpeed = 0.12f;
-
-        [SerializeField, Range(0f, 0.35f)]
-        private float widthBreathingStrength = 0.035f;
-
-        [SerializeField, Range(0f, 0.25f)]
-        private float lateralDriftStrength = 0.025f;
-
-        [SerializeField, Min(0f)]
-        private float patternEvolutionSpeed = 0.08f;
+        [SerializeField]
+        private WeatherLightRayEvolutionPreset evolutionPreset =
+            WeatherLightRayEvolutionPreset.Subtle;
 
         [SerializeField, Range(0f, 1f)]
-        private float perStrandPhaseVariation = 0.8f;
+        private float evolutionStrength = 0.35f;
+
+        [SerializeField, Range(0f, 1f)]
+        private float evolutionSpeed = 0.25f;
 
         [SerializeField, Min(1)]
         private int variationSeed = 7319;
+
+        [Header("Local Instance Overrides")]
+        [SerializeField, Min(0f)]
+        private float localIntensityMultiplier = 1f;
+
+        [SerializeField]
+        private bool overridePresetBeamSpacing;
 
         private WeatherLightRayController registeredController;
         private WeatherLightRayHandle handle;
@@ -174,26 +214,33 @@ namespace ProgrammaticStylized3D.Weather
         public bool ExternallyControlledVisible =>
             externallyControlledVisible;
         public uint LifecycleRevision => lifecycleRevision;
-        public float RadiusMetres => radiusMetres;
-        public float TopRadiusScale => topRadiusScale;
         public float HeightMetres => heightMetres;
-        public float VisualEnvelopeRadiusScale =>
-            visualEnvelopeRadiusScale;
-        public float VisualEnvelopeEdgeSoftness =>
-            visualEnvelopeEdgeSoftness;
-        public float MaximumVisualLeanDegrees =>
-            maximumVisualLeanDegrees;
+        public float AreaDiameterMetres => areaDiameterMetres;
+        public float BeamSpacingMetres => beamSpacingMetres;
+        public bool OverridePresetBeamSpacing => overridePresetBeamSpacing;
+        public float LocalIntensityMultiplier => Mathf.Max(0f, localIntensityMultiplier);
+        public WeatherLightRayAreaLayout AreaLayout =>
+            WeatherLightRayAreaLayout.Calculate(
+                areaDiameterMetres,
+                beamSpacingMetres);
+        public int BeamCount => AreaLayout.BeamCount;
+        public float BeamPitchMetres => AreaLayout.BeamPitchMetres;
+        public Vector2 BeamWidthRatioRange => beamWidthRatioRange;
+        public float FootprintRadiusMetres => AreaLayout.RadiusMetres;
         public Color ColourMultiplier => colourMultiplier;
         public float WarmthContribution => warmthContribution;
-        public float ShaftIntensity => shaftIntensity;
-        public float EnvelopeHazeIntensity => envelopeHazeIntensity;
-        public float GroundLightIntensity => groundLightIntensity;
-        public float SurfaceLightIntensity => surfaceLightIntensity;
-        public float CloudCompensationIntensity =>
-            cloudCompensationIntensity;
+        public float AtmosphericIntensity => atmosphericIntensity;
+        public float SurfaceSpotLightIntensity =>
+            surfaceSpotLightIntensity;
+        public float ScreenSpaceSurfaceIntensity =>
+            screenSpaceSurfaceIntensity;
         public float FadeInDurationSeconds => fadeInDurationSeconds;
         public float HoldDurationSeconds => holdDurationSeconds;
         public float FadeOutDurationSeconds => fadeOutDurationSeconds;
+        public bool OverrideControllerEvolution => overrideControllerEvolution;
+        public WeatherLightRayEvolutionPreset EvolutionPreset => evolutionPreset;
+        public float EvolutionStrength => ResolveEvolutionStrength();
+        public float EvolutionSpeed => ResolveEvolutionSpeed();
         public uint VariationSeed => (uint)Mathf.Max(1, variationSeed);
         public WeatherLightRayController RegisteredController =>
             registeredController;
@@ -202,6 +249,8 @@ namespace ProgrammaticStylized3D.Weather
 
         private void OnEnable()
         {
+            MigrateIntensityDefaults();
+            MigrateSurfaceControls();
             RefreshRegistration();
         }
 
@@ -217,49 +266,61 @@ namespace ProgrammaticStylized3D.Weather
 
         private void OnValidate()
         {
-            radiusMetres = Mathf.Max(0.1f, radiusMetres);
-            topRadiusScale = Mathf.Clamp(topRadiusScale, 0.05f, 2f);
+            MigrateIntensityDefaults();
+            MigrateSurfaceControls();
+
             heightMetres = Mathf.Max(0.5f, heightMetres);
-            visualEnvelopeRadiusScale = Mathf.Clamp(
-                visualEnvelopeRadiusScale,
-                0.1f,
-                2f);
-            visualEnvelopeEdgeSoftness = Mathf.Clamp(
-                visualEnvelopeEdgeSoftness,
-                0.01f,
-                1f);
             maximumVisualLeanDegrees = Mathf.Clamp(
                 maximumVisualLeanDegrees,
                 0f,
                 75f);
-            strandCount = Mathf.Clamp(strandCount, 1, 8);
-            strandWidthRange = NormalizeRange(
-                strandWidthRange,
-                0.01f,
-                0.5f);
-            strandSpread = Mathf.Clamp01(strandSpread);
-            strandPositionVariation = Mathf.Clamp01(
-                strandPositionVariation);
-            strandIntensityVariation = Mathf.Clamp01(
-                strandIntensityVariation);
-            strandLengthVariation = Mathf.Clamp01(
-                strandLengthVariation);
-            strandTaper = Mathf.Clamp01(strandTaper);
-            strandEdgeSoftness = Mathf.Clamp(
-                strandEdgeSoftness,
+            areaDiameterMetres = Mathf.Max(
+                WeatherLightRayAreaLayout.MinimumDiameterMetres,
+                !float.IsNaN(areaDiameterMetres) &&
+                    !float.IsInfinity(areaDiameterMetres)
+                    ? areaDiameterMetres
+                    : WeatherLightRayAreaLayout.MinimumDiameterMetres);
+            beamWidthRatioRange = NormalizeRange(
+                beamWidthRatioRange,
+                1f,
+                2f);
+            legacyBeamCount = Mathf.Clamp(legacyBeamCount, 2, 12);
+            legacyBeamWidthRangeMetres = NormalizeRange(
+                legacyBeamWidthRangeMetres,
+                0.05f,
+                4f);
+            beamSpacingMetres = Mathf.Clamp(
+                !float.IsNaN(beamSpacingMetres) &&
+                    !float.IsInfinity(beamSpacingMetres)
+                    ? beamSpacingMetres
+                    : WeatherLightRayAreaLayout.DefaultBeamSpacingMetres,
+                WeatherLightRayAreaLayout.MinimumBeamSpacingMetres,
+                WeatherLightRayAreaLayout.MaximumBeamSpacingMetres);
+            legacyBeamPacking = Mathf.Clamp01(legacyBeamPacking);
+            beamIntensityVariation = Mathf.Clamp(
+                beamIntensityVariation,
+                0f,
+                0.75f);
+            beamEdgeSoftness = Mathf.Clamp(
+                beamEdgeSoftness,
                 0.01f,
                 1f);
-            strandClusterBias = Mathf.Clamp01(strandClusterBias);
-            warmthContribution = Mathf.Clamp01(warmthContribution);
-            shaftIntensity = Mathf.Max(0f, shaftIntensity);
-            envelopeHazeIntensity = Mathf.Max(
+            beamSoftnessVariation = Mathf.Clamp(
+                beamSoftnessVariation,
                 0f,
-                envelopeHazeIntensity);
-            scatterLength = Mathf.Clamp(scatterLength, 0f, 8f);
-            scatterSoftness = Mathf.Clamp01(scatterSoftness);
-            heightFade = Mathf.Clamp(heightFade, 0.001f, 0.49f);
+                0.75f);
+            upperFade = Mathf.Clamp(upperFade, 0.001f, 0.49f);
+            groundFade = Mathf.Clamp(groundFade, 0.001f, 0.49f);
+            contactPlaneOpacity = Mathf.Clamp01(contactPlaneOpacity);
+            warmthContribution = Mathf.Clamp01(warmthContribution);
+            atmosphericIntensity = Mathf.Max(0f, atmosphericIntensity);
+            softeningStrength = Mathf.Clamp01(softeningStrength);
             cameraIntersectionFade = Mathf.Clamp01(
                 cameraIntersectionFade);
+            surfaceSpotLightIntensity = Mathf.Clamp01(
+                surfaceSpotLightIntensity);
+            screenSpaceSurfaceIntensity = Mathf.Clamp01(
+                screenSpaceSurfaceIntensity);
             groundLightIntensity = Mathf.Max(
                 0f,
                 groundLightIntensity);
@@ -269,28 +330,16 @@ namespace ProgrammaticStylized3D.Weather
             cloudCompensationIntensity = Mathf.Max(
                 0f,
                 cloudCompensationIntensity);
-            edgeSoftness = Mathf.Clamp(edgeSoftness, 0.01f, 1f);
-            footprintIrregularity = Mathf.Clamp01(
-                footprintIrregularity);
+            legacyFootprintRadiusMetres = Mathf.Clamp(
+                legacyFootprintRadiusMetres,
+                0.1f,
+                20f);
+            edgeSoftness = Mathf.Clamp01(edgeSoftness);
+            legacyFootprintIrregularity = Mathf.Clamp01(
+                legacyFootprintIrregularity);
             coreEmphasis = Mathf.Max(0f, coreEmphasis);
-            fluctuationStrength = Mathf.Clamp(
-                fluctuationStrength,
-                0f,
-                0.5f);
-            fluctuationSpeed = Mathf.Max(0f, fluctuationSpeed);
-            widthBreathingStrength = Mathf.Clamp(
-                widthBreathingStrength,
-                0f,
-                0.35f);
-            lateralDriftStrength = Mathf.Clamp(
-                lateralDriftStrength,
-                0f,
-                0.25f);
-            patternEvolutionSpeed = Mathf.Max(
-                0f,
-                patternEvolutionSpeed);
-            perStrandPhaseVariation = Mathf.Clamp01(
-                perStrandPhaseVariation);
+            evolutionStrength = Mathf.Clamp01(evolutionStrength);
+            evolutionSpeed = Mathf.Clamp01(evolutionSpeed);
             fadeInDurationSeconds = Mathf.Max(
                 0f,
                 fadeInDurationSeconds);
@@ -301,6 +350,7 @@ namespace ProgrammaticStylized3D.Weather
                 0f,
                 fadeOutDurationSeconds);
             variationSeed = Mathf.Max(1, variationSeed);
+            localIntensityMultiplier = Mathf.Max(0f, localIntensityMultiplier);
 
             if (lifetimePolicy == WeatherLightRayLifetimePolicy.Timed)
             {
@@ -321,12 +371,20 @@ namespace ProgrammaticStylized3D.Weather
             }
         }
 
-        public WeatherLightRayDescriptor BuildDescriptor()
+        public WeatherLightRayDescriptor BuildDescriptor(
+            WeatherLightRayEvolutionPreset controllerPreset,
+            float controllerStrength,
+            float controllerSpeed)
         {
-            float baseRadius = Mathf.Max(0.1f, radiusMetres);
-            float topRadius = baseRadius * Mathf.Max(
-                0.05f,
-                topRadiusScale);
+            WeatherLightRayEvolutionPreset resolvedPreset = overrideControllerEvolution
+                ? evolutionPreset
+                : controllerPreset;
+            float resolvedStrength = overrideControllerEvolution
+                ? ResolveEvolutionStrength()
+                : Mathf.Clamp01(controllerStrength);
+            float resolvedSpeed = overrideControllerEvolution
+                ? ResolveEvolutionSpeed()
+                : Mathf.Clamp01(controllerSpeed);
             return new WeatherLightRayDescriptor(
                 sourceKind,
                 WeatherLightRayOriginKind.Authored,
@@ -335,45 +393,123 @@ namespace ProgrammaticStylized3D.Weather
                 sourceGatePolicy,
                 WeatherLightRayMovementPolicy.Static,
                 heightMetres,
-                new Vector2(baseRadius, baseRadius),
-                new Vector2(topRadius, topRadius),
-                visualEnvelopeRadiusScale,
-                visualEnvelopeEdgeSoftness,
                 maximumVisualLeanDegrees,
-                strandCount,
-                strandWidthRange,
-                strandSpread,
-                strandPositionVariation,
-                strandIntensityVariation,
-                strandLengthVariation,
-                strandTaper,
-                strandEdgeSoftness,
-                strandClusterBias,
+                areaDiameterMetres,
+                beamSpacingMetres,
+                beamWidthRatioRange,
+                beamIntensityVariation,
+                beamEdgeSoftness,
+                beamSoftnessVariation,
+                upperFade,
+                groundFade,
+                contactPlaneOpacity,
                 colourMultiplier,
                 warmthContribution,
-                shaftIntensity,
-                envelopeHazeIntensity,
-                scatterLength,
-                scatterSoftness,
-                heightFade,
+                atmosphericIntensity * LocalIntensityMultiplier,
+                softeningStrength,
                 cameraIntersectionFade,
-                groundLightIntensity,
-                surfaceLightIntensity,
-                cloudCompensationIntensity,
+                surfaceSpotLightIntensity,
+                screenSpaceSurfaceIntensity,
                 edgeSoftness,
-                footprintIrregularity,
-                coreEmphasis,
-                fluctuationStrength,
-                fluctuationSpeed,
-                widthBreathingStrength,
-                lateralDriftStrength,
-                patternEvolutionSpeed,
-                perStrandPhaseVariation,
+                resolvedPreset,
+                resolvedStrength,
+                resolvedSpeed,
                 fadeInDurationSeconds,
                 holdDurationSeconds,
                 fadeOutDurationSeconds,
                 0,
                 VariationSeed);
+        }
+
+        private float ResolveEvolutionStrength()
+        {
+            switch (evolutionPreset)
+            {
+                case WeatherLightRayEvolutionPreset.Static:
+                    return 0f;
+                case WeatherLightRayEvolutionPreset.Subtle:
+                    return 0.35f;
+                case WeatherLightRayEvolutionPreset.Living:
+                    return 0.65f;
+                default:
+                    return Mathf.Clamp01(evolutionStrength);
+            }
+        }
+
+        private float ResolveEvolutionSpeed()
+        {
+            switch (evolutionPreset)
+            {
+                case WeatherLightRayEvolutionPreset.Static:
+                    return 0f;
+                case WeatherLightRayEvolutionPreset.Subtle:
+                    return 0.25f;
+                case WeatherLightRayEvolutionPreset.Living:
+                    return 0.50f;
+                default:
+                    return Mathf.Clamp01(evolutionSpeed);
+            }
+        }
+
+        private void MigrateIntensityDefaults()
+        {
+            if (intensityDefaultsVersion >= CurrentIntensityDefaultsVersion)
+            {
+                return;
+            }
+
+            atmosphericIntensity = MigrateKnownDefault(
+                atmosphericIntensity,
+                LegacyDefaultAtmosphericIntensity,
+                PreviousDefaultAtmosphericIntensity,
+                DefaultAtmosphericIntensity);
+            groundLightIntensity = MigrateKnownDefault(
+                groundLightIntensity,
+                LegacyDefaultGroundLightIntensity,
+                PreviousDefaultGroundLightIntensity,
+                DefaultGroundLightIntensity);
+            surfaceLightIntensity = MigrateKnownDefault(
+                surfaceLightIntensity,
+                LegacyDefaultSurfaceLightIntensity,
+                PreviousDefaultSurfaceLightIntensity,
+                DefaultSurfaceLightIntensity);
+            cloudCompensationIntensity = MigrateKnownDefault(
+                cloudCompensationIntensity,
+                LegacyDefaultCloudCompensationIntensity,
+                PreviousDefaultCloudCompensationIntensity,
+                DefaultCloudCompensationIntensity);
+
+            intensityDefaultsVersion = CurrentIntensityDefaultsVersion;
+        }
+
+
+        private void MigrateSurfaceControls()
+        {
+            if (surfaceControlsVersion >= CurrentSurfaceControlsVersion)
+            {
+                return;
+            }
+
+            // AF4 explicitly disables the former post-composite surface path
+            // by default and promotes one real URP Spot Light as the primary
+            // material-lighting response. The migration intentionally resets
+            // every pre-AF4 complement value to zero as approved by the user.
+            surfaceSpotLightIntensity = DefaultSurfaceSpotLightIntensity;
+            screenSpaceSurfaceIntensity =
+                DefaultScreenSpaceSurfaceIntensity;
+            surfaceControlsVersion = CurrentSurfaceControlsVersion;
+        }
+
+        private static float MigrateKnownDefault(
+            float currentValue,
+            float legacyDefault,
+            float previousDefault,
+            float currentDefault)
+        {
+            return Mathf.Approximately(currentValue, legacyDefault) ||
+                Mathf.Approximately(currentValue, previousDefault)
+                    ? currentDefault
+                    : currentValue;
         }
 
         public void RestartTimedLifecycle()

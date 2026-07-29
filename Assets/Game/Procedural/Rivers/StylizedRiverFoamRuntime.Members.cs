@@ -132,6 +132,9 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticFreeWaterBirthSubmittedLastUpdate;
         private int automaticFreeWaterBirthRejectedLastUpdate;
         private int automaticFreeWaterBirthSubmittedTotal;
+        private int automaticPacketEnvelopeRejectedLastUpdate;
+        private int automaticPacketEnvelopeRejectedTotal;
+        private int automaticPacketReservationActiveCount;
         private int activeAutomaticFoamSourceEventCount;
         private int automaticSourceEventsRasterizedLastUpdate;
         private string automaticShoreBirthStatus =
@@ -253,12 +256,12 @@ namespace ProgrammaticStylized3D.Rivers
             topologyStartupDistinctGeneratedSources = new();
         private bool topologyStartupSummaryLogged;
 
-        private readonly List<PendingInjection> pendingInjections = new();
-        private readonly List<PendingInjection> pendingMaterialBirths = new();
-        private readonly FoamCompositionEvent[] foamCompositionEvents =
-            new FoamCompositionEvent[FoamCompositionEventCapacity];
         private readonly AutomaticFoamSourceEvent[] automaticFoamSourceEvents =
             new AutomaticFoamSourceEvent[AutomaticFoamSourceEventCapacity];
+        private readonly AutomaticFoamPacketReservation[]
+            automaticFoamPacketReservations =
+                new AutomaticFoamPacketReservation[
+                    AutomaticFoamPacketReservationCapacity];
         private readonly FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
             new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
         private readonly AutomaticRevealTimingTelemetry[]
@@ -524,7 +527,6 @@ namespace ProgrammaticStylized3D.Rivers
         private bool lastConfiguredAbsoluteLifeProbeActive;
         private double idleSince;
         private int clearKernel = -1;
-        private int injectKernel = -1;
         private int rasterizeFoamSourceEventKernel = -1;
         private int rasterizeFoamSourceEventDebugKernel = -1;
         private int writeIsolatedLifeProbeKernel = -1;
@@ -541,6 +543,9 @@ namespace ProgrammaticStylized3D.Rivers
         private int resetTransportMetricsKernel = -1;
         private int remapPersistentStateKernel = -1;
         private int simulateKernel = -1;
+        private float bulkTransportPhaseCells;
+        private float previousBulkTransportPhaseCells;
+        private int bulkTransportIntegerShift;
         private int buildFilmSourceKernel = -1;
         private int buildFilmSupportKernel = -1;
         private int advanceVisualOccupancyKernel = -1;
@@ -607,7 +612,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int injectedLastUpdate;
         private float lastInjectionBoundaryCoverage = -1f;
         private bool lastInjectionStateSynchronized;
-        private int manualInjectionSequence;
         private bool pendingIsolatedLifeProbe;
         private bool pendingIsolatedLifeProbeAbsoluteAging;
         private bool isolatedLifeProbeAbsoluteAgingActive;
@@ -616,12 +620,6 @@ namespace ProgrammaticStylized3D.Rivers
         private float pendingIsolatedLifeProbeAcrossNormalized;
         private string isolatedLifeProbeStatus =
             "Not emitted this session";
-        private int foamCompositionSequence;
-        private int activeFoamCompositionEventCount;
-        private int foamCompositionScanCursor;
-        private int foamCompositionStartedCount;
-        private int foamCompositionCompletedCount;
-        private int foamCompositionRejectedCount;
         private float latestFoamCompositionProgress;
         private float latestFoamCompositionHeadDistanceNormalized;
         private float latestFoamCompositionHeadAcrossNormalized;
@@ -629,10 +627,10 @@ namespace ProgrammaticStylized3D.Rivers
         private float latestFoamCompositionPreviousAcrossNormalized;
         private float lastFoamCompositionSegmentLength;
         private int latestFoamCompositionEventId;
-        private int foamCompositionEventUpdateCount;
-        private int foamCompositionSegmentDispatchAttemptCount;
-        private int foamCompositionSegmentDispatchSubmittedCount;
-        private float foamCompositionCumulativeCentrelineDistance;
+        private int foamCompositionSequence;
+        private int foamCompositionStartedCount;
+        private int foamCompositionRejectedCount;
+        private int foamCompositionCompletedCount;
         private bool automaticBirthDebugActiveLastUpdate;
         private bool automaticBirthDebugReadbackPending;
         private bool automaticBirthDebugReadbackAvailable;

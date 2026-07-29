@@ -8,7 +8,11 @@ namespace ProgrammaticStylized3D.Trees
 {
     public static class TreeGenerator
     {
-        public const int CurrentGeneratorVersion = 3;
+        public const int CurrentGeneratorVersion = 6;
+        // Geometry/constraint algorithm versions may advance without rerolling
+        // accepted seed streams or stable branch IDs. Change this only when a
+        // deterministic structural reroll is explicitly approved.
+        private const int CurrentGeneratorSeedCompatibilityVersion = 3;
         private const float GoldenAngleDegrees = 137.507764f;
         private const float TwoPi = Mathf.PI * 2f;
         private const float Epsilon = 0.00001f;
@@ -20,6 +24,11 @@ namespace ProgrammaticStylized3D.Trees
             internal TreeReferenceCalibrationPreset Calibration;
             internal TreeMaterialPalette Palette;
             internal TreeGenerationOverrides InstanceOverrides;
+            internal TreeResolvedControls ExactControls;
+            internal TreeGenerationRuntimePolicy Policy;
+            internal TreeFamily DisplayFamily;
+            internal string SourceIdentity;
+            internal bool RecipeOnly;
             internal int MasterSeed;
             internal TreeSeedSet Seeds;
             internal TreeResolvedParameters Parameters;
@@ -46,6 +55,34 @@ namespace ProgrammaticStylized3D.Trees
             int masterSeed)
         {
             return GenerateInternal(recipe, instanceOverrides, masterSeed, true);
+        }
+
+        public static TreeGenerationResult Generate(
+            TreeResolvedControls exactControls,
+            int masterSeed,
+            string sourceRecipeIdentity,
+            TreeFamily displayFamily = TreeFamily.Common)
+        {
+            return GenerateExactInternal(
+                exactControls,
+                masterSeed,
+                sourceRecipeIdentity,
+                displayFamily,
+                true);
+        }
+
+        public static TreeGenerationResult GenerateExactForValidation(
+            TreeResolvedControls exactControls,
+            int masterSeed,
+            string sourceRecipeIdentity,
+            TreeFamily displayFamily = TreeFamily.Common)
+        {
+            return GenerateExactInternal(
+                exactControls,
+                masterSeed,
+                sourceRecipeIdentity,
+                displayFamily,
+                false);
         }
 
         public static string RunDeterminismAndDependencyValidation(
@@ -274,17 +311,18 @@ namespace ProgrammaticStylized3D.Trees
                 baselineBarkInput,
                 barkSettings);
 
-            TreeGenerationOverrides ridgeOverrides = CloneOverrides(instanceOverrides);
-            float changedRidgeDepth = ChooseDifferentValue(
-                baseline.ResolvedParameters.TrunkTwistRidgeDepth,
-                recipe.FamilyProfile.Trunk.TwistRidgeDepth);
-            ridgeOverrides.SetTrunkTwistRidgeDepthForTest(changedRidgeDepth);
-            TreeGenerationResult ridgeResult = GenerateInternal(
-                recipe, ridgeOverrides, masterSeed, false);
+            TreeGenerationOverrides buttressCountOverrides = CloneOverrides(instanceOverrides);
+            int changedButtressCount = ChooseDifferentValue(
+                baseline.ResolvedParameters.RootButtressCount,
+                recipe.FamilyProfile.Trunk.RootButtressCount);
+            buttressCountOverrides.SetRootButtressCountForTest(
+                changedButtressCount);
+            TreeGenerationResult buttressCountResult = GenerateInternal(
+                recipe, buttressCountOverrides, masterSeed, false);
             passed &= AppendBarkOnlyChangeTest(
                 report,
-                "Trunk-ridge changes preserve structure while changing bark input",
-                ridgeResult,
+                "Root-buttress count changes preserve structure while changing bark input",
+                buttressCountResult,
                 baseline,
                 baselineBarkInput,
                 barkSettings);
@@ -298,7 +336,7 @@ namespace ProgrammaticStylized3D.Trees
                 recipe, buttressOverrides, masterSeed, false);
             passed &= AppendBarkOnlyChangeTest(
                 report,
-                "Root-buttress changes preserve structure while changing bark input",
+                "Root-buttress strength changes preserve structure while changing bark input",
                 buttressResult,
                 baseline,
                 baselineBarkInput,
@@ -353,6 +391,113 @@ namespace ProgrammaticStylized3D.Trees
             return report.ToString();
         }
 
+        private static TreeGenerationResult GenerateExactInternal(
+            TreeResolvedControls exactControls,
+            int masterSeed,
+            string sourceRecipeIdentity,
+            TreeFamily displayFamily,
+            bool includeFullReport)
+        {
+            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var failures = new List<string>();
+            if (exactControls == null || !exactControls.IsInitialized)
+            {
+                failures.Add("No initialized recipe-only exact control snapshot was supplied.");
+                return CreateFailure(timestamp, failures, includeFullReport);
+            }
+
+            exactControls.ValidateAndClamp();
+            var context = new GenerationContext
+            {
+                ExactControls = exactControls,
+                Policy = TreeGenerationRuntimePolicy.RecipeOnly(),
+                DisplayFamily = displayFamily,
+                SourceIdentity = string.IsNullOrWhiteSpace(sourceRecipeIdentity)
+                    ? "tree-recipe-unassigned"
+                    : sourceRecipeIdentity,
+                RecipeOnly = true,
+                MasterSeed = masterSeed,
+                InstanceOverrides = new TreeGenerationOverrides()
+            };
+
+            context.Seeds = BuildSeedSet(context);
+            context.Parameters = ResolveExactParameters(
+                exactControls,
+                displayFamily,
+                context.SourceIdentity,
+                failures);
+            ValidateRecipeOnlyParameters(context.Parameters, failures);
+            if (failures.Count > 0)
+            {
+                return CreateFailure(timestamp, failures, includeFullReport);
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            GenerateStructure(context);
+            stopwatch.Stop();
+
+            ValidateStructure(context, failures);
+            TreeGenerationMetrics metrics = CalculateMetrics(
+                context,
+                stopwatch.Elapsed.Ticks);
+            Bounds bounds = CalculateBounds(context.Branches);
+            Vector2 footprint = CalculateFootprint(bounds);
+            string dependencyHash = CalculateDependencyFingerprint(context);
+            string trunkHash = CalculateTrunkFingerprint(context.Branches);
+            string branchHash = CalculateBranchFingerprint(context.Branches);
+            string foliageHash = CalculateFoliageFingerprint(context);
+            string paletteHash = CalculatePaletteFingerprint(context);
+            string structuralHash = CalculateStructuralFingerprint(
+                trunkHash,
+                branchHash);
+
+            bool passed = failures.Count == 0;
+            TreeDefinition definition = null;
+            if (passed)
+            {
+                definition = new TreeDefinition();
+                definition.Initialize(
+                    displayFamily,
+                    context.SourceIdentity,
+                    CurrentGeneratorVersion,
+                    masterSeed,
+                    0,
+                    context.Branches,
+                    context.FoliageClusters,
+                    bounds,
+                    footprint,
+                    context.Seeds,
+                    context.Parameters,
+                    metrics,
+                    dependencyHash,
+                    trunkHash,
+                    branchHash,
+                    foliageHash,
+                    paletteHash,
+                    structuralHash,
+                    context.Warnings);
+            }
+
+            string report = includeFullReport
+                ? BuildGenerationReport(
+                    timestamp,
+                    context,
+                    definition,
+                    metrics,
+                    failures)
+                : failures.Count > 0
+                    ? BuildFailureSummary(timestamp, failures)
+                    : string.Empty;
+
+            return new TreeGenerationResult
+            {
+                Passed = passed,
+                Definition = definition,
+                Report = report,
+                Timestamp = timestamp
+            };
+        }
+
         private static TreeGenerationResult GenerateInternal(
             TreeGenerationRecipe recipe,
             TreeGenerationOverrides instanceOverrides,
@@ -380,6 +525,10 @@ namespace ProgrammaticStylized3D.Trees
                 Calibration = recipe.ReferenceCalibration,
                 Palette = recipe.ResolvePalette(),
                 InstanceOverrides = instanceOverrides ?? new TreeGenerationOverrides(),
+                Policy = TreeGenerationRuntimePolicy.FromLegacy(recipe.FamilyProfile),
+                DisplayFamily = recipe.FamilyProfile.Family,
+                SourceIdentity = recipe.StableIdentity,
+                RecipeOnly = false,
                 MasterSeed = masterSeed
             };
 
@@ -425,8 +574,8 @@ namespace ProgrammaticStylized3D.Trees
             {
                 definition = new TreeDefinition();
                 definition.Initialize(
-                    context.Profile.Family,
-                    recipe.StableIdentity,
+                    context.DisplayFamily,
+                    context.SourceIdentity,
                     CurrentGeneratorVersion,
                     masterSeed,
                     0,
@@ -473,14 +622,33 @@ namespace ProgrammaticStylized3D.Trees
             for (int index = 0; index < streams.Length; index++)
             {
                 var stream = (TreeSeedStream)streams.GetValue(index);
-                bool locked = context.Recipe.TryGetLockedSeed(
-                    stream,
-                    out int lockedSeed);
-                int seed = locked
-                    ? lockedSeed
-                    : TreeDeterministicUtility.DeriveSeed(
+                bool locked = false;
+                int lockedSeed = 0;
+                if (!context.RecipeOnly && context.Recipe != null)
+                {
+                    locked = context.Recipe.TryGetLockedSeed(
+                        stream,
+                        out lockedSeed);
+                }
+
+                int seed;
+                if (locked)
+                {
+                    seed = lockedSeed;
+                }
+                else if (context.RecipeOnly)
+                {
+                    seed = TreeDeterministicUtility.DeriveSeed(
                         context.MasterSeed,
-                        context.Profile.Family,
+                        "tree-recipe-exact",
+                        CurrentGeneratorSeedCompatibilityVersion,
+                        stream);
+                }
+                else
+                {
+                    seed = TreeDeterministicUtility.DeriveSeed(
+                        context.MasterSeed,
+                        context.DisplayFamily,
                         context.Profile.StableIdentity,
                         context.Profile.ProfileVersion,
                         context.Calibration != null
@@ -490,15 +658,219 @@ namespace ProgrammaticStylized3D.Trees
                             ? context.Calibration.CalibrationVersion
                             : 0,
                         context.Recipe.StableIdentity,
-                        context.Recipe.RecipeVersion,
-                        CurrentGeneratorVersion,
+                        TreeGenerationRecipe.CurrentDeterministicSeedVersion,
+                        CurrentGeneratorSeedCompatibilityVersion,
                         stream);
+                }
+
                 records.Add(new TreeSeedRecord(stream, seed, locked));
             }
 
             var set = new TreeSeedSet();
             set.SetRecords(records);
             return set;
+        }
+
+        private static TreeResolvedParameters ResolveExactParameters(
+            TreeResolvedControls controls,
+            TreeFamily displayFamily,
+            string sourceIdentity,
+            List<string> failures)
+        {
+            if (controls == null || !controls.IsInitialized)
+            {
+                failures.Add(
+                    "Recipe-only exact controls are missing or uninitialized.");
+                return null;
+            }
+
+            float branchArch = controls.BranchArch;
+            float signedTurns = controls.SignedPathSpiralTurns;
+            int trunkControlPointCount = Mathf.Max(
+                6,
+                TreeGenerationRuntimePolicy.RecipeOnly()
+                    .RecipeOnlyTrunkControlPointCount);
+            int secondaryCandidates = Mathf.CeilToInt(
+                Mathf.Max(0f, controls.SecondaryDensity));
+            int tertiaryCandidates = Mathf.CeilToInt(
+                Mathf.Max(0f, controls.TertiaryDensity));
+            // Fork Chance owns probability only. The compact v1 fork form
+            // uses one stable placement independent of the primary branch band.
+            const float forkHeight = 0.68f;
+
+            var parameters = new TreeResolvedParameters
+            {
+                Family = displayFamily,
+                Height = controls.Height,
+                TrunkBaseRadius = controls.TrunkBaseRadius,
+                CrownStartHeight = controls.BranchStartHeight,
+                CrownVolume = 1f,
+                CrownWidthScale = 1f,
+                CrownHeightScale = 1f,
+                CrownFill = 1f,
+                CrownAsymmetry = 0f,
+                CrownLobeCount = 1,
+                CrownLobeRadius = 1f,
+                TrunkControlPointCount = trunkControlPointCount,
+                TrunkCurvature = controls.BendAmount,
+                TrunkBendCount = controls.BendFrequency,
+                TrunkDirectionalDrift = controls.TrunkDrift,
+                TrunkLeanStrength = controls.LeanAmount,
+                TrunkLeanDirectionDegrees = controls.LeanDirection,
+                TrunkSurfaceTorsionDegrees = controls.AxialTwist,
+                RootButtressCount = controls.RootCount,
+                RootButtressStrength = 0f,
+                RootButtressHeight = controls.RootHeight,
+                ButtressTransition = controls.ButtressTransition,
+                RootFlareScale = 1f,
+                RecipeOnlyControlSource = true,
+                RootReach = controls.RootReach,
+                RootThickness = controls.RootThickness,
+                SecondaryDensity = controls.SecondaryDensity,
+                TertiaryDensity = controls.TertiaryDensity,
+                ChildScale = controls.ChildScale,
+                TierSpacing = controls.TierSpacing,
+                TipUpturn = controls.TipUpturn,
+                TrunkSpiralStrength = controls.PathSpiralRadius,
+                TrunkSpiralTurns = Mathf.Abs(signedTurns),
+                TrunkSpiralDirection = signedTurns < 0f ? -1f : 1f,
+                TrunkIrregularity = controls.TrunkRoughness,
+                TrunkTaper = controls.TrunkTaper,
+                TrunkForkProbability = controls.ForkChance,
+                TrunkForkHeight = forkHeight,
+                PrimaryBranchCount = controls.PrimaryBranchCount,
+                PrimaryBranchStartHeight = controls.BranchStartHeight,
+                PrimaryBranchEndHeight = controls.BranchEndHeight,
+                InitialBranchElevationDegrees = controls.BranchElevation,
+                BranchArchDirection = Mathf.Abs(branchArch) <= Epsilon
+                    ? 1f
+                    : Mathf.Sign(branchArch),
+                BranchArchStrength = Mathf.Abs(branchArch),
+                LateBranchSag = controls.LateSag,
+                AzimuthSymmetry = controls.BranchSymmetry,
+                DirectionalBiasAngleDegrees = controls.DirectionalBiasAngle,
+                DirectionalBiasStrength = controls.DirectionalBias,
+                PrimaryAttachmentMinimum = controls.BranchStartHeight,
+                PrimaryAttachmentMaximum = controls.BranchEndHeight,
+                PrimaryBranchCurvature = controls.BranchCurvature,
+                PrimaryBranchDroop = 0f,
+                PrimaryBranchUpwardBias = 0f,
+                PrimaryBranchSideSweep = controls.SideSweep,
+                PrimaryBranchTwistDegrees = 0f,
+                PrimaryBranchIrregularity = 0f,
+                PrimaryBranchEndCurl = controls.TipUpturn,
+                PrimaryBranchLengthRatio = controls.BranchLength,
+                PrimaryBranchRadiusRatio = controls.BranchThickness,
+                SecondaryBranchesPerPrimary = secondaryCandidates,
+                TertiaryBranchesPerSecondary = tertiaryCandidates,
+                MaximumBranchOrder = controls.MaximumBranchOrder,
+                SecondaryLengthRatio = controls.ChildScale,
+                TertiaryLengthRatio = controls.ChildScale,
+                HigherOrderCurvatureScale = 0.75f,
+                ClusterWidthScale = 1f,
+                ClusterHeightScale = 1f,
+                ClusterLengthScale = 1f,
+                ClusterRadialSpread = 1f,
+                CardSizeScale = 1f,
+                FoliageClusterCount = 0,
+                CardsPerCluster = 0,
+                FoliageEligibility = 0f,
+                ClusterOccupancy = 0f,
+                TerminalFoliageProbability = 0f,
+                CardRetentionFraction = 0f,
+                MissingBranchProbability = controls.MissingBranchChance,
+                DeadBranchProbability = controls.DeadBranchChance,
+                BreakProbability = controls.BrokenBranchChance,
+                BarkTint = controls.BarkTint,
+                FoliageBaseColor = Color.white,
+                FoliageHighlightColor = Color.white,
+                FoliageShadowColor = Color.black
+            };
+            parameters.AddOwnership(
+                "Recipe-only exact snapshot: " + sourceIdentity +
+                " (41 controls; zero family/calibration behavioral reads).");
+            return parameters;
+        }
+
+        private static void ValidateRecipeOnlyParameters(
+            TreeResolvedParameters p,
+            List<string> failures)
+        {
+            if (p == null)
+            {
+                failures.Add("Recipe-only resolved parameters are null.");
+                return;
+            }
+
+            if (!TreeDeterministicUtility.IsFinite(p.Height) ||
+                p.Height <= 0f)
+            {
+                failures.Add("Recipe-only Height must be finite and positive.");
+            }
+
+            if (!TreeDeterministicUtility.IsFinite(p.TrunkBaseRadius) ||
+                p.TrunkBaseRadius <= 0f)
+            {
+                failures.Add(
+                    "Recipe-only Trunk Base Radius must be finite and positive.");
+            }
+
+            if (p.PrimaryBranchStartHeight < 0f ||
+                p.PrimaryBranchEndHeight > 1f ||
+                p.PrimaryBranchEndHeight < p.PrimaryBranchStartHeight)
+            {
+                failures.Add(
+                    "Recipe-only primary branch start/end interval is invalid.");
+            }
+
+            if (p.RootButtressCount < 3 || p.RootButtressCount > 8)
+            {
+                failures.Add("Recipe-only Root Count must be between 3 and 8.");
+            }
+
+            if (!TreeDeterministicUtility.IsFinite(p.RootReach) ||
+                p.RootReach < 0f ||
+                !TreeDeterministicUtility.IsFinite(p.RootThickness) ||
+                p.RootThickness < 0.1f ||
+                p.RootThickness > 1f)
+            {
+                failures.Add(
+                    "Recipe-only Root Reach/Thickness values are invalid.");
+            }
+
+            if (!TreeDeterministicUtility.IsFinite(p.ButtressTransition) ||
+                p.ButtressTransition < 0f ||
+                p.ButtressTransition > 1f)
+            {
+                failures.Add(
+                    "Recipe-only Buttress Persistence must be between 0 and 1.");
+            }
+
+            if (p.MaximumBranchOrder < 1 || p.MaximumBranchOrder > 3 ||
+                p.PrimaryBranchCount < 0 ||
+                p.SecondaryDensity < 0f ||
+                p.TertiaryDensity < 0f)
+            {
+                failures.Add(
+                    "Recipe-only branch count/order/density values are invalid.");
+            }
+
+            ValidateProbability(
+                p.MissingBranchProbability,
+                "Missing branch chance",
+                failures);
+            ValidateProbability(
+                p.DeadBranchProbability,
+                "Dead branch chance",
+                failures);
+            ValidateProbability(
+                p.BreakProbability,
+                "Broken branch chance",
+                failures);
+            if (!IsFiniteColor(p.BarkTint))
+            {
+                failures.Add("Recipe-only Bark Tint must be finite.");
+            }
         }
 
         private static TreeResolvedParameters ResolveParameters(
@@ -527,8 +899,7 @@ namespace ProgrammaticStylized3D.Trees
                 TrunkLeanStrength = Sample(profile.Trunk.LeanStrength, seeds, TreeSeedStream.TrunkShape, "trunk-lean"),
                 TrunkLeanDirectionDegrees = Sample(profile.Trunk.LeanDirectionDegrees, seeds, TreeSeedStream.TrunkShape, "trunk-lean-yaw"),
                 TrunkSurfaceTorsionDegrees = Sample(profile.Trunk.SurfaceTorsionDegrees, seeds, TreeSeedStream.TrunkShape, "trunk-surface-torsion"),
-                TrunkTwistRidgeCount = Sample(profile.Trunk.TwistRidgeCount, seeds, TreeSeedStream.TrunkShape, "trunk-twist-ridge-count"),
-                TrunkTwistRidgeDepth = Sample(profile.Trunk.TwistRidgeDepth, seeds, TreeSeedStream.TrunkShape, "trunk-twist-ridge-depth"),
+                RootButtressCount = Sample(profile.Trunk.RootButtressCount, seeds, TreeSeedStream.TrunkShape, "root-buttress-count"),
                 RootButtressStrength = Sample(profile.Trunk.RootButtressStrength, seeds, TreeSeedStream.TrunkShape, "root-buttress-strength"),
                 RootButtressHeight = Sample(profile.Trunk.RootButtressHeight, seeds, TreeSeedStream.TrunkShape, "root-buttress-height"),
                 RootFlareScale = Sample(profile.Trunk.RootFlareScale, seeds, TreeSeedStream.TrunkShape, "root-flare-scale"),
@@ -610,7 +981,7 @@ namespace ProgrammaticStylized3D.Trees
             parameters.PrimaryAttachmentMinimum = parameters.PrimaryBranchStartHeight;
             parameters.PrimaryAttachmentMaximum = parameters.PrimaryBranchEndHeight;
 
-            if (context.Profile.Family == TreeFamily.Dead)
+            if (context.DisplayFamily == TreeFamily.Dead)
             {
                 parameters.FoliageClusterCount = 0;
                 parameters.CardsPerCluster = 0;
@@ -659,8 +1030,7 @@ namespace ProgrammaticStylized3D.Trees
             p.TrunkLeanStrength = o.TrunkLeanStrength.Resolve(p.TrunkLeanStrength, trunkSeed, owner + ".trunk-lean");
             p.TrunkLeanDirectionDegrees = o.TrunkLeanDirectionDegrees.Resolve(p.TrunkLeanDirectionDegrees, trunkSeed, owner + ".trunk-lean-yaw");
             p.TrunkSurfaceTorsionDegrees = o.TrunkSurfaceTorsionDegrees.Resolve(p.TrunkSurfaceTorsionDegrees, trunkSeed, owner + ".trunk-surface-torsion");
-            p.TrunkTwistRidgeCount = o.TrunkTwistRidgeCount.Resolve(p.TrunkTwistRidgeCount, trunkSeed, owner + ".trunk-twist-ridge-count");
-            p.TrunkTwistRidgeDepth = o.TrunkTwistRidgeDepth.Resolve(p.TrunkTwistRidgeDepth, trunkSeed, owner + ".trunk-twist-ridge-depth");
+            p.RootButtressCount = o.RootButtressCount.Resolve(p.RootButtressCount, trunkSeed, owner + ".root-buttress-count");
             p.RootButtressStrength = o.RootButtressStrength.Resolve(p.RootButtressStrength, trunkSeed, owner + ".root-buttress-strength");
             p.RootButtressHeight = o.RootButtressHeight.Resolve(p.RootButtressHeight, trunkSeed, owner + ".root-buttress-height");
             p.RootFlareScale = o.RootFlareScale.Resolve(p.RootFlareScale, trunkSeed, owner + ".root-flare-scale");
@@ -738,8 +1108,7 @@ namespace ProgrammaticStylized3D.Trees
             ValidateInside(p.TrunkLeanStrength, profile.Trunk.LeanStrength, "Trunk lean strength", failures);
             ValidateInside(p.TrunkLeanDirectionDegrees, profile.Trunk.LeanDirectionDegrees, "Trunk lean direction", failures);
             ValidateInside(p.TrunkSurfaceTorsionDegrees, profile.Trunk.SurfaceTorsionDegrees, "Trunk twist degrees", failures);
-            ValidateInside(p.TrunkTwistRidgeCount, profile.Trunk.TwistRidgeCount, "Trunk twist ridge count", failures);
-            ValidateInside(p.TrunkTwistRidgeDepth, profile.Trunk.TwistRidgeDepth, "Trunk twist ridge depth", failures);
+            ValidateInside(p.RootButtressCount, profile.Trunk.RootButtressCount, "Root buttress count", failures);
             ValidateInside(p.RootButtressStrength, profile.Trunk.RootButtressStrength, "Root buttress strength", failures);
             ValidateInside(p.RootButtressHeight, profile.Trunk.RootButtressHeight, "Root buttress height", failures);
             ValidateInside(p.RootFlareScale, profile.Trunk.RootFlareScale, "Root flare scale", failures);
@@ -852,13 +1221,19 @@ namespace ProgrammaticStylized3D.Trees
             {
                 float t = index / (float)(pointCount - 1);
                 float y = p.Height * t;
-                float bendPhase = t * Mathf.PI * 2f * p.TrunkBendCount;
                 float bendEnvelope = Mathf.Sin(Mathf.PI * t);
                 float curveAmplitude = p.TrunkCurvature * p.Height * 0.12f;
-                Vector2 curve =
-                    primaryCurveDirection * Mathf.Sin(bendPhase) * curveAmplitude * bendEnvelope +
-                    secondaryCurveDirection * Mathf.Sin(bendPhase * 0.53f + 1.17f) *
-                    curveAmplitude * 0.45f * bendEnvelope;
+                Vector2 curve = Vector2.zero;
+                if (p.TrunkBendCount > Epsilon && curveAmplitude > Epsilon)
+                {
+                    float bendPhase = t * Mathf.PI * 2f * p.TrunkBendCount;
+                    curve =
+                        primaryCurveDirection * Mathf.Sin(bendPhase) *
+                        curveAmplitude * bendEnvelope +
+                        secondaryCurveDirection *
+                        Mathf.Sin(bendPhase * 0.53f + 1.17f) *
+                        curveAmplitude * 0.45f * bendEnvelope;
+                }
                 Vector2 jitterDirection = TreeDeterministicUtility.DirectionXZ(
                     seed,
                     "trunk-jitter-" + index);
@@ -873,7 +1248,9 @@ namespace ProgrammaticStylized3D.Trees
                     Mathf.Lerp(0.7f, 1f, t);
                 float spiralAngle = spiralPhase +
                     p.TrunkSpiralDirection * TwoPi * p.TrunkSpiralTurns * t;
-                float spiralRadius = p.TrunkSpiralStrength * p.Height * 0.35f * spiralEnvelope;
+                float spiralRadius = p.TrunkSpiralStrength * p.Height *
+                    (p.RecipeOnlyControlSource ? 1f : 0.35f) *
+                    spiralEnvelope;
                 Vector2 spiral = new Vector2(
                     Mathf.Cos(spiralAngle),
                     Mathf.Sin(spiralAngle)) * spiralRadius;
@@ -885,15 +1262,22 @@ namespace ProgrammaticStylized3D.Trees
 
             ConstrainTrunkControlPoints(context, points);
 
-            float endRadius = Mathf.Max(
-                context.Profile.MinimumBranchRadius,
-                p.TrunkBaseRadius * (1f - p.TrunkTaper));
+            float endRadius = context.RecipeOnly
+                ? ResolveRecipeOnlyTrunkEndRadius(
+                    p.TrunkBaseRadius,
+                    p.TrunkTaper,
+                    context.Policy.MinimumBranchRadius,
+                    context.Policy.RecipeOnlyMinimumTrunkTipRadiusRatio)
+                : Mathf.Max(
+                    context.Policy.MinimumBranchRadius,
+                    p.TrunkBaseRadius * (1f - p.TrunkTaper));
             List<TreeCurveSample> samples = BuildCurveSamples(
                 points,
                 p.TrunkBaseRadius,
                 endRadius,
-                p.TrunkSurfaceTorsionDegrees,
-                context.Profile.MaximumSamplesPerBranch,
+                context.RecipeOnly ? 0f : p.TrunkSurfaceTorsionDegrees,
+                context.Policy.MaximumSamplesPerBranch,
+                0f,
                 context.Warnings,
                 "Trunk");
             var trunk = new TreeBranchDefinition();
@@ -915,28 +1299,38 @@ namespace ProgrammaticStylized3D.Trees
             context.Branches.Add(trunk);
         }
 
+        private static float ResolveRecipeOnlyTrunkEndRadius(
+            float baseRadius,
+            float taper,
+            float minimumRadius,
+            float minimumTipRadiusRatio)
+        {
+            float safeBase = Mathf.Max(minimumRadius, baseRadius);
+            float safeTip = Mathf.Max(
+                minimumRadius,
+                safeBase * Mathf.Clamp01(minimumTipRadiusRatio));
+            return Mathf.Lerp(
+                safeBase,
+                safeTip,
+                Mathf.Clamp01(taper));
+        }
+
         private static void CreatePrimaryBranches(GenerationContext context)
         {
             TreeResolvedParameters p = context.Parameters;
             int layoutSeed = context.Seeds.GetSeed(TreeSeedStream.PrimaryBranchLayout);
             int damageSeed = context.Seeds.GetSeed(TreeSeedStream.StructuralDamage);
             int requestedCount = Mathf.Max(0, p.PrimaryBranchCount);
-            int tiers = context.Profile.PrimaryBranches.TierCount.Sample(
+            ResolvePrimaryTierLayout(
+                context,
+                requestedCount,
                 layoutSeed,
-                "resolved-tier-count");
-            int perTier = context.Profile.PrimaryBranches.BranchesPerTier.Sample(
-                layoutSeed,
-                "resolved-branches-per-tier");
-            if (tiers > 0 && perTier > 0)
-            {
-                tiers = Mathf.Max(
-                    tiers,
-                    Mathf.CeilToInt(requestedCount / (float)perTier));
-            }
+                out int tiers,
+                out int perTier);
 
             for (int index = 0; index < requestedCount; index++)
             {
-                if (context.Branches.Count >= context.Profile.MaximumBranchCount)
+                if (context.Branches.Count >= context.Policy.MaximumBranchCount)
                 {
                     context.RejectedBranches += requestedCount - index;
                     context.Warnings.Add("Maximum branch-count budget stopped primary generation.");
@@ -976,7 +1370,7 @@ namespace ProgrammaticStylized3D.Trees
                             layoutSeed,
                             "primary-length-" + index));
                 float radius = Mathf.Max(
-                    context.Profile.MinimumBranchRadius,
+                    context.Policy.MinimumBranchRadius,
                     frame.Radius * p.PrimaryBranchRadiusRatio);
                 TreeBranchState state = ResolveBranchState(
                     p,
@@ -1008,7 +1402,7 @@ namespace ProgrammaticStylized3D.Trees
                     length,
                     radius,
                     Mathf.Max(
-                        context.Profile.MinimumBranchRadius,
+                        context.Policy.MinimumBranchRadius,
                         radius * 0.16f),
                     p.PrimaryBranchCurvature,
                     p.BranchArchDirection,
@@ -1032,7 +1426,7 @@ namespace ProgrammaticStylized3D.Trees
                 TreeDeterministicUtility.Sample01(
                     context.Seeds.GetSeed(TreeSeedStream.TrunkForks),
                     "trunk-fork-accept") < p.TrunkForkProbability &&
-                context.Branches.Count < context.Profile.MaximumBranchCount)
+                context.Branches.Count < context.Policy.MaximumBranchCount)
             {
                 CreateForkBranch(context);
             }
@@ -1055,7 +1449,7 @@ namespace ProgrammaticStylized3D.Trees
                 frame.Tangent * 0.89f).normalized;
             float length = p.Height * (1f - attachment) * 0.9f;
             float radius = Mathf.Max(
-                context.Profile.MinimumBranchRadius,
+                context.Policy.MinimumBranchRadius,
                 frame.Radius * 0.72f);
             TreeBranchDefinition branch = CreateBranch(
                 context,
@@ -1067,7 +1461,7 @@ namespace ProgrammaticStylized3D.Trees
                 direction,
                 length,
                 radius,
-                Mathf.Max(context.Profile.MinimumBranchRadius, radius * 0.22f),
+                Mathf.Max(context.Policy.MinimumBranchRadius, radius * 0.22f),
                 p.TrunkCurvature * 0.7f,
                 p.BranchArchDirection * 0.5f,
                 p.BranchArchStrength * 0.45f,
@@ -1075,7 +1469,9 @@ namespace ProgrammaticStylized3D.Trees
                 p.PrimaryBranchSideSweep * 0.5f,
                 p.TrunkIrregularity,
                 0.05f,
-                p.TrunkSurfaceTorsionDegrees * 0.5f,
+                context.RecipeOnly
+                    ? 0f
+                    : p.TrunkSurfaceTorsionDegrees * 0.5f,
                 TreeBranchState.None,
                 0.3f,
                 1f,
@@ -1084,6 +1480,26 @@ namespace ProgrammaticStylized3D.Trees
             {
                 context.Branches.Add(branch);
             }
+        }
+
+        private static int ResolveExpectedChildCount(
+            float density,
+            int layoutSeed,
+            int parentStableId,
+            int childOrder)
+        {
+            float clamped = Mathf.Max(0f, density);
+            int whole = Mathf.FloorToInt(clamped);
+            float fraction = clamped - whole;
+            if (fraction <= 0f)
+            {
+                return whole;
+            }
+
+            float sample = TreeDeterministicUtility.Sample01(
+                layoutSeed,
+                "expected-density-" + childOrder + "-" + parentStableId);
+            return whole + (sample < fraction ? 1 : 0);
         }
 
         private static void CreateHigherOrderBranches(
@@ -1114,9 +1530,20 @@ namespace ProgrammaticStylized3D.Trees
                 }
 
                 float parentLength = CalculateBranchLength(parent);
-                for (int childIndex = 0; childIndex < childCount; childIndex++)
+                int resolvedChildCount = context.RecipeOnly
+                    ? ResolveExpectedChildCount(
+                        childOrder == 2
+                            ? p.SecondaryDensity
+                            : p.TertiaryDensity,
+                        layoutSeed,
+                        parent.StableBranchId,
+                        childOrder)
+                    : childCount;
+                for (int childIndex = 0;
+                     childIndex < resolvedChildCount;
+                     childIndex++)
                 {
-                    if (context.Branches.Count >= context.Profile.MaximumBranchCount)
+                    if (context.Branches.Count >= context.Policy.MaximumBranchCount)
                     {
                         context.RejectedBranches++;
                         context.Warnings.Add(
@@ -1135,9 +1562,11 @@ namespace ProgrammaticStylized3D.Trees
                         continue;
                     }
 
-                    float survivalProbability = childOrder == 2
-                        ? context.Profile.StructuralConstraints.SecondarySurvivalProbability
-                        : context.Profile.StructuralConstraints.TertiarySurvivalProbability;
+                    float survivalProbability = context.RecipeOnly
+                        ? 1f
+                        : childOrder == 2
+                            ? context.Policy.SecondarySurvivalProbability
+                            : context.Policy.TertiarySurvivalProbability;
                     if (TreeDeterministicUtility.Sample01(
                             layoutSeed,
                             "higher-survival-" + branchId) >= survivalProbability)
@@ -1149,7 +1578,7 @@ namespace ProgrammaticStylized3D.Trees
                     float attachment = Mathf.Lerp(
                         0.28f,
                         0.92f,
-                        (childIndex + 1f) / (childCount + 1f));
+                        (childIndex + 1f) / (resolvedChildCount + 1f));
                     attachment += TreeDeterministicUtility.SampleSigned(
                         layoutSeed,
                         "higher-attachment-" + branchId) * 0.06f;
@@ -1181,9 +1610,16 @@ namespace ProgrammaticStylized3D.Trees
                         TreeDeterministicUtility.Sample01(
                             layoutSeed,
                             "higher-length-" + branchId));
+                    float childRadiusScale = context.RecipeOnly
+                        ? Mathf.Pow(
+                            Mathf.Clamp(p.ChildScale, 0.05f, 0.90f),
+                            1.25f)
+                        : childOrder == 2
+                            ? 0.42f
+                            : 0.36f;
                     float radius = Mathf.Max(
-                        context.Profile.MinimumBranchRadius,
-                        frame.Radius * (childOrder == 2 ? 0.42f : 0.36f));
+                        context.Policy.MinimumBranchRadius,
+                        frame.Radius * childRadiusScale);
                     TreeBranchState state = ResolveBranchState(
                         p,
                         damageSeed,
@@ -1204,7 +1640,7 @@ namespace ProgrammaticStylized3D.Trees
                         length,
                         radius,
                         Mathf.Max(
-                            context.Profile.MinimumBranchRadius,
+                            context.Policy.MinimumBranchRadius,
                             radius * 0.14f),
                         p.PrimaryBranchCurvature *
                             p.HigherOrderCurvatureScale *
@@ -1253,7 +1689,7 @@ namespace ProgrammaticStylized3D.Trees
             string key)
         {
             length = Mathf.Max(
-                context.Profile.MinimumBranchLength * 1.05f,
+                context.Policy.MinimumBranchLength * 1.05f,
                 length);
             int curveSeed = context.Seeds.GetSeed(TreeSeedStream.BranchCurvature);
             int pointCount = Mathf.Clamp(4 + order, 4, 7);
@@ -1292,7 +1728,11 @@ namespace ProgrammaticStylized3D.Trees
                 float sagT = Mathf.Clamp01((t - 0.45f) / 0.55f);
                 sagT = sagT * sagT * (3f - 2f * sagT);
                 position += Vector3.down * lateSag * length * sagT * sagT;
-                position += Vector3.up * endCurl * length * t * t * t;
+                if (!context.RecipeOnly)
+                {
+                    // Preserve the legacy compatibility curve exactly.
+                    position += Vector3.up * endCurl * length * t * t * t;
+                }
                 Vector2 jitter = TreeDeterministicUtility.DirectionXZ(
                     curveSeed,
                     key + "-jitter-" + index);
@@ -1318,10 +1758,10 @@ namespace ProgrammaticStylized3D.Trees
 
             RemoveCollapsedControlPoints(
                 controlPoints,
-                context.Profile.MinimumBranchLength * 0.025f);
+                context.Policy.MinimumBranchLength * 0.025f);
             if (controlPoints.Count < 2 ||
                 CalculatePolylineLength(controlPoints) <
-                context.Profile.MinimumBranchLength)
+                context.Policy.MinimumBranchLength)
             {
                 RejectCollapsedBranch(
                     context,
@@ -1336,16 +1776,31 @@ namespace ProgrammaticStylized3D.Trees
                 startRadius,
                 endRadius,
                 twistDegrees,
-                context.Profile.MaximumSamplesPerBranch,
+                context.Policy.MaximumSamplesPerBranch,
+                context.RecipeOnly ||
+                context.DisplayFamily == TreeFamily.Twisted ||
+                context.DisplayFamily == TreeFamily.Dead
+                    ? Mathf.Max(
+                        4f,
+                        context.Policy
+                            .MaximumBranchSegmentTurnDegrees * 0.45f)
+                    : 0f,
                 branchWarnings,
                 "Branch " + stableId);
+            if (context.RecipeOnly && endCurl > Epsilon)
+            {
+                samples = ApplyRecipeOnlyTipUpturn(
+                    samples,
+                    endCurl,
+                    length);
+            }
             float sampledLength = CalculateSampleLength(samples);
             bool containedCollapsedTangent = branchWarnings.Exists(
                 warning => warning.IndexOf(
                     "zero-length tangent",
                     StringComparison.Ordinal) >= 0);
             if (samples.Count < 2 ||
-                sampledLength < context.Profile.MinimumBranchLength ||
+                sampledLength < context.Policy.MinimumBranchLength ||
                 containedCollapsedTangent)
             {
                 RejectCollapsedBranch(
@@ -1392,8 +1847,8 @@ namespace ProgrammaticStylized3D.Trees
                 return;
             }
 
-            TreeStructuralConstraintSettings constraints =
-                context.Profile.StructuralConstraints;
+            TreeGenerationRuntimePolicy constraints =
+                context.Policy;
             float maximumHorizontal =
                 context.Parameters.Height *
                 constraints.MaximumTrunkHorizontalDisplacementRatio;
@@ -1444,8 +1899,8 @@ namespace ProgrammaticStylized3D.Trees
                 return;
             }
 
-            TreeStructuralConstraintSettings constraints =
-                context.Profile.StructuralConstraints;
+            TreeGenerationRuntimePolicy constraints =
+                context.Policy;
             float maximumAccumulated = order <= 1
                 ? constraints.MaximumPrimaryAccumulatedTurnDegrees
                 : constraints.MaximumHigherOrderAccumulatedTurnDegrees;
@@ -1515,15 +1970,15 @@ namespace ProgrammaticStylized3D.Trees
             float radiusX = Mathf.Max(
                 0.1f,
                 calibration.TargetVisibleWidth * 0.5f *
-                (1f - context.Profile.StructuralConstraints.CrownEnvelopeOvershoot * 0.35f));
+                (1f - context.Policy.CrownEnvelopeOvershoot * 0.35f));
             float radiusZ = Mathf.Max(
                 0.1f,
                 calibration.TargetVisibleDepth * 0.5f *
-                (1f - context.Profile.StructuralConstraints.CrownEnvelopeOvershoot * 0.35f));
+                (1f - context.Policy.CrownEnvelopeOvershoot * 0.35f));
             float maximumY = Mathf.Max(
                 0.1f,
                 calibration.TargetVisibleHeight -
-                context.Profile.MinimumBranchRadius);
+                context.Policy.MinimumBranchRadius);
 
             for (int index = 1; index < points.Count; index++)
             {
@@ -1961,12 +2416,107 @@ namespace ProgrammaticStylized3D.Trees
             return new Vector3(last.x, height, last.z);
         }
 
+
+        private static List<TreeCurveSample> ApplyRecipeOnlyTipUpturn(
+            IReadOnlyList<TreeCurveSample> source,
+            float strength,
+            float branchLength)
+        {
+            if (source == null || source.Count < 2 || strength <= Epsilon)
+            {
+                return source == null
+                    ? new List<TreeCurveSample>()
+                    : new List<TreeCurveSample>(source);
+            }
+
+            const float WindowStart = 0.72f;
+            var positions = new List<Vector3>(source.Count);
+            int firstAffected = source.Count;
+            for (int index = 0; index < source.Count; index++)
+            {
+                TreeCurveSample sample = source[index];
+                Vector3 position = sample.Position;
+                if (sample.NormalizedDistance > WindowStart)
+                {
+                    firstAffected = Mathf.Min(firstAffected, index);
+                    float tipT = Mathf.Clamp01(
+                        (sample.NormalizedDistance - WindowStart) /
+                        (1f - WindowStart));
+                    float tipWindow = tipT * tipT * (3f - 2f * tipT);
+                    position += Vector3.up * strength * branchLength *
+                        tipWindow * tipWindow;
+                }
+                positions.Add(position);
+            }
+
+            if (firstAffected >= source.Count)
+            {
+                return new List<TreeCurveSample>(source);
+            }
+
+            var result = new List<TreeCurveSample>(source.Count);
+            for (int index = 0; index < firstAffected; index++)
+            {
+                result.Add(source[index]);
+            }
+
+            int previousIndex = Mathf.Max(0, firstAffected - 1);
+            Vector3 previousTangent = source[previousIndex].Tangent;
+            Vector3 normal = source[previousIndex].Normal;
+            for (int index = firstAffected; index < source.Count; index++)
+            {
+                Vector3 tangent;
+                if (index >= positions.Count - 1)
+                {
+                    tangent = positions[index] - positions[index - 1];
+                }
+                else
+                {
+                    tangent = positions[index + 1] - positions[index - 1];
+                }
+
+                if (tangent.sqrMagnitude <= Epsilon)
+                {
+                    tangent = previousTangent.sqrMagnitude > Epsilon
+                        ? previousTangent
+                        : Vector3.up;
+                }
+                tangent.Normalize();
+
+                Quaternion transport = Quaternion.FromToRotation(
+                    previousTangent,
+                    tangent);
+                normal = transport * normal;
+                normal = Vector3.ProjectOnPlane(normal, tangent);
+                if (normal.sqrMagnitude <= Epsilon)
+                {
+                    normal = ChooseInitialNormal(tangent);
+                }
+                normal.Normalize();
+                Vector3 binormal = Vector3.Cross(tangent, normal).normalized;
+                normal = Vector3.Cross(binormal, tangent).normalized;
+
+                TreeCurveSample original = source[index];
+                result.Add(new TreeCurveSample(
+                    positions[index],
+                    tangent,
+                    normal,
+                    binormal,
+                    original.Radius,
+                    original.NormalizedDistance));
+                previousTangent = tangent;
+            }
+
+            return result;
+        }
+
         private static List<TreeCurveSample> BuildCurveSamples(
             List<Vector3> controlPoints,
             float startRadius,
             float endRadius,
             float twistDegrees,
             int maximumSamples,
+            float maximumSampleTurnDegrees,
             List<string> warnings,
             string label)
         {
@@ -1979,6 +2529,16 @@ namespace ProgrammaticStylized3D.Trees
             {
                 float t = index / (float)(sampleCount - 1);
                 positions.Add(EvaluateCatmullRom(controlPoints, t));
+            }
+
+            if (maximumSampleTurnDegrees > 0f)
+            {
+                ConstrainSampledCurveTurns(
+                    positions,
+                    controlPoints[1] - controlPoints[0],
+                    maximumSampleTurnDegrees,
+                    warnings,
+                    label);
             }
 
             var samples = new List<TreeCurveSample>(sampleCount);
@@ -2039,6 +2599,90 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             return samples;
+        }
+
+        private static void ConstrainSampledCurveTurns(
+            List<Vector3> positions,
+            Vector3 initialDirection,
+            float maximumTurnDegrees,
+            List<string> warnings,
+            string label)
+        {
+            if (positions == null || positions.Count < 2)
+            {
+                return;
+            }
+
+            var originalPositions = new List<Vector3>(positions);
+            float originalArcLength = CalculatePolylineLength(
+                originalPositions);
+            Vector3 previousDirection = initialDirection.sqrMagnitude > Epsilon
+                ? initialDirection.normalized
+                : originalPositions[1] - originalPositions[0];
+            if (previousDirection.sqrMagnitude <= Epsilon)
+            {
+                previousDirection = Vector3.up;
+            }
+            else
+            {
+                previousDirection.Normalize();
+            }
+
+            float maximumTurnRadians = Mathf.Clamp(
+                maximumTurnDegrees,
+                1f,
+                90f) * Mathf.Deg2Rad;
+            for (int index = 1; index < positions.Count; index++)
+            {
+                Vector3 originalSegment =
+                    originalPositions[index] - originalPositions[index - 1];
+                float segmentLength = originalSegment.magnitude;
+                if (segmentLength <= Epsilon)
+                {
+                    positions[index] = positions[index - 1];
+                    continue;
+                }
+
+                Vector3 desiredDirection = originalSegment / segmentLength;
+                Vector3 constrainedDirection = Vector3.RotateTowards(
+                    previousDirection,
+                    desiredDirection,
+                    maximumTurnRadians,
+                    0f).normalized;
+                positions[index] = positions[index - 1] +
+                    constrainedDirection * segmentLength;
+                previousDirection = constrainedDirection;
+            }
+
+            float constrainedArcLength = CalculatePolylineLength(positions);
+            float lengthTolerance = Mathf.Max(
+                0.001f,
+                originalArcLength * 0.001f);
+            bool invalidResult =
+                !TreeDeterministicUtility.IsFinite(originalArcLength) ||
+                !TreeDeterministicUtility.IsFinite(constrainedArcLength) ||
+                Mathf.Abs(constrainedArcLength - originalArcLength) >
+                    lengthTolerance;
+            if (!invalidResult)
+            {
+                for (int index = 0; index < positions.Count; index++)
+                {
+                    if (!IsFinite(positions[index]))
+                    {
+                        invalidResult = true;
+                        break;
+                    }
+                }
+            }
+
+            if (invalidResult)
+            {
+                positions.Clear();
+                positions.AddRange(originalPositions);
+                warnings?.Add(
+                    label +
+                    " sampled-turn clamp was discarded because arc-length preservation failed.");
+            }
         }
 
         private static Vector3 EvaluateCatmullRom(
@@ -2145,6 +2789,92 @@ namespace ProgrammaticStylized3D.Trees
             };
         }
 
+        private static void ResolvePrimaryTierLayout(
+            GenerationContext context,
+            int requestedCount,
+            int layoutSeed,
+            out int tiers,
+            out int perTier)
+        {
+            tiers = 0;
+            perTier = 0;
+            if (requestedCount <= 0)
+            {
+                return;
+            }
+
+            if (context.RecipeOnly)
+            {
+                float spacing = context.Parameters.TierSpacing;
+                float span = Mathf.Max(
+                    0f,
+                    context.Parameters.PrimaryBranchEndHeight -
+                    context.Parameters.PrimaryBranchStartHeight);
+                if (spacing <= 0.0001f || span <= 0.0001f)
+                {
+                    return;
+                }
+
+                int intervals = Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(span / spacing));
+                tiers = Mathf.Min(intervals + 1, requestedCount);
+                perTier = 0;
+                return;
+            }
+
+            tiers = context.Profile.PrimaryBranches.TierCount.Sample(
+                layoutSeed,
+                "resolved-tier-count");
+            perTier = context.Profile.PrimaryBranches.BranchesPerTier.Sample(
+                layoutSeed,
+                "resolved-branches-per-tier");
+            if (tiers > 0 && perTier > 0)
+            {
+                tiers = Mathf.Max(
+                    tiers,
+                    Mathf.CeilToInt(requestedCount / (float)perTier));
+            }
+        }
+
+        private static float ResolvePrimaryTierIrregularity(
+            GenerationContext context)
+        {
+            if (!context.RecipeOnly)
+            {
+                return context.Profile.PrimaryBranches
+                    .TierIrregularity.Midpoint;
+            }
+
+            return Mathf.Min(
+                0.035f,
+                Mathf.Max(0.006f, context.Parameters.TierSpacing * 0.18f));
+        }
+
+        private static void ResolveRecipeTierMembership(
+            int index,
+            int branchCount,
+            int tierCount,
+            out int tier,
+            out int indexInsideTier,
+            out int branchesInTier)
+        {
+            int safeCount = Mathf.Max(1, branchCount);
+            int safeTiers = Mathf.Clamp(tierCount, 1, safeCount);
+            tier = Mathf.Min(
+                safeTiers - 1,
+                Mathf.FloorToInt(index * safeTiers / (float)safeCount));
+            int tierStart = Mathf.CeilToInt(
+                tier * safeCount / (float)safeTiers);
+            int tierEnd = Mathf.CeilToInt(
+                (tier + 1) * safeCount / (float)safeTiers);
+            branchesInTier = Mathf.Max(1, tierEnd - tierStart);
+            indexInsideTier = Mathf.Clamp(
+                index - tierStart,
+                0,
+                branchesInTier - 1);
+        }
+
         private static float ResolvePrimaryAttachment(
             GenerationContext context,
             int index,
@@ -2155,7 +2885,27 @@ namespace ProgrammaticStylized3D.Trees
         {
             TreeResolvedParameters p = context.Parameters;
             float normalized;
-            if (tierCount > 0 && branchesPerTier > 0)
+            if (tierCount > 0 && context.RecipeOnly)
+            {
+                ResolveRecipeTierMembership(
+                    index,
+                    count,
+                    tierCount,
+                    out int tier,
+                    out _,
+                    out _);
+                normalized = tierCount <= 1
+                    ? 0.5f
+                    : tier / (float)(tierCount - 1);
+                if (tier > 0 && tier < tierCount - 1)
+                {
+                    normalized += TreeDeterministicUtility.SampleSigned(
+                        seed,
+                        "primary-tier-height-" + index) *
+                        ResolvePrimaryTierIrregularity(context);
+                }
+            }
+            else if (tierCount > 0 && branchesPerTier > 0)
             {
                 int tier = index / branchesPerTier;
                 int effectiveTiers = Mathf.Max(1, tierCount);
@@ -2165,7 +2915,7 @@ namespace ProgrammaticStylized3D.Trees
                 normalized += TreeDeterministicUtility.SampleSigned(
                     seed,
                     "primary-tier-height-" + index) *
-                    context.Profile.PrimaryBranches.TierIrregularity.Midpoint;
+                    ResolvePrimaryTierIrregularity(context);
             }
             else
             {
@@ -2189,7 +2939,22 @@ namespace ProgrammaticStylized3D.Trees
             int seed)
         {
             float evenYaw;
-            if (tierCount > 0 && branchesPerTier > 0)
+            if (tierCount > 0 && context.RecipeOnly)
+            {
+                ResolveRecipeTierMembership(
+                    index,
+                    context.Parameters.PrimaryBranchCount,
+                    tierCount,
+                    out int tier,
+                    out int inTier,
+                    out int tierSize);
+                float tierRotation = TreeDeterministicUtility.SampleSigned(
+                    seed,
+                    "primary-tier-rotation-" + tier) * 28f;
+                evenYaw = inTier * (360f / Mathf.Max(1, tierSize)) +
+                    tierRotation;
+            }
+            else if (tierCount > 0 && branchesPerTier > 0)
             {
                 int tier = index / branchesPerTier;
                 int inTier = index % branchesPerTier;
@@ -2291,11 +3056,11 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             float safeParentRadius = Mathf.Max(
-                context.Profile.MinimumBranchRadius,
+                context.Policy.MinimumBranchRadius,
                 parentFrame.Radius);
             float safeChildRadius = Mathf.Min(
                 safeParentRadius * 0.9f,
-                Mathf.Max(context.Profile.MinimumBranchRadius, childRadius));
+                Mathf.Max(context.Policy.MinimumBranchRadius, childRadius));
             float rootDistance = Mathf.Max(
                 0f,
                 (safeParentRadius - safeChildRadius * 1.08f) / radialMagnitude);
@@ -2427,7 +3192,7 @@ namespace ProgrammaticStylized3D.Trees
                     }
                 }
 
-                if (length < context.Profile.MinimumBranchLength)
+                if (length < context.Policy.MinimumBranchLength)
                 {
                     failures.Add(
                         "Branch " + branch.StableBranchId +
@@ -2482,7 +3247,7 @@ namespace ProgrammaticStylized3D.Trees
                 generatedBounds.center.z);
             float allowedEnvelope =
                 1f +
-                context.Profile.StructuralConstraints.CrownEnvelopeOvershoot;
+                context.Policy.CrownEnvelopeOvershoot;
 
             for (int index = 0; index < context.Branches.Count; index++)
             {
@@ -2706,10 +3471,37 @@ namespace ProgrammaticStylized3D.Trees
         {
             ulong hash = TreeDeterministicUtility.BeginHash();
             TreeDeterministicUtility.Append(ref hash, CurrentGeneratorVersion);
-            TreeDeterministicUtility.Append(ref hash, context.Profile.StableIdentity);
-            TreeDeterministicUtility.Append(ref hash, context.Profile.ProfileVersion);
-            TreeDeterministicUtility.Append(ref hash, context.Recipe.StableIdentity);
-            TreeDeterministicUtility.Append(ref hash, context.Recipe.RecipeVersion);
+            TreeDeterministicUtility.Append(
+                ref hash,
+                context.RecipeOnly ? "recipe-only-exact" : "legacy");
+            if (context.RecipeOnly)
+            {
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    context.SourceIdentity);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    TreeResolvedControls.CurrentSchemaVersion);
+            }
+            else
+            {
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    context.Profile.StableIdentity);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    context.Profile.ProfileVersion);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    context.Recipe.StableIdentity);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    context.Recipe.RecipeVersion);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    TreeGenerationRecipe.CurrentDeterministicSeedVersion);
+            }
+
             TreeDeterministicUtility.Append(ref hash, context.MasterSeed);
             if (context.Calibration != null)
             {
@@ -2733,8 +3525,8 @@ namespace ProgrammaticStylized3D.Trees
                     context.Calibration.DimensionTolerance);
             }
 
-            TreeStructuralConstraintSettings constraints =
-                context.Profile.StructuralConstraints;
+            TreeGenerationRuntimePolicy constraints =
+                context.Policy;
             TreeDeterministicUtility.Append(
                 ref hash,
                 constraints.MaximumTrunkHorizontalDisplacementRatio);
@@ -2846,10 +3638,18 @@ namespace ProgrammaticStylized3D.Trees
             ulong hash = TreeDeterministicUtility.BeginHash();
             TreeDeterministicUtility.Append(
                 ref hash,
-                context.Palette != null ? context.Palette.StableIdentity : string.Empty);
+                context.RecipeOnly
+                    ? "recipe-bark-material-property-block"
+                    : context.Palette != null
+                        ? context.Palette.StableIdentity
+                        : string.Empty);
             TreeDeterministicUtility.Append(
                 ref hash,
-                context.Palette != null ? context.Palette.PaletteVersion : 0);
+                context.RecipeOnly
+                    ? TreeResolvedControls.CurrentSchemaVersion
+                    : context.Palette != null
+                        ? context.Palette.PaletteVersion
+                        : 0);
             TreeDeterministicUtility.Append(ref hash, context.Parameters.BarkTint);
             TreeDeterministicUtility.Append(ref hash, context.Parameters.FoliageBaseColor);
             TreeDeterministicUtility.Append(ref hash, context.Parameters.FoliageHighlightColor);
@@ -2891,11 +3691,19 @@ namespace ProgrammaticStylized3D.Trees
             TreeDeterministicUtility.Append(ref hash, p.TrunkLeanStrength);
             TreeDeterministicUtility.Append(ref hash, p.TrunkLeanDirectionDegrees);
             TreeDeterministicUtility.Append(ref hash, p.TrunkSurfaceTorsionDegrees);
-            TreeDeterministicUtility.Append(ref hash, p.TrunkTwistRidgeCount);
-            TreeDeterministicUtility.Append(ref hash, p.TrunkTwistRidgeDepth);
+            TreeDeterministicUtility.Append(ref hash, p.RootButtressCount);
             TreeDeterministicUtility.Append(ref hash, p.RootButtressStrength);
             TreeDeterministicUtility.Append(ref hash, p.RootButtressHeight);
+            TreeDeterministicUtility.Append(ref hash, p.ButtressTransition);
             TreeDeterministicUtility.Append(ref hash, p.RootFlareScale);
+            TreeDeterministicUtility.Append(ref hash, p.RecipeOnlyControlSource);
+            TreeDeterministicUtility.Append(ref hash, p.RootReach);
+            TreeDeterministicUtility.Append(ref hash, p.RootThickness);
+            TreeDeterministicUtility.Append(ref hash, p.SecondaryDensity);
+            TreeDeterministicUtility.Append(ref hash, p.TertiaryDensity);
+            TreeDeterministicUtility.Append(ref hash, p.ChildScale);
+            TreeDeterministicUtility.Append(ref hash, p.TierSpacing);
+            TreeDeterministicUtility.Append(ref hash, p.TipUpturn);
             TreeDeterministicUtility.Append(ref hash, p.TrunkSpiralStrength);
             TreeDeterministicUtility.Append(ref hash, p.TrunkSpiralTurns);
             TreeDeterministicUtility.Append(ref hash, p.TrunkSpiralDirection);
@@ -2983,27 +3791,60 @@ namespace ProgrammaticStylized3D.Trees
             List<string> failures)
         {
             var report = new StringBuilder(24576);
-            report.AppendLine("[TREE-GEN.2C Calibrated Deterministic Structural Generation]");
+            report.AppendLine(
+                context.RecipeOnly
+                    ? "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]"
+                    : "[TREE-GEN.2C Calibrated Deterministic Structural Generation]");
             report.Append("Generated: ").AppendLine(timestamp);
             report.Append("Generator version: ").AppendLine(CurrentGeneratorVersion.ToString());
+            report.Append("Generator seed-compatibility version: ")
+                .AppendLine(CurrentGeneratorSeedCompatibilityVersion.ToString());
             report.AppendLine(
                 "Output: branch graph, transported curve frames, resolved authoring parameters, fingerprints, and diagnostics only; no bark/foliage meshes are created");
             report.AppendLine();
 
             report.AppendLine("[Authoring Inputs]");
-            report.Append("Family profile: ").AppendLine(context.Profile.StableIdentity);
-            report.Append("Family: ").AppendLine(context.Profile.Family.ToString());
-            report.Append("Calibration: ").AppendLine(
-                context.Calibration != null
-                    ? context.Calibration.StableIdentity
-                    : "None");
-            report.Append("Recipe: ").AppendLine(context.Recipe.StableIdentity);
-            report.Append("Age class: ").AppendLine(context.Recipe.AgeClass.ToString());
-            report.Append("Master seed: ").AppendLine(context.MasterSeed.ToString());
-            report.Append("Instance overrides: ").AppendLine(
-                context.InstanceOverrides != null && context.InstanceOverrides.HasAnyOverride
-                    ? "Present"
-                    : "None");
+            report.Append("Generation path: ").AppendLine(
+                context.RecipeOnly
+                    ? "Standalone recipe -> exact instance controls"
+                    : "Legacy family/calibration/override compatibility");
+            report.Append("Reference grouping label: ")
+                .AppendLine(context.DisplayFamily.ToString());
+            if (context.RecipeOnly)
+            {
+                report.Append("Source recipe identity: ")
+                    .AppendLine(context.SourceIdentity);
+                report.Append("Exact-control schema: ")
+                    .AppendLine(TreeResolvedControls.CurrentSchemaVersion.ToString());
+                report.AppendLine(
+                    "Behavioral family reads: 0 | Behavioral calibration reads: 0");
+            }
+            else
+            {
+                report.Append("Family profile: ")
+                    .AppendLine(context.Profile.StableIdentity);
+                report.Append("Calibration: ").AppendLine(
+                    context.Calibration != null
+                        ? context.Calibration.StableIdentity
+                        : "None");
+                report.Append("Recipe: ")
+                    .AppendLine(context.Recipe.StableIdentity);
+                report.Append("Recipe schema / deterministic seed version: ")
+                    .Append(context.Recipe.RecipeVersion)
+                    .Append(" / ")
+                    .AppendLine(
+                        TreeGenerationRecipe.CurrentDeterministicSeedVersion.ToString());
+                report.Append("Age class: ")
+                    .AppendLine(context.Recipe.AgeClass.ToString());
+                report.Append("Instance overrides: ").AppendLine(
+                    context.InstanceOverrides != null &&
+                    context.InstanceOverrides.HasAnyOverride
+                        ? "Present"
+                        : "None");
+            }
+
+            report.Append("Master seed: ")
+                .AppendLine(context.MasterSeed.ToString());
             report.AppendLine();
 
             report.AppendLine("[Independent Seed Streams]");
@@ -3112,7 +3953,10 @@ namespace ProgrammaticStylized3D.Trees
                 report.AppendLine("PASS | Parent indices are backward-only and acyclic.");
                 report.AppendLine("PASS | Attachments, lengths, radii, and frames are finite and valid.");
                 report.AppendLine("PASS | Stable branch IDs are unique.");
-                report.AppendLine("PASS | Structure remained inside profile branch/sample budgets.");
+                report.AppendLine(
+                    context.RecipeOnly
+                        ? "PASS | Structure remained inside recipe-generation safety and sample budgets."
+                        : "PASS | Structure remained inside profile branch/sample budgets.");
                 if (context.Calibration != null)
                 {
                     report.AppendLine("PASS | Reference calibration stayed inside its dimension tolerance.");
@@ -3146,58 +3990,131 @@ namespace ProgrammaticStylized3D.Trees
             TreeResolvedParameters p)
         {
             report.AppendLine("[Resolved Parameters]");
-            report.Append("Height / trunk radius: ")
+            report.Append("Height / trunk radius / taper: ")
                 .Append(p.Height.ToString("F3")).Append(" / ")
-                .AppendLine(p.TrunkBaseRadius.ToString("F3"));
-            report.Append("Trunk controls: points=")
+                .Append(p.TrunkBaseRadius.ToString("F3")).Append(" / ")
+                .AppendLine(p.TrunkTaper.ToString("F3"));
+            report.Append("Trunk: points=")
                 .Append(p.TrunkControlPointCount)
-                .Append(" curvature=").Append(p.TrunkCurvature.ToString("F3"))
-                .Append(" bends=").Append(p.TrunkBendCount.ToString("F3"))
+                .Append(" bendAmount=").Append(p.TrunkCurvature.ToString("F3"))
+                .Append(" bendFrequency=").Append(p.TrunkBendCount.ToString("F3"))
                 .Append(" drift=").Append(p.TrunkDirectionalDrift.ToString("F3"))
+                .Append(" roughness=").Append(p.TrunkIrregularity.ToString("F3"))
                 .Append(" lean=").Append(p.TrunkLeanStrength.ToString("F3"))
-                .Append(" yaw=").Append(p.TrunkLeanDirectionDegrees.ToString("F1"))
-                .Append(" twistDegrees=").Append(p.TrunkSurfaceTorsionDegrees.ToString("F1"))
-                .Append(" ridges=").Append(p.TrunkTwistRidgeCount)
-                .Append(" ridgeDepth=").Append(p.TrunkTwistRidgeDepth.ToString("F3"))
-                .Append(" buttress=").Append(p.RootButtressStrength.ToString("F3"))
-                .Append(" buttressHeight=").Append(p.RootButtressHeight.ToString("F3"))
-                .Append(" rootFlare=").Append(p.RootFlareScale.ToString("F3"))
-                .Append(" pathSpiral=").Append(p.TrunkSpiralStrength.ToString("F3"))
-                .Append(" turns=").Append(p.TrunkSpiralTurns.ToString("F2"))
-                .Append(" direction=").AppendLine(p.TrunkSpiralDirection > 0f ? "CCW" : "CW");
+                .Append(" leanYaw=").Append(p.TrunkLeanDirectionDegrees.ToString("F1"))
+                .Append(" axialTwist=")
+                .AppendLine(p.TrunkSurfaceTorsionDegrees.ToString("F1"));
+            if (p.RecipeOnlyControlSource)
+            {
+                float signedTurns = p.TrunkSpiralTurns *
+                    (p.TrunkSpiralDirection < 0f ? -1f : 1f);
+                report.Append("Recipe roots: count=")
+                    .Append(p.RootButtressCount)
+                    .Append(" reach=").Append(p.RootReach.ToString("F3"))
+                    .Append(" thickness=").Append(p.RootThickness.ToString("F3"))
+                    .Append(" height=")
+                    .Append(p.RootButtressHeight.ToString("F3"))
+                    .Append(" buttressPersistence=")
+                    .AppendLine(p.ButtressTransition.ToString("F3"));
+                report.Append("Recipe spiral: radiusFraction=")
+                    .Append(p.TrunkSpiralStrength.ToString("F3"))
+                    .Append(" signedTurns=")
+                    .AppendLine(signedTurns.ToString("F3"));
+                report.Append("Recipe hierarchy: maxOrder=")
+                    .Append(p.MaximumBranchOrder)
+                    .Append(" secondaryDensity=")
+                    .Append(p.SecondaryDensity.ToString("F3"))
+                    .Append(" tertiaryDensity=")
+                    .Append(p.TertiaryDensity.ToString("F3"))
+                    .Append(" childScale=")
+                    .Append(p.ChildScale.ToString("F3"))
+                    .Append(" tierSpacing=")
+                    .Append(p.TierSpacing.ToString("F3"));
+                if (p.TierSpacing > 0.0001f)
+                {
+                    float bandSpan = Mathf.Max(
+                        0f,
+                        p.PrimaryBranchEndHeight -
+                        p.PrimaryBranchStartHeight);
+                    int requestedIntervals = Mathf.Max(
+                        1,
+                        Mathf.RoundToInt(bandSpan / p.TierSpacing));
+                    int emittedTiers = Mathf.Min(
+                        requestedIntervals + 1,
+                        Mathf.Max(1, p.PrimaryBranchCount));
+                    float emittedSpacing = emittedTiers > 1
+                        ? bandSpan / (emittedTiers - 1)
+                        : 0f;
+                    report.Append(" emittedTierSpacing=")
+                        .Append(emittedSpacing.ToString("F3"))
+                        .Append(" tiers=")
+                        .Append(emittedTiers.ToString());
+                }
+                report.Append(" tipUpturn=")
+                    .AppendLine(p.TipUpturn.ToString("F3"));
+            }
+            else
+            {
+                report.Append("Legacy roots: count=")
+                    .Append(p.RootButtressCount)
+                    .Append(" strength=")
+                    .Append(p.RootButtressStrength.ToString("F3"))
+                    .Append(" height=")
+                    .Append(p.RootButtressHeight.ToString("F3"))
+                    .Append(" flare=")
+                    .AppendLine(p.RootFlareScale.ToString("F3"));
+                report.Append("Legacy path spiral: strength=")
+                    .Append(p.TrunkSpiralStrength.ToString("F3"))
+                    .Append(" turns=").Append(p.TrunkSpiralTurns.ToString("F2"))
+                    .Append(" direction=")
+                    .AppendLine(p.TrunkSpiralDirection > 0f ? "CCW" : "CW");
+                report.Append("Legacy higher orders: max=")
+                    .Append(p.MaximumBranchOrder)
+                    .Append(" secondary/primary=")
+                    .Append(p.SecondaryBranchesPerPrimary)
+                    .Append(" tertiary/secondary=")
+                    .AppendLine(p.TertiaryBranchesPerSecondary.ToString());
+            }
+
             report.Append("Primary branches: count=")
                 .Append(p.PrimaryBranchCount)
-                .Append(" start/end=").Append(p.PrimaryBranchStartHeight.ToString("F3"))
-                .Append("/").Append(p.PrimaryBranchEndHeight.ToString("F3"))
-                .Append(" elevation=").Append(p.InitialBranchElevationDegrees.ToString("F1"))
-                .Append(" arch=").Append(p.BranchArchDirection.ToString("F2"))
-                .Append("x").Append(p.BranchArchStrength.ToString("F3"))
-                .Append(" lateSag=").Append(p.LateBranchSag.ToString("F3"))
-                .Append(" symmetry=").Append(p.AzimuthSymmetry.ToString("F3"))
-                .Append(" bias=").Append(p.DirectionalBiasAngleDegrees.ToString("F1"))
-                .Append("@").Append(p.DirectionalBiasStrength.ToString("F3"))
-                .Append(" curvature=").Append(p.PrimaryBranchCurvature.ToString("F3"))
-                .Append(" lengthRatio=").AppendLine(p.PrimaryBranchLengthRatio.ToString("F3"));
-            report.Append("Higher orders: max=")
-                .Append(p.MaximumBranchOrder)
-                .Append(" secondary/primary=").Append(p.SecondaryBranchesPerPrimary)
-                .Append(" tertiary/secondary=").AppendLine(p.TertiaryBranchesPerSecondary.ToString());
-            report.Append("Crown volume: overall=")
-                .Append(p.CrownVolume.ToString("F3"))
-                .Append(" width=").Append(p.CrownWidthScale.ToString("F3"))
-                .Append(" height=").Append(p.CrownHeightScale.ToString("F3"))
-                .Append(" fill=").Append(p.CrownFill.ToString("F3"))
-                .Append(" lobes=").AppendLine(p.CrownLobeCount.ToString());
-            report.Append("Foliage density: clusters=")
-                .Append(p.FoliageClusterCount)
-                .Append(" cards/cluster=").Append(p.CardsPerCluster)
-                .Append(" eligibility=").Append(p.FoliageEligibility.ToString("F3"))
-                .Append(" occupancy=").AppendLine(p.ClusterOccupancy.ToString("F3"));
+                .Append(" start/end=")
+                .Append(p.PrimaryBranchStartHeight.ToString("F3"))
+                .Append("/")
+                .Append(p.PrimaryBranchEndHeight.ToString("F3"))
+                .Append(" elevation=")
+                .Append(p.InitialBranchElevationDegrees.ToString("F1"))
+                .Append(" signedArch=")
+                .Append((p.BranchArchDirection * p.BranchArchStrength)
+                    .ToString("F3"))
+                .Append(" lateSag=")
+                .Append(p.LateBranchSag.ToString("F3"))
+                .Append(" symmetry=")
+                .Append(p.AzimuthSymmetry.ToString("F3"))
+                .Append(" bias=")
+                .Append(p.DirectionalBiasAngleDegrees.ToString("F1"))
+                .Append("@")
+                .Append(p.DirectionalBiasStrength.ToString("F3"))
+                .Append(" curvature=")
+                .Append(p.PrimaryBranchCurvature.ToString("F3"))
+                .Append(" lengthRatio=")
+                .Append(p.PrimaryBranchLengthRatio.ToString("F3"))
+                .Append(" radiusRatio=")
+                .AppendLine(p.PrimaryBranchRadiusRatio.ToString("F3"));
+            if (p.RecipeOnlyControlSource)
+            {
+                report.AppendLine(
+                    "Procedural foliage: deferred; no clusters or cards generated.");
+            }
+            else
+            {
+                report.Append("Legacy crown/foliage intent: crownVolume=")
+                    .Append(p.CrownVolume.ToString("F3"))
+                    .Append(" clusters=").Append(p.FoliageClusterCount)
+                    .Append(" cards/cluster=")
+                    .AppendLine(p.CardsPerCluster.ToString());
+            }
             report.Append("Bark tint: ").AppendLine(p.BarkTint.ToString());
-            report.Append("Foliage base/highlight/shadow: ")
-                .Append(p.FoliageBaseColor).Append(" / ")
-                .Append(p.FoliageHighlightColor).Append(" / ")
-                .AppendLine(p.FoliageShadowColor.ToString());
             report.AppendLine("Ownership trace:");
             for (int index = 0; index < p.OwnershipTrace.Count; index++)
             {
@@ -3226,7 +4143,7 @@ namespace ProgrammaticStylized3D.Trees
             List<string> failures)
         {
             var report = new StringBuilder(4096);
-            report.AppendLine("[TREE-GEN.2C Calibrated Deterministic Structural Generation]");
+            report.AppendLine("[Tree Structural Generation Failure]");
             report.Append("Generated: ").AppendLine(timestamp);
             report.AppendLine("[Validation]");
             for (int index = 0; index < failures.Count; index++)
@@ -3245,11 +4162,13 @@ namespace ProgrammaticStylized3D.Trees
         {
             return TreeDeterministicUtility.DeriveSeed(
                 context.MasterSeed,
-                context.Profile.Family,
+                context.RecipeOnly
+                    ? "recipe-only-branch"
+                    : context.DisplayFamily.ToString(),
                 parentStableId,
                 order,
                 ordinal,
-                CurrentGeneratorVersion);
+                CurrentGeneratorSeedCompatibilityVersion);
         }
 
         private static float CalculateBranchLength(TreeBranchDefinition branch)
@@ -3545,28 +4464,39 @@ namespace ProgrammaticStylized3D.Trees
             string baselineBarkInput,
             TreeBarkMeshSettings settings)
         {
-            bool passed = result != null &&
-                result.Passed &&
-                result.Definition.StructuralFingerprint !=
-                    baseline.StructuralFingerprint &&
-                result.Definition.FoliageGeometryFingerprint ==
-                    baseline.FoliageGeometryFingerprint &&
-                result.Definition.PaletteFingerprint ==
-                    baseline.PaletteFingerprint;
             string changedBarkInput = result != null && result.Passed
                 ? TreeBarkMeshGenerator.CalculateInputFingerprint(
                     result.Definition,
                     settings)
                 : "Generation failed";
-            passed &= changedBarkInput != baselineBarkInput;
+            bool passed = result != null &&
+                result.Passed &&
+                result.Definition.StructuralFingerprint !=
+                    baseline.StructuralFingerprint &&
+                result.Definition.TrunkFingerprint !=
+                    baseline.TrunkFingerprint &&
+                result.Definition.BranchFingerprint !=
+                    baseline.BranchFingerprint &&
+                result.Definition.PaletteFingerprint ==
+                    baseline.PaletteFingerprint &&
+                changedBarkInput != baselineBarkInput;
             return AppendTest(
                 report,
-                "Trunk-twist changes retain the existing structural-frame response and change bark input",
+                "Trunk-twist changes invalidate transported structure and bark input while preserving palette",
                 passed,
-                baseline.StructuralFingerprint + " / bark=" + baselineBarkInput,
+                "structural=" + baseline.StructuralFingerprint +
+                    " trunk=" + baseline.TrunkFingerprint +
+                    " branches=" + baseline.BranchFingerprint +
+                    " foliage=" + baseline.FoliageGeometryFingerprint +
+                    " palette=" + baseline.PaletteFingerprint +
+                    " bark=" + baselineBarkInput,
                 result != null && result.Passed
-                    ? result.Definition.StructuralFingerprint +
-                      " / bark=" + changedBarkInput
+                    ? "structural=" + result.Definition.StructuralFingerprint +
+                      " trunk=" + result.Definition.TrunkFingerprint +
+                      " branches=" + result.Definition.BranchFingerprint +
+                      " foliage=" + result.Definition.FoliageGeometryFingerprint +
+                      " palette=" + result.Definition.PaletteFingerprint +
+                      " bark=" + changedBarkInput
                     : "Generation failed");
         }
 

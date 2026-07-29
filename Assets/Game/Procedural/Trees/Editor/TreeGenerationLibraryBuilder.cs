@@ -86,8 +86,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     upgradedProfileCount++;
                     migrationNotes.Add(
                         "MIGRATE | " + profile.name +
-                        " | added=compact trunk ridge and root-buttress grammar" +
-                        " | preserved=existing twist range, structural seed versions, and all unrelated authored fields");
+                        " | barkGrammar=" + profile.BarkGrammarVersion +
+                        " | twistRange=" +
+                        profile.Trunk.SurfaceTorsionDegrees.Minimum.ToString("F1") +
+                        ".." +
+                        profile.Trunk.SurfaceTorsionDegrees.Maximum.ToString("F1") +
+                        " | rootCount=" +
+                        profile.Trunk.RootButtressCount.Minimum +
+                        ".." +
+                        profile.Trunk.RootButtressCount.Maximum +
+                        " | branchCalibration=Twisted/Dead denser, thicker, shorter, more upward defaults where legacy values matched" +
+                        " | preserved=non-legacy authored ranges and all unrelated fields");
                     EditorUtility.SetDirty(profile);
                 }
 
@@ -162,7 +171,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     existingSubAssets,
                     recipeIdentity,
                     "TR_" + slot.Family + "_" + slot.SourceVariantIndex);
-                if (recipe == null)
+                bool createdRecipe = recipe == null;
+                if (createdRecipe)
                 {
                     recipe = ScriptableObject.CreateInstance<TreeGenerationRecipe>();
                     recipe.name =
@@ -189,8 +199,88 @@ namespace ProgrammaticStylized3D.Trees.Editor
                         calibration);
                 }
 
+                bool hadExplicitTrunkTwist =
+                    recipe.Overrides.TrunkSurfaceTorsionDegrees.IsSet;
+                bool applyManagedTwist = TryResolveManagedRepresentativeTwist(
+                    slot.Family,
+                    slot.SourceVariantIndex,
+                    out float previousManagedTwistDegrees,
+                    out float managedTwistDegrees);
+                bool twistDefaultAdded = false;
+                bool managedTwistUpgraded = false;
+                if (applyManagedTwist)
+                {
+                    if (createdRecipe)
+                    {
+                        twistDefaultAdded =
+                            recipe.ConfigureManagedTrunkTwistDefault(
+                                managedTwistDegrees);
+                    }
+                    else
+                    {
+                        managedTwistUpgraded =
+                            recipe.UpgradeManagedTrunkTwistDefault(
+                                previousManagedTwistDegrees,
+                                managedTwistDegrees);
+                    }
+                }
+
+                bool applyManagedRoot = TryResolveManagedRepresentativeRoot(
+                    slot.Family,
+                    slot.SourceVariantIndex,
+                    out int previousManagedRootCount,
+                    out int managedRootCount,
+                    out float previousManagedRootStrength,
+                    out float managedRootStrength,
+                    out float managedRootHeight,
+                    out float previousManagedRootFlare,
+                    out float managedRootFlare);
+                bool rootDefaultsAdded = false;
+                if (applyManagedRoot)
+                {
+                    rootDefaultsAdded = createdRecipe
+                        ? recipe.ConfigureManagedRootButtressDefaults(
+                            managedRootCount,
+                            managedRootStrength,
+                            managedRootHeight,
+                            managedRootFlare)
+                        : recipe.UpgradeManagedRootButtressDefaults(
+                            previousManagedRootCount,
+                            managedRootCount,
+                            previousManagedRootStrength,
+                            managedRootStrength,
+                            managedRootHeight,
+                            previousManagedRootFlare,
+                            managedRootFlare);
+                }
+
+                bool applyManagedPathSpiral =
+                    TryResolveManagedRepresentativePathSpiral(
+                        slot.Family,
+                        slot.SourceVariantIndex,
+                        out float managedPathStrength,
+                        out float managedPathTurns,
+                        out float managedPathDirection);
+                bool pathSpiralDefaultsAdded = applyManagedPathSpiral &&
+                    recipe.ConfigureManagedPathSpiralDefaults(
+                        managedPathStrength,
+                        managedPathTurns,
+                        managedPathDirection);
+
                 bool hadExplicitBarkTint = recipe.Overrides.BarkTint.Enabled;
-                if (recipe.UpgradeManagedDefaults(neutralComparisonBark: true))
+                bool upgradedRecipe = recipe.UpgradeManagedDefaults(
+                    neutralComparisonBark: true,
+                    applyManagedTrunkTwistDefault: applyManagedTwist,
+                    managedTrunkTwistDegrees: managedTwistDegrees);
+                bool managedTwistAdded =
+                    applyManagedTwist &&
+                    !hadExplicitTrunkTwist &&
+                    recipe.Overrides.TrunkSurfaceTorsionDegrees.IsSet;
+                if (upgradedRecipe ||
+                    twistDefaultAdded ||
+                    managedTwistUpgraded ||
+                    rootDefaultsAdded ||
+                    pathSpiralDefaultsAdded)
                 {
                     upgradedRecipeCount++;
                     bool neutralized =
@@ -202,10 +292,41 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
                     migrationNotes.Add(
                         "MIGRATE | " + recipe.name +
-                        " | legacy attachment endpoints pinned and branch overrides mapped when present" +
                         " | barkTint=" + (neutralized
                             ? "neutral comparison override added"
-                            : "existing explicit override preserved"));
+                            : "existing explicit override preserved") +
+                        " | trunkTwist=" + (managedTwistUpgraded
+                            ? previousManagedTwistDegrees.ToString("F1") +
+                              " -> " +
+                              recipe.Overrides.TrunkSurfaceTorsionDegrees.ExactValue.ToString("F1") +
+                              " degrees managed default upgraded"
+                            : managedTwistAdded
+                                ? recipe.Overrides.TrunkSurfaceTorsionDegrees.ExactValue.ToString("F1") + " degrees managed default added"
+                                : hadExplicitTrunkTwist
+                                    ? "existing explicit override preserved"
+                                    : "not applicable") +
+                        " | root=" + (rootDefaultsAdded
+                            ? recipe.Overrides.RootButtressCount.ExactValue +
+                              "/" +
+                              recipe.Overrides.RootButtressStrength.ExactValue.ToString("F3") +
+                              "/" +
+                              recipe.Overrides.RootButtressHeight.ExactValue.ToString("F3") +
+                              "/" +
+                              recipe.Overrides.RootFlareScale.ExactValue.ToString("F3") +
+                              " managed defaults added/upgraded"
+                            : applyManagedRoot
+                                ? "existing explicit values preserved"
+                                : "not applicable") +
+                        " | pathSpiral=" + (pathSpiralDefaultsAdded
+                            ? recipe.Overrides.TrunkSpiralStrength.ExactValue.ToString("F3") +
+                              "/" +
+                              recipe.Overrides.TrunkSpiralTurns.ExactValue.ToString("F2") +
+                              "/" +
+                              recipe.Overrides.TrunkSpiralDirection.ExactValue.ToString("F0") +
+                              " managed defaults added"
+                            : applyManagedPathSpiral
+                                ? "existing explicit values preserved"
+                                : "not applicable"));
                 }
                 EditorUtility.SetDirty(recipe);
 
@@ -248,6 +369,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 .Append(TreeGenerationLibrary.CurrentLibraryVersion)
                 .Append(" | profileVersion=")
                 .Append(TreeFamilyProfile.CurrentProfileVersion)
+                .Append(" | seedVersion=")
+                .Append(TreeGenerationRecipe.CurrentDeterministicSeedVersion)
                 .Append(" | barkGrammarVersion=")
                 .Append(TreeFamilyProfile.CurrentBarkGrammarVersion)
                 .Append(" | upgradedProfiles=")
@@ -273,6 +396,133 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
 
             return true;
+        }
+
+        private static bool TryResolveManagedRepresentativeTwist(
+            TreeFamily family,
+            int variantIndex,
+            out float previousManagedDegrees,
+            out float currentManagedDegrees)
+        {
+            if (variantIndex == 1 && family == TreeFamily.Twisted)
+            {
+                previousManagedDegrees = -210f;
+                currentManagedDegrees = -330f;
+                return true;
+            }
+
+            if (variantIndex == 1 && family == TreeFamily.Dead)
+            {
+                previousManagedDegrees = -180f;
+                currentManagedDegrees = -270f;
+                return true;
+            }
+
+            previousManagedDegrees = 0f;
+            currentManagedDegrees = 0f;
+            return false;
+        }
+
+        private static bool TryResolveManagedRepresentativeRoot(
+            TreeFamily family,
+            int variantIndex,
+            out int previousCount,
+            out int currentCount,
+            out float previousStrength,
+            out float currentStrength,
+            out float currentHeight,
+            out float previousFlare,
+            out float currentFlare)
+        {
+            if (variantIndex != 1)
+            {
+                previousCount = 0;
+                currentCount = 0;
+                previousStrength = 0f;
+                currentStrength = 0f;
+                currentHeight = 0f;
+                previousFlare = 1f;
+                currentFlare = 1f;
+                return false;
+            }
+
+            switch (family)
+            {
+                case TreeFamily.Common:
+                    previousCount = 5;
+                    currentCount = 5;
+                    previousStrength = 0.68f;
+                    currentStrength = 0.72f;
+                    currentHeight = 0.16f;
+                    previousFlare = 1.12f;
+                    currentFlare = 1.39f;
+                    return true;
+                case TreeFamily.Pine:
+                    previousCount = 5;
+                    currentCount = 5;
+                    previousStrength = 0.30f;
+                    currentStrength = 0.30f;
+                    currentHeight = 0.16f;
+                    previousFlare = 1.18f;
+                    currentFlare = 1.18f;
+                    return true;
+                case TreeFamily.Twisted:
+                    previousCount = 5;
+                    currentCount = 5;
+                    previousStrength = 0.82f;
+                    currentStrength = 0.88f;
+                    currentHeight = 0.22f;
+                    previousFlare = 1.18f;
+                    currentFlare = 1.52f;
+                    return true;
+                case TreeFamily.Dead:
+                    previousCount = 6;
+                    currentCount = 6;
+                    previousStrength = 0.70f;
+                    currentStrength = 0.84f;
+                    currentHeight = 0.20f;
+                    previousFlare = 1.38f;
+                    currentFlare = 1.48f;
+                    return true;
+                default:
+                    previousCount = 0;
+                    currentCount = 0;
+                    previousStrength = 0f;
+                    currentStrength = 0f;
+                    currentHeight = 0f;
+                    previousFlare = 1f;
+                    currentFlare = 1f;
+                    return false;
+            }
+        }
+
+        private static bool TryResolveManagedRepresentativePathSpiral(
+            TreeFamily family,
+            int variantIndex,
+            out float strength,
+            out float turns,
+            out float direction)
+        {
+            if (variantIndex == 1 && family == TreeFamily.Twisted)
+            {
+                strength = 0.18f;
+                turns = 1f;
+                direction = -1f;
+                return true;
+            }
+
+            if (variantIndex == 1 && family == TreeFamily.Dead)
+            {
+                strength = 0.10f;
+                turns = 0.75f;
+                direction = -1f;
+                return true;
+            }
+
+            strength = 0f;
+            turns = 0f;
+            direction = 1f;
+            return false;
         }
 
         private static int CompareVariants(

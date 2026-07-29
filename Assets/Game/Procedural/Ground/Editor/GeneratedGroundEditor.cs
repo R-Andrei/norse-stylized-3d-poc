@@ -3177,6 +3177,72 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
                     "Regenerate when authoring values change."));
 
             EditorGUILayout.Space(4f);
+            bool editorIsPlayingOrChanging =
+                Application.isPlaying ||
+                EditorApplication.isPlayingOrWillChangePlaymode;
+            bool canRunCompleteRebuild =
+                targets.Length == 1 &&
+                !editorIsPlayingOrChanging;
+            using (new EditorGUI.DisabledScope(!canRunCompleteRebuild))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Rebuild Ground, Rivers & Production Caches",
+                            "Rebuilds this Ground and its active child Rivers, then updates the required Painted Accent output and every assigned River Foam topology cache.")))
+                {
+                    GeneratedGround ground =
+                        target as GeneratedGround;
+                    serializedObject.ApplyModifiedProperties();
+                    if (EditorUtility.DisplayDialog(
+                            "Rebuild Ground, Rivers & Production Caches?",
+                            "This synchronous Edit Mode action will rebuild the " +
+                            "selected Ground and its active child Rivers, update " +
+                            "the required Painted Accent production asset, and " +
+                            "overwrite every assigned child River Foam topology " +
+                            "cache. Missing Foam cache assignments will be skipped. " +
+                            "The scene will not be saved automatically.",
+                            "Rebuild",
+                            "Cancel"))
+                    {
+                        bool succeeded =
+                            GroundRiverProductionRebuildCoordinator.TryRebuild(
+                                ground,
+                                out string report);
+                        if (succeeded)
+                        {
+                            Debug.Log(report, ground);
+                        }
+                        else
+                        {
+                            Debug.LogError(report, ground);
+                        }
+
+                        EditorUtility.DisplayDialog(
+                            succeeded
+                                ? "Complete Rebuild Finished"
+                                : "Complete Rebuild Failed",
+                            report,
+                            "OK");
+                        serializedObject.Update();
+                        Repaint();
+                    }
+                }
+            }
+
+            if (targets.Length != 1)
+            {
+                EditorGUILayout.HelpBox(
+                    "The complete Ground/River production rebuild requires exactly one selected GeneratedGround.",
+                    MessageType.Info);
+            }
+            else if (editorIsPlayingOrChanging)
+            {
+                EditorGUILayout.HelpBox(
+                    "The complete Ground/River production rebuild is available only in Edit Mode.",
+                    MessageType.Info);
+            }
+
+            EditorGUILayout.Space(4f);
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Randomize Shape Seed"))

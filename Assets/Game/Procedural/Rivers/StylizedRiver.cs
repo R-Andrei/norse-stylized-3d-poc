@@ -120,7 +120,9 @@ namespace ProgrammaticStylized3D.Rivers
         [InspectorName("Donor Cell")]
         DonorCell = 0,
         [InspectorName("TVD Superbee")]
-        TvdSuperbee = 1
+        TvdSuperbee = 1,
+        [InspectorName("Bulk-Phase Residual TVD")]
+        BulkPhaseResidualTvd = 2
     }
 
     public enum StylizedRiverFoamBirthShapeMode
@@ -202,6 +204,10 @@ namespace ProgrammaticStylized3D.Rivers
         ChipCandidateField = 18,
         ProductionChipMask = 25,
         ChipEligibilityComposite = 26,
+        MaterialCoverage = 27,
+        MaterialAmount = 28,
+        MaterialStateComposite = 29,
+        VisibilityPipelineComposite = 30,
     }
 
 
@@ -456,22 +462,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamChipShapeTransitionTime = 0.10f;
         private const float MaximumFoamChipShapeTransitionTime = 30f;
         private const float DefaultFoamChipShapeTransitionTime = 4f;
-        private const float MinimumFoamProgressiveRibbonDuration = 0.5f;
-        private const float MaximumFoamProgressiveRibbonDuration = 5f;
-        private const float DefaultFoamProgressiveRibbonDuration = 2.4f;
-        private const float MinimumFoamProgressiveRibbonTravelDistance = 0.5f;
-        private const float MaximumFoamProgressiveRibbonTravelDistance = 8f;
-        private const float DefaultFoamProgressiveRibbonTravelDistance = 3f;
-        private const float MinimumFoamProgressiveRibbonAcrossDrift = -1f;
-        private const float MaximumFoamProgressiveRibbonAcrossDrift = 1f;
-        private const float DefaultFoamProgressiveRibbonAcrossDrift = 0.25f;
-        private const float MinimumFoamProgressiveRibbonPathWander = 0f;
-        private const float MaximumFoamProgressiveRibbonPathWander = 1f;
-        private const float DefaultFoamProgressiveRibbonPathWander = 0.35f;
-        private const float FoamSpawnMaximumBendAcross = 0.35f;
-        private const float MinimumFoamSpawnScale = 0.03f;
-        private const float MaximumFoamSpawnScale = 1.25f;
-        private const float DefaultFoamSpawnScale = 0.18f;
 
 
         [Header("Setup")]
@@ -1014,10 +1004,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamFixedMetricCellSize =
                 StylizedRiverFoamFixedMetricCellSize.QualityDefault;
 
-        [Tooltip("Selects how Layer C transports geometric Coverage. Donor Cell is the conservative first-order baseline and is more numerically diffuse. TVD Superbee reconstructs bounded Coverage at faces to retain sharper footprints while transporting one coherent material state. Neither scheme is permitted to alter decoded intrinsic Presence or Remaining Life merely because material moved. This changes no allocation or topology contract and may be switched during Play Mode.")]
+        [Tooltip("Selects how Layer C transports the coherent packed material state. Donor Cell is the conservative first-order baseline. TVD Superbee reconstructs bounded Coverage at faces. Bulk-Phase Residual TVD removes the shared downstream speed from scalar advection, advances it as a global subcell phase, and transports only local residual and lateral motion in the existing single dispatch. It allocates no additional full-field texture and adds no material dispatch. All schemes move Coverage, Presence, Remaining Life, and Pattern together. Bulk-Phase Residual TVD is the accepted production baseline and serialized default; Donor Cell and TVD Superbee remain available for rollback and comparison.")]
         [SerializeField]
         private StylizedRiverFoamTransportScheme foamTransportScheme =
-            StylizedRiverFoamTransportScheme.DonorCell;
+            StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
 
         [Tooltip("Persistent prepared-topology cache associated with this authored river. Exact caches load directly. Stale-compatible caches may be used for one Play session without replacement; missing or incompatible caches require explicit Edit Mode preparation and are never generated or saved automatically during Play.")]
         [SerializeField]
@@ -1085,7 +1075,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterEventAmount = 0.5f;
 
-        [Tooltip("Enables conservative automatic Layer C material birth from source candidates. This creates real persistent FoamState material through the existing birth pipeline; support topology then decides how long it survives. Disabled by default so validation can compare against manual sources honestly.")]
+        [Tooltip("Enables conservative automatic Layer C material birth from source candidates. This creates real persistent FoamState material through the existing birth pipeline; support topology then decides how long it survives. Disabled by default so automatic-source behavior can be isolated during validation.")]
         [SerializeField] private bool foamAutomaticBirthEnabled;
 
         [Tooltip("Selects which automatic source-population strategy is active. Shore Contact Test and Obstacle Contact Test are implemented Layer C source-spawning classes. Free-water source entries remain documented placeholders.")]
@@ -1106,7 +1096,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamActivity = 0.45f;
 
-        [Tooltip("Minimum downstream clearance in metres required after one Shore packet completes before the same deterministic source slot may emit again.")]
+        [Tooltip("Minimum downstream clearance in metres reserved after one Shore packet completes. It rearms the same deterministic slot and extends the shared cross-source packet-envelope reservation used to prevent neighbouring packets from welding together.")]
         [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
         [SerializeField] private float foamShoreMinimumPacketGapMetres =
             DefaultShoreFoamPacketGapMetres;
@@ -1248,7 +1238,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectFoamActivity = 0.35f;
 
-        [Tooltip("Minimum downstream gap in metres between released Object packets from the same anchor. Full Arc/Semi-Arc rearm uses the previous wake-arm length plus this gap at normal Foam downstream speed. Contact-only reinforcement has its own interval and does not reset this packet clock.")]
+        [Tooltip("Minimum downstream gap in metres between released Object packets from the same anchor. Full Arc/Semi-Arc rearm uses the previous wake-arm length plus this gap at normal Foam downstream speed, and the same gap extends the shared cross-source packet-envelope reservation. Contact-only reinforcement from the same anchor is the one intentional overlap exemption.")]
         [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
         [SerializeField] private float foamObjectContactMinimumPacketGapMetres =
             DefaultObjectContactPacketGapMetres;
@@ -1457,7 +1447,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFoamActivity = 0.25f;
 
-        [Tooltip("Minimum downstream clearance in metres required after one Free Water packet completes before the same deterministic source slot may emit again.")]
+        [Tooltip("Minimum downstream clearance in metres reserved after one Free Water packet completes. It rearms the same deterministic slot and extends the shared cross-source packet-envelope reservation used to prevent neighbouring packets from welding together.")]
         [Range(MinimumFoamPacketGapMetres, MaximumFoamPacketGapMetres)]
         [SerializeField] private float foamFreeWaterMinimumPacketGapMetres =
             DefaultFreeWaterFoamPacketGapMetres;
@@ -1605,6 +1595,104 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum initial normalized Remaining Life written exactly to newly occupied Free Water Torn Fragment material. Only explicit Layer C aging changes it afterward.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMax = 0.65f;
+
+
+        // D8.2 staged cell-authoritative source geometry. These values are serialized and
+        // Inspector-visible in D8.2, but legacy metric controls remain runtime-authoritative
+        // until the matching recipe is converted to the shared D8.3 raster contract.
+        [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMinCells = 15f;
+        [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMaxCells = 47f;
+        [Min(1f)] [SerializeField] private float foamShoreRibbonWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamShoreRibbonWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamShoreRibbonHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamShoreRibbonHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamShoreRibbonOffsetMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamShoreRibbonOffsetMaxCells = 0.5f;
+        [Min(0.01f)] [SerializeField] private float foamShoreRibbonRevealSpeedCellsPerSecond = 8f;
+
+        [Min(1f)] [SerializeField] private float foamInwardWashAlongLengthMinCells = 5f;
+        [Min(1f)] [SerializeField] private float foamInwardWashAlongLengthMaxCells = 13f;
+        [Min(1f)] [SerializeField] private float foamInwardWashWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamInwardWashWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamInwardWashReachMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamInwardWashReachMaxCells = 5f;
+        [Min(1f)] [SerializeField] private float foamInwardWashHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamInwardWashHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamInwardWashOffsetMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamInwardWashOffsetMaxCells = 0.5f;
+        [Min(0f)] [SerializeField] private float foamInwardWashBendAmplitudeMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamInwardWashBendAmplitudeMaxCells = 2f;
+        [Min(0.01f)] [SerializeField] private float foamInwardWashRevealSpeedCellsPerSecond = 6f;
+
+        [Min(1f)] [SerializeField] private float foamObjectArcContactSpanMinCells = 3f;
+        [Min(1f)] [SerializeField] private float foamObjectArcContactSpanMaxCells = 12f;
+        [Min(1f)] [SerializeField] private float foamObjectArcContactWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectArcContactWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectArcWakeLengthMinCells = 3f;
+        [Min(1f)] [SerializeField] private float foamObjectArcWakeLengthMaxCells = 12f;
+        [Min(1f)] [SerializeField] private float foamObjectArcWakeWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectArcWakeWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectArcHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectArcHeadWidthCells = 1f;
+        [SerializeField] private float foamObjectArcAlongFlowOffsetCells;
+        [SerializeField] private float foamObjectArcAcrossRiverOffsetCells;
+        [Min(0.01f)] [SerializeField] private float foamObjectArcRevealSpeedCellsPerSecond = 7f;
+
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcContactSpanMinCells = 2f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcContactSpanMaxCells = 8f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcContactWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcContactWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcWakeLengthMinCells = 2f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcWakeLengthMaxCells = 9f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcWakeWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcWakeWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectSemiArcHeadWidthCells = 1f;
+        [SerializeField] private float foamObjectSemiArcAlongFlowOffsetCells;
+        [SerializeField] private float foamObjectSemiArcAcrossRiverOffsetCells;
+        [Min(0.01f)] [SerializeField] private float foamObjectSemiArcRevealSpeedCellsPerSecond = 7f;
+
+        [Min(1f)] [SerializeField] private float foamObjectFleckLengthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectFleckLengthMaxCells = 5f;
+        [Min(1f)] [SerializeField] private float foamObjectFleckWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectFleckWidthMaxCells = 2f;
+        [Min(1f)] [SerializeField] private float foamObjectFleckHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamObjectFleckHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamObjectFleckOffsetMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamObjectFleckOffsetMaxCells = 1f;
+        [Min(0.01f)] [SerializeField] private float foamObjectFleckRevealSpeedCellsPerSecond = 6f;
+
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceLengthMinCells = 9f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceLengthMaxCells = 39f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterLaceHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterLaceBendMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterLaceBendMaxCells = 4f;
+        [Min(0.01f)] [SerializeField] private float foamFreeWaterLaceRevealSpeedCellsPerSecond = 8f;
+
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceLengthMinCells = 5f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceLengthMaxCells = 16f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterCrossLaceHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterCrossLaceBendMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterCrossLaceBendMaxCells = 3f;
+        [Min(0.01f)] [SerializeField] private float foamFreeWaterCrossLaceRevealSpeedCellsPerSecond = 7f;
+
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentLengthMinCells = 2f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentLengthMaxCells = 9f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentWidthMinCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentWidthMaxCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentHeadLengthCells = 1f;
+        [Min(1f)] [SerializeField] private float foamFreeWaterBrokenFilamentHeadWidthCells = 1f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterBrokenFilamentBendMinCells = 0f;
+        [Min(0f)] [SerializeField] private float foamFreeWaterBrokenFilamentBendMaxCells = 2f;
+        [Range(1, 8)] [SerializeField] private int foamFreeWaterBrokenFilamentBreakCountMin = 1;
+        [Range(1, 8)] [SerializeField] private int foamFreeWaterBrokenFilamentBreakCountMax = 3;
+        [Min(0.01f)] [SerializeField] private float foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond = 6f;
 
 
 
@@ -1913,72 +2001,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Selects one of the retained Stage 6 diagnostics. Final is the normal rendered result; all obsolete Foam debug modes have been removed.")]
         [SerializeField] private StylizedRiverFoamDebugView foamDebugView =
             StylizedRiverFoamDebugView.Final;
-
-
-        [FormerlySerializedAs("foamTestDistanceNormalized")]
-        [Tooltip("Compatibility normalized longitudinal position. The source command resolves it to global river distance when submitted.")]
-        [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamSpawnDistanceNormalized = 0.5f;
-
-        [FormerlySerializedAs("foamTestAcrossNormalized")]
-        [Tooltip("Compatibility normalized lateral position. The source command resolves it against the local left/right river half-width when submitted.")]
-        [HideInInspector, SerializeField, Range(-1f, 1f)]
-        private float foamSpawnAcrossNormalized;
-
-        [Tooltip("World-space half-width of the canonical manual source. This is source material footprint size, not final Foam fracture or renderer detail.")]
-        [FormerlySerializedAs("foamSpawnRibbonHalfWidth")]
-        [FormerlySerializedAs("foamSpawnPatchRadius")]
-        [FormerlySerializedAs("foamTestProgressiveRibbonHalfWidth")]
-        [FormerlySerializedAs("foamTestRadius")]
-        [HideInInspector, SerializeField]
-        [Range(MinimumFoamSpawnScale, MaximumFoamSpawnScale)]
-        private float foamSpawnScale = DefaultFoamSpawnScale;
-
-        [Tooltip("Source-only coefficient controlling how much of the candidate birth shape becomes occupied Foam. It does not modify Initial Remaining Life or durability.")]
-        [FormerlySerializedAs("foamTestAmount")]
-        [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamSpawnAmount = 0.85f;
-
-        [FormerlySerializedAs("foamTestRemainingLife")]
-        [HideInInspector, SerializeField, Range(0f, 1f)]
-        private float foamSpawnRemainingLife = 1f;
-
-
-        [Tooltip("Duration of the budgeted moving-head manual source event.")]
-        [FormerlySerializedAs("foamTestProgressiveRibbonDuration")]
-        [HideInInspector, SerializeField]
-        [Range(
-            MinimumFoamProgressiveRibbonDuration,
-            MaximumFoamProgressiveRibbonDuration)]
-        private float foamSpawnRibbonDuration =
-            DefaultFoamProgressiveRibbonDuration;
-
-        [Tooltip("Net downstream distance travelled by the manual source head while the event is active.")]
-        [FormerlySerializedAs("foamTestProgressiveRibbonTravelDistance")]
-        [HideInInspector, SerializeField]
-        [Range(
-            MinimumFoamProgressiveRibbonTravelDistance,
-            MaximumFoamProgressiveRibbonTravelDistance)]
-        private float foamSpawnRibbonTravelDistance =
-            DefaultFoamProgressiveRibbonTravelDistance;
-
-        [Tooltip("Compatibility normalized lateral drift from event start to event end. Metric command callers provide drift directly in metres.")]
-        [FormerlySerializedAs("foamTestProgressiveRibbonAcrossDrift")]
-        [HideInInspector, SerializeField]
-        [Range(
-            MinimumFoamProgressiveRibbonAcrossDrift,
-            MaximumFoamProgressiveRibbonAcrossDrift)]
-        private float foamSpawnRibbonAcrossDrift =
-            DefaultFoamProgressiveRibbonAcrossDrift;
-
-        [Tooltip("Compatibility normalized bend strength. Zero follows only downstream travel and Across Drift; metric command callers provide the maximum bend directly in metres.")]
-        [FormerlySerializedAs("foamTestProgressiveRibbonPathWander")]
-        [HideInInspector, SerializeField]
-        [Range(
-            MinimumFoamProgressiveRibbonPathWander,
-            MaximumFoamProgressiveRibbonPathWander)]
-        private float foamSpawnRibbonPathWander =
-            DefaultFoamProgressiveRibbonPathWander;
 
         [Header("Water Body Validation")]
         [SerializeField]
@@ -2433,9 +2455,29 @@ namespace ProgrammaticStylized3D.Rivers
         public StylizedRiverFoamFixedMetricCellSize
             FoamFixedMetricCellSize => foamFixedMetricCellSize;
         public StylizedRiverFoamTransportScheme FoamTransportScheme =>
-            foamTransportScheme == StylizedRiverFoamTransportScheme.TvdSuperbee
-                ? StylizedRiverFoamTransportScheme.TvdSuperbee
-                : StylizedRiverFoamTransportScheme.DonorCell;
+            foamTransportScheme switch
+            {
+                StylizedRiverFoamTransportScheme.TvdSuperbee =>
+                    StylizedRiverFoamTransportScheme.TvdSuperbee,
+                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
+                    StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd,
+                _ => StylizedRiverFoamTransportScheme.DonorCell
+            };
+#if UNITY_EDITOR
+        internal void SetFoamTransportSchemeForDiagnostics(
+            StylizedRiverFoamTransportScheme scheme)
+        {
+            foamTransportScheme = scheme switch
+            {
+                StylizedRiverFoamTransportScheme.TvdSuperbee =>
+                    StylizedRiverFoamTransportScheme.TvdSuperbee,
+                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
+                    StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd,
+                _ => StylizedRiverFoamTransportScheme.DonorCell
+            };
+        }
+#endif
+
         public float FoamFixedMetricRequestedCellSizeMetres =>
             ResolveFoamFixedMetricRequestedCellSizeMetres();
         public bool FoamStateHeld =>
@@ -2890,6 +2932,103 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Clamp01(Mathf.Max(
                 foamFreeWaterFragmentInitialLifeMin,
                 foamFreeWaterFragmentInitialLifeMax));
+
+        // D8.2 staged cell-source accessors. Runtime birth producers intentionally do not
+        // consume these until their D8.3 recipe conversion is complete.
+        public float FoamShoreRibbonLengthMinCells => Mathf.Max(1f, foamShoreRibbonLengthMinCells);
+        public float FoamShoreRibbonLengthMaxCells => Mathf.Max(FoamShoreRibbonLengthMinCells, foamShoreRibbonLengthMaxCells);
+        public float FoamShoreRibbonWidthMinCells => Mathf.Max(1f, foamShoreRibbonWidthMinCells);
+        public float FoamShoreRibbonWidthMaxCells => Mathf.Max(FoamShoreRibbonWidthMinCells, foamShoreRibbonWidthMaxCells);
+        public float FoamShoreRibbonHeadLengthCells => Mathf.Max(1f, foamShoreRibbonHeadLengthCells);
+        public float FoamShoreRibbonHeadWidthCells => Mathf.Max(1f, foamShoreRibbonHeadWidthCells);
+        public float FoamShoreRibbonOffsetMinCells => Mathf.Max(0f, foamShoreRibbonOffsetMinCells);
+        public float FoamShoreRibbonOffsetMaxCells => Mathf.Max(FoamShoreRibbonOffsetMinCells, foamShoreRibbonOffsetMaxCells);
+        public float FoamShoreRibbonRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamShoreRibbonRevealSpeedCellsPerSecond);
+
+        public float FoamInwardWashAlongLengthMinCells => Mathf.Max(1f, foamInwardWashAlongLengthMinCells);
+        public float FoamInwardWashAlongLengthMaxCells => Mathf.Max(FoamInwardWashAlongLengthMinCells, foamInwardWashAlongLengthMaxCells);
+        public float FoamInwardWashWidthMinCells => Mathf.Max(1f, foamInwardWashWidthMinCells);
+        public float FoamInwardWashWidthMaxCells => Mathf.Max(FoamInwardWashWidthMinCells, foamInwardWashWidthMaxCells);
+        public float FoamInwardWashReachMinCells => Mathf.Max(1f, foamInwardWashReachMinCells);
+        public float FoamInwardWashReachMaxCells => Mathf.Max(FoamInwardWashReachMinCells, foamInwardWashReachMaxCells);
+        public float FoamInwardWashHeadLengthCells => Mathf.Max(1f, foamInwardWashHeadLengthCells);
+        public float FoamInwardWashHeadWidthCells => Mathf.Max(1f, foamInwardWashHeadWidthCells);
+        public float FoamInwardWashOffsetMinCells => Mathf.Max(0f, foamInwardWashOffsetMinCells);
+        public float FoamInwardWashOffsetMaxCells => Mathf.Max(FoamInwardWashOffsetMinCells, foamInwardWashOffsetMaxCells);
+        public float FoamInwardWashBendAmplitudeMinCells => Mathf.Max(0f, foamInwardWashBendAmplitudeMinCells);
+        public float FoamInwardWashBendAmplitudeMaxCells => Mathf.Max(FoamInwardWashBendAmplitudeMinCells, foamInwardWashBendAmplitudeMaxCells);
+        public float FoamInwardWashRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamInwardWashRevealSpeedCellsPerSecond);
+
+        public float FoamObjectArcContactSpanMinCells => Mathf.Max(1f, foamObjectArcContactSpanMinCells);
+        public float FoamObjectArcContactSpanMaxCells => Mathf.Max(FoamObjectArcContactSpanMinCells, foamObjectArcContactSpanMaxCells);
+        public float FoamObjectArcContactWidthMinCells => Mathf.Max(1f, foamObjectArcContactWidthMinCells);
+        public float FoamObjectArcContactWidthMaxCells => Mathf.Max(FoamObjectArcContactWidthMinCells, foamObjectArcContactWidthMaxCells);
+        public float FoamObjectArcWakeLengthMinCells => Mathf.Max(1f, foamObjectArcWakeLengthMinCells);
+        public float FoamObjectArcWakeLengthMaxCells => Mathf.Max(FoamObjectArcWakeLengthMinCells, foamObjectArcWakeLengthMaxCells);
+        public float FoamObjectArcWakeWidthMinCells => Mathf.Max(1f, foamObjectArcWakeWidthMinCells);
+        public float FoamObjectArcWakeWidthMaxCells => Mathf.Max(FoamObjectArcWakeWidthMinCells, foamObjectArcWakeWidthMaxCells);
+        public float FoamObjectArcHeadLengthCells => Mathf.Max(1f, foamObjectArcHeadLengthCells);
+        public float FoamObjectArcHeadWidthCells => Mathf.Max(1f, foamObjectArcHeadWidthCells);
+        public float FoamObjectArcAlongFlowOffsetCells => ResolveFiniteContactOffset(foamObjectArcAlongFlowOffsetCells);
+        public float FoamObjectArcAcrossRiverOffsetCells => ResolveFiniteContactOffset(foamObjectArcAcrossRiverOffsetCells);
+        public float FoamObjectArcRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamObjectArcRevealSpeedCellsPerSecond);
+
+        public float FoamObjectSemiArcContactSpanMinCells => Mathf.Max(1f, foamObjectSemiArcContactSpanMinCells);
+        public float FoamObjectSemiArcContactSpanMaxCells => Mathf.Max(FoamObjectSemiArcContactSpanMinCells, foamObjectSemiArcContactSpanMaxCells);
+        public float FoamObjectSemiArcContactWidthMinCells => Mathf.Max(1f, foamObjectSemiArcContactWidthMinCells);
+        public float FoamObjectSemiArcContactWidthMaxCells => Mathf.Max(FoamObjectSemiArcContactWidthMinCells, foamObjectSemiArcContactWidthMaxCells);
+        public float FoamObjectSemiArcWakeLengthMinCells => Mathf.Max(1f, foamObjectSemiArcWakeLengthMinCells);
+        public float FoamObjectSemiArcWakeLengthMaxCells => Mathf.Max(FoamObjectSemiArcWakeLengthMinCells, foamObjectSemiArcWakeLengthMaxCells);
+        public float FoamObjectSemiArcWakeWidthMinCells => Mathf.Max(1f, foamObjectSemiArcWakeWidthMinCells);
+        public float FoamObjectSemiArcWakeWidthMaxCells => Mathf.Max(FoamObjectSemiArcWakeWidthMinCells, foamObjectSemiArcWakeWidthMaxCells);
+        public float FoamObjectSemiArcHeadLengthCells => Mathf.Max(1f, foamObjectSemiArcHeadLengthCells);
+        public float FoamObjectSemiArcHeadWidthCells => Mathf.Max(1f, foamObjectSemiArcHeadWidthCells);
+        public float FoamObjectSemiArcAlongFlowOffsetCells => ResolveFiniteContactOffset(foamObjectSemiArcAlongFlowOffsetCells);
+        public float FoamObjectSemiArcAcrossRiverOffsetCells => ResolveFiniteContactOffset(foamObjectSemiArcAcrossRiverOffsetCells);
+        public float FoamObjectSemiArcRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamObjectSemiArcRevealSpeedCellsPerSecond);
+
+        public float FoamObjectFleckLengthMinCells => Mathf.Max(1f, foamObjectFleckLengthMinCells);
+        public float FoamObjectFleckLengthMaxCells => Mathf.Max(FoamObjectFleckLengthMinCells, foamObjectFleckLengthMaxCells);
+        public float FoamObjectFleckWidthMinCells => Mathf.Max(1f, foamObjectFleckWidthMinCells);
+        public float FoamObjectFleckWidthMaxCells => Mathf.Max(FoamObjectFleckWidthMinCells, foamObjectFleckWidthMaxCells);
+        public float FoamObjectFleckHeadLengthCells => Mathf.Max(1f, foamObjectFleckHeadLengthCells);
+        public float FoamObjectFleckHeadWidthCells => Mathf.Max(1f, foamObjectFleckHeadWidthCells);
+        public float FoamObjectFleckOffsetMinCells => Mathf.Max(0f, foamObjectFleckOffsetMinCells);
+        public float FoamObjectFleckOffsetMaxCells => Mathf.Max(FoamObjectFleckOffsetMinCells, foamObjectFleckOffsetMaxCells);
+        public float FoamObjectFleckRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamObjectFleckRevealSpeedCellsPerSecond);
+
+        public float FoamFreeWaterLaceLengthMinCells => Mathf.Max(1f, foamFreeWaterLaceLengthMinCells);
+        public float FoamFreeWaterLaceLengthMaxCells => Mathf.Max(FoamFreeWaterLaceLengthMinCells, foamFreeWaterLaceLengthMaxCells);
+        public float FoamFreeWaterLaceWidthMinCells => Mathf.Max(1f, foamFreeWaterLaceWidthMinCells);
+        public float FoamFreeWaterLaceWidthMaxCells => Mathf.Max(FoamFreeWaterLaceWidthMinCells, foamFreeWaterLaceWidthMaxCells);
+        public float FoamFreeWaterLaceHeadLengthCells => Mathf.Max(1f, foamFreeWaterLaceHeadLengthCells);
+        public float FoamFreeWaterLaceHeadWidthCells => Mathf.Max(1f, foamFreeWaterLaceHeadWidthCells);
+        public float FoamFreeWaterLaceBendMinCells => Mathf.Max(0f, foamFreeWaterLaceBendMinCells);
+        public float FoamFreeWaterLaceBendMaxCells => Mathf.Max(FoamFreeWaterLaceBendMinCells, foamFreeWaterLaceBendMaxCells);
+        public float FoamFreeWaterLaceRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamFreeWaterLaceRevealSpeedCellsPerSecond);
+
+        public float FoamFreeWaterCrossLaceLengthMinCells => Mathf.Max(1f, foamFreeWaterCrossLaceLengthMinCells);
+        public float FoamFreeWaterCrossLaceLengthMaxCells => Mathf.Max(FoamFreeWaterCrossLaceLengthMinCells, foamFreeWaterCrossLaceLengthMaxCells);
+        public float FoamFreeWaterCrossLaceWidthMinCells => Mathf.Max(1f, foamFreeWaterCrossLaceWidthMinCells);
+        public float FoamFreeWaterCrossLaceWidthMaxCells => Mathf.Max(FoamFreeWaterCrossLaceWidthMinCells, foamFreeWaterCrossLaceWidthMaxCells);
+        public float FoamFreeWaterCrossLaceHeadLengthCells => Mathf.Max(1f, foamFreeWaterCrossLaceHeadLengthCells);
+        public float FoamFreeWaterCrossLaceHeadWidthCells => Mathf.Max(1f, foamFreeWaterCrossLaceHeadWidthCells);
+        public float FoamFreeWaterCrossLaceBendMinCells => Mathf.Max(0f, foamFreeWaterCrossLaceBendMinCells);
+        public float FoamFreeWaterCrossLaceBendMaxCells => Mathf.Max(FoamFreeWaterCrossLaceBendMinCells, foamFreeWaterCrossLaceBendMaxCells);
+        public float FoamFreeWaterCrossLaceRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamFreeWaterCrossLaceRevealSpeedCellsPerSecond);
+
+        public float FoamFreeWaterBrokenFilamentLengthMinCells => Mathf.Max(1f, foamFreeWaterBrokenFilamentLengthMinCells);
+        public float FoamFreeWaterBrokenFilamentLengthMaxCells => Mathf.Max(FoamFreeWaterBrokenFilamentLengthMinCells, foamFreeWaterBrokenFilamentLengthMaxCells);
+        public float FoamFreeWaterBrokenFilamentWidthMinCells => Mathf.Max(1f, foamFreeWaterBrokenFilamentWidthMinCells);
+        public float FoamFreeWaterBrokenFilamentWidthMaxCells => Mathf.Max(FoamFreeWaterBrokenFilamentWidthMinCells, foamFreeWaterBrokenFilamentWidthMaxCells);
+        public float FoamFreeWaterBrokenFilamentHeadLengthCells => Mathf.Max(1f, foamFreeWaterBrokenFilamentHeadLengthCells);
+        public float FoamFreeWaterBrokenFilamentHeadWidthCells => Mathf.Max(1f, foamFreeWaterBrokenFilamentHeadWidthCells);
+        public float FoamFreeWaterBrokenFilamentBendMinCells => Mathf.Max(0f, foamFreeWaterBrokenFilamentBendMinCells);
+        public float FoamFreeWaterBrokenFilamentBendMaxCells => Mathf.Max(FoamFreeWaterBrokenFilamentBendMinCells, foamFreeWaterBrokenFilamentBendMaxCells);
+        public int FoamFreeWaterBrokenFilamentBreakCountMin => Mathf.Clamp(foamFreeWaterBrokenFilamentBreakCountMin, 1, 8);
+        public int FoamFreeWaterBrokenFilamentBreakCountMax => Mathf.Clamp(foamFreeWaterBrokenFilamentBreakCountMax, FoamFreeWaterBrokenFilamentBreakCountMin, 8);
+        public float FoamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond);
+
         public float FoamShoreFoamStrength =>
             Mathf.Clamp01(foamShoreFoamStrength);
         public float FoamShoreFoamPersistence =>
@@ -3092,37 +3231,7 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamStrandReach =>
             Mathf.Clamp01(foamStrandReach);
         public StylizedRiverFoamDebugView FoamDebugView => foamDebugView;
-        public float FoamSpawnDistanceNormalized =>
-            foamSpawnDistanceNormalized;
-        public float FoamSpawnAcrossNormalized =>
-            foamSpawnAcrossNormalized;
-        public float FoamSpawnScale =>
-            Mathf.Clamp(
-                foamSpawnScale,
-                MinimumFoamSpawnScale,
-                MaximumFoamSpawnScale);
-        public float FoamSpawnAmount => foamSpawnAmount;
-        public float FoamSpawnRemainingLife => foamSpawnRemainingLife;
-        public float FoamSpawnRibbonDuration =>
-            Mathf.Clamp(
-                foamSpawnRibbonDuration,
-                MinimumFoamProgressiveRibbonDuration,
-                MaximumFoamProgressiveRibbonDuration);
-        public float FoamSpawnRibbonTravelDistance =>
-            Mathf.Clamp(
-                foamSpawnRibbonTravelDistance,
-                MinimumFoamProgressiveRibbonTravelDistance,
-                MaximumFoamProgressiveRibbonTravelDistance);
-        public float FoamSpawnRibbonAcrossDrift =>
-            Mathf.Clamp(
-                foamSpawnRibbonAcrossDrift,
-                MinimumFoamProgressiveRibbonAcrossDrift,
-                MaximumFoamProgressiveRibbonAcrossDrift);
-        public float FoamSpawnRibbonPathWander =>
-            Mathf.Clamp(
-                foamSpawnRibbonPathWander,
-                MinimumFoamProgressiveRibbonPathWander,
-                MaximumFoamProgressiveRibbonPathWander);
+
 
         // Compatibility aliases for existing emitter and renderer integrations.
         // They are no longer backed by exposed global Stage 5 controls.
@@ -3501,6 +3610,76 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamFreeWaterFragmentInitialLifeMax);
         }
 
+
+        private void SanitizeD8CellSourceControls()
+        {
+            SanitizePositiveRange(ref foamShoreRibbonLengthMinCells, ref foamShoreRibbonLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamShoreRibbonWidthMinCells, ref foamShoreRibbonWidthMaxCells, 1f);
+            foamShoreRibbonHeadLengthCells = Mathf.Max(1f, foamShoreRibbonHeadLengthCells);
+            foamShoreRibbonHeadWidthCells = Mathf.Max(1f, foamShoreRibbonHeadWidthCells);
+            SanitizePositiveRange(ref foamShoreRibbonOffsetMinCells, ref foamShoreRibbonOffsetMaxCells, 0f);
+            foamShoreRibbonRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamShoreRibbonRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamInwardWashAlongLengthMinCells, ref foamInwardWashAlongLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamInwardWashWidthMinCells, ref foamInwardWashWidthMaxCells, 1f);
+            SanitizePositiveRange(ref foamInwardWashReachMinCells, ref foamInwardWashReachMaxCells, 1f);
+            foamInwardWashHeadLengthCells = Mathf.Max(1f, foamInwardWashHeadLengthCells);
+            foamInwardWashHeadWidthCells = Mathf.Max(1f, foamInwardWashHeadWidthCells);
+            SanitizePositiveRange(ref foamInwardWashOffsetMinCells, ref foamInwardWashOffsetMaxCells, 0f);
+            SanitizePositiveRange(ref foamInwardWashBendAmplitudeMinCells, ref foamInwardWashBendAmplitudeMaxCells, 0f);
+            foamInwardWashRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamInwardWashRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamObjectArcContactSpanMinCells, ref foamObjectArcContactSpanMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectArcContactWidthMinCells, ref foamObjectArcContactWidthMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectArcWakeLengthMinCells, ref foamObjectArcWakeLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectArcWakeWidthMinCells, ref foamObjectArcWakeWidthMaxCells, 1f);
+            foamObjectArcHeadLengthCells = Mathf.Max(1f, foamObjectArcHeadLengthCells);
+            foamObjectArcHeadWidthCells = Mathf.Max(1f, foamObjectArcHeadWidthCells);
+            SanitizeFiniteContactOffset(ref foamObjectArcAlongFlowOffsetCells);
+            SanitizeFiniteContactOffset(ref foamObjectArcAcrossRiverOffsetCells);
+            foamObjectArcRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamObjectArcRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamObjectSemiArcContactSpanMinCells, ref foamObjectSemiArcContactSpanMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectSemiArcContactWidthMinCells, ref foamObjectSemiArcContactWidthMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectSemiArcWakeLengthMinCells, ref foamObjectSemiArcWakeLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectSemiArcWakeWidthMinCells, ref foamObjectSemiArcWakeWidthMaxCells, 1f);
+            foamObjectSemiArcHeadLengthCells = Mathf.Max(1f, foamObjectSemiArcHeadLengthCells);
+            foamObjectSemiArcHeadWidthCells = Mathf.Max(1f, foamObjectSemiArcHeadWidthCells);
+            SanitizeFiniteContactOffset(ref foamObjectSemiArcAlongFlowOffsetCells);
+            SanitizeFiniteContactOffset(ref foamObjectSemiArcAcrossRiverOffsetCells);
+            foamObjectSemiArcRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamObjectSemiArcRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamObjectFleckLengthMinCells, ref foamObjectFleckLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamObjectFleckWidthMinCells, ref foamObjectFleckWidthMaxCells, 1f);
+            foamObjectFleckHeadLengthCells = Mathf.Max(1f, foamObjectFleckHeadLengthCells);
+            foamObjectFleckHeadWidthCells = Mathf.Max(1f, foamObjectFleckHeadWidthCells);
+            SanitizePositiveRange(ref foamObjectFleckOffsetMinCells, ref foamObjectFleckOffsetMaxCells, 0f);
+            foamObjectFleckRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamObjectFleckRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamFreeWaterLaceLengthMinCells, ref foamFreeWaterLaceLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamFreeWaterLaceWidthMinCells, ref foamFreeWaterLaceWidthMaxCells, 1f);
+            foamFreeWaterLaceHeadLengthCells = Mathf.Max(1f, foamFreeWaterLaceHeadLengthCells);
+            foamFreeWaterLaceHeadWidthCells = Mathf.Max(1f, foamFreeWaterLaceHeadWidthCells);
+            SanitizePositiveRange(ref foamFreeWaterLaceBendMinCells, ref foamFreeWaterLaceBendMaxCells, 0f);
+            foamFreeWaterLaceRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamFreeWaterLaceRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamFreeWaterCrossLaceLengthMinCells, ref foamFreeWaterCrossLaceLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamFreeWaterCrossLaceWidthMinCells, ref foamFreeWaterCrossLaceWidthMaxCells, 1f);
+            foamFreeWaterCrossLaceHeadLengthCells = Mathf.Max(1f, foamFreeWaterCrossLaceHeadLengthCells);
+            foamFreeWaterCrossLaceHeadWidthCells = Mathf.Max(1f, foamFreeWaterCrossLaceHeadWidthCells);
+            SanitizePositiveRange(ref foamFreeWaterCrossLaceBendMinCells, ref foamFreeWaterCrossLaceBendMaxCells, 0f);
+            foamFreeWaterCrossLaceRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamFreeWaterCrossLaceRevealSpeedCellsPerSecond);
+
+            SanitizePositiveRange(ref foamFreeWaterBrokenFilamentLengthMinCells, ref foamFreeWaterBrokenFilamentLengthMaxCells, 1f);
+            SanitizePositiveRange(ref foamFreeWaterBrokenFilamentWidthMinCells, ref foamFreeWaterBrokenFilamentWidthMaxCells, 1f);
+            foamFreeWaterBrokenFilamentHeadLengthCells = Mathf.Max(1f, foamFreeWaterBrokenFilamentHeadLengthCells);
+            foamFreeWaterBrokenFilamentHeadWidthCells = Mathf.Max(1f, foamFreeWaterBrokenFilamentHeadWidthCells);
+            SanitizePositiveRange(ref foamFreeWaterBrokenFilamentBendMinCells, ref foamFreeWaterBrokenFilamentBendMaxCells, 0f);
+            foamFreeWaterBrokenFilamentBreakCountMin = Mathf.Clamp(foamFreeWaterBrokenFilamentBreakCountMin, 1, 8);
+            foamFreeWaterBrokenFilamentBreakCountMax = Mathf.Clamp(foamFreeWaterBrokenFilamentBreakCountMax, foamFreeWaterBrokenFilamentBreakCountMin, 8);
+            foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond);
+        }
+
         private static void SanitizePositiveRange(
             ref float minimum,
             ref float maximum,
@@ -3784,6 +3963,14 @@ namespace ProgrammaticStylized3D.Rivers
                     return StylizedRiverFoamDebugView.ProductionChipMask;
                 case (int)StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return StylizedRiverFoamDebugView.ChipEligibilityComposite;
+                case (int)StylizedRiverFoamDebugView.MaterialCoverage:
+                    return StylizedRiverFoamDebugView.MaterialCoverage;
+                case (int)StylizedRiverFoamDebugView.MaterialAmount:
+                    return StylizedRiverFoamDebugView.MaterialAmount;
+                case (int)StylizedRiverFoamDebugView.MaterialStateComposite:
+                    return StylizedRiverFoamDebugView.MaterialStateComposite;
+                case (int)StylizedRiverFoamDebugView.VisibilityPipelineComposite:
+                    return StylizedRiverFoamDebugView.VisibilityPipelineComposite;
                 default:
                     return StylizedRiverFoamDebugView.Final;
             }
@@ -4381,118 +4568,13 @@ namespace ProgrammaticStylized3D.Rivers
             return foamRuntime;
         }
 
-        public bool StartFoamSpawn()
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            if (runtime == null)
-            {
-                return false;
-            }
-
-            return runtime.StartFoamCompositionNormalized(
-                foamSpawnDistanceNormalized,
-                foamSpawnAcrossNormalized,
-                FoamSpawnScale,
-                foamSpawnAmount,
-                foamSpawnRemainingLife,
-                foamSpawnRibbonDuration,
-                foamSpawnRibbonTravelDistance,
-                foamSpawnRibbonAcrossDrift,
-                foamSpawnRibbonPathWander);
-        }
-
-        public bool TryResolveFoamSpawnMetricPlacement(
-            out float globalDistance,
-            out float lateralMetres,
-            out float driftMetres,
-            out float maximumBendMetres)
-        {
-            globalDistance = 0f;
-            lateralMetres = 0f;
-            driftMetres = 0f;
-            maximumBendMetres = 0f;
-            if (!Domain.IsValid)
-            {
-                return false;
-            }
-
-            globalDistance = Mathf.Lerp(
-                Domain.GlobalDistanceMinimum,
-                Domain.GlobalDistanceMaximum,
-                Mathf.Clamp01(foamSpawnDistanceNormalized));
-            StylizedRiverSplineSample sample =
-                Domain.SampleAtGlobalDistance(globalDistance);
-            float startAcross = Mathf.Clamp(
-                foamSpawnAcrossNormalized,
-                -1f,
-                1f);
-            lateralMetres = startAcross < 0f
-                ? startAcross * sample.LeftHalfWidth
-                : startAcross * sample.RightHalfWidth;
-            float targetAcross = Mathf.Clamp(
-                startAcross + FoamSpawnRibbonAcrossDrift,
-                -1f,
-                1f);
-            float targetLateral = targetAcross < 0f
-                ? targetAcross * sample.LeftHalfWidth
-                : targetAcross * sample.RightHalfWidth;
-            driftMetres = targetLateral - lateralMetres;
-            maximumBendMetres = FoamSpawnRibbonPathWander *
-                FoamSpawnMaximumBendAcross * Mathf.Max(
-                    sample.LeftHalfWidth,
-                    sample.RightHalfWidth);
-            return true;
-        }
-
-        public bool StartFoamSpawnMetric(
-            float globalDistance,
-            float lateralMetres,
-            float scale,
-            float amount,
-            float remainingLife,
-            float duration,
-            float travelDistanceMetres,
-            float lateralDriftMetres,
-            float maximumBendMetres)
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            return runtime != null && runtime.StartFoamCompositionMetric(
-                globalDistance,
-                lateralMetres,
-                scale,
-                amount,
-                remainingLife,
-                duration,
-                travelDistanceMetres,
-                lateralDriftMetres,
-                maximumBendMetres);
-        }
-
-        public bool EmitFoamMetric(
-            float globalDistance,
-            float lateralMetres,
-            float radiusMetres,
-            float amount,
-            float initialRemainingLife,
-            float elongation)
-        {
-            StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
-            return runtime != null && runtime.EmitMetric(
-                globalDistance,
-                lateralMetres,
-                radiusMetres,
-                amount,
-                initialRemainingLife,
-                elongation);
-        }
-
         public bool ClearAndEmitFoamIsolatedLifeProbe(
             bool absoluteAging = false)
         {
             StylizedRiverFoamRuntime runtime = GetOrCreateFoamRuntime();
             return runtime != null && runtime.EmitIsolatedLifeProbe(
-                foamSpawnDistanceNormalized,
-                foamSpawnAcrossNormalized,
+                0.5f,
+                0f,
                 absoluteAging);
         }
 
@@ -5369,6 +5451,7 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizeShoreFoamPatternControls();
             SanitizeObjectFoamPatternControls();
             SanitizeFreeWaterFoamPatternControls();
+            SanitizeD8CellSourceControls();
             foamShoreFoamStrength = Mathf.Clamp01(
                 foamShoreFoamStrength);
             foamShoreFoamPersistence = Mathf.Clamp01(
@@ -5527,35 +5610,6 @@ namespace ProgrammaticStylized3D.Rivers
             foamStrandScale = Mathf.Clamp01(foamStrandScale);
             foamStrandDensity = Mathf.Clamp01(foamStrandDensity);
             foamStrandReach = Mathf.Clamp01(foamStrandReach);
-            foamSpawnDistanceNormalized = Mathf.Clamp01(
-                foamSpawnDistanceNormalized);
-            foamSpawnAcrossNormalized = Mathf.Clamp(
-                foamSpawnAcrossNormalized,
-                -1f,
-                1f);
-            foamSpawnScale = Mathf.Clamp(
-                foamSpawnScale,
-                MinimumFoamSpawnScale,
-                MaximumFoamSpawnScale);
-            foamSpawnAmount = Mathf.Clamp01(foamSpawnAmount);
-            foamSpawnRemainingLife = Mathf.Clamp01(
-                foamSpawnRemainingLife);
-            foamSpawnRibbonDuration = Mathf.Clamp(
-                foamSpawnRibbonDuration,
-                MinimumFoamProgressiveRibbonDuration,
-                MaximumFoamProgressiveRibbonDuration);
-            foamSpawnRibbonTravelDistance = Mathf.Clamp(
-                foamSpawnRibbonTravelDistance,
-                MinimumFoamProgressiveRibbonTravelDistance,
-                MaximumFoamProgressiveRibbonTravelDistance);
-            foamSpawnRibbonAcrossDrift = Mathf.Clamp(
-                foamSpawnRibbonAcrossDrift,
-                MinimumFoamProgressiveRibbonAcrossDrift,
-                MaximumFoamProgressiveRibbonAcrossDrift);
-            foamSpawnRibbonPathWander = Mathf.Clamp(
-                foamSpawnRibbonPathWander,
-                MinimumFoamProgressiveRibbonPathWander,
-                MaximumFoamProgressiveRibbonPathWander);
 
             visualSeed = Mathf.Clamp(visualSeed, 1, 9999);
         }

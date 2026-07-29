@@ -19,6 +19,7 @@ Shader "PS3D/Trees/Stylized Tree Bark"
         [HideInInspector] _TreeFoliageFlutterStrength("Tree Foliage Flutter Strength", Range(0, 0.2)) = 0
         [HideInInspector] _TreePhase("Tree Phase", Float) = 0
         [HideInInspector] _TreeDebugMode("Tree Debug Mode", Float) = 0
+        [HideInInspector] _TreeDeadBranchMetadataEnabled("Tree Dead Branch Metadata Enabled", Float) = 0
     }
 
     SubShader
@@ -61,6 +62,7 @@ Shader "PS3D/Trees/Stylized Tree Bark"
             float _TreeFoliageFlutterStrength;
             float _TreePhase;
             float _TreeDebugMode;
+            float _TreeDeadBranchMetadataEnabled;
         CBUFFER_END
 
         float3 _LightDirection;
@@ -96,12 +98,15 @@ Shader "PS3D/Trees/Stylized Tree Bark"
             float3 tangentWS = TransformObjectToWorldDir(
                 input.tangentOS.xyz);
 
+            float4 windMetadata = input.colour;
+            windMetadata.a *= saturate(
+                _TreeDeadBranchMetadataEnabled);
             TreeWindVertexResult wind = ApplyTreeWindResponse(
                 input.positionOS.xyz,
                 positionWS,
                 normalWS,
                 tangentWS,
-                input.colour,
+                windMetadata,
                 TransformObjectToWorld(_TreeRootPositionOS.xyz),
                 _TreeBoundsMinY,
                 _TreeBoundsHeight,
@@ -223,6 +228,19 @@ Shader "PS3D/Trees/Stylized Tree Bark"
                     _BaseMap,
                     sampler_BaseMap,
                     input.uv) * _BaseColor;
+                half deadMask = saturate(input.colour.a) *
+                    saturate(_TreeDeadBranchMetadataEnabled);
+                half deadLuminance = dot(
+                    baseSample.rgb,
+                    half3(0.2126h, 0.7152h, 0.0722h));
+                half3 deadColour = lerp(
+                    baseSample.rgb,
+                    deadLuminance.xxx * 0.62h,
+                    0.55h);
+                baseSample.rgb = lerp(
+                    baseSample.rgb,
+                    deadColour,
+                    deadMask);
                 InputData inputData = BuildTreeInputData(
                     input.positionCS,
                     input.positionWS,

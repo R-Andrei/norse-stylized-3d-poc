@@ -7,9 +7,9 @@ struct FoamSourceEventData
     // x/y = start/end storage global except Object Arc/Semi-Arc point 0;
     // z = centre storage global; w = flow direction except Object Arc/Semi-Arc point 1.x.
     float4 distance;
-    // x = shore inset except Object Arc/Semi-Arc point 1.y; y = width metres
+    // x = shore offset cells for D8 Shore/Inward except Object Arc/Semi-Arc point 1.y; y = width metres
     // except Shore Ribbon thickness cells and Object Arc/Semi-Arc wake-arm length;
-    // z = inward reach or Arc/Semi-Arc normalized material-step duration; w = feather or point 2.x.
+    // z = inward reach cells for D8 Inward Wash or Arc/Semi-Arc normalized material-step duration; w = feather or point 2.x.
     float4 shore;
     // x = authored intrinsic Presence, y = authored normalized Remaining Life,
     // z = material pattern seed, w = pattern feature size.

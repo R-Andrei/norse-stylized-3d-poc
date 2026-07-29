@@ -62,15 +62,11 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField]
         private TreeFloatOverride trunkSurfaceTorsionDegrees;
 
-        [InspectorName("Trunk Twist Ridge Count")]
-        [SerializeField]
-        private TreeIntOverride trunkTwistRidgeCount;
-
-        [InspectorName("Trunk Twist Ridge Depth")]
-        [SerializeField]
-        private TreeFloatOverride trunkTwistRidgeDepth;
-
         [Header("Root Buttress")]
+        [InspectorName("Root Buttress Count")]
+        [SerializeField]
+        private TreeIntOverride rootButtressCount;
+
         [SerializeField]
         private TreeFloatOverride rootButtressStrength;
 
@@ -258,8 +254,7 @@ namespace ProgrammaticStylized3D.Trees
         public TreeFloatOverride TrunkLeanDirectionDegrees => trunkLeanDirectionDegrees;
         public TreeFloatOverride TrunkTwistDegrees => trunkSurfaceTorsionDegrees;
         public TreeFloatOverride TrunkSurfaceTorsionDegrees => trunkSurfaceTorsionDegrees;
-        public TreeIntOverride TrunkTwistRidgeCount => trunkTwistRidgeCount;
-        public TreeFloatOverride TrunkTwistRidgeDepth => trunkTwistRidgeDepth;
+        public TreeIntOverride RootButtressCount => rootButtressCount;
         public TreeFloatOverride RootButtressStrength => rootButtressStrength;
         public TreeFloatOverride RootButtressHeight => rootButtressHeight;
         public TreeFloatOverride RootFlareScale => rootFlareScale;
@@ -335,8 +330,7 @@ namespace ProgrammaticStylized3D.Trees
                     trunkLeanStrength.IsSet ||
                     trunkLeanDirectionDegrees.IsSet ||
                     trunkSurfaceTorsionDegrees.IsSet ||
-                    trunkTwistRidgeCount.IsSet ||
-                    trunkTwistRidgeDepth.IsSet ||
+                    rootButtressCount.IsSet ||
                     rootButtressStrength.IsSet ||
                     rootButtressHeight.IsSet ||
                     rootFlareScale.IsSet ||
@@ -445,9 +439,192 @@ namespace ProgrammaticStylized3D.Trees
             trunkSurfaceTorsionDegrees = TreeFloatOverride.Exact(value);
         }
 
-        internal void SetTrunkTwistRidgeDepthForTest(float value)
+        internal bool EnsureManagedTrunkTwistDefault(float value)
         {
-            trunkTwistRidgeDepth = TreeFloatOverride.Exact(value);
+            if (trunkSurfaceTorsionDegrees.IsSet)
+            {
+                return false;
+            }
+
+            trunkSurfaceTorsionDegrees = TreeFloatOverride.Exact(value);
+            return true;
+        }
+
+        internal bool UpgradeManagedTrunkTwistDefault(
+            float previousManagedValue,
+            float currentManagedValue)
+        {
+            if (!trunkSurfaceTorsionDegrees.IsSet)
+            {
+                trunkSurfaceTorsionDegrees =
+                    TreeFloatOverride.Exact(currentManagedValue);
+                return true;
+            }
+
+            if (trunkSurfaceTorsionDegrees.Mode !=
+                TreeOverrideMode.Exact)
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(
+                    trunkSurfaceTorsionDegrees.ExactValue -
+                    currentManagedValue) <= 0.0001f)
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(
+                    trunkSurfaceTorsionDegrees.ExactValue -
+                    previousManagedValue) <= 0.0001f)
+            {
+                trunkSurfaceTorsionDegrees =
+                    TreeFloatOverride.Exact(currentManagedValue);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal bool EnsureManagedRootButtressDefaults(
+            int buttressCount,
+            float buttressStrength,
+            float buttressHeight,
+            float flareScale)
+        {
+            bool changed = false;
+            if (!rootButtressCount.IsSet)
+            {
+                rootButtressCount = TreeIntOverride.Exact(
+                    Mathf.Clamp(buttressCount, 3, 8));
+                changed = true;
+            }
+            if (!rootButtressStrength.IsSet)
+            {
+                rootButtressStrength =
+                    TreeFloatOverride.Exact(buttressStrength);
+                changed = true;
+            }
+            if (!rootButtressHeight.IsSet)
+            {
+                rootButtressHeight =
+                    TreeFloatOverride.Exact(buttressHeight);
+                changed = true;
+            }
+            if (!rootFlareScale.IsSet)
+            {
+                rootFlareScale = TreeFloatOverride.Exact(flareScale);
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        internal bool UpgradeManagedRootButtressDefaults(
+            int previousCount,
+            int currentCount,
+            float previousStrength,
+            float currentStrength,
+            float currentHeight,
+            float previousFlare,
+            float currentFlare)
+        {
+            bool changed = UpgradeManagedExact(
+                ref rootButtressCount,
+                previousCount,
+                currentCount);
+            changed |= UpgradeManagedExact(
+                ref rootButtressStrength,
+                previousStrength,
+                currentStrength);
+            if (!rootButtressHeight.IsSet)
+            {
+                rootButtressHeight =
+                    TreeFloatOverride.Exact(currentHeight);
+                changed = true;
+            }
+            changed |= UpgradeManagedExact(
+                ref rootFlareScale,
+                previousFlare,
+                currentFlare);
+            return changed;
+        }
+
+        private static bool UpgradeManagedExact(
+            ref TreeIntOverride value,
+            int previousManagedValue,
+            int currentManagedValue)
+        {
+            currentManagedValue = Mathf.Clamp(currentManagedValue, 3, 8);
+            previousManagedValue = Mathf.Clamp(previousManagedValue, 3, 8);
+            if (!value.IsSet)
+            {
+                value = TreeIntOverride.Exact(currentManagedValue);
+                return true;
+            }
+
+            if (value.Mode != TreeOverrideMode.Exact ||
+                value.ExactValue != previousManagedValue)
+            {
+                return false;
+            }
+
+            value = TreeIntOverride.Exact(currentManagedValue);
+            return true;
+        }
+
+        private static bool UpgradeManagedExact(
+            ref TreeFloatOverride value,
+            float previousManagedValue,
+            float currentManagedValue)
+        {
+            if (!value.IsSet)
+            {
+                value = TreeFloatOverride.Exact(currentManagedValue);
+                return true;
+            }
+
+            if (value.Mode != TreeOverrideMode.Exact ||
+                Mathf.Abs(value.ExactValue - previousManagedValue) > 0.0001f)
+            {
+                return false;
+            }
+
+            value = TreeFloatOverride.Exact(currentManagedValue);
+            return true;
+        }
+
+        internal bool EnsureManagedPathSpiralDefaults(
+            float strength,
+            float turns,
+            float direction)
+        {
+            bool changed = false;
+            if (!trunkSpiralStrength.IsSet)
+            {
+                trunkSpiralStrength = TreeFloatOverride.Exact(strength);
+                changed = true;
+            }
+
+            if (!trunkSpiralTurns.IsSet)
+            {
+                trunkSpiralTurns = TreeFloatOverride.Exact(turns);
+                changed = true;
+            }
+
+            if (!trunkSpiralDirection.IsSet)
+            {
+                trunkSpiralDirection = TreeFloatOverride.Exact(
+                    direction < 0f ? -1f : 1f);
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        internal void SetRootButtressCountForTest(int value)
+        {
+            rootButtressCount = TreeIntOverride.Exact(value);
         }
 
         internal void SetRootButtressStrengthForTest(float value)

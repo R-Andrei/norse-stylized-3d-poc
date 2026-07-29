@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3388f272f7b04cb3a751e005827817bf, type: 3}
+  m_Name: TreeRecipeCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Trees.TreeRecipeCatalog
+  stableIdentity: 
+  displayName: Tree Recipes
+  description: Index of standalone tree recipes. The catalog contributes no generation
+    values.
+  recipes:
+  - {fileID: 11400000, guid: 26ccb541e3f024e45ab0e62dc40f0e60, type: 2}
+  - {fileID: 11400000, guid: ea5eb2898f895a341a8105ed62c8bc9e, type: 2}
+  - {fileID: 11400000, guid: 55cb3f3483fc1ae4f8637834c9d8c377, type: 2}
+  - {fileID: 11400000, guid: afd9047517e5c1a419a6995d6354c379, type: 2}
+  - {fileID: 11400000, guid: 5d787faaad296c3438635cde19665cb2, type: 2}
+  - {fileID: 11400000, guid: bd1fe98c50908f74a9c2a61f6d86591a, type: 2}
+  - {fileID: 11400000, guid: 5af53530dcc3468418437c2f98dd9bb4, type: 2}
+  - {fileID: 11400000, guid: 4aad368b707182f4ebcba753c60f3428, type: 2}
+  - {fileID: 11400000, guid: 7c802ade09a10e34fa0f4a8f5b6607ba, type: 2}
+  - {fileID: 11400000, guid: 8208b12c8e029db4c92e925a0991d219, type: 2}
+  - {fileID: 11400000, guid: 1afec8ab4f216c846b3fa6bde6d3c820, type: 2}
+  - {fileID: 11400000, guid: 5d850dfca76eaba489eaa5b49685ae6b, type: 2}
+  - {fileID: 11400000, guid: 5519bc5e4c4aed641913fbb23192a0f8, type: 2}

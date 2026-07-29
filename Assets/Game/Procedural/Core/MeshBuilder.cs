@@ -43,6 +43,14 @@ namespace ProgrammaticStylized3D.Geometry
                 targetMesh.SetUVs(2, data.UV2);
             }
 
+            if (data.HasSurfaceFeatures)
+            {
+                // TEXCOORD4 is reserved for Generated Mass structural
+                // feature contributions. TEXCOORD3 remains untouched because
+                // the retired diagnostic feature-atlas path still uses it.
+                targetMesh.SetUVs(4, data.SurfaceFeatures);
+            }
+
             targetMesh.SetColors(data.Colors);
 
             if (data.HasNormals)

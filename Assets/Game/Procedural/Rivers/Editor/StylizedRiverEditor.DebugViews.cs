@@ -210,15 +210,21 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private static readonly string[] FoamLayerCLabels =
         {
+            "Material Coverage",
             "Material Presence",
             "Material Remaining Life",
+            "Material Amount",
+            "Material State Composite",
             "Automatic Birth Sources"
         };
 
         private static readonly int[] FoamLayerCValues =
         {
+            (int)StylizedRiverFoamDebugView.MaterialCoverage,
             (int)StylizedRiverFoamDebugView.MaterialPresence,
             (int)StylizedRiverFoamDebugView.MaterialRemainingLife,
+            (int)StylizedRiverFoamDebugView.MaterialAmount,
+            (int)StylizedRiverFoamDebugView.MaterialStateComposite,
             (int)StylizedRiverFoamDebugView.AutomaticBirthSources
         };
 
@@ -264,6 +270,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private static readonly string[] FoamLayerELabels =
         {
+            "Visibility Pipeline Composite",
             "Chip Candidate Field",
             "Chip Eligibility Composite",
             "Production Chip Mask",
@@ -273,6 +280,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private static readonly int[] FoamLayerEValues =
         {
+            (int)StylizedRiverFoamDebugView.VisibilityPipelineComposite,
             (int)StylizedRiverFoamDebugView.ChipCandidateField,
             (int)StylizedRiverFoamDebugView.ChipEligibilityComposite,
             (int)StylizedRiverFoamDebugView.ProductionChipMask,
@@ -375,6 +383,10 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         (int)StylizedRiverFoamDebugView.AutomaticBirthSources)
                 {
                     DrawAutomaticBirthSourceDebugStatus();
+                }
+                if (selectedFeature == RiverDebugFeature.Foam)
+                {
+                    DrawFoamVisibilityDiagnosticActions();
                 }
             }
             else if (!hasMixedSelection)
@@ -493,6 +505,74 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 $"{runtime.AutomaticObjectContactReinforcementCount} reinforcement | " +
                 $"{runtime.AutomaticObjectContactFleckCount} Fleck | " +
                 $"{runtime.AutomaticObjectWaitingClearanceCount} waiting for packet clearance");
+        }
+
+        private void DrawFoamVisibilityDiagnosticActions()
+        {
+            StylizedRiver selectedRiver = targets.Length == 1
+                ? target as StylizedRiver
+                : null;
+            StylizedRiverFoamRuntime runtime = selectedRiver != null
+                ? selectedRiver.GetComponent<StylizedRiverFoamRuntime>()
+                : null;
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField(
+                "Coverage / Visibility Evidence",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Capture reads the exact previous/current committed Layer C " +
+                "ARGBHalf pair and the current interpolation alpha. The CPU " +
+                "report measures Coverage, Material Amount, Life-weighted " +
+                "Material Amount, and the selected scalar visibility base. " +
+                "The blue channel of Visibility Pipeline Composite remains " +
+                "the exact pixel-space pre-Chip production mask.",
+                MessageType.None);
+
+            string status = !Application.isPlaying
+                ? "Not in Play Mode"
+                : runtime == null
+                    ? "Foam runtime unavailable"
+                    : runtime.FoamVisibilityDiagnosticReadbackPending
+                        ? "Awaiting GPU readback"
+                        : string.IsNullOrEmpty(
+                            runtime.FoamVisibilityDiagnosticReport)
+                            ? "No report captured"
+                            : "Report ready";
+            DrawReadOnlyRow(
+                new GUIContent("Coverage Report"),
+                status);
+
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(
+                       !Application.isPlaying ||
+                       runtime == null ||
+                       runtime.FoamVisibilityDiagnosticReadbackPending))
+            {
+                if (GUILayout.Button(
+                        new GUIContent(
+                            "Capture Coverage Report",
+                            "Asynchronously reads the currently bound committed " +
+                            "Foam states and builds the Coverage distribution " +
+                            "report without changing simulation state.")))
+                {
+                    runtime.CaptureFoamVisibilityDiagnosticReport();
+                    Repaint();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       runtime == null ||
+                       string.IsNullOrEmpty(
+                           runtime.FoamVisibilityDiagnosticReport)))
+            {
+                if (GUILayout.Button("Copy Coverage Report"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        runtime.FoamVisibilityDiagnosticReport;
+                }
+            }
+            EditorGUILayout.EndHorizontal();
         }
 
         private int DrawDebugViewSelector(
@@ -1419,13 +1499,29 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     return
                         "Exact automatic Layer C geometric birth Coverage from the latest material update before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update overlap between multiple source events or categories, and black means no source Coverage was written this update. This view does not encode intrinsic Presence or Remaining Life.";
 
+                case StylizedRiverFoamDebugView.MaterialCoverage:
+                    return
+                        "Literal geometric Coverage C from the temporally interpolated committed Layer C state. Brightness equals C directly: 1 means the cell is fully occupied, 0.5 means half occupied, and 0 means no material. Presence and Remaining Life do not rescale this view.";
+
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
-                        "Decoded intrinsic material Presence sampled at the unshifted field coordinate through ordinary temporal interpolation between committed Layer C states. At Coverage 0.02 or greater, brightness is the literal decoded Presence with no Coverage ramp; source shape, subcell width, transport diffusion, and valid-fluid clipping do not attenuate it.";
+                        "Decoded intrinsic material Presence P sampled at the unshifted field coordinate through ordinary temporal interpolation between committed Layer C states. At Coverage 0.02 or greater, brightness is literal P with no Coverage ramp; this describes material strength inside the occupied fraction, not occupied cell area.";
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Exact normalized Remaining Life decoded from the temporally interpolated committed Layer C life moment. At Coverage 0.02 or greater, brightness is literal Remaining Life with no visibility floor or Coverage ramp; only explicit Layer C aging changes it.";
+                        "Exact normalized Remaining Life L decoded from the temporally interpolated committed Layer C life moment. At Coverage 0.02 or greater, brightness is literal L with no visibility floor or Coverage ramp; this is lifecycle progress for existing material, not occupied cell area or final opacity.";
+
+                case StylizedRiverFoamDebugView.MaterialAmount:
+                    return
+                        "Literal transported Material Amount C × P from the packed red channel of the same temporally interpolated committed Layer C state. Unlike the decoded Presence view, narrow or diffuse Coverage attenuates this brightness.";
+
+                case StylizedRiverFoamDebugView.MaterialStateComposite:
+                    return
+                        "Layer C state composite: red = literal Coverage C, green = decoded Presence P, blue = decoded Remaining Life L. Green and blue are gated black below Coverage 0.02, matching the individual Presence/Life authority rule. Cyan therefore means strong, living material with low Coverage; white means high Coverage, Presence, and Life.";
+
+                case StylizedRiverFoamDebugView.VisibilityPipelineComposite:
+                    return
+                        "Production visibility-stage composite: red = meaningful raw Coverage footprint smoothstep(0.02, 0.10, C); green = the selected Final Foam Visibility base before Pattern/life shaping; blue = the exact production pre-Chip Foam mask after Pattern/life shaping, surface warp/wake coupling, and the selected Presence Footprint. Red without green means the visibility base rejected existing Coverage. Green without blue means later pre-Chip shaping or coupling removed it. White means the material survives all three stages.";
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return

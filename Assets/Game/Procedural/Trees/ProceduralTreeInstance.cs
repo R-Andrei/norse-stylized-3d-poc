@@ -33,6 +33,14 @@ namespace ProgrammaticStylized3D.Trees
         private TreeGenerationOverrides instanceOverrides =
             new TreeGenerationOverrides();
 
+        [Header("Recipe-Only Exact Controls")]
+        [SerializeField]
+        private TreeResolvedControls exactControls =
+            new TreeResolvedControls();
+
+        [SerializeField, HideInInspector]
+        private string exactControlsSourceRecipeIdentity = string.Empty;
+
         [Header("Structural Preview")]
         [SerializeField]
         private bool showStructuralPreview = true;
@@ -106,6 +114,15 @@ namespace ProgrammaticStylized3D.Trees
         public TreeGenerationRecipe Recipe => recipe;
         public int MasterSeed => masterSeed;
         public TreeGenerationOverrides InstanceOverrides => instanceOverrides;
+        public TreeResolvedControls ExactControls => exactControls;
+        public string ExactControlsSourceRecipeIdentity =>
+            exactControlsSourceRecipeIdentity;
+        public bool HasExactControls =>
+            exactControls != null && exactControls.IsInitialized;
+        public bool UsesRecipeOnlyGeneration =>
+            recipe != null &&
+            recipe.FamilyProfile == null &&
+            HasExactControls;
         public TreeDefinition GeneratedDefinition => generatedDefinition;
         public bool HasGeneratedDefinition =>
             generatedDefinition != null && generatedDefinition.IsValid;
@@ -160,6 +177,12 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             instanceOverrides ??= new TreeGenerationOverrides();
+            exactControls ??= new TreeResolvedControls();
+            if (recipe != null &&
+                exactControlsSourceRecipeIdentity != recipe.StableIdentity)
+            {
+                SampleExactControlsFromRecipe();
+            }
         }
 
         public void ConfigureRecipe(
@@ -172,16 +195,138 @@ namespace ProgrammaticStylized3D.Trees
             {
                 masterSeed = recipe.MasterSeed;
             }
+
+            SampleExactControlsFromRecipe();
+        }
+
+        public void ConfigureStandaloneRecipe(
+            TreeGenerationRecipe standaloneRecipe,
+            bool adoptRecipeSeed)
+        {
+            ConfigureStandaloneRecipe(
+                standaloneRecipe,
+                adoptRecipeSeed,
+                family);
+        }
+
+        public void ConfigureStandaloneRecipe(
+            TreeGenerationRecipe standaloneRecipe,
+            bool adoptRecipeSeed,
+            TreeFamily referenceGrouping)
+        {
+            library = null;
+            family = referenceGrouping;
+            recipe = standaloneRecipe;
+            instanceOverrides = new TreeGenerationOverrides();
+            if (adoptRecipeSeed && recipe != null)
+            {
+                masterSeed = recipe.MasterSeed;
+            }
+
+            SampleExactControlsFromRecipe();
+        }
+
+        public void ConfigureRecipeOnlySpawn(
+            TreeGenerationRecipe standaloneRecipe,
+            int seed,
+            TreeFamily referenceGrouping,
+            int referenceVariantIndex = 1,
+            TreeGenerationLibrary meshStorageLibrary = null)
+        {
+            // Recipe-only generation never reads behavioral values from this
+            // library. The optional reference exists solely so generated bark
+            // meshes remain persistent subassets across scene/domain reloads.
+            library = meshStorageLibrary;
+            family = referenceGrouping;
+            sourceVariantIndex = Mathf.Clamp(referenceVariantIndex, 1, 5);
+            recipe = standaloneRecipe;
+            masterSeed = seed == int.MinValue ? 0 : Mathf.Abs(seed);
+            instanceOverrides = new TreeGenerationOverrides();
+            SampleExactControlsFromRecipe();
+        }
+
+        public bool SampleExactControlsFromRecipe()
+        {
+            if (recipe == null)
+            {
+                return false;
+            }
+
+            recipe.EnsureRecipeOnlyFoundation();
+            exactControls ??= new TreeResolvedControls();
+            exactControls.ResolveFrom(recipe.ControlRanges, masterSeed);
+            exactControlsSourceRecipeIdentity = recipe.StableIdentity;
+            return true;
+        }
+
+        public void ValidateExactControls()
+        {
+            exactControls ??= new TreeResolvedControls();
+            if (recipe != null)
+            {
+                recipe.EnsureRecipeOnlyFoundation();
+                if (exactControlsSourceRecipeIdentity != recipe.StableIdentity)
+                {
+                    exactControls.ResolveFrom(
+                        recipe.ControlRanges,
+                        masterSeed);
+                    exactControlsSourceRecipeIdentity = recipe.StableIdentity;
+                }
+                else
+                {
+                    exactControls.EnsureInitialized(
+                        recipe.ControlRanges,
+                        masterSeed);
+                }
+            }
+            else if (exactControls.IsInitialized)
+            {
+                exactControls.ValidateAndClamp();
+            }
+            else
+            {
+                exactControls.ResolveFrom(
+                    TreeRecipeControlRanges.CreateStarterDefaults(),
+                    masterSeed);
+                exactControlsSourceRecipeIdentity = string.Empty;
+            }
         }
 
         public TreeGenerationResult GenerateStructure()
         {
-            instanceOverrides ??= new TreeGenerationOverrides();
-            instanceOverrides.UpgradeTreeGen2BControls();
+            TreeGenerationResult result;
+            if (UsesRecipeOnlyGeneration)
+            {
+                exactControls.ValidateAndClamp();
+                result = TreeGenerator.Generate(
+                    exactControls,
+                    masterSeed,
+                    exactControlsSourceRecipeIdentity,
+                    family);
+            }
+            else
+            {
+                instanceOverrides ??= new TreeGenerationOverrides();
+                instanceOverrides.UpgradeTreeGen2BControls();
+                result = TreeGenerator.Generate(
+                    recipe,
+                    instanceOverrides,
+                    masterSeed);
+            }
+
+            RecordGeneration(result);
+            return result;
+        }
+
+        public TreeGenerationResult RegenerateFromExactControls()
+        {
+            exactControls ??= new TreeResolvedControls();
+            exactControls.ValidateAndClamp();
             TreeGenerationResult result = TreeGenerator.Generate(
-                recipe,
-                instanceOverrides,
-                masterSeed);
+                exactControls,
+                masterSeed,
+                exactControlsSourceRecipeIdentity,
+                family);
             RecordGeneration(result);
             return result;
         }
@@ -292,6 +437,8 @@ namespace ProgrammaticStylized3D.Trees
             sourceVariantIndex = Mathf.Clamp(sourceVariantIndex, 1, 5);
             frameDisplayScale = Mathf.Clamp(frameDisplayScale, 0.01f, 0.5f);
             instanceOverrides ??= new TreeGenerationOverrides();
+            exactControls ??= new TreeResolvedControls();
+            ValidateExactControls();
         }
 
         private void OnDrawGizmos()

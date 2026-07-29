@@ -131,9 +131,18 @@ namespace ProgrammaticStylized3D.Trees
         [Range(0f, 1f)]
         private float foliageShadowFloor = 0.38f;
 
-        [Header("Generated Tree Library")]
+        [Header("Curated Recipe Gallery")]
         [SerializeField]
-        [Tooltip("Automatically managed library containing the four family profiles, four palettes, and twenty reference-calibrated generation recipes used by the procedural comparison slots.")]
+        [Tooltip("Standalone recipe catalog used by all procedural comparison-slot spawners.")]
+        private TreeRecipeCatalog recipeCatalog;
+
+        [SerializeField]
+        [Tooltip("Stable gallery-level seed. Every slot derives its own seed from this value and its stable family/index identity.")]
+        private int curatedGallerySeed = 7319;
+
+        [Header("Generated Mesh Storage / Legacy Compatibility")]
+        [SerializeField]
+        [Tooltip("Temporary managed asset container for generated bark meshes and legacy comparison evidence. It does not provide behavioral values to recipe-only generation.")]
         private TreeGenerationLibrary generationLibrary;
 
         [SerializeField]
@@ -292,6 +301,8 @@ namespace ProgrammaticStylized3D.Trees
         public float FoliageShadowReceiveStrength =>
             foliageShadowReceiveStrength;
         public float FoliageShadowFloor => foliageShadowFloor;
+        public TreeRecipeCatalog RecipeCatalog => recipeCatalog;
+        public int CuratedGallerySeed => curatedGallerySeed;
         public TreeGenerationLibrary GenerationLibrary => generationLibrary;
         public bool ShowGeneratedStructuralPreviews =>
             showGeneratedStructuralPreviews;
@@ -399,11 +410,20 @@ namespace ProgrammaticStylized3D.Trees
             foliageShadowReceiveStrength = Mathf.Clamp01(
                 foliageShadowReceiveStrength);
             foliageShadowFloor = Mathf.Clamp01(foliageShadowFloor);
+            if (curatedGallerySeed == int.MinValue)
+            {
+                curatedGallerySeed = 0;
+            }
         }
 
         public void SetReferenceGround(GeneratedGround ground)
         {
             referenceGround = ground;
+        }
+
+        public void SetRecipeCatalog(TreeRecipeCatalog catalog)
+        {
+            recipeCatalog = catalog;
         }
 
         public void SetGenerationLibrary(TreeGenerationLibrary library)

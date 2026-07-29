@@ -22,11 +22,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             previewStatus = default;
             boundedPreviewStatus = default;
             unifiedPreviewStatus = default;
-            if (evaluationMode == EdgeWearEvaluationMode.None)
+            if (evaluationMode == EdgeWearEvaluationMode.BaseGeometryOnly)
             {
                 return null;
             }
 
+            bool runProductionSurfaceFeatures =
+                evaluationMode ==
+                    EdgeWearEvaluationMode.ProductionSurfaceFeatures;
             bool applyPlaneCutBevelPreview =
                 evaluationMode == EdgeWearEvaluationMode.PlaneCutPreview;
             bool runLegacyDiagnosticAudit =
@@ -46,9 +49,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool runCornerDamagePreview =
                 runCornerDamageGeometryPreview ||
                 runCornerDamageIntegrationPreview;
-            bool useCornerDamageCandidatePolicy =
-                runCornerDamagePreview ||
+            bool freshPostChipOrdinaryPass =
+                runCornerDamageIntegrationPreview ||
                 runCornerDamageIntegrationPreflight;
+            bool useCornerDamageCandidatePolicy =
+                runCornerDamagePreview &&
+                !freshPostChipOrdinaryPass;
             bool runCornerDamageTransactionMode =
                 runCornerDamagePreview ||
                 runCornerDamageIntegrationPreflight;
@@ -66,6 +72,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 evaluationMode ==
                     EdgeWearEvaluationMode.CornerDamageTransactionAudit;
             bool runUnifiedEvaluation =
+                runProductionSurfaceFeatures ||
                 applyUnifiedBoundedPreview ||
                 runCornerDamageIntegrationPreview ||
                 runUnifiedBatchAudit ||
@@ -73,6 +80,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 buildSourceEdgeIndexDebug;
             bool includeAllGeometricCandidates = runUnifiedBatchAudit;
             bool logUnifiedAudit =
+                !runProductionSurfaceFeatures &&
                 !buildSourceEdgeIndexDebug &&
                 !runCornerDamagePreview;
             if (!surfaceFeatures.HasValue || faces == null || faces.Count < 4)
@@ -120,11 +128,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     committedPlan.CapRingDepthLimit,
                     committedPlan.CapRingEdgeLimit,
                     committedPlan.CapRingWinningLimit,
-                    committedPlan.CapRingRequestedWidth);
+                    committedPlan.CapRingRequestedWidth,
+                    true);
                 CaptureCornerDamagePreviewCandidateSelection(
-                    committedPlan.PlannedMandatoryIdentities.Length,
-                    committedPlan.PlannedMandatoryIdentities.Length,
-                    committedPlan.PlannedMandatoryIdentities.Length);
+                    0,
+                    0,
+                    0);
                 unifiedPreviewStatus = committedPlan.UnifiedStatus;
                 CaptureCornerDamagePreviewOutcome(
                     unifiedPreviewStatus,
@@ -133,45 +142,30 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     committedPlan.PreviewSoup);
             }
 #endif
-#if UNITY_EDITOR
+            // C1B.1 construction order is intentionally strict:
+            //   raw closed source faces -> certified chip-only vertices ->
+            //   canonical convex-hull source rebuild -> fresh edge-wear
+            //   normalization -> ordinary candidate discovery.
+            // Edge-wear normalization is never allowed to alter the source
+            // topology from which the chip is selected or to lend historical
+            // identities to the post-chip bevel pass.
+            bool buildChipBeforeEdgeWear =
+                runCornerDamageTransactionAudit ||
+                runCornerDamageTransactionMode;
             EdgeWearMicroTopologyNormalizationResult
-                microTopologyNormalization;
-            CornerDamagePreflightReplayCache replayCache =
-                runCornerDamageIntegrationPreflight
-                    ? ResolveCornerDamagePreflightReplayCache()
-                    : null;
-            if (replayCache != null &&
-                replayCache.NormalizedFoundation != null)
-            {
-                microTopologyNormalization =
-                    replayCache.NormalizedFoundation;
-                replayCache.NormalizedFoundationReuseCount++;
-            }
-            else
+                microTopologyNormalization = null;
+            List<PolygonFace> edgeWearFaces = faces;
+            Bounds edgeWearBounds = bounds;
+            if (!buildChipBeforeEdgeWear)
             {
                 microTopologyNormalization =
                     NormalizeEdgeWearMicroTopology(
                         faces,
                         maximumDimension,
                         minimumStyleWidth);
-                if (replayCache != null)
-                {
-                    replayCache.NormalizedFoundation =
-                        microTopologyNormalization;
-                    replayCache.NormalizedFoundationBuildCount++;
-                }
+                edgeWearFaces = microTopologyNormalization.Faces ?? faces;
+                edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
             }
-#else
-            EdgeWearMicroTopologyNormalizationResult
-                microTopologyNormalization =
-                    NormalizeEdgeWearMicroTopology(
-                        faces,
-                        maximumDimension,
-                        minimumStyleWidth);
-#endif
-            List<PolygonFace> edgeWearFaces =
-                microTopologyNormalization.Faces ?? faces;
-            Bounds edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
             CornerDamageTransactionAuditResult cornerDamageTransaction = null;
             float capRingRequestedWidth = 0f;
             float capRingOrdinaryLimit = 0f;
@@ -183,7 +177,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 cornerDamageTransaction = EvaluateCornerDamageTransaction(
                     edgeWearFaces,
-                    microTopologyNormalization,
                     edgeWearBounds,
                     maximumDimension,
                     recipe,
@@ -195,8 +188,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return null;
                 }
 
-                if (runCornerDamageIntegrationPreview ||
-                    runCornerDamageIntegrationPreflight)
+                if (!freshPostChipOrdinaryPass &&
+                    (runCornerDamageIntegrationPreview ||
+                     runCornerDamageIntegrationPreflight))
                 {
                     capRingRequestedWidth =
                         ResolveCornerDamageCapRingRequestedWidth(
@@ -221,7 +215,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         capRingDepthLimit,
                         capRingEdgeLimit,
                         capRingWinningLimit,
-                        capRingRequestedWidth);
+                        capRingRequestedWidth,
+                        freshPostChipOrdinaryPass);
                 }
                 if (cornerDamageTransaction == null ||
                     !cornerDamageTransaction.Succeeded ||
@@ -292,14 +287,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                     return null;
                 }
-                if (cornerDamageTransaction.AcceptedConstructionFaces ==
-                        null ||
-                    cornerDamageTransaction.
-                        ConstructionSourceFaceCountExpected <= 0 ||
-                    cornerDamageTransaction.
-                        ConstructionSourceFaceCountAttributed !=
-                    cornerDamageTransaction.
-                        ConstructionSourceFaceCountExpected)
+                if (!freshPostChipOrdinaryPass &&
+                    (cornerDamageTransaction.AcceptedConstructionFaces ==
+                         null ||
+                     cornerDamageTransaction.
+                         ConstructionSourceFaceCountExpected <= 0 ||
+                     cornerDamageTransaction.
+                         ConstructionSourceFaceCountAttributed !=
+                     cornerDamageTransaction.
+                         ConstructionSourceFaceCountExpected))
                 {
                     if (runCornerDamageIntegrationPreflight)
                     {
@@ -327,8 +323,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                     return null;
                 }
-                if (capRingRequestedWidth + PointMergeDistance <
-                    minimumStyleWidth)
+                if (!freshPostChipOrdinaryPass &&
+                    capRingRequestedWidth + PointMergeDistance <
+                        minimumStyleWidth)
                 {
                     if (runCornerDamageIntegrationPreflight)
                     {
@@ -357,8 +354,84 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     return null;
                 }
 
-                edgeWearFaces =
-                    cornerDamageTransaction.AcceptedConstructionFaces;
+                if (freshPostChipOrdinaryPass)
+                {
+                    if (!TryBuildFreshPostChipSourceFaces(
+                            cornerDamageTransaction.AcceptedFaces,
+                            out List<PolygonFace> freshPostChipSourceFaces,
+                            out string freshSourceBlocker))
+                    {
+                        string freshSourceDiagnostic = string.IsNullOrEmpty(
+                                freshSourceBlocker)
+                            ? "fresh post-chip source rebuild failed"
+                            : freshSourceBlocker;
+                        if (runCornerDamageIntegrationPreflight)
+                        {
+                            CaptureCornerDamageIntegrationPreflight(
+                                BuildCornerDamageIntegrationPreflightRecord(
+                                    cornerDamageTransaction,
+                                    null,
+                                    0f,
+                                    minimumStyleWidth,
+                                    0,
+                                    0,
+                                    null,
+                                    null,
+                                    false,
+                                    false,
+                                    1f,
+                                    freshSourceDiagnostic));
+                        }
+                        else
+                        {
+                            CaptureCornerDamagePreviewBlocker(freshSourceDiagnostic);
+                        }
+                        return null;
+                    }
+
+                    EdgeWearMicroTopologyNormalizationResult
+                        postChipNormalization =
+                            NormalizeEdgeWearMicroTopology(
+                                freshPostChipSourceFaces,
+                                maximumDimension,
+                                minimumStyleWidth);
+                    if (postChipNormalization == null ||
+                        postChipNormalization.Faces == null ||
+                        postChipNormalization.Faces.Count < 4)
+                    {
+                        if (runCornerDamageIntegrationPreflight)
+                        {
+                            CaptureCornerDamageIntegrationPreflight(
+                                BuildCornerDamageIntegrationPreflightRecord(
+                                    cornerDamageTransaction,
+                                    null,
+                                    0f,
+                                    minimumStyleWidth,
+                                    0,
+                                    0,
+                                    null,
+                                    null,
+                                    false,
+                                    false,
+                                    1f,
+                                    "fresh post-chip micro-topology normalization failed"));
+                        }
+                        else
+                        {
+                            CaptureCornerDamagePreviewBlocker(
+                                "fresh post-chip micro-topology normalization failed");
+                        }
+                        return null;
+                    }
+
+                    microTopologyNormalization = postChipNormalization;
+                    edgeWearFaces = postChipNormalization.Faces;
+                }
+                else
+                {
+                    edgeWearFaces =
+                        cornerDamageTransaction.AcceptedConstructionFaces;
+                }
                 edgeWearBounds = CalculateFaceBounds(edgeWearFaces);
             }
 
@@ -373,14 +446,99 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     requestedWidth,
                     includeAllGeometricCandidates,
                     microTopologyNormalization,
-                    cornerDamageTransaction,
-                    capRingRequestedWidth,
-                    false,
                     out EdgeWearCoverageAudit coverageAudit);
+            CaptureGeneratedMassSelectionArchitectureAudit(
+                edgeWearFaces,
+                candidates,
+                coverageAudit,
+                freshPostChipOrdinaryPass);
+            CaptureGeneratedMassFullRebuildOracle(
+                edgeWearFaces,
+                edgeWearBounds,
+                maximumDimension,
+                recipe,
+                settings,
+                amount01,
+                requestedWidth,
+                includeAllGeometricCandidates,
+                microTopologyNormalization,
+                candidates,
+                coverageAudit);
+            CaptureGeneratedMassIsolatedEligibilityAudit(coverageAudit);
+            CaptureGeneratedMassPotentialInteractionAudit(
+                candidates, coverageAudit);
+            CaptureGeneratedMassPairwiseCompatibilityAudit(
+                candidates, coverageAudit);
+            if (freshPostChipOrdinaryPass)
+            {
+                for (int candidateIndex = 0;
+                     candidateIndex < candidates.Count;
+                     candidateIndex++)
+                {
+                    EdgeWearBevelCandidate candidate =
+                        candidates[candidateIndex];
+                    if (!candidate.Mandatory &&
+                        candidate.CandidateClass ==
+                            EdgeWearCandidateClass.Ordinary)
+                    {
+                        continue;
+                    }
+
+                    const string invariantBlocker =
+                        "C1B.1 invariant violation: fresh post-chip edges must enter the ordinary non-mandatory bevel pipeline";
+                    if (runCornerDamageIntegrationPreflight)
+                    {
+                        CaptureCornerDamageIntegrationPreflight(
+                            BuildCornerDamageIntegrationPreflightRecord(
+                                cornerDamageTransaction,
+                                coverageAudit,
+                                0f,
+                                minimumStyleWidth,
+                                candidates.Count,
+                                0,
+                                null,
+                                null,
+                                false,
+                                false,
+                                1f,
+                                invariantBlocker));
+                    }
+                    else
+                    {
+                        CaptureCornerDamagePreviewBlocker(
+                            invariantBlocker);
+                    }
+                    return null;
+                }
+            }
             if (candidates.Count == 0)
             {
-                const string noViableCandidateReason =
+                string noViableCandidateReason =
                     "no geometrically viable edge-wear candidates";
+                if (freshPostChipOrdinaryPass && coverageAudit != null)
+                {
+                    EdgeWearMicroTopologyNormalizationResult normalization =
+                        coverageAudit.MicroTopologyNormalization;
+                    noViableCandidateReason +=
+                        " (freshFaces=" + edgeWearFaces.Count +
+                        "; rawEdges=" + coverageAudit.RawSourceEdgeCount +
+                        "; sourceEdges=" + coverageAudit.SourceEdgeCount +
+                        "; structural=" +
+                            coverageAudit.StructuralEligibleCount +
+                        "; geometric=" +
+                            coverageAudit.GeometricEligibleCount +
+                        "; artistic=" +
+                            coverageAudit.ArtisticEligibleCount +
+                        "; microApplied=" +
+                            (normalization != null && normalization.Applied
+                                ? 1
+                                : 0) +
+                        "; microTransitions=" +
+                            (normalization == null
+                                ? 0
+                                : normalization.GeneratedTransitionKeys.Count) +
+                        ")";
+                }
                 if (runCornerDamageIntegrationPreflight)
                 {
                     CaptureCornerDamageIntegrationPreflight(
@@ -477,14 +635,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (runCornerDamagePreview)
             {
                 CaptureCornerDamagePreviewCandidateSelection(
-                    cornerDamageTransaction == null
+                    freshPostChipOrdinaryPass ||
+                        cornerDamageTransaction == null
                         ? 0
                         : cornerDamageTransaction.CapRingKeys.Count,
-                    mandatoryCandidateCount,
-                    Mathf.Min(mandatoryCandidateCount, selectedCount));
+                    freshPostChipOrdinaryPass
+                        ? 0
+                        : mandatoryCandidateCount,
+                    freshPostChipOrdinaryPass
+                        ? 0
+                        : Mathf.Min(
+                            mandatoryCandidateCount,
+                            selectedCount));
             }
             float integrationPreflightScale = 1f;
-            if (runCornerDamageIntegrationPreflight)
+            if (runCornerDamageIntegrationPreflight &&
+                !freshPostChipOrdinaryPass)
             {
                 integrationPreflightScale =
                     ResolveAndApplyCornerDamageIntegrationPreflightScale(
@@ -754,6 +920,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     }
                     if (previewApplied)
                     {
+                        CaptureCommittedPlaneCutLogicalBevels(
+                            allEdgePreviewSoup,
+                            context);
                         return allEdgePreviewSoup;
                     }
                 }
@@ -837,7 +1006,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                                     minimumStableEdgeLength,
                                     minimumStableFaceArea,
                                     coverageAudit,
-                                    true,
                                     out TriangleSoup planeCutPreviewSoup);
                             LogPlaneCutBevelAudit(planeCutAudit);
 
@@ -1541,6 +1709,187 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string Blocker = string.Empty;
         }
 
+        private static List<EdgeWearEdgeLifecycleRecord>
+            BuildRankedOrdinaryBevelRecords(
+                EdgeWearCoverageAudit coverageAudit)
+        {
+            List<EdgeWearEdgeLifecycleRecord> ranked =
+                new List<EdgeWearEdgeLifecycleRecord>();
+            if (coverageAudit == null)
+            {
+                return ranked;
+            }
+            for (int recordIndex = 0;
+                 recordIndex < coverageAudit.Records.Count;
+                 recordIndex++)
+            {
+                EdgeWearEdgeLifecycleRecord record =
+                    coverageAudit.Records[recordIndex];
+                if (!record.Candidate ||
+                    record.CandidateIndex < 0 ||
+                    record.Mandatory ||
+                    record.CandidateClass !=
+                        EdgeWearCandidateClass.Ordinary)
+                {
+                    continue;
+                }
+                ranked.Add(record);
+            }
+            ranked.Sort((left, right) =>
+            {
+                int candidateOrder =
+                    left.CandidateIndex.CompareTo(right.CandidateIndex);
+                if (candidateOrder != 0)
+                {
+                    return candidateOrder;
+                }
+                return left.SourceEdgeIndex.CompareTo(right.SourceEdgeIndex);
+            });
+            return ranked;
+        }
+
+        private static int ParseGeneratedMassConflictEdge(
+            string evidence,
+            string token)
+        {
+            if (string.IsNullOrEmpty(evidence) ||
+                string.IsNullOrEmpty(token))
+            {
+                return -1;
+            }
+            int tokenIndex = evidence.IndexOf(
+                token,
+                StringComparison.Ordinal);
+            if (tokenIndex < 0)
+            {
+                return -1;
+            }
+            int valueStart = tokenIndex + token.Length;
+            int valueEnd = valueStart;
+            while (valueEnd < evidence.Length &&
+                   char.IsDigit(evidence[valueEnd]))
+            {
+                valueEnd++;
+            }
+            if (valueEnd == valueStart ||
+                !int.TryParse(
+                    evidence.Substring(valueStart, valueEnd - valueStart),
+                    out int value))
+            {
+                return -1;
+            }
+            return value;
+        }
+
+        private static int SelectRankedOrdinaryBevelLoser(
+            List<EdgeWearEdgeLifecycleRecord> ranked,
+            SortedSet<int> alreadyDeferred,
+            PlaneCutBevelAuditResult failedAudit,
+            string blocker,
+            out string evidence)
+        {
+            evidence = string.Empty;
+            if (ranked == null || ranked.Count == 0)
+            {
+                return -1;
+            }
+
+            int victim = failedAudit.EdgeConflictVictimEdgeIndex;
+            int foreign = failedAudit.EdgeConflictForeignEdgeIndex;
+            if (victim < 0)
+            {
+                victim = ParseGeneratedMassConflictEdge(
+                    blocker,
+                    "bevel-band edge ");
+            }
+            if (foreign < 0)
+            {
+                foreign = ParseGeneratedMassConflictEdge(
+                    blocker,
+                    "EdgeBevelPlane:");
+            }
+
+            int victimRank = -1;
+            int foreignRank = -1;
+            for (int rank = 0; rank < ranked.Count; rank++)
+            {
+                int sourceEdge = ranked[rank].SourceEdgeIndex;
+                if (sourceEdge == victim)
+                {
+                    victimRank = rank;
+                }
+                if (sourceEdge == foreign)
+                {
+                    foreignRank = rank;
+                }
+            }
+
+            int loserRank = -1;
+            string reason;
+            if (victimRank >= 0 && foreignRank >= 0)
+            {
+                loserRank = Mathf.Max(victimRank, foreignRank);
+                reason = "proven-pair-lower-rank";
+            }
+            else if (victimRank >= 0)
+            {
+                loserRank = victimRank;
+                reason = "proven-victim-only";
+            }
+            else if (foreignRank >= 0)
+            {
+                loserRank = foreignRank;
+                reason = "proven-foreign-only";
+            }
+            else
+            {
+                reason = "bounded-lowest-rank-fallback";
+                for (int rank = ranked.Count - 1; rank >= 0; rank--)
+                {
+                    if (!alreadyDeferred.Contains(
+                            ranked[rank].SourceEdgeIndex))
+                    {
+                        loserRank = rank;
+                        break;
+                    }
+                }
+            }
+
+            if (loserRank < 0)
+            {
+                return -1;
+            }
+            EdgeWearEdgeLifecycleRecord loser = ranked[loserRank];
+            if (alreadyDeferred.Contains(loser.SourceEdgeIndex))
+            {
+                for (int rank = ranked.Count - 1; rank >= 0; rank--)
+                {
+                    if (!alreadyDeferred.Contains(
+                            ranked[rank].SourceEdgeIndex))
+                    {
+                        loserRank = rank;
+                        loser = ranked[rank];
+                        reason = "bounded-lowest-rank-fallback";
+                        break;
+                    }
+                }
+            }
+            if (alreadyDeferred.Contains(loser.SourceEdgeIndex))
+            {
+                return -1;
+            }
+
+            evidence =
+                reason +
+                ":loserRank=" + loserRank +
+                ":candidate=" + loser.CandidateIndex +
+                ":sourceEdge=" + loser.SourceEdgeIndex +
+                ":tie=" + loser.SourceEdgeIndex +
+                ":victim=" + victim +
+                ":foreign=" + foreign;
+            return loser.SourceEdgeIndex;
+        }
+
         private static bool TryAuditCertifiedBaselineAugmentation(
             List<PolygonFace> sourceFaces,
             ChamferTopologyContext context,
@@ -1582,8 +1931,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 materialWidthRecoveryTargets);
             baselineProvisionalEdges.UnionWith(nonMaterialRecoveryEdges);
 
-            ChamferPlaneRetentionTrialOutcome certifiedBaseline =
-                EvaluateChamferPlaneRetentionTrial(
+            List<EdgeWearEdgeLifecycleRecord> rankedOrdinary =
+                BuildRankedOrdinaryBevelRecords(coverageAudit);
+            SortedSet<int> rankedDeferred =
+                new SortedSet<int>(baselineProvisionalEdges);
+            List<string> rankedDiscardEvidence = new List<string>();
+            ChamferPlaneRetentionTrialOutcome certifiedBaseline = null;
+            int rankedDiscardAttempts = 0;
+            int maximumRankedDiscardAttempts = rankedOrdinary.Count;
+            while (true)
+            {
+                certifiedBaseline = EvaluateChamferPlaneRetentionTrial(
                     sourceFaces,
                     context,
                     recipe,
@@ -1591,9 +1949,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     coverageAudit,
-                    baselineProvisionalEdges,
-                    true,
+                    rankedDeferred,
                     false);
+                if (certifiedBaseline.FullyValid)
+                {
+                    break;
+                }
+                if (rankedDiscardAttempts >=
+                    maximumRankedDiscardAttempts)
+                {
+                    break;
+                }
+
+                int loserEdge = SelectRankedOrdinaryBevelLoser(
+                    rankedOrdinary,
+                    rankedDeferred,
+                    certifiedBaseline.PlaneAudit,
+                    certifiedBaseline.Blocker,
+                    out string discardEvidence);
+                if (loserEdge < 0 || !rankedDeferred.Add(loserEdge))
+                {
+                    break;
+                }
+                rankedDiscardAttempts++;
+                rankedDiscardEvidence.Add(discardEvidence);
+            }
             if (!certifiedBaseline.FullyValid)
             {
                 blocker = string.IsNullOrEmpty(certifiedBaseline.Blocker)
@@ -1607,8 +1987,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 winningAudit.AugmentationAttempted = 0;
                 winningAudit.AugmentationApplied = 0;
                 winningAudit.AugmentationFailure = blocker;
+                winningAudit.RankedDiscardAttemptCount =
+                    rankedDiscardAttempts;
+                winningAudit.RankedDiscardAppliedCount =
+                    rankedDeferred.Count - baselineProvisionalEdges.Count;
+                winningAudit.RankedDiscardEvidence =
+                    rankedDiscardEvidence.Count == 0
+                        ? "none"
+                        : string.Join("|", rankedDiscardEvidence);
                 return false;
             }
+            certifiedBaseline.PlaneAudit.RankedDiscardAttemptCount =
+                rankedDiscardAttempts;
+            certifiedBaseline.PlaneAudit.RankedDiscardAppliedCount =
+                rankedDeferred.Count - baselineProvisionalEdges.Count;
+            certifiedBaseline.PlaneAudit.RankedDiscardEvidence =
+                rankedDiscardEvidence.Count == 0
+                    ? "none"
+                    : string.Join("|", rankedDiscardEvidence);
 
             bool recoveryRequested =
                 materialWidthRecoveryTargets.Count > 0 ||
@@ -1664,6 +2060,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     materialWidthRecoveryTargets);
             ChamferPlaneRetentionTrialOutcome recoveryBaseline =
                 materialSummary.Winner ?? certifiedBaseline;
+            if (recoveryBaseline != null &&
+                recoveryBaseline != certifiedBaseline)
+            {
+                recoveryBaseline.PlaneAudit.RankedDiscardAttemptCount =
+                    certifiedBaseline.PlaneAudit.RankedDiscardAttemptCount;
+                recoveryBaseline.PlaneAudit.RankedDiscardAppliedCount =
+                    certifiedBaseline.PlaneAudit.RankedDiscardAppliedCount;
+                recoveryBaseline.PlaneAudit.RankedDiscardEvidence =
+                    certifiedBaseline.PlaneAudit.RankedDiscardEvidence;
+            }
             bool materialPhaseTerminal = materialSummary.Cancelled ||
                 materialSummary.TimeBudgetExceeded;
 
@@ -1830,7 +2236,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableFaceArea,
                         coverageAudit,
                         forced,
-                        false,
                         true);
                 CopyMaterialWidthRecoveryExecutionEvidence(
                     coverageAudit,
@@ -2098,7 +2503,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         minimumStableFaceArea,
                         sourceCoverage,
                         forced,
-                        false,
                         true);
                 bool trialCompleted =
                     IsMaterialWidthRecoveryTrialCompleted(outcome);
@@ -2268,8 +2672,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             ChamferPlaneRetentionTrialOutcome outcome)
         {
             return outcome != null &&
-                (outcome.CornerStats.ConflictSearchCancelled != 0 ||
-                 outcome.PlaneAudit.CoexistenceSearchCancelled != 0);
+                (outcome.CornerStats.ConflictSearchCancelled != 0);
         }
 
         private static bool
@@ -2278,9 +2681,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         {
             return outcome != null &&
                 (outcome.CornerStats.ConflictSearchTimeBudgetExceeded != 0 ||
-                 outcome.PlaneAudit.SolveTimedOut != 0 ||
-                 outcome.PlaneAudit
-                     .CoexistenceSearchTimeBudgetExceeded != 0);
+                 outcome.PlaneAudit.SolveTimedOut != 0);
         }
 
         private static bool IsMaterialWidthRecoveryTrialCompleted(
@@ -2293,9 +2694,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
             return outcome.CornerStats.ConflictSearchCancelled == 0 &&
                 outcome.CornerStats.ConflictSearchTimeBudgetExceeded == 0 &&
-                outcome.PlaneAudit.SolveTimedOut == 0 &&
-                outcome.PlaneAudit.CoexistenceSearchCancelled == 0 &&
-                outcome.PlaneAudit.CoexistenceSearchTimeBudgetExceeded == 0;
+                outcome.PlaneAudit.SolveTimedOut == 0;
         }
 
         private static string ResolveIncompleteMaterialWidthRecoveryTrialReason(
@@ -2305,18 +2704,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 return "material-width-target-trial-produced-no-outcome";
             }
-            if (outcome.CornerStats.ConflictSearchCancelled != 0 ||
-                outcome.PlaneAudit.CoexistenceSearchCancelled != 0)
+            if (outcome.CornerStats.ConflictSearchCancelled != 0)
             {
                 return "material-width-target-trial-cancelled";
             }
             if (outcome.CornerStats.ConflictSearchTimeBudgetExceeded != 0)
             {
                 return "material-width-target-corner-time-budget-exceeded";
-            }
-            if (outcome.PlaneAudit.CoexistenceSearchTimeBudgetExceeded != 0)
-            {
-                return "material-width-target-coexistence-time-budget-exceeded";
             }
             if (outcome.PlaneAudit.SolveTimedOut != 0)
             {
@@ -2571,7 +2965,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 float minimumStableFaceArea,
                 EdgeWearCoverageAudit sourceCoverage,
                 ICollection<int> forcedDeferredEdges,
-                bool allowKernelConflictSearch,
                 bool validateRenderChannels)
         {
             ChamferPlaneRetentionTrialOutcome outcome =
@@ -2614,7 +3007,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     minimumStableEdgeLength,
                     minimumStableFaceArea,
                     outcome.Coverage,
-                    allowKernelConflictSearch,
                     out outcome.PreviewSoup);
             }
             catch (InvalidOperationException exception)

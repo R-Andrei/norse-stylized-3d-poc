@@ -48,8 +48,9 @@ P12e exposes two independent runtime comparisons while preserving the former res
 ```text
 Foam > Runtime & Quality
   Material Transport Scheme
-    Donor Cell (Current)
+    Donor Cell
     TVD Superbee
+    Bulk-Phase Residual TVD (accepted serialized default)
 
 Foam > Layer E — Rendering > General Composition
   Presence Footprint
@@ -57,11 +58,11 @@ Foam > Layer E — Rendering > General Composition
     Presence-Amplitude
 ```
 
-`Donor Cell` retains the exact first-order packed-state face donor. `TVD Superbee` uses bounded monotonic interior-face reconstruction and the existing CFL/substep contract; it carries Presence, Presence×Remaining Life, and Presence×Pattern through the same conservative face flux and does not alter closed faces or endpoint outflow.
+`Donor Cell` retains the exact first-order packed-state face donor. `TVD Superbee` uses bounded monotonic interior-face reconstruction and the existing CFL/substep contract; it carries Presence, Presence×Remaining Life, and Presence×Pattern through the same conservative face flux and does not alter closed faces or endpoint outflow. D3's three-pass FCT selections were rejected because they remained visibly diffuse while increasing dispatch and memory cost; their runtime resources and selectable enum values were removed by D4. D5 also removes the rejected `Nearest-Characteristic` branch. `Bulk-Phase Residual TVD` is the accepted production transport because it preserves the one-dispatch/no-extra-field budget while removing the dominant shared downstream motion from repeated neighbour averaging.
 
 `Current` retains the accepted Layer E footprint mapping. `Presence-Amplitude` caps the resolved base footprint by committed Presence before the existing opaque patterned-body evaluation. It does not change Layer C material, Remaining Life, Film, Shape, sources, colour, lighting, or final composition controls.
 
-Both controls are serialized, independent, and rebound live. They add no textures, buffers, kernels, dispatches, cache contract, topology work, or Debug View. P12 snapshot/sweep reports include the selected values. Unity import succeeded; Presence-Amplitude is retained for further visual testing, while TVD selection remains open.
+Both controls are serialized, independent, and rebound live. Every current transport selection dispatches exactly one full-field material kernel per CFL substep and allocates no transport-specific full-field texture. `Bulk-Phase Residual TVD` adds only scalar phase/shift state and two material-property values for previous/current presentation phase. No mode changes cache topology or adds a Debug View. P12 snapshot/sweep and Coverage reports include the selected values. Visual compactness and the D5 performance/accounting evidence are accepted. The one-time D5 ABBA suite is retired from the Inspector; its result is frozen below.
 
 
 ### Mode-specific Chip-edge ownership — P12g/P12j
@@ -3556,7 +3557,7 @@ Final Foam consumes an ordinary fixed-step temporal blend of the previous/curren
 
 `4.11C.5.16E.2` remains the accepted no-backtrace architecture. P12a adds only ordinary interpolation between the two already committed Layer C states so the 8/12/16 Hz material cadence is not exposed as hard edge changes; it does not reconstruct velocity or move the sample coordinate. Final Foam keeps both reversible visibility policies, the supported-aging minimum is `0.05`, and lifecycle aging is quantized once per complete material tick rather than once per CFL substep. `_FoamShapeMask` remains diagnostic-only.
 
-The current unresolved issue is a visibility discrepancy, not an ownership rewrite: Final Foam appears to hide more support than same-frame Layer C `Material Presence` and `Material Remaining Life` suggest. The next work must compare the complete existing Layer C → Layer D → Layer E chain and identify the first diverging mask. Until then, source amount, lifecycle, transport, and cache ownership remain protected from speculative retuning.
+The former visibility discrepancy is resolved diagnostically. Material Coverage and the Visibility Pipeline Composite proved that `Concentration + Lifetime` hid a broad low-Coverage footprint already present in Layer C. `Lifecycle-Faithful` exposes that state honestly; it did not create the blob. The active blocker is therefore Layer C transport compactness: under-resolved ribbons widen while their integrated packed material remains broadly conserved. D4 preserves Layer C ownership and tests two one-dispatch, zero-extra-field transport alternatives under an absolute no-regression performance ceiling.
 
 The accepted R1–R5 Inspector redesign is the current Layer F tooling contract. `4.11C.5.16E.3 — Transport Presence Capacity-Loss Attribution Audit` is Unity-validated and accepted. It uses `Runtime Diagnostics > Foam > Layer C — Material & Lifecycle > Transport Accounting` and changes no transport, lifecycle, source, Layer D, or rendering behavior.
 
@@ -4327,6 +4328,14 @@ This deliberately prevents weak dying material from suppressing a fresh event. I
 
 Donor Cell transports the complete packed donor state. TVD Superbee limits/reconstructs Coverage alone and re-encodes the donor's coherent intrinsic state at the reconstructed Coverage. Conservative flux then moves Coverage and all material moments together. Uniform material retains its decoded Presence/Life through numerical diffusion; cells mixing different material decode explicit moment-weighted values.
 
+D3 adds two explicitly experimental transport-integrated FCT selections. They use Donor Cell as the bounded low-order state and derive signed correction mass from a Lax-Wendroff target minus the Donor flux on each open interior east/north face. A multidimensional cell limiter accepts only the correction mass permitted by the current-cell/neighbour Coverage extrema and resolved valid-fluid capacity. Every accepted Coverage correction uses the actual correction donor's decoded `P/L/M` and one shared face limiter, so the equal-and-opposite packed transfer remains:
+
+```text
+ΔPackedMass = ΔCoverageMass × (P, P×L, P×M, 1)
+```
+
+The Low and Medium modes use fixed correction scales `0.35` and `0.70`. They are diagnostic candidates, not authoring controls or accepted defaults. Their temporary resources exist only while either experimental mode is selected.
+
 Unit capacity and the valid-fluid boundary own maximum Coverage. Convergent capacity resolution and valid-fluid clipping both reduce Coverage coherently and re-encode the same intrinsic Presence, Life, and Pattern; neither independently saturates packed moments or reinterprets a boundary fraction as intrinsic material.
 
 ### Final visibility
@@ -4351,6 +4360,154 @@ The three policies are co-located under `Foam > Transport & Visibility Contract`
 ### Preserved ownership
 
 Negative topology and all aging rates remain unchanged. The original analytical Candidate, soft Eligibility, accepted soft-mask Chipping reconstruction, and structural Strand order remain Layer E authorities. P13A adds no resource, cadence, pass, or draw-call dependency.
+
+### RIVER-FOAM-TRANSPORT-D1 ribbon compactness diagnostic contract
+
+The visibility audit established that `Concentration + Lifetime` can hide broad fractional Coverage while `Lifecycle-Faithful` exposes it. That does not by itself determine whether the exposed support is correct. The active transport question is whether the Layer C finite-volume solve preserves a thin ribbon footprint or conserves only integrated packed material while spreading its support across progressively more cells.
+
+For scalar Coverage, the conservative update is:
+
+```text
+M_i^n = C_i^n A_i
+M_i^(n+1) = M_i^n - Δt (F_e - F_w + F_n - F_s)
+C_i^(n+1) = clip(M_i^(n+1) / A_i, 0, validFluid_i)
+```
+
+This guarantees neither constant support width nor constant interface thickness. At an isolated one-cell maximum the Superbee backward and forward differences have opposite signs, so the limited slope is zero and the first update is the Donor Cell update. A one-cell ribbon can therefore become multiple fractional cells while preserving integrated Coverage. Presence, Life, and Pattern remain coherent because all packed moments use the same face flux.
+
+`RIVER-FOAM-TRANSPORT-D1` adds an explicit Editor-only CPU diagnostic mirror; it does not modify the production solver. One Inspector action runs three bounded matrices:
+
+1. a one-dimensional intrinsic-diffusion matrix with `144` parameter cases and `720` checkpoint rows across Donor Cell/Superbee, 1/2/4/8-cell widths, full/quarter-cell initial Coverage, CFL `0.10–0.90`, and travel `0.25–4 m`;
+2. a Cartesian two-dimensional matrix with `108` parameter cases and `324` checkpoint rows across both schemes, flow-aligned/cross-flow ribbons, 1/2/4-cell widths, downstream/lateral/diagonal velocity, CFL `0.25/0.50/0.75`, and travel `0.5–2 m`;
+3. a current live-field matrix with up to `108` parameter cases and `324` checkpoint rows when all three automatically selected open, high-lateral, and obstacle-influenced anchors resolve, comparing anchor-resolved downstream-only frozen-local-uniform, live-downstream-only, and complete live velocity.
+
+Live travel checkpoints integrate Coverage-mass-weighted mean speed rather than maximum cell speed. Every checkpoint records integrated Coverage error, peak Coverage, support at `C = 0.02/0.10/0.20/0.30/0.50`, Coverage-weighted centroid error, covariance-derived designated thickness/length, principal minor/major extents, connected components at `C = 0.10`, and low-Coverage tail fractions. The covariance includes each cell's finite interior second moment (`Δ²/12`), so a single occupied cell measures one cell of thickness rather than zero.
+
+The comparison contract is diagnostic:
+
+```text
+1D growth                    -> intrinsic scheme diffusion
+2D minus corresponding 1D   -> orientation and split-axis effects
+frozen live-field growth    -> fixed-metric/valid-fluid geometry
+downstream-only minus frozen -> downstream-speed gradients and slowdown
+complete-live minus downstream-only -> lateral intent, shear, and routing
+1-cell versus wider ribbons -> resolution dependence
+C=0.25 versus C=1.0          -> subcell-amplitude dependence
+```
+
+The suite runs only from an explicit Play Mode button, performs no GPU readback, adds no per-frame work, never seeds or advances live Foam state, and writes one report under `Library/RiverFoamDiagnostics`. It is an Editor-only scalar Coverage CPU mirror rather than a synthetic GPU dispatch: intrinsic Presence, Remaining Life, and Pattern are held uniform because production transports all packed moments through the same face flux. This isolates footprint deformation but does not replace Unity compilation or future GPU parity evidence. Its output is evidence for a later solver decision; it must not automatically select compression, geometric VOF, higher resolution, or a Lagrangian representation.
+
+
+### RIVER-FOAM-TRANSPORT-D2 conservative compactness tournament contract
+
+D1 proved that the current transport is conservative but not compactness-preserving. D2 remains Editor-only and diagnostic. It adds no production kernel, resource, serialized control, runtime selection, or default change.
+
+The supplied repository does not contain the deleted `4.11C.5.4c` predictor/corrector/compression implementation. The only surviving evidence is the removal tombstone in `CS_RiverFoam.Transport.hlsl` and the corresponding deleted-runtime placeholders. D2 therefore does not restore, approximate, or attribute behavior to that historical path.
+
+For every valid cell:
+
+```text
+V_i = resolved valid-fluid capacity
+C_i = Coverage
+q_i = C_i / V_i
+M_i = C_i A_i
+```
+
+After each mirrored TVD Superbee transport substep, a candidate may request an equal-and-opposite mass transfer across an interior open face. Transfer direction is always from the lower normalized fill toward the higher normalized fill. No candidate creates or deletes requested mass.
+
+Normal interface-compression candidate:
+
+```text
+q_f = 0.5 (q_a + q_b)
+D_face = s_n CFL [4 q_f (1 - q_f)] min(V_a A_a, V_b A_b)
+```
+
+Flux-corrected anti-diffusive candidate:
+
+```text
+D_face = s_a CFL |q_b - q_a| min(V_a A_a, V_b A_b)
+```
+
+`D_face` is only a desired transfer. Before application, D2 accumulates every cell's total requested outflow and inflow. Donor scale is limited by available mass; receiver scale is limited by remaining valid-fluid capacity. Each final face transfer uses the smaller donor/receiver scale, then all faces apply simultaneously. The required invariants are:
+
+```text
+Σ M_after = Σ M_before
+0 <= C_i <= V_i
+closed face => zero transfer
+zero-mass gap => no bridge source
+uniform q => zero correction
+binary 0/1 interface => zero correction unless a partial receiving capacity exists
+```
+
+The candidate ledger is intentionally bounded:
+
+- baseline TVD Superbee;
+- normal compression strengths `0.25 / 0.50 / 0.75`;
+- anti-diffusion strengths `0.15 / 0.30 / 0.45`;
+- one hybrid candidate `normal 0.35 + anti-diffusion 0.20`.
+
+Uniform synthetic cases compare every candidate against an exact geometric reference. The reference translates the original axis-aligned ribbon analytically and rasterizes its exact overlap with each base cell; it therefore owns the zero-diffusion target without requiring a numerical solver. Selected cases also run current Superbee at `2×` and `4×` linear resolution and conservatively downsample to the base lattice. These references expose what resolution alone buys without proposing the resulting cell-count cost as a default.
+
+D2 retains all D1 global measurements and adds local branch evidence at `C >= 0.10`. For every supported cell, contiguous support is measured along horizontal, vertical, and both diagonal axes; the minimum physical run is that cell's local thickness. The report records median, P95, maximum, support compactness, and:
+
+```text
+separation excess = max(0, global designated thickness - local P95 thickness)
+```
+
+This separates branch displacement/splitting from actual local blob thickening more honestly than global covariance alone.
+
+The tournament contains four evidence layers:
+
+1. deterministic candidate self-checks for conservation, bounds, uniform/binary invariance, partial valid-fluid capacity, zero-gap non-bridging, and repeatability;
+2. synthetic exact-reference transport across both orientations, 1/2/4-cell widths, full/quarter Coverage, downstream/lateral/diagonal velocity, low/production/high CFL, and `0.5/1/2 m` travel;
+3. correction-only adversarial topology for parallel separated ribbons, detached blobs, an L bend, a Y split, a hollow ring, checkerboard input, and a smooth fractional hump;
+4. captured live-field transport for baseline plus the two strongest non-baseline synthetic candidates at the D1 open-low-lateral, open-high-lateral, and obstacle-influenced anchors.
+
+The provisional diagnostic targets after `1 m` in open uniform transport are:
+
+```text
+initial width 1 cell: local P95 growth <= 1.50
+initial width 2 cells: local P95 growth <= 1.25
+initial width 4 cells: local P95 growth <= 1.15
+absolute mass error ratio < 0.001
+centroid error < 0.5 base cell
+no negative Coverage, capacity excess, or unexpected component change
+```
+
+The report ranks candidates from exact-reference error, centroid error, local-thickness growth, mass/bounds, topology mismatches, and target failures. Ranking only chooses which candidates receive the expensive live-field matrix. It does not change production and is not an approval. D2 evidence rejected the isotropic post-transport correction as a production design: weak anti-diffusion improved compactness but retained excessive thickness and introduced phase/topology errors, while stronger normal/hybrid variants snapped or fragmented material.
+
+D2's original synchronous Inspector execution is superseded by D3. The same evidence matrix now advances as a cooperative main-thread state machine with a `4 ms` target slice. It exposes stage, current case, progress, elapsed time, ETA, Pause/Resume, and Cancel; it writes partial checkpoints under `Library/RiverFoamDiagnostics`; cancellation, disable, destruction, or Play Mode exit preserve completed rows instead of blocking or discarding them. One indivisible bounded operation may exceed the target slice and the final report records the slowest observed slice and its case. D1 remains accepted historical evidence; its synchronous Inspector launch is retired so no legacy long-running diagnostic remains user-launchable without the responsive job contract.
+
+
+### RIVER-FOAM-TRANSPORT-D3 transport-integrated FCT experiment
+
+D3 tests whether anti-diffusion tied to the actual advective face flux can preserve compactness more honestly than D2's generic post-pass. The experiment adds no new birth, lifecycle, visibility, rendering, cache, topology, or default behavior. Donor Cell and TVD Superbee remain the existing one-dispatch paths. Only the two explicitly experimental FCT selections use the following three-pass material substep:
+
+1. `BuildFctLowOrder`
+   - execute the existing Donor Cell packed flux into a temporary low-order state;
+   - write signed Lax-Wendroff-minus-Donor Coverage correction mass for each open east/north face;
+   - preserve ordinary open longitudinal endpoint outflow in the low-order solve; correction faces exist only between two valid simulation cells.
+2. `BuildFctLimiter`
+   - derive local Coverage lower/upper bounds from the current cell and open valid neighbours;
+   - clamp the upper bound to resolved valid-fluid capacity;
+   - accumulate every requested positive/negative correction contribution and calculate `R+ / R-` acceptance ratios.
+3. `ApplyFctCorrection`
+   - choose one face coefficient from donor-removal and receiver-addition capacity;
+   - apply equal-and-opposite packed correction mass to the low-order state;
+   - execute the existing transport accounting and lifecycle/topology write exactly once on the final corrected state.
+
+The authoritative equations are:
+
+```text
+C_target,f = 0.5(C_- + C_+) - 0.5 λ_f (C_+ - C_-)
+D_f = s_FCT Δt u_f L_f (C_target,f - C_upwind,f)
+α_f(D_f >= 0) = min(R^-_-, R^+_+)
+α_f(D_f <  0) = min(R^+_-, R^-_+)
+```
+
+where `D_f` is signed physical Coverage mass, `L_f` is face length, and `s_FCT` is the fixed Low/Medium experiment scale. Interior face application is equal and opposite; final clamping is a numerical guard rather than the intended compactness mechanism.
+
+Conditional performance cost while FCT is selected is four full-field `ARGBHalf` temporary textures and three compute dispatches instead of the single standard transport dispatch for each CFL substep. Donor Cell and TVD Superbee allocate none of those textures and dispatch none of those kernels. Exact GPU time, temporal stability, one-cell thickness retention, centroid error, topology behavior, and packed-state clamp loss remain pending Unity evidence. Failure of both bounded strengths to preserve a one-cell ribbon near its original local thickness without material hiding or topology damage is the escalation gate for geometric/Lagrangian ribbon representation.
 
 
 ## RG-METRIC-P13B — Packet-rearmed birth and object-contact retention
@@ -4567,18 +4724,329 @@ The later accepted S3.1E.3 shore-wave result also preserves this architecture. I
 
 P13G is documentation-only and has no runtime performance effect. No `PERFORMANCE EXCEPTION` applies.
 
-## Current unresolved rendering investigation
+## Visibility investigation closure and active transport blocker
 
-Final Foam appears to hide more material than the underlying same-frame Presence and Remaining Life evidence suggests. Diagnose this with existing views in ownership order:
+The earlier Final-versus-Presence/Life discrepancy is closed. The established Coverage, Material Amount, Material State Composite, and Visibility Pipeline Composite demonstrated that the first divergence was the concentration visibility base rejecting low Coverage. Chipping was not responsible. `Lifecycle-Faithful` is the diagnostic authority because it reveals the complete living Layer C footprint.
+
+That exposed the underlying blocker: thin ribbons balloon in Layer C itself. The current work must change transport without hiding material, increasing simulation resolution, adding full-field passes/resources, or increasing total river cost. D4 is the active bounded experiment.
+
+
+
+## RIVER-FOAM-TRANSPORT-D4 — zero-regression single-pass transport experiments (historical; superseded by D5)
+
+### Why D4 exists
+
+D1 proved that the accepted scalar finite-volume transport conserves integrated material while widening under-resolved ribbons. D2 proved that generic conservative post-pass compression reduces some spread but introduces centroid shift, neck erosion, and topology damage. D3 tested transport-integrated FCT, but direct Unity Coverage captures showed that both Low and Medium still spread and lower Coverage intensity. D3 also violated the project performance direction by using three full-field dispatches and four full-field temporary `ARGBHalf` textures while selected. The D3 algorithms are therefore rejected on both visual and performance grounds.
+
+The D4 performance contract is absolute:
 
 ```text
-Material Presence
-Material Remaining Life
-Material Pattern
-Foam Evaluated Shape / evaluated preview
-Foam Chip And Strand Probe
-Final Foam
+material dispatches per CFL substep <= TVD Superbee baseline (one)
+additional full-field transport textures = zero
+serialized default remains Donor Cell
+no birth/lifecycle/visibility/topology/cache rewrite
+candidate acceptance requires measured GPU mean and P95 <= TVD Superbee
 ```
 
-The first divergent stage owns the next patch. Likely review points are Final Visibility, Presence Footprint, lifecycle gating, patterned erosion/hardening, Layer D shape use, Chipping, Strands, opacity/colour composition, and shoreline edge coverage. Do not increase births or lifetime merely to compensate for a later render mask.
+D4 deliberately does not add a strength control. It exposes two algorithmically distinct one-pass experiments so visual and cost evidence can select or reject them without producing another tuning surface.
 
+### Candidate A — Bulk-Phase Residual TVD
+
+The resolved longitudinal velocity is decomposed as:
+
+```text
+u(x,y) = Ubulk + uresidual(x,y)
+```
+
+`Ubulk` is the current configured base Foam downstream speed with river-flow sign. Its displacement is accumulated as one signed scalar phase in cell units:
+
+```text
+phase += sign(flow) * Ubulk * dt / dx
+integerShift = trunc_toward_zero_when_abs_phase_at_least_one(phase)
+phase -= integerShift
+```
+
+The existing ping-pong material dispatch reads the old packed state at `destinationX - integerShift`, then applies the existing TVD Superbee face solve only to residual longitudinal velocity and lateral/routing velocity. In open valid water the residual longitudinal component is approximately zero. Near slowdown/contact fields it becomes negative relative motion, allowing obstacle-adjacent material to lag behind the rigid bulk translation without numerically advecting the shared speed every tick.
+
+The fractional phase is not discarded. Previous/current phase values are bound with the previous/current committed textures and applied as separate longitudinal sample offsets before temporal interpolation. Manual and automatic births evaluate their physical longitudinal position with the same current phase, so newly born material remains world-aligned instead of inheriting a presentation offset. The phase remains attached to the persistent state if the user changes transport modes; only the Bulk-Phase candidate advances it. Resource rebuild/reset returns it to zero.
+
+Open-water Motion Lane sampling is streamwise-coherent in this candidate: it samples one shared centre-row lane value across the river width, while existing obstacle routing remains spatially local. This tests whether a ribbon can bend/translate coherently without cross-width lane divergence fanning it into a blob. No lane texture, pass, or dispatch is added.
+
+Known experiment boundaries:
+
+- integer cell transfer is exact-copy rather than conservative geometric remap across changing metric/boundary capacity;
+- partial-cell valid-fluid boundaries may clip shifted material;
+- the fractional presentation phase adds a small fragment-shader coordinate offset and must be included in the GPU benchmark;
+- it is not accepted until births, obstacle lag, reverse flow, endpoint outflow, and previous/current interpolation are visually verified.
+
+### Candidate B — Nearest-Characteristic
+
+The shared base downstream component uses the same scalar phase and whole-cell state shift as Candidate A. The remaining longitudinal/lateral characteristic displacement is converted to an integer source offset through a deterministic low-discrepancy temporal sequence:
+
+```text
+dresidual = uresidual * dt / spacing
+thresholdAxis = frac((sequenceIndex + 1) * goldenRatio + axisOffset)
+offsetAxis = sign(dresidual) * (floor(abs(dresidual)) +
+    (frac(abs(dresidual)) > thresholdAxis ? 1 : 0))
+stateNext(destination) = statePrevious(destination - offset)
+```
+
+Uniform subcell residual motion therefore crosses a cell on the correct long-term fraction of material ticks without requiring a per-cell phase texture. A naive nearest backtrace was explicitly rejected during implementation because the production per-tick displacement is normally below half a cell and would otherwise leave material stationary forever. Coverage, Presence amount, Remaining-Life moment, and Pattern moment move together. Lifecycle still executes exactly once on the final substep. The method intentionally gives up strict finite-volume conservation: multiple destinations can select one source and some sources can be skipped. Its purpose is to test whether stable thin silhouettes and lower texture-read cost are preferable to conservative numerical diffusion for this stylized system.
+
+The candidate adds no texture and no dispatch. Compared with TVD Superbee it removes four face solves, neighbour reconstruction loads, and limiter arithmetic from the hot path. The existing transport accounting will expose duplication/loss as before/after discrepancy rather than concealing it.
+
+Known experiment boundaries:
+
+- divergent/convergent fields can duplicate or lose packed material;
+- temporally rounded cell crossings can step or pulse, although the low-discrepancy sequence avoids permanent sub-half-cell stasis;
+- obstacle/bank source selection may create holes;
+- it is rejected if material gain/loss, jitter, or topology artifacts are more objectionable than TVD spread.
+
+### Responsive validation ownership
+
+The default validation action is now `Transport Quick Gate`, not the exhaustive D2 tournament. It measures the currently selected transport mode for ten seconds using existing steady-state work accounting, then requests the existing Coverage/Visibility diagnostic through `AsyncGPUReadback`. The job changes no setting, blocks no frame, can be cancelled immediately, and produces one copied report containing:
+
+- selected transport mode;
+- observed duration;
+- one-dispatch/zero-extra-texture structural contract;
+- existing material dispatch/cell-iteration/CPU-submission accounting;
+- same-state Coverage histogram and integrated material/life evidence.
+
+The D2 exhaustive matrix remains available only as a clearly labelled optional historical post-pass comparison. It is cooperative, pausable, cancellable, and checkpointed, but it does not test either D4 runtime candidate and must not be used as the default D4 gate.
+
+The Quick Gate does not claim GPU time. Final performance acceptance requires identical-state Unity GPU Profiler captures for TVD Superbee, Bulk-Phase Residual TVD, and Nearest-Characteristic. A candidate is accepted only when both mean and P95 Foam cost are no higher than TVD; values within measurement noise are not sufficient evidence.
+
+### D4 pending acceptance — closed by D5 evidence
+
+- Unity C# and compute/shader compilation.
+- Forward and reverse-flow phase direction.
+- Birth alignment while fractional phase is nonzero.
+- State continuity when switching among all four transport modes.
+- One-cell horizontal/vertical thickness at birth, 1 m, and 2 m.
+- Coverage gain/loss and topology under Nearest-Characteristic.
+- Obstacle routing and endpoint behavior under both candidates.
+- Quick Gate responsiveness/cancellation/readback completion.
+- GPU mean/P95 comparison against TVD Superbee.
+
+No D4 candidate is a production default. `DonorCell` remains the serialized initializer, and TVD Superbee remains the accepted comparison control.
+
+
+## RIVER-FOAM-TRANSPORT-D5 — Bulk-Phase acceptance and diagnostic consolidation
+
+### Decision boundary
+
+D5 does not introduce another transport algorithm. Runtime evidence rejected `Nearest-Characteristic` completely and showed that `Bulk-Phase Residual TVD` is the only candidate worth finishing. The remaining decision is narrow and factual:
+
+1. does Bulk-Phase preserve the visually accepted thin-ribbon behavior across the current live river;
+2. does it stay within the absolute performance ceiling of TVD Superbee;
+3. does transport accounting remain inside the accepted conservation and capacity-loss gates.
+
+No spawning, lifetime, Coverage, Presence, Pattern, visibility, topology, cache, or final-render default is changed by this patch. Spawn recalibration remains blocked until transport acceptance is complete, because births were previously tuned around transport diffusion and visibility suppression.
+
+### Rejected branch removal
+
+`Nearest-Characteristic` is removed from the serialized transport enum, Inspector contract text, runtime parameters, C# setup, and compute path. Existing serialized integer value `3` now resolves through the existing fallback to `Donor Cell`; it is not reassigned to another experiment. The following rejected implementation state is removed:
+
+- temporal crossing sequence index;
+- nearest-characteristic HLSL helpers;
+- nearest source-cell transport branch;
+- nearest-specific Inspector and diagnostic labels.
+
+This reduces code and shader branching rather than leaving a failed selectable mode in the production authoring surface.
+
+### One-button acceptance suite
+
+The former per-mode ten-second Quick Gate is replaced by one `TVD vs Bulk-Phase Acceptance Suite` action. One click runs the complete comparison and a second button copies the report.
+
+The suite is a cooperative frame-driven state machine. It contains no synchronous loop, thread wait, sleep, blocking readback, or multi-minute CPU matrix. The Editor remains interactive at every stage, and explicit cancellation restores the authored transport selection immediately while preserving completed blocks.
+
+The sequence is ABBA:
+
+1. TVD warmup A — 3 seconds;
+2. TVD measurement A — 10 seconds;
+3. Bulk-Phase warmup A — 3 seconds;
+4. Bulk-Phase measurement A — 10 seconds;
+5. Bulk-Phase warmup B — 3 seconds;
+6. Bulk-Phase measurement B — 10 seconds;
+7. asynchronous Bulk-Phase Coverage report;
+8. TVD warmup B — 3 seconds;
+9. TVD measurement B — 10 seconds;
+10. asynchronous TVD Coverage report;
+11. restore the authored transport selection and finalize the report.
+
+ABBA ordering reduces monotonic scene-drift and thermal-order bias without pretending that the live field is rewound. The suite deliberately does not clear, reseed, hold, or restore the persistent Foam state; it measures the real current scene. The report states this limitation explicitly.
+
+### Evidence captured per block
+
+Each ten-second block records:
+
+- Unity `FrameTimingManager` GPU frame time when supported;
+- CPU total, main-thread, render-thread, and Present-wait timing;
+- Unity unscaled frame delta as a universal fallback;
+- exact material step, dispatch, cell-iteration, CFL/substep, and CPU submission accounting;
+- latest packed Amount/Life/Pattern conservation error;
+- Capacity/Clamp loss and unit/boundary/obstacle attribution;
+- capacity-hit counts.
+
+The last Bulk-Phase block and last TVD block additionally capture the existing non-blocking Coverage/Visibility report. Reports are stored under `Library/RiverFoamDiagnostics/` and are copyable/revealable from the Inspector.
+
+`FrameTimingManager` measures the complete frame, not one compute dispatch. That is intentional: the hard user contract is total river cost, and a transport mode that indirectly increases rendered Foam cost is not allowed to hide behind dispatch-only timing. The report still includes exact structural parity so a whole-frame result can be interpreted correctly.
+
+### Performance verdict contract
+
+Bulk-Phase is accepted only when all of the following hold:
+
+- one material dispatch per CFL substep remains true;
+- no additional full-field transport resource exists;
+- at least 120 nonzero GPU timing samples are captured for each mode;
+- Bulk-Phase P95 GPU frame time is no higher than TVD P95;
+- the upper approximate 95% confidence bound for `Bulk mean - TVD mean` is at or below zero;
+- transport conservation and Capacity/Clamp evidence is reviewed against the existing targets;
+- the already-observed visual compactness remains acceptable.
+
+If GPU timing is unsupported or the strict confidence condition is not met, the suite reports `INCONCLUSIVE`; it never silently promotes the candidate. A measured regression over the one-percent ceiling produces `FAIL`.
+
+### Obsolete test-suite removal
+
+The following transport diagnostics are retired from the Inspector and reduced to tombstones so they cannot be launched or add runtime/editor logic:
+
+- D1 synchronous Ribbon Transport Preservation matrix;
+- D2 Conservative Compactness Tournament and cooperative job;
+- D4 per-selected-mode Transport Quick Gate.
+
+Their conclusions remain in this canonical document. The unrelated P12 grid/cadence candidate sweep remains because it validates a different architectural decision and is not part of the retired transport-compactness experiments.
+
+### D5 unresolved decision
+
+Only one decision remains: accept or reject Bulk-Phase from the copied D5 report plus the user's visual assessment. If accepted, remove the `Experimental` label in a subsequent freeze patch and then recalibrate births per source family. If rejected, do not revive Nearest, FCT, D1, or D2; return to transport architecture under the same zero-regression ceiling.
+
+
+## RIVER-FOAM-TRANSPORT-D6 — Bulk-Phase promotion, acceptance freeze, and spawn-pack audit
+
+### Accepted production transport
+
+`Bulk-Phase Residual TVD` is promoted from experimental candidate to the production Layer C transport baseline. Enum value `2` is retained, so existing serialized selections remain valid. The Inspector label no longer says Experimental, and new `StylizedRiver` instances initialize to Bulk-Phase. `Donor Cell` and `TVD Superbee` remain explicit rollback/reference selections.
+
+The accepted D5 evidence was:
+
+- same structural budget as TVD: one material dispatch per CFL substep, one substep at the measured `0.434` CFL, and zero additional full-field transport textures/buffers;
+- aggregate GPU mean `3.605662 ms` versus TVD `3.603349 ms`, a measured difference of `+0.002313 ms / +0.064%`;
+- aggregate GPU P95 `4.005222 ms` versus TVD `3.985664 ms`, a difference of `+0.019558 ms / +0.491%`;
+- approximate 95% mean-difference interval `[-0.011976, +0.016603] ms`; its upper bound is approximately `+0.461%` of the TVD mean, below the project's hard 1% regression ceiling;
+- Bulk maximum unaccounted Material Amount error `0.103%`, below the `0.250%` review threshold;
+- Bulk Capacity/Clamp loss `0.156–0.174%`, lower than the two TVD blocks (`0.181–0.283%`) even though the old absolute aspirational `0.100%` target was not met by either mode;
+- direct Material Coverage review accepted the major visual result: uniform downstream movement no longer balloons thin packets through repeated full-speed neighbour averaging.
+
+This is a user-approved production decision. Do not reopen Nearest-Characteristic, FCT, post-pass compression, D1, or D2 as selectable transport alternatives.
+
+### Diagnostic cleanup
+
+The D5 TVD-versus-Bulk one-time acceptance suite is retired after completing its decision. Its Inspector section and runtime lifecycle hooks are removed, and `StylizedRiverFoamRuntime.TransportQuickGate.cs` remains only as a tombstone. The prior D1/D2 tombstones remain documentary only. The unrelated fixed-metric candidate sweep and automatic-birth reveal-speed report remain because they validate different systems.
+
+### Spawn-pack audit: why the accepted transport reveals oversized packs
+
+The remaining abundance problem is not a reason to weaken Coverage visibility or restore transport diffusion. Current automatic births are intrinsically large and can weld together or continually rejuvenate existing material:
+
+1. Shore sources run at up to `5.0 × Activity` events/s. At the default Activity `0.45`, that is `2.25` attempted starts/s across two banks. Shore Ribbon weight is `0.88`. With Patch Size `0.35`, deterministic event scale is approximately `0.287–0.413`; the authored `2.20–7.00 m` range therefore resolves to roughly `3.58–4.18 m` per ordinary shore ribbon before transport. One packet is already several metres long.
+2. Free-water sources run at up to `1.10 × Activity`; default Activity `0.25` gives `0.275` events/s. Mixed weights are Lace `0.30`, Cross-Lace `0.45`, Torn Fragment `0.25`. Lace packets can be `1.40–5.80 m` long, Cross-Lace `0.70–2.40 m`, and Torn Fragments `0.35–1.35 m`.
+3. Every eligible static object participates in contact cycles by default because Object Contact Cycle Coverage is `1.00`. Arc packets contain two downstream arms up to `1.80 m`, Semi-Arcs one arm up to `1.35 m`; the default packet contains two finite strokes, and contact-only reinforcement is enabled every `6 s` while the next full packet waits.
+4. Packet clearance is source-slot-local. Shore and free-water slots wait for their own completed event plus a distance-based gap, and object anchors wait for their own packet clearance. There is no cross-family or neighbouring-slot packet-overlap gate, so distinct packets may be born into paths that later meet.
+5. `FoamMergeBornMaterial` uses `max` Coverage but also applies `max(existing, source)` to Presence and Remaining Life even when the source adds zero new Coverage. An overlapping birth therefore cannot increase Coverage above the larger footprint, but it can rejuvenate the entire existing cell. Repeated contacts can weld separate packets into one long-lived connected pack.
+
+### Highest-impact correction order
+
+The next spawn patch should target local pack size and packet independence, not global river-wide material count:
+
+1. **Added-Coverage-only birth merge.** If `sourceCoverage <= existingCoverage`, preserve the existing packed state instead of refreshing Presence/Life. When source Coverage genuinely extends the footprint, mix only the newly added Coverage fraction into the packed Presence/Life/Pattern moments. This is full-field cost-neutral and directly prevents overlapping packets from indefinitely rejuvenating old connected material.
+2. **Cross-source packet isolation gate.** Before starting a new automatic event, compare its prepared longitudinal/lateral envelope against the at-most-32 active automatic event envelopes. Defer the event or scan another deterministic slot when overlap/separation is below a small packet-gap threshold. This is low-frequency CPU work at birth time, requires no field texture/readback, and prevents adjacent shore/free/object packets from being authored on top of one another. It must be benchmarked, but the fixed 32-event ceiling makes the work strictly bounded.
+3. **Shorter authored packet envelopes while retaining event population.** Reduce source length maxima/minima, not Activity or global source Coverage. Shore Ribbons are the first target because the normal default packet is about four metres and owns 88% of shore events. Free-water Lace is the second target because one event can reach 5.8 m. Keep thin widths and strong initial material; use more short packets rather than fewer weak packets.
+4. **Motion coherence as a separate follow-up.** Bulk-Phase removes dominant downstream numerical spreading, but lateral lane divergence, obstacle slowdown gradients, and routing can still stretch or merge nearby packets. Ordinary open-water lateral intent should remain coherent across packet width; only explicit obstacle routing should create branch separation.
+
+No spawn defaults are changed by D6. The audit establishes the next implementation order so transport promotion and spawn recalibration are not conflated.
+
+## RIVER-FOAM-SPAWN-D7 — packet independence and overlap-safe birth merge
+
+### Accepted transport baseline
+
+`Bulk-Phase Residual TVD` is the production transport baseline. The accepted D5 ABBA evidence showed one material dispatch per CFL substep, no additional full-field transport resource, aggregate whole-frame GPU mean `+0.064%`, P95 `+0.491%`, and an approximate upper 95% mean-regression bound of `+0.461%` versus TVD Superbee. `Nearest-Characteristic` remains permanently rejected. The completed transport acceptance suite and obsolete D1/D2 compactness suites are retired from the Inspector.
+
+### Active problem after transport acceptance
+
+The remaining visual failure is packet scale and packet welding, not a need to hide living material. The desired population may contain many thin pockets, but independent Shore, Object, and Free-Water births must not combine into a few giant connected reservoirs.
+
+D7 therefore changes two ownership rules without editing scenes, prefabs, authored values, simulation cadence, textures, buffers, kernels, dispatch count, or render passes.
+
+### Added-Coverage-only birth merge
+
+The previous Layer C birth merge used max Coverage but independently max-refreshed intrinsic Presence and Remaining Life. A new source could therefore rejuvenate an older cell even when it added no geometric Coverage.
+
+D7 makes the existing scalar-coverage assumption explicit:
+
+```text
+addedCoverage = max(0, sourceCoverage - existingCoverage)
+```
+
+When `addedCoverage` is zero, the existing packed material state is returned unchanged. When the source genuinely adds occupied fraction, only that new fraction contributes material moments:
+
+```text
+existingAmount = existingCoverage * existingPresence
+addedAmount = addedCoverage * sourcePresence
+combinedCoverage = existingCoverage + addedCoverage
+combinedAmount = existingAmount + addedAmount
+
+combinedPresence = combinedAmount / combinedCoverage
+combinedLife =
+    (existingAmount * existingLife + addedAmount * sourceLife) /
+    combinedAmount
+combinedPattern =
+    (existingAmount * existingPattern + addedAmount * sourcePattern) /
+    combinedAmount
+```
+
+This is implemented inside the existing `FoamMergeBornMaterial` call sites. It adds no texture read, no dispatch, and no persistent state. Repeated overlap no longer resets the age or strength of the already occupied fraction.
+
+The scalar field cannot distinguish two disjoint subcell shapes with the same Coverage. D7 therefore preserves the existing max-Coverage union model rather than pretending that hidden subcell geometry exists.
+
+### Shared automatic packet-envelope reservation
+
+Per-slot and per-object clearance alone cannot stop neighbouring source identities or different source families from beginning intersecting packets. D7 adds one bounded CPU-side start filter shared by Shore, Object, and Free-Water automatic events.
+
+Before an automatic event is committed, its already prepared geometry is converted to an axis-aligned envelope in river coordinates:
+
+```text
+longitudinal = global-distance range + reveal trail + feather + one-cell padding
+lateral = prepared source geometry + feather/padding
+```
+
+Shore envelopes sample the live left/right shore at the event start, midpoint, and end. Object contact envelopes include object extents, contact padding, and wake-arm reach. Free-Water envelopes use the prepared centre, longitudinal extent, width, and lateral padding.
+
+A candidate is rejected only when both its longitudinal and lateral intervals overlap an active or recently released reservation. The caller continues its existing bounded deterministic slot/object scan, so another independent location can still start during the same opportunity.
+
+Reservations are fixed-capacity (`64`), allocation-free, and checked only at low-frequency automatic start attempts. They are not scanned per cell or per GPU dispatch. A reservation expires after the source event duration plus the relevant authored Minimum Packet Gap converted through the existing downstream-speed clearance contract.
+
+Contact-only reinforcement from the same Object anchor is the sole intentional overlap exemption. The added-Coverage-only merge still prevents it from rejuvenating already occupied material.
+
+### Diagnostics
+
+The existing Birth Activity diagnostic gains one compact read-only row:
+
+```text
+Shared Packet Separation:
+    active reservations / overlap rejects this update / total overlap rejects
+```
+
+No new action, test suite, foldout, readback, or Inspector control is introduced.
+
+### Scene and serialization contract
+
+D7 does not edit `VisualFrameworkDemo.unity`, any prefab, material, asset metadata, or serialized `StylizedRiver` value. Packet-length and pattern-mix recalibration remains a manual authoring step on the existing river instance after the code correction is validated.
+
+### Performance contract
+
+- Material GPU dispatch count: unchanged.
+- Full-field texture/buffer allocation: unchanged.
+- Simulation cadence and CFL substeps: unchanged.
+- Birth-merge HLSL work: replaces max-refresh operations with a guarded moment blend only when Coverage is genuinely added.
+- Shared envelope work: bounded CPU comparisons only when an automatic start is attempted; no per-frame allocation and no per-cell work.
+
+D7 must be rejected or revised if profiling demonstrates a measurable one-percent river-cost regression, but its structural work is outside the material transport/render hot path.

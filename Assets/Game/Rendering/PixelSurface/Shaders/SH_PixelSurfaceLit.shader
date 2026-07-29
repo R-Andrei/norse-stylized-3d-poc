@@ -45,6 +45,8 @@ Shader "PS3D/Pixel Surface Lit"
         _GeneratedMassOverallRockTint("Overall Rock Tint", Color) = (0.50, 0.50, 0.50, 1)
         _GeneratedMassOverallRockTintStrength("Overall Rock Tint Strength", Range(0, 1)) = 0
         _GeneratedMassLightingTintInfluence("Lighting Tint Influence", Range(0, 1)) = 0.35
+        [HideInInspector] _GeneratedMassSurfaceNormalStrength("Generated Mass Surface Normal Strength", Float) = 0.18
+        [HideInInspector] _GeneratedMassSurfaceNormalScale("Generated Mass Surface Normal Scale", Float) = 1.6
 
         _StoneEdgeWearResponse("Stone Edge Wear Response", Range(0, 1)) = 0.5
         _StoneEdgeWearTint("Stone Edge Wear Tint", Color) = (0.76, 0.74, 0.62, 1)
@@ -196,6 +198,8 @@ Shader "PS3D/Pixel Surface Lit"
                 half4 _GeneratedMassOverallRockTint;
                 float _GeneratedMassOverallRockTintStrength;
                 float _GeneratedMassLightingTintInfluence;
+                float _GeneratedMassSurfaceNormalStrength;
+                float _GeneratedMassSurfaceNormalScale;
                 float _StoneEdgeWearResponse;
                 half4 _StoneEdgeWearTint;
                 float _StoneCreaseResponse;

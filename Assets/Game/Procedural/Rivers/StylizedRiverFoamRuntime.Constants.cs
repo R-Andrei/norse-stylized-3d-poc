@@ -19,23 +19,22 @@ namespace ProgrammaticStylized3D.Rivers
         private const int MediumStructuralResolution = 96;
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
-        private const float MaximumManualReservationSeconds = 300f;
         private const float TopologyMetricsUpdateRate = 8f;
-        private const int FoamCompositionEventCapacity = 8;
         // Patch 4.11C.5.14E separates final automatic source
         // rasterization from the manual/debug injection primitive path. Keep
         // this bounded: source events are authored vocabulary, not particles.
         private const int AutomaticFoamSourceEventCapacity = 32;
-        private const int LowFoamCompositionBirthBudgetPerStep = 2;
-        private const int MediumFoamCompositionBirthBudgetPerStep = 4;
-        private const int HighFoamCompositionBirthBudgetPerStep = 6;
+        // D7 reserves the prepared geometric envelope of active and recently
+        // released automatic packets. This is a bounded CPU-side start filter,
+        // not a particle system and not per-cell simulation work.
+        private const int AutomaticFoamPacketReservationCapacity = 64;
+        private const float AutomaticFoamPacketEnvelopeMinimumPaddingMetres = 0.10f;
         private const int AutomaticBirthDebugCounterCount = 1;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;
         private const float ProgressiveRibbonMaximumDuration = 5f;
         private const float ProgressiveRibbonMinimumTravelDistance = 0.5f;
         private const float ProgressiveRibbonMaximumTravelDistance = 8f;
         private const float ProgressiveRibbonMaximumBendAcross = 0.35f;
-        private const float ManualSourceStrokeAspect = 6.25f;
         private const float ProgressiveRibbonRampInEnd = 0.18f;
         private const float ProgressiveRibbonTaperStart = 0.72f;
         private const float ProgressiveRibbonMinimumHalfWidth = 0.05f;
@@ -46,10 +45,6 @@ namespace ProgrammaticStylized3D.Rivers
         // not collapse the fill into one-texel checkerboard fragments.
         private const float SourceFillMinimumFeatureSizeMetres = 0.20f;
         private const float SourceFillFeatureSizeRadiusMultiplier = 0.65f;
-        private const float ProgressiveSourceFillSeedSalt = 83.173f;
-        private const float ManualSourceFillSeedSalt = 141.919f;
-        private const float ProgressivePatternSeedSalt = 191.447f;
-        private const float ManualPatternSeedSalt = 233.719f;
         private const int ThreadGroupSize = 8;
         private const int TopologyMetricValidFluid = 0;
         private const int TopologyMetricMajorSupport = 1;
@@ -167,7 +162,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float LowMaterialTemporalUpdateRate = 8f;
         private const float MediumMaterialTemporalUpdateRate = 12f;
         private const float HighMaterialTemporalUpdateRate = 16f;
-        private const float ManualTestShapeVariety = 0f;
 
         private const float AutomaticObjectSourceMaximumEventsPerSecond = 3.0f;
         private const int AutomaticObjectSourceMaximumStartsPerUpdate = 2;
@@ -565,6 +559,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamObstacleMinimumDownstreamFactor");
         private static readonly int FoamInterpolationId =
             Shader.PropertyToID("_FoamInterpolation");
+        private static readonly int FoamPreviousBulkPhaseCellsId =
+            Shader.PropertyToID("_FoamPreviousBulkPhaseCells");
+        private static readonly int FoamCurrentBulkPhaseCellsId =
+            Shader.PropertyToID("_FoamCurrentBulkPhaseCells");
         private static readonly int FoamGlobalStartId =
             Shader.PropertyToID("_FoamGlobalStart");
         private static readonly int FoamFieldLengthId =

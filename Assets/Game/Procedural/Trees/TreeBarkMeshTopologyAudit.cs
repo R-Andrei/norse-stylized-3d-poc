@@ -17,6 +17,8 @@ namespace ProgrammaticStylized3D.Trees
         public int ZeroLengthRingSegmentCount { get; internal set; }
         public int InwardSideTriangleCount { get; internal set; }
         public int SideOrientationFailureCount { get; internal set; }
+        public int RadialValidatedSideTriangleCount { get; internal set; }
+        public int ContourValidatedSideTriangleCount { get; internal set; }
         public int CapOrientationFailureCount { get; internal set; }
         public int TangentBasisFailureCount { get; internal set; }
         public int RawBoundaryEdgeCount { get; internal set; }
@@ -43,6 +45,8 @@ namespace ProgrammaticStylized3D.Trees
         internal Vector3 RootCenter;
         internal float RootRadius;
         internal int ZeroLengthRingSegmentCount;
+        internal bool[] SideTriangleUsesContour;
+        internal Vector3[] SideTriangleExpectedDirections;
     }
 
     internal sealed class TreeBarkMeshCapAuditRecord
@@ -325,7 +329,26 @@ namespace ProgrammaticStylized3D.Trees
                         continue;
                     }
 
-                    Vector3 expected = normals[a] + normals[b] + normals[c];
+                    int localTriangleIndex =
+                        (triangleIndex - record.SideTriangleStart) / 3;
+                    bool usesContour =
+                        record.SideTriangleUsesContour != null &&
+                        localTriangleIndex >= 0 &&
+                        localTriangleIndex < record.SideTriangleUsesContour.Length &&
+                        record.SideTriangleUsesContour[localTriangleIndex];
+                    Vector3 expected = usesContour &&
+                        record.SideTriangleExpectedDirections != null &&
+                        localTriangleIndex < record.SideTriangleExpectedDirections.Length
+                            ? record.SideTriangleExpectedDirections[localTriangleIndex]
+                            : normals[a] + normals[b] + normals[c];
+                    if (usesContour)
+                    {
+                        result.ContourValidatedSideTriangleCount++;
+                    }
+                    else
+                    {
+                        result.RadialValidatedSideTriangleCount++;
+                    }
                     if (expected.sqrMagnitude <= OrientationEpsilon)
                     {
                         result.SideOrientationFailureCount++;
@@ -858,6 +881,9 @@ namespace ProgrammaticStylized3D.Trees
                 .Append(result.InwardSideTriangleCount).Append(" / ")
                 .Append(result.SideOrientationFailureCount).Append(" / ")
                 .AppendLine(result.CapOrientationFailureCount.ToString());
+            report.Append("Radial / contour validated side triangles: ")
+                .Append(result.RadialValidatedSideTriangleCount).Append(" / ")
+                .AppendLine(result.ContourValidatedSideTriangleCount.ToString());
             report.Append("Tangent-basis failures: ")
                 .AppendLine(result.TangentBasisFailureCount.ToString());
             report.Append("Raw boundary edges / welded seam edges: ")

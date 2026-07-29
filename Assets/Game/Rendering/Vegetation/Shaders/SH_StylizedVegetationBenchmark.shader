@@ -70,6 +70,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
             #pragma multi_compile_fog
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _CLUSTER_LIGHT_LOOP
+            #pragma multi_compile_fragment _ _LIGHT_LAYERS
             #pragma multi_compile_fragment _ _LIGHT_COOKIES
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -132,6 +133,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 float2 centerXZ : TEXCOORD1;
                 float4 color : COLOR;
                 uint instanceId : SV_InstanceID;
+                uint vertexId : SV_VertexID;
             };
 
             struct Varyings
@@ -144,6 +146,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 float fogFactor : TEXCOORD4;
                 float3 positionWS : TEXCOORD5;
                 float signedNormalBendRatio : TEXCOORD6;
+                nointerpolation float lightRayAccentCandidate01 : TEXCOORD7;
             };
 
             Varyings Vert(Attributes input)
@@ -317,6 +320,16 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                 output.fogFactor = ComputeFogFactor(output.positionCS.z);
                 output.positionWS = worldPosition;
                 output.signedNormalBendRatio = signedNormalBendRatio;
+                // VegetationClusterMeshBuilder emits exactly six vertices per
+                // crossed card: three rows with two vertices per row.
+                // SV_VertexID therefore provides a stable logical card index
+                // shared by every triangle and segment of that card.
+                const uint verticesPerCard = 6u;
+                uint cardIndex = input.vertexId / verticesPerCard;
+                output.lightRayAccentCandidate01 =
+                    VegetationStableAccentCandidate01(
+                        instanceId,
+                        cardIndex);
                 return output;
             }
 
@@ -409,6 +422,7 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                         edgeWidth,
                         pixelsPerSignedUnit,
                         _MinimumStableAccentPixels,
+                        input.lightRayAccentCandidate01,
                         _AmbientResponse,
                         _SunResponse,
                         _LocalLightResponse,
@@ -418,6 +432,14 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                         _EdgeHighlightWhiteness,
                         _LocalEdgeFalloffPower,
                         _LocalEdgeActivationThreshold);
+                if (_WeatherLightRayVegetationDiagnosticMode > 0.5)
+                {
+                    return half4(
+                        VegetationResolveLightRayDiagnosticColour(
+                            vegetationLighting),
+                        1.0);
+                }
+
                 float3 lighting = VegetationResolveLighting(
                     vegetationLighting,
                     _MinimumNightVisibility);

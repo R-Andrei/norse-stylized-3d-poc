@@ -18,6 +18,7 @@ namespace ProgrammaticStylized3D.Geometry
         public readonly List<int> Triangles = new();
         public readonly List<Vector2> UV0 = new();
         public readonly List<Vector4> UV2 = new();
+        public readonly List<Vector4> SurfaceFeatures = new();
         public readonly List<Color> Colors = new();
         public readonly List<Vector3> Normals = new();
 
@@ -25,6 +26,8 @@ namespace ProgrammaticStylized3D.Geometry
         public int TriangleCount => Triangles.Count / 3;
         public bool HasUV2 => UV2.Count == Vertices.Count && Vertices.Count > 0;
         public bool HasNormals => Normals.Count == Vertices.Count && Vertices.Count > 0;
+        public bool HasSurfaceFeatures =>
+            SurfaceFeatures.Count == Vertices.Count && Vertices.Count > 0;
 
         public void Clear()
         {
@@ -32,6 +35,7 @@ namespace ProgrammaticStylized3D.Geometry
             Triangles.Clear();
             UV0.Clear();
             UV2.Clear();
+            SurfaceFeatures.Clear();
             Colors.Clear();
             Normals.Clear();
         }
@@ -65,6 +69,26 @@ namespace ProgrammaticStylized3D.Geometry
             }
 
             UV2.Add(uv2);
+            return index;
+        }
+
+
+        public int AddVertex(
+            Vector3 position,
+            Vector2 uv,
+            Color color,
+            Vector4 uv2,
+            Vector4 surfaceFeatures)
+        {
+            int index = AddVertex(position, uv, color, uv2);
+
+            if (SurfaceFeatures.Count != index)
+            {
+                throw new InvalidOperationException(
+                    "Surface feature data must be supplied for every vertex when using the surface-feature AddVertex overload.");
+            }
+
+            SurfaceFeatures.Add(surfaceFeatures);
             return index;
         }
 
@@ -109,6 +133,13 @@ namespace ProgrammaticStylized3D.Geometry
             {
                 throw new InvalidOperationException(
                     "UV2 must either be empty or match the vertex count.");
+            }
+
+            if (SurfaceFeatures.Count != 0 &&
+                SurfaceFeatures.Count != Vertices.Count)
+            {
+                throw new InvalidOperationException(
+                    "Surface feature data must either be empty or match the vertex count.");
             }
 
             if (Colors.Count != Vertices.Count)

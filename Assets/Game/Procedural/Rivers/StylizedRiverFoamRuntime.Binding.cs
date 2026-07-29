@@ -84,6 +84,8 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamInterpolationId,
                 snapshot.Interpolation);
+            propertyBlock.SetFloat(FoamPreviousBulkPhaseCellsId, 0f);
+            propertyBlock.SetFloat(FoamCurrentBulkPhaseCellsId, 0f);
             propertyBlock.SetFloat(FoamGlobalStartId, snapshot.GlobalStart);
             propertyBlock.SetFloat(
                 FoamFieldLengthId,
@@ -262,6 +264,12 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 river.FoamObstacleMinimumDownstreamFactor);
             propertyBlock.SetFloat(FoamInterpolationId, simulationInterpolation);
+            propertyBlock.SetFloat(
+                FoamPreviousBulkPhaseCellsId,
+                previousBulkTransportPhaseCells);
+            propertyBlock.SetFloat(
+                FoamCurrentBulkPhaseCellsId,
+                bulkTransportPhaseCells);
             propertyBlock.SetFloat(FoamGlobalStartId, allocatedGlobalStart);
             propertyBlock.SetFloat(FoamFieldLengthId, Mathf.Max(0.001f, fieldLength));
             propertyBlock.SetColor(FoamColourId, river.FoamColour);
@@ -407,6 +415,8 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamObstacleMinimumDownstreamFactorId,
                 1f);
             propertyBlock.SetFloat(FoamInterpolationId, 1f);
+            propertyBlock.SetFloat(FoamPreviousBulkPhaseCellsId, 0f);
+            propertyBlock.SetFloat(FoamCurrentBulkPhaseCellsId, 0f);
             propertyBlock.SetFloat(FoamGlobalStartId, 0f);
             propertyBlock.SetFloat(FoamFieldLengthId, 1f);
             propertyBlock.SetColor(FoamColourId, Color.clear);

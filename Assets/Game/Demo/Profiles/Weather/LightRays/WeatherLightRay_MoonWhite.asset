@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df2893d54e5347e1bf2ae7aad04c53ac, type: 3}
+  m_Name: WeatherLightRay_MoonWhite
+  m_EditorClassIdentifier: 
+  displayName: Moon — White
+  sourceKind: 1
+  colourMultiplier: {r: 0.82, g: 0.87, b: 1, a: 1}
+  warmthContribution: 0.05
+  atmosphericIntensity: 0.16
+  softeningStrength: 0.56
+  cameraIntersectionFade: 0.92
+  screenSpaceSurfaceIntensity: 0
+  beamSpacingMetres: 1
+  beamWidthRatioRange: {x: 0.9, y: 1.25}
+  beamIntensityVariation: 0.55
+  beamEdgeSoftness: 0.48
+  beamSoftnessVariation: 0.42
+  upperFade: 0.49
+  groundFade: 0.2
+  contactPlaneOpacity: 0.12
+  surfaceSpotLightIntensity: 0.28
+  footprintEdgeSoftness: 1
+  accentLineIntensity: 0.28
+  vegetationAccentCoverage: 0.25
+  vegetationAccentSoftness: 0.52
+  evolutionPreset: 3
+  evolutionStrength: 0.3
+  evolutionSpeed: 0.2
+  defaultHeightMetres: 27.7
+  defaultMaximumVisualLeanDegrees: 25.2
+  defaultAreaDiameterMetres: 4.91

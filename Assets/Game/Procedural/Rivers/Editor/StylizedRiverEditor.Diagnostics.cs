@@ -1094,9 +1094,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                       $"{runtime.AutomaticFreeWaterBirthRejectedLastUpdate:N0} rejected"
                     : unavailable);
             DrawReadOnlyRow(
-                new GUIContent("Queued Injections"),
+                new GUIContent("Shared Packet Separation"),
                 runtime != null
-                    ? runtime.PendingInjectionCount.ToString("N0")
+                    ? $"{runtime.AutomaticPacketReservationActiveCount:N0} reserved / " +
+                      $"{runtime.AutomaticPacketEnvelopeRejectedLastUpdate:N0} overlap rejects this update / " +
+                      $"{runtime.AutomaticPacketEnvelopeRejectedTotal:N0} total"
                     : unavailable);
             DrawReadOnlyRow(
                 new GUIContent("Injected Last Update"),
@@ -1104,17 +1106,9 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     ? runtime.InjectedLastUpdate.ToString("N0")
                     : unavailable);
             DrawReadOnlyRow(
-                new GUIContent("Composition Events"),
-                runtime != null
-                    ? $"{runtime.ActiveFoamCompositionEventCount} active / " +
-                      $"{runtime.FoamCompositionStartedCount} started / " +
-                      $"{runtime.FoamCompositionCompletedCount} completed"
-                    : unavailable);
-            DrawReadOnlyRow(
                 new GUIContent("Birth Budget"),
                 runtime != null
-                    ? $"{runtime.FoamCompositionBirthBudgetPerStep} composition / " +
-                      $"{runtime.AutomaticShoreBirthBudgetPerTick} shore / " +
+                    ? $"{runtime.AutomaticShoreBirthBudgetPerTick} shore / " +
                       $"{runtime.AutomaticObjectBirthBudgetPerTick} object / " +
                       $"{runtime.AutomaticFreeWaterBirthBudgetPerTick} free-water"
                     : unavailable);

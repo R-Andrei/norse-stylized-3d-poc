@@ -218,6 +218,12 @@ namespace ProgrammaticStylized3D.Weather
         private byte[] currentCookiePixels;
         private byte[] nextCookiePixels;
         private byte[] blendedCookiePixels;
+        // WEATHER LIGHTRAY CLOUD-COVER CONTRACT.
+        // Measured coverage is derived only when cookie pixels are generated.
+        // Steady runtime consumers read O(1) cached values; never add a per-frame
+        // cookie scan or GPU readback for LightRay selection/population.
+        private float currentMeasuredCloudCover;
+        private float nextMeasuredCloudCover;
         private WeatherCloudShadowCookieGenerator.Workspace generationWorkspace;
         private CookieEvolutionState evolutionState;
         private int currentCookieSeed;
@@ -290,6 +296,24 @@ namespace ProgrammaticStylized3D.Weather
         public float EvolutionProgress => evolutionProgress;
         public int CurrentCookieSeed => currentCookieSeed;
         public int NextEvolutionSeed => nextEvolutionSeed;
+        public float MeasuredCloudCover
+        {
+            get
+            {
+                if (!EvolutionInProgress)
+                {
+                    return Mathf.Clamp01(currentMeasuredCloudCover);
+                }
+
+                float smoothProgress = evolutionProgress *
+                    evolutionProgress * (3f - 2f * evolutionProgress);
+                return Mathf.Clamp01(
+                    Mathf.Lerp(
+                        currentMeasuredCloudCover,
+                        nextMeasuredCloudCover,
+                        smoothProgress));
+            }
+        }
         public double SecondsUntilNextEvolution
         {
             get
@@ -541,6 +565,28 @@ namespace ProgrammaticStylized3D.Weather
             Light celestialSource,
             out WeatherCloudTransmissionSample sample)
         {
+            return TrySampleCloudTransmissionAtTimeOffset(
+                worldPosition,
+                celestialSource,
+                0f,
+                out sample);
+        }
+
+        public bool TrySampleCloudTransmissionAtTimeOffset(
+            Vector3 worldPosition,
+            Light celestialSource,
+            float futureSeconds,
+            out WeatherCloudTransmissionSample sample)
+        {
+            if (float.IsNaN(futureSeconds) ||
+                float.IsInfinity(futureSeconds) ||
+                futureSeconds < 0f)
+            {
+                sample = WeatherCloudTransmissionSample.Failure(
+                    "Cloud transmission forecast time must be finite and non-negative.");
+                return false;
+            }
+
             if (!cloudShadowsEnabled)
             {
                 sample = WeatherCloudTransmissionSample.ClearSky();
@@ -563,9 +609,10 @@ namespace ProgrammaticStylized3D.Weather
                 return false;
             }
 
-            if (!TryProjectCloudCookieUv(
+            if (!TryProjectCloudCookieUvInternal(
                     worldPosition,
                     celestialSource,
+                    futureSeconds,
                     out Vector2 cookieUv,
                     out Vector2 cookieOffset,
                     out string projectionError))
@@ -609,6 +656,23 @@ namespace ProgrammaticStylized3D.Weather
             out Vector2 cookieOffset,
             out string error)
         {
+            return TryProjectCloudCookieUvInternal(
+                worldPosition,
+                celestialSource,
+                0f,
+                out cookieUv,
+                out cookieOffset,
+                out error);
+        }
+
+        private bool TryProjectCloudCookieUvInternal(
+            Vector3 worldPosition,
+            Light celestialSource,
+            float futureSeconds,
+            out Vector2 cookieUv,
+            out Vector2 cookieOffset,
+            out string error)
+        {
             cookieUv = Vector2.zero;
             cookieOffset = Vector2.zero;
             error = string.Empty;
@@ -625,12 +689,34 @@ namespace ProgrammaticStylized3D.Weather
                 return false;
             }
 
+            float futureDistance =
+                movementSpeedMetresPerSecond * futureSeconds;
+            if (float.IsNaN(futureDistance) ||
+                float.IsInfinity(futureDistance))
+            {
+                error =
+                    "Cloud transmission forecast distance is not finite.";
+                return false;
+            }
+
+            Vector2 forecastWorldPhase = worldPhaseXZ +
+                resolvedWindDirection * futureDistance;
+            if (float.IsNaN(forecastWorldPhase.x) ||
+                float.IsInfinity(forecastWorldPhase.x) ||
+                float.IsNaN(forecastWorldPhase.y) ||
+                float.IsInfinity(forecastWorldPhase.y))
+            {
+                error = "Cloud transmission forecast phase is not finite.";
+                return false;
+            }
+
             float worldPeriod = Mathf.Max(0.001f, cookieWorldSizeMetres);
             Vector3 sourceLocalPosition =
                 celestialSource.transform.InverseTransformPoint(
                     worldPosition);
             cookieOffset = ResolveCookieOffsetForSource(
-                celestialSource);
+                celestialSource,
+                forecastWorldPhase);
             cookieUv = new Vector2(
                 (sourceLocalPosition.x - cookieOffset.x) / worldPeriod + 0.5f,
                 (sourceLocalPosition.y - cookieOffset.y) / worldPeriod + 0.5f);
@@ -846,6 +932,8 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Cookie repeat period: ")
                 .Append(cookieWorldSizeMetres.ToString("0.###"))
                 .AppendLine(" m per axis (globally tiled)");
+            builder.Append("Measured normalized cloud cover: ")
+                .AppendLine(MeasuredCloudCover.ToString("0.###"));
             builder.Append("Debug focus: ")
                 .Append(resolvedDebugFocus != null
                     ? resolvedDebugFocus.name
@@ -1190,6 +1278,10 @@ namespace ProgrammaticStylized3D.Weather
                 SwapPixelBuffers(
                     ref currentCookiePixels,
                     ref blendedCookiePixels);
+                currentMeasuredCloudCover = MeasureCloudCover(
+                    currentCookiePixels,
+                    shadedTransmission);
+                nextMeasuredCloudCover = currentMeasuredCloudCover;
                 currentCookieSeed = seed;
                 cookieDirty = false;
                 lastGenerationError = string.Empty;
@@ -1223,6 +1315,36 @@ namespace ProgrammaticStylized3D.Weather
                 transitionSoftnessMetres,
                 minimumOpeningDiameterMetres,
                 shadedTransmission);
+        }
+
+
+        /// <summary>
+        /// Computes normalized cloud coverage from an already generated R8
+        /// transmission field. This dirty-time helper is the only LightRay
+        /// selection/population coverage measurement path. Do not call it from
+        /// Update, camera rendering, or candidate evaluation.
+        /// </summary>
+        private static float MeasureCloudCover(
+            byte[] pixels,
+            float shadedTransmissionValue)
+        {
+            if (pixels == null || pixels.Length == 0)
+            {
+                return 0f;
+            }
+
+            float shaded = Mathf.Clamp01(shadedTransmissionValue);
+            float inverseRange = 1f / Mathf.Max(0.0001f, 1f - shaded);
+            double cloudSum = 0.0;
+            for (int index = 0; index < pixels.Length; index++)
+            {
+                float transmission = pixels[index] / 255f;
+                float open = Mathf.Clamp01(
+                    (transmission - shaded) * inverseRange);
+                cloudSum += 1.0 - open;
+            }
+
+            return Mathf.Clamp01((float)(cloudSum / pixels.Length));
         }
 
         private void EnsureCookieBuffers(int pixelCount)
@@ -1311,6 +1433,9 @@ namespace ProgrammaticStylized3D.Weather
                     settings,
                     nextCookiePixels,
                     generationWorkspace);
+                nextMeasuredCloudCover = MeasureCloudCover(
+                    nextCookiePixels,
+                    shadedTransmission);
                 lastEvolutionPreparationMilliseconds =
                     ResolveElapsedMilliseconds(
                         preparationStartTimestamp);
@@ -1419,6 +1544,8 @@ namespace ProgrammaticStylized3D.Weather
             SwapPixelBuffers(
                 ref currentCookiePixels,
                 ref nextCookiePixels);
+            currentMeasuredCloudCover = nextMeasuredCloudCover;
+            nextMeasuredCloudCover = currentMeasuredCloudCover;
             seed = nextEvolutionSeed;
             currentCookieSeed = seed;
             evolutionSequence++;
@@ -1725,14 +1852,23 @@ namespace ProgrammaticStylized3D.Weather
         private Vector2 ResolveCookieOffsetForSource(
             Light celestialSource)
         {
+            return ResolveCookieOffsetForSource(
+                celestialSource,
+                worldPhaseXZ);
+        }
+
+        private Vector2 ResolveCookieOffsetForSource(
+            Light celestialSource,
+            Vector2 resolvedWorldPhaseXZ)
+        {
             Vector2 baseOffset =
                 celestialSource == capturedSun && originalSunStateCaptured
                     ? originalCookieOffset
                     : Vector2.zero;
             Vector3 displacementWorld = new Vector3(
-                worldPhaseXZ.x,
+                resolvedWorldPhaseXZ.x,
                 0f,
-                worldPhaseXZ.y);
+                resolvedWorldPhaseXZ.y);
             Vector3 displacementSourceLocal =
                 celestialSource.transform.InverseTransformVector(
                     displacementWorld);

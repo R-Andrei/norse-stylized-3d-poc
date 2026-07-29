@@ -37,7 +37,14 @@ float FoamSampleMotionLaneSmooth(float2 coordinate)
     int x0 = (int)floor(scrolledX);
     int x1 = x0 + 1;
     float blend = frac(scrolledX);
-    int y = ClampY((int)floor(coordinate.y));
+    // Dimensions are strictly positive. Use an unsigned shift for the coherent
+    // centre row so D3D11 does not emit a signed integer-division instruction
+    // in every kernel that includes this helper. For positive integers this is
+    // exactly floor(height / 2), so transport behaviour is unchanged.
+    int coherentLaneY = (int)((uint)max(1, _FoamDimensions.y) >> 1);
+    int y = (_FoamTransportScheme == 2)
+        ? ClampY(coherentLaneY)
+        : ClampY((int)floor(coordinate.y));
     float a = FoamLoadMotionLaneCell(x0, y);
     float b = FoamLoadMotionLaneCell(x1, y);
     return lerp(a, b, blend);

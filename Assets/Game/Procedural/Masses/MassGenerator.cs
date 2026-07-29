@@ -8,6 +8,66 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 {
     public static partial class MassGenerator
     {
+        public enum CornerDamageRecoveryTournamentStrategy
+        {
+            RemoteComponentConforming,
+            RemoteComponentFixedPoint,
+            RemoteComponentSimpleCycleFixedPoint,
+            RemoteComponentSourceStripsFixedPoint,
+            RemoteComponentHalfEdgeFixedPoint,
+            RemoteComponentCellFanFixedPoint,
+            RemoteComponentAxialTransitionFixedPoint,
+            RemoteComponentTaperTransitionFixedPoint,
+            RemoteComponentRawEdgeFanFixedPoint,
+            OwnLimitFixedPoint,
+            OwnLimitSimpleCycleFixedPoint,
+            OwnLimitSourceStripsFixedPoint,
+            OwnLimitHalfEdgeFixedPoint,
+            OwnLimitCellFanFixedPoint,
+            OwnLimitRawEdgeFanFixedPoint,
+            OwnLimitAxialTransitionFixedPoint,
+            OwnLimitTaperTransitionFixedPoint,
+            WidthPreconditionedRemoteComponentFixedPoint,
+            SingleBandSuppressionFixedPoint,
+            AllButOneBandSuppressionFixedPoint,
+            AllBandSuppressionFixedPoint,
+            GeometricCellRemoteComponentFixedPoint,
+            GeometricCellRemoteComponentSimpleCycleFixedPoint,
+            GeometricCellRemoteComponentSourceStripsFixedPoint,
+            GeometricCellRemoteComponentHalfEdgeFixedPoint,
+            GeometricCellRemoteComponentCellFanFixedPoint,
+            GeometricCellRemoteComponentRawEdgeFanFixedPoint,
+            GeometricCellRemoteComponentAxialTransitionFixedPoint,
+            GeometricCellRemoteComponentTaperTransitionFixedPoint,
+            LegacyBoundedEndpointCell
+        }
+
+        public readonly struct CornerDamageRecoveryTournamentConfiguration
+        {
+            public readonly CornerDamageRecoveryTournamentStrategy Strategy;
+            public readonly int VariantIndex;
+            public readonly float PrimaryParameter;
+            public readonly float SecondaryParameter;
+            public readonly double CaseBudgetMilliseconds;
+            public readonly string Name;
+
+            public CornerDamageRecoveryTournamentConfiguration(
+                CornerDamageRecoveryTournamentStrategy strategy,
+                int variantIndex,
+                float primaryParameter,
+                float secondaryParameter,
+                double caseBudgetMilliseconds,
+                string name)
+            {
+                Strategy = strategy;
+                VariantIndex = Mathf.Max(0, variantIndex);
+                PrimaryParameter = primaryParameter;
+                SecondaryParameter = secondaryParameter;
+                CaseBudgetMilliseconds = Math.Max(100d, caseBudgetMilliseconds);
+                Name = name ?? strategy.ToString();
+            }
+        }
+
 #if UNITY_EDITOR
         private static Func<bool> edgeWearAuditCancellationProbe;
 
@@ -143,6 +203,37 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static CornerDamageIntegrationPlan
             cornerDamageIntegrationPlanOverride;
 
+        [ThreadStatic]
+        private static bool cornerDamageRecoveryTournamentActive;
+
+        [ThreadStatic]
+        private static CornerDamageRecoveryTournamentConfiguration
+            cornerDamageRecoveryTournamentConfiguration;
+
+        private readonly struct CornerDamageRecoveryTournamentScope : IDisposable
+        {
+            private readonly bool previousActive;
+            private readonly CornerDamageRecoveryTournamentConfiguration
+                previousConfiguration;
+
+            public CornerDamageRecoveryTournamentScope(
+                CornerDamageRecoveryTournamentConfiguration configuration)
+            {
+                previousActive = cornerDamageRecoveryTournamentActive;
+                previousConfiguration =
+                    cornerDamageRecoveryTournamentConfiguration;
+                cornerDamageRecoveryTournamentActive = true;
+                cornerDamageRecoveryTournamentConfiguration = configuration;
+            }
+
+            public void Dispose()
+            {
+                cornerDamageRecoveryTournamentActive = previousActive;
+                cornerDamageRecoveryTournamentConfiguration =
+                    previousConfiguration;
+            }
+        }
+
         private readonly struct CornerDamageIntegrationPlanScope : IDisposable
         {
             private readonly CornerDamageIntegrationPlan previous;
@@ -191,6 +282,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return cornerDamageIntegrationPlanOverride;
 #else
             return null;
+#endif
+        }
+
+        private static bool IsCornerDamageRecoveryTournamentActive()
+        {
+#if UNITY_EDITOR
+            return cornerDamageRecoveryTournamentActive;
+#else
+            return false;
+#endif
+        }
+
+        private static CornerDamageRecoveryTournamentConfiguration
+            ResolveCornerDamageRecoveryTournamentConfiguration()
+        {
+#if UNITY_EDITOR
+            return cornerDamageRecoveryTournamentConfiguration;
+#else
+            return default;
 #endif
         }
 
@@ -525,6 +635,63 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public double PreflightMilliseconds;
             public int RawSourceEdgeCount;
             public int SourceEdgeCount;
+            public int SelectionArchitectureParityCaptured;
+            public int SelectionArchitectureParityValid;
+            public int SelectionArchitectureLifecycleCandidateCount;
+            public int SelectionArchitectureReturnedCandidateCount;
+            public string SelectionArchitectureDiagnostic = string.Empty;
+            public int FullRebuildOracleCaptured;
+            public int FullRebuildOracleValid;
+            public int FullRebuildOraclePrimaryCandidateCount;
+            public int FullRebuildOracleRebuildCandidateCount;
+            public int FullRebuildOraclePrimaryLifecycleCount;
+            public int FullRebuildOracleRebuildLifecycleCount;
+            public int FullRebuildOracleCandidateMismatchCount;
+            public int FullRebuildOracleLifecycleMismatchCount;
+            public string FullRebuildOracleDiagnostic = string.Empty;
+            public int IsolatedEligibilityCaptured;
+            public int IsolatedEligibilityValid;
+            public int IsolatedEligibilityLifecycleCount;
+            public int IsolatedEligibilityStructuralCount;
+            public int IsolatedEligibilityGeometricCount;
+            public int IsolatedEligibilityWidthEvidenceCount;
+            public int IsolatedEligibilityWidthFeasibleCount;
+            public int IsolatedEligibilityCertifiedCount;
+            public int IsolatedEligibilityMissingEvidenceCount;
+            public int IsolatedEligibilityInvalidIntervalCount;
+            public int IsolatedEligibilityInconsistentCount;
+            public float IsolatedEligibilityMinimumCertifiedWidth;
+            public float IsolatedEligibilityMaximumCertifiedWidth;
+            public string IsolatedEligibilityProblematicEdges = string.Empty;
+            public string IsolatedEligibilityDiagnostic = string.Empty;
+            public int PotentialInteractionCaptured;
+            public int PotentialInteractionValid;
+            public int PotentialInteractionCandidateCount;
+            public int PotentialInteractionTotalPairCount;
+            public int PotentialInteractionPotentialPairCount;
+            public int PotentialInteractionDisjointPairCount;
+            public int PotentialInteractionSharedEndpointCount;
+            public int PotentialInteractionSharedFaceCount;
+            public int PotentialInteractionExpandedBoundsCount;
+            public int PotentialInteractionMissingEvidenceCount;
+            public int PotentialInteractionDuplicatePairCount;
+            public int PotentialInteractionMaximumDegree;
+            public string PotentialInteractionSamplePairs = string.Empty;
+            public string PotentialInteractionProblematicCandidates = string.Empty;
+            public string PotentialInteractionDiagnostic = string.Empty;
+            public int PairwiseCompatibilityCaptured;
+            public int PairwiseCompatibilityValid;
+            public int PairwiseCompatibilityPotentialPairs;
+            public int PairwiseCompatibilityEvaluatedPairs;
+            public int PairwiseCompatibilityCompatiblePairs;
+            public int PairwiseCompatibilityIncompatiblePairs;
+            public int PairwiseCompatibilityUnresolvedPairs;
+            public int PairwiseCompatibilityMissingRelations;
+            public int PairwiseCompatibilityDuplicateRelations;
+            public float PairwiseCompatibilityMinimumClearance;
+            public string PairwiseCompatibilityIncompatibleEvidence = string.Empty;
+            public string PairwiseCompatibilityUnresolvedEvidence = string.Empty;
+            public string PairwiseCompatibilityDiagnostic = string.Empty;
             public int CoincidentBoundarySeamPairCount;
             public int CoincidentGraphVertexReconciliationCount;
             public int CoincidentGraphBoundarySeamPairCount;
@@ -588,11 +755,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int CornerWidthInactiveExclusionCount;
             public int CoexistenceTrialCount;
             public int CoexistenceCacheUseCount;
-            public int CoexistenceSearchStatesEvaluated;
-            public int CoexistenceSearchStatesDeduplicated;
-            public int CoexistenceSearchMaximumDepth;
-            public int CoexistenceSearchFrontierRemaining;
-            public int CoexistenceSearchWinningDepth;
             public int CandidateConservationFailureCount;
             public int SolverPassCount;
             public int WidthReductionCount;
@@ -622,7 +784,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string PlacementFrameHash = string.Empty;
             public string EvaluationHash = string.Empty;
             public string PrimaryFailure = string.Empty;
-            public string CoexistenceSearchTrace = string.Empty;
 
             public int ExpectedCertificationCount =>
                 RequireAllGeometricCandidates
@@ -808,6 +969,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public string EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
             public string EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
             public string EndpointPatchRecoveryCellFailureSource = string.Empty;
+            public int EndpointPatchRecoveryBoundaryComponentCount;
+            public int EndpointPatchRecoveryClosedCycleCount;
+            public int EndpointPatchRecoveryOpenChainCount;
+            public int EndpointPatchRecoveryBranchVertexCount;
+            public int EndpointPatchRecoveryTransitionFaceCount;
+            public int EndpointPatchRecoveryResidualOpenEdgeCount;
+            public string EndpointPatchRecoveryMechanismSignature = string.Empty;
+            public string EndpointPatchRecoveryModifiedIdentitySignature = string.Empty;
             public string EndpointPatchRecoveryDiagnostic = string.Empty;
             public int PreflightCandidateCount;
             public int PreflightSelectedCount;
@@ -831,6 +1000,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public int[] UnexpectedFinalOrdinary = Array.Empty<int>();
             public int[] MissingPlannedMandatory = Array.Empty<int>();
             public int[] UnexpectedFinalMandatory = Array.Empty<int>();
+            public int RequestedChipCount;
+            public int CommittedChipCount;
+            public int CandidateAttemptCount;
+            public int DepthTrialCount;
+            public int InitialSafeCapacity;
+            public string EarlyStopReason = string.Empty;
+            public Vector3[] CommittedChipPositions = Array.Empty<Vector3>();
+            public float[] CommittedChipDepths = Array.Empty<float>();
             public int AcceptedCornerRank = -1;
             public float CapRingCommittedScale;
             public string SearchFailureStage = string.Empty;
@@ -977,7 +1154,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private enum EdgeWearEvaluationMode
         {
-            None,
+            BaseGeometryOnly,
+            ProductionSurfaceFeatures,
             PlaneCutPreview,
             LegacyDiagnosticAudit,
             BoundedSingleEdgePreview,
@@ -1050,14 +1228,60 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             return Generate(recipe, null);
         }
 
+        private static EdgeWearEvaluationMode
+            ResolveProductionSurfaceFeatureBuildMode(
+                MassSurfaceFeatureSettings? surfaceFeatures)
+        {
+            if (!surfaceFeatures.HasValue)
+            {
+                return EdgeWearEvaluationMode.BaseGeometryOnly;
+            }
+
+            MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
+            bool edgeWearEnabled = settings.EdgeWearAmount > 0.0001f;
+            return edgeWearEnabled || settings.CornerChippingEnabled
+                ? EdgeWearEvaluationMode.ProductionSurfaceFeatures
+                : EdgeWearEvaluationMode.BaseGeometryOnly;
+        }
+
         public static MeshData Generate(
             MassRecipe recipe,
             MassSurfaceFeatureSettings? surfaceFeatures)
         {
+            EdgeWearEvaluationMode mode =
+                ResolveProductionSurfaceFeatureBuildMode(surfaceFeatures);
+            if (mode == EdgeWearEvaluationMode.BaseGeometryOnly)
+            {
+                return GenerateInternal(
+                    recipe,
+                    surfaceFeatures,
+                    mode,
+                    -1,
+                    out _,
+                    out _,
+                    out _);
+            }
+
+            MassSurfaceFeatureSettings settings = surfaceFeatures.Value;
+            if (settings.CornerChippingEnabled)
+            {
+                return GenerateCornerDamageFullCertificationSearch(
+                    recipe,
+                    settings,
+                    false,
+                    null,
+                    default,
+                    0d,
+                    0d,
+                    CornerDamageSearchHardBudgetMilliseconds,
+                    out _,
+                    out _);
+            }
+
             return GenerateInternal(
                 recipe,
-                surfaceFeatures,
-                EdgeWearEvaluationMode.None,
+                settings,
+                EdgeWearEvaluationMode.ProductionSurfaceFeatures,
                 -1,
                 out _,
                 out _,
@@ -1123,7 +1347,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             0.25f
         };
 
-        private const double CornerDamageSearchHardBudgetMilliseconds = 5000d;
+        private const double CornerDamageSearchHardBudgetMilliseconds = 8000d;
 
         private sealed class CornerDamageBaselineBundle
         {
@@ -1314,6 +1538,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 out unifiedStatus);
         }
 
+#if UNITY_EDITOR
+        public static MeshData GenerateCornerDamageRecoveryTournamentPreview(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            MeshData baselineMesh,
+            UnifiedEdgeWearPreviewStatus baselineStatus,
+            double baselineBuildMilliseconds,
+            double estimatedIntegrationMilliseconds,
+            CornerDamageRecoveryTournamentConfiguration configuration,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            if (recipe == null)
+            {
+                throw new ArgumentNullException(nameof(recipe));
+            }
+
+            MassSurfaceFeatureSettings effectiveSettings =
+                ApplyCornerDamageRecoveryTournamentSettings(
+                    surfaceFeatures,
+                    configuration);
+            using (new CornerDamageRecoveryTournamentScope(configuration))
+            {
+                return GenerateCornerDamageFullCertificationSearch(
+                    recipe,
+                    effectiveSettings,
+                    baselineMesh != null && baselineStatus.PreviewApplied,
+                    baselineMesh,
+                    baselineStatus,
+                    baselineBuildMilliseconds,
+                    estimatedIntegrationMilliseconds,
+                    configuration.CaseBudgetMilliseconds,
+                    out previewStatus,
+                    out unifiedStatus);
+            }
+        }
+
+        private static MassSurfaceFeatureSettings
+            ApplyCornerDamageRecoveryTournamentSettings(
+                MassSurfaceFeatureSettings source,
+                CornerDamageRecoveryTournamentConfiguration configuration)
+        {
+            return source;
+        }
+#endif
+
         private static MeshData GenerateCornerDamageIntegrationPreview(
             MassRecipe recipe,
             MassSurfaceFeatureSettings surfaceFeatures,
@@ -1405,6 +1675,356 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             out CornerDamagePreviewStatus previewStatus,
             out UnifiedEdgeWearPreviewStatus unifiedStatus)
         {
+            // EW-C1C.1: corner selection and ordinary bevel construction are
+            // deliberately separate transactions. The chip audit commits the
+            // requested sequential chip count against exact certified face
+            // topology, reranking after each chip. The accepted first rank is
+            // then replayed once through CornerDamageIntegrationPreview, whose
+            // runUnifiedEvaluation branch performs the same complete sequence
+            // and enters the ordinary augmentation path only after the final
+            // chip. No explicit corner solution, prepared plane-cut plan,
+            // mandatory ring, or legacy endpoint recovery is allowed.
+            CornerDamageSearchTelemetry telemetry =
+                new CornerDamageSearchTelemetry();
+            double countScaledHardBudgetMilliseconds =
+                hardBudgetMilliseconds *
+                (1d + 0.5d * Math.Max(
+                    0,
+                    surfaceFeatures.CornerChipCount - 1));
+            System.Diagnostics.Stopwatch searchStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            CornerDamageBaselineBundle baseline =
+                BuildCornerDamageBaselineBundle(
+                    recipe,
+                    surfaceFeatures,
+                    useProvidedBaseline,
+                    providedBaselineMesh,
+                    providedBaselineStatus,
+                    providedBaselineMilliseconds,
+                    telemetry);
+            // The complete case stopwatch still includes baseline generation,
+            // but the ordinary integration deadline begins only after the
+            // baseline exists. A cold baseline must not consume the entire
+            // plane-solve window before the accepted chip is evaluated.
+            using CornerDamageSearchDeadlineScope deadlineScope =
+                new CornerDamageSearchDeadlineScope(
+                    countScaledHardBudgetMilliseconds);
+
+            int candidateCornerCount = -1;
+            int attemptedCornerCount = 0;
+            int acceptedCandidateRank = -1;
+            CornerDamageTransactionAuditResult acceptedTransaction = null;
+            string selectionFailureReason =
+                "no certified corner-damage transaction was available";
+            StringBuilder searchAttempts = new StringBuilder(256);
+
+            for (int candidateRank = 0;
+                 candidateCornerCount < 0 ||
+                 candidateRank < candidateCornerCount;
+                 candidateRank++)
+            {
+                if (IsEdgeWearAuditCancellationRequested())
+                {
+                    selectionFailureReason = "cancelled by user";
+                    break;
+                }
+                if (searchStopwatch.Elapsed.TotalMilliseconds >=
+                    countScaledHardBudgetMilliseconds)
+                {
+                    telemetry.CaseBudgetExceeded = true;
+                    selectionFailureReason =
+                        "corner transaction search exceeded the case hard budget";
+                    break;
+                }
+
+                telemetry.TransactionAttemptCount++;
+                ResetCornerDamageTransactionAuditCapture();
+                System.Diagnostics.Stopwatch transactionStopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
+                InvalidOperationException transactionException = null;
+                try
+                {
+                    using (new CornerDamageSearchAttemptScope(
+                               candidateRank,
+                               1f))
+                    {
+                        GenerateInternal(
+                            recipe,
+                            surfaceFeatures,
+                            EdgeWearEvaluationMode.CornerDamageTransactionAudit,
+                            -1,
+                            out _,
+                            out _,
+                            out _);
+                    }
+                }
+                catch (InvalidOperationException exception)
+                {
+                    transactionException = exception;
+                }
+                finally
+                {
+                    transactionStopwatch.Stop();
+                }
+
+                CornerDamageTransactionAuditResult transaction =
+                    CompleteCornerDamageTransactionAuditResultCapture();
+                if (transaction != null)
+                {
+                    telemetry.CandidateRankingMilliseconds +=
+                        transaction.CandidateRankingMilliseconds;
+                    telemetry.TransactionMilliseconds += Mathf.Max(
+                        0f,
+                        (float)(transaction.TransactionMilliseconds -
+                            transaction.CandidateRankingMilliseconds));
+                }
+                else
+                {
+                    telemetry.TransactionMilliseconds +=
+                        transactionStopwatch.Elapsed.TotalMilliseconds;
+                }
+
+                if (candidateCornerCount < 0)
+                {
+                    candidateCornerCount = transaction == null
+                        ? 0
+                        : transaction.EligibleCandidateCount;
+                }
+                if (candidateRank < candidateCornerCount)
+                {
+                    attemptedCornerCount++;
+                }
+
+                if (searchAttempts.Length > 0)
+                {
+                    searchAttempts.Append(';');
+                }
+                searchAttempts.Append("r");
+                searchAttempts.Append(candidateRank);
+                searchAttempts.Append("@1:");
+                if (transactionException != null)
+                {
+                    selectionFailureReason =
+                        "corner transaction exception: " +
+                        transactionException.Message;
+                    searchAttempts.Append("transaction-exception");
+                    continue;
+                }
+                if (transaction == null)
+                {
+                    selectionFailureReason =
+                        "corner transaction audit result was unavailable";
+                    searchAttempts.Append("transaction-unavailable");
+                    continue;
+                }
+                if (!transaction.Succeeded)
+                {
+                    selectionFailureReason = string.IsNullOrEmpty(
+                            transaction.Diagnostic)
+                        ? "corner transaction did not certify"
+                        : transaction.Diagnostic;
+                    searchAttempts.Append("transaction-rejected");
+                    continue;
+                }
+
+                acceptedCandidateRank = candidateRank;
+                acceptedTransaction = transaction;
+                searchAttempts.Append("chip-certified");
+                break;
+            }
+
+            if (acceptedTransaction == null || acceptedCandidateRank < 0)
+            {
+                searchStopwatch.Stop();
+                CornerDamagePreviewStatus selectionFailure =
+                    new CornerDamagePreviewStatus
+                    {
+                        PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
+                        ShapeSeed = recipe.ShapeSeed,
+                        AuthoringEnabled = true,
+                        TransactionCertified = false,
+                        Diagnostic = selectionFailureReason
+                    };
+                ApplyCornerDamageSearchSummary(
+                    selectionFailure,
+                    Mathf.Max(0, candidateCornerCount),
+                    attemptedCornerCount,
+                    0,
+                    -1,
+                    0f,
+                    telemetry.CaseBudgetExceeded
+                        ? "performance-budget"
+                        : "corner-transaction",
+                    selectionFailureReason,
+                    searchAttempts.ToString(),
+                    telemetry);
+                return ReturnCornerDamageBaselineFallback(
+                    baseline,
+                    selectionFailure,
+                    out previewStatus,
+                    out unifiedStatus);
+            }
+
+            telemetry.FullIntegrationBuildCount = 1;
+            System.Diagnostics.Stopwatch directStopwatch =
+                System.Diagnostics.Stopwatch.StartNew();
+            ResetCornerDamagePreviewCapture();
+            MeshData directMesh = null;
+            UnifiedEdgeWearPreviewStatus directUnified = default;
+            InvalidOperationException directException = null;
+            try
+            {
+                using (new CornerDamageSearchAttemptScope(
+                           acceptedCandidateRank,
+                           1f))
+                {
+                    directMesh = GenerateInternal(
+                        recipe,
+                        surfaceFeatures,
+                        EdgeWearEvaluationMode.CornerDamageIntegrationPreview,
+                        -1,
+                        out _,
+                        out _,
+                        out directUnified);
+                }
+            }
+            catch (InvalidOperationException exception)
+            {
+                directException = exception;
+            }
+            finally
+            {
+                directStopwatch.Stop();
+            }
+
+            telemetry.IntegrationMilliseconds =
+                directStopwatch.Elapsed.TotalMilliseconds;
+            CornerDamagePreviewStatus directStatus =
+                CompleteCornerDamagePreviewCapture(
+                    recipe,
+                    baseline.Status,
+                    directUnified,
+                    baseline.BuildMilliseconds,
+                    directStopwatch.Elapsed.TotalMilliseconds);
+            if (directStatus == null)
+            {
+                directStatus = new CornerDamagePreviewStatus
+                {
+                    PreviewKind = CornerDamagePreviewKind.WithEdgeWear,
+                    ShapeSeed = recipe.ShapeSeed,
+                    AuthoringEnabled = true,
+                    TransactionCertified = true,
+                    AcceptedCornerRank = acceptedCandidateRank
+                };
+            }
+
+            // These fields remain named "Preflight" for report-schema
+            // compatibility, but in C1B.1d they are direct ordinary-production
+            // evidence captured from the actual unified build.
+            directStatus.PreflightCandidateCount =
+                directUnified.CandidateCount;
+            directStatus.PreflightSelectedCount =
+                directUnified.CandidateCount;
+            directStatus.PreflightSelectedGraphEdgeCount =
+                directUnified.CandidateCount;
+            directStatus.PreflightCandidateConservationValid =
+                directUnified.CandidateCount > 0;
+            directStatus.PreflightTopologyReady =
+                directUnified.CandidateCount > 0;
+            directStatus.PreflightWidthSolutionReady =
+                directUnified.PreviewApplied;
+            directStatus.PreflightMandatorySolvedCount = 0;
+            directStatus.IntegrationPreflightDiagnostic =
+                directUnified.Diagnostic ?? string.Empty;
+
+            bool directApplied =
+                directException == null &&
+                directMesh != null &&
+                directStatus.PreviewApplied &&
+                directUnified.PreviewApplied &&
+                directUnified.CandidateCount > 0 &&
+                directUnified.ActiveEdgeCount > 0 &&
+                directUnified.BevelFaceCount > 0;
+            string directFailureReason;
+            if (directApplied)
+            {
+                directFailureReason = "none";
+            }
+            else if (directException != null)
+            {
+                directFailureReason =
+                    "direct ordinary bevel build exception: " +
+                    directException.Message;
+            }
+            else if (!string.IsNullOrEmpty(directStatus.Diagnostic))
+            {
+                directFailureReason = directStatus.Diagnostic;
+            }
+            else if (!string.IsNullOrEmpty(directUnified.Diagnostic))
+            {
+                directFailureReason = directUnified.Diagnostic;
+            }
+            else
+            {
+                directFailureReason =
+                    "direct ordinary bevel build did not certify";
+            }
+
+            if (searchAttempts.Length > 0)
+            {
+                searchAttempts.Append(';');
+            }
+            searchAttempts.Append("r");
+            searchAttempts.Append(acceptedCandidateRank);
+            searchAttempts.Append("@1:");
+            searchAttempts.Append(
+                directApplied
+                    ? "direct-ordinary-certified"
+                    : "direct-ordinary-rejected");
+
+            searchStopwatch.Stop();
+            ApplyCornerDamageSearchSummary(
+                directStatus,
+                Mathf.Max(0, candidateCornerCount),
+                attemptedCornerCount,
+                1,
+                directApplied ? acceptedCandidateRank : -1,
+                0f,
+                directApplied ? "none" : "direct-ordinary-build",
+                directFailureReason,
+                searchAttempts.ToString(),
+                telemetry);
+            if (directApplied)
+            {
+                previewStatus = directStatus;
+                unifiedStatus = directUnified;
+                return directMesh;
+            }
+
+            directStatus.PreviewApplied = false;
+            directStatus.Diagnostic = directFailureReason;
+            return ReturnCornerDamageChipFirstFallback(
+                recipe,
+                surfaceFeatures,
+                baseline,
+                acceptedCandidateRank,
+                directStatus,
+                out previewStatus,
+                out unifiedStatus);
+        }
+
+        private static MeshData GenerateCornerDamageLegacyFullCertificationSearch(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            bool useProvidedBaseline,
+            MeshData providedBaselineMesh,
+            UnifiedEdgeWearPreviewStatus providedBaselineStatus,
+            double providedBaselineMilliseconds,
+            double estimatedIntegrationMilliseconds,
+            double hardBudgetMilliseconds,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
             CornerDamageSearchTelemetry telemetry =
                 new CornerDamageSearchTelemetry();
             CornerDamagePreflightReplayCache replayCache =
@@ -1439,6 +2059,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             CornerDamageIntegrationPreflightRecord acceptedPreflight = null;
             CornerDamageIntegrationPlan acceptedPlan = null;
             int acceptedCandidateRank = -1;
+            int chipFallbackCandidateRank = -1;
 
             for (int candidateRank = 0;
                  candidateCornerCount < 0 ||
@@ -1500,6 +2121,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     preflight == null ? null : preflight.Transaction;
                 if (transaction != null)
                 {
+                    if (transaction.Succeeded && chipFallbackCandidateRank < 0)
+                    {
+                        chipFallbackCandidateRank = candidateRank;
+                    }
                     telemetry.CandidateRankingMilliseconds +=
                         transaction.CandidateRankingMilliseconds;
                     telemetry.TransactionMilliseconds += Mathf.Max(
@@ -1550,215 +2175,207 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         "none",
                         StringComparison.Ordinal))
                 {
-                    ApplyCornerDamageIntegrationPreflightRetention(
-                        preflight,
-                        baselineStatus);
-                    if (preflight.PredictedCollateralLostCount > 0)
-                    {
-                        preflight.FailureStage = "unrelated-retention";
-                        preflight.Diagnostic =
-                            "integration preflight predicts unrelated bevel loss";
-                        preflightStatus = BuildCornerDamagePreflightStatus(
+                    // C1B.1: a certified chip locks the selected corner.
+                    // The bevel pass may succeed, reduce its selected set, or
+                    // fail back to this exact closed chip-only mesh; it may not
+                    // choose a different corner to preserve pre-chip bevels.
+                    preflight.PredictedUnrelatedBaselineCount = 0;
+                    preflight.PredictedUnrelatedRetainedCount = 0;
+                    preflight.PredictedCollateralLostCount = 0;
+                    preflight.PredictedCollateralLostIdentities =
+                        Array.Empty<int>();
+                    telemetry.IntegrationPlanAttemptCount++;
+                    telemetry.AuthoritativeSolveAttemptCount++;
+                    bool preparationBuilt =
+                        TryPrepareCornerDamageIntegrationPlan(
                             recipe,
-                            surfaceFeatures,
                             preflight,
-                            preflight.Diagnostic);
-                        preflightStage = preflight.FailureStage;
-                    }
-                    else
+                            out CornerDamageIntegrationPlan candidatePlan,
+                            out double preparationMilliseconds);
+                    telemetry.IntegrationPlanMilliseconds +=
+                        preparationMilliseconds;
+                    telemetry.AuthoritativeSolveMilliseconds +=
+                        preparationMilliseconds;
+                    if (candidatePlan != null &&
+                        candidatePlan.EndpointConflictGuardAttempted)
                     {
-                        telemetry.IntegrationPlanAttemptCount++;
-                        telemetry.AuthoritativeSolveAttemptCount++;
-                        bool preparationBuilt =
-                            TryPrepareCornerDamageIntegrationPlan(
-                                recipe,
-                                preflight,
-                                baselineStatus,
-                                out CornerDamageIntegrationPlan candidatePlan,
-                                out double preparationMilliseconds);
-                        telemetry.IntegrationPlanMilliseconds +=
-                            preparationMilliseconds;
-                        telemetry.AuthoritativeSolveMilliseconds +=
-                            preparationMilliseconds;
-                        if (candidatePlan != null &&
-                            candidatePlan.EndpointConflictGuardAttempted)
+                        telemetry.EndpointConflictGuardAttemptCount++;
+                        telemetry.EndpointConflictGuardTestedRailCount +=
+                            candidatePlan.EndpointConflictGuardTestedRailCount;
+                        telemetry.EndpointConflictGuardMilliseconds +=
+                            candidatePlan.EndpointConflictGuardMilliseconds;
+                        if (candidatePlan.EndpointConflictGuardPassed)
                         {
-                            telemetry.EndpointConflictGuardAttemptCount++;
-                            telemetry.EndpointConflictGuardTestedRailCount +=
-                                candidatePlan.EndpointConflictGuardTestedRailCount;
-                            telemetry.EndpointConflictGuardMilliseconds +=
-                                candidatePlan.EndpointConflictGuardMilliseconds;
-                            if (candidatePlan.EndpointConflictGuardPassed)
-                            {
-                                telemetry.EndpointConflictGuardPassCount++;
-                            }
-                            else if (candidatePlan.EndpointConflictGuardConflictCount > 0)
-                            {
-                                telemetry.EndpointConflictGuardRejectCount++;
-                            }
+                            telemetry.EndpointConflictGuardPassCount++;
                         }
-                        if (candidatePlan != null &&
-                            candidatePlan.EndpointPatchRecoveryAttempted)
+                        else if (candidatePlan.EndpointConflictGuardConflictCount > 0)
                         {
-                            telemetry.EndpointPatchRecoveryAttemptCount +=
-                                candidatePlan.EndpointPatchRecoveryAttemptCount;
-                            telemetry.EndpointPatchRecoveryMilliseconds +=
-                                candidatePlan.EndpointPatchRecoveryMilliseconds;
-                            telemetry.EndpointPatchRecoveryUnsupportedStarCount +=
-                                candidatePlan.EndpointPatchRecoveryUnsupportedStarCount;
-                            telemetry.EndpointPatchRecoveryPatchExtractionCount +=
-                                candidatePlan.EndpointPatchRecoveryPatchExtractionCount;
-                            telemetry.EndpointPatchRecoveryDisconnectedPatchCount +=
-                                candidatePlan.EndpointPatchRecoveryDisconnectedPatchCount;
-                            telemetry.EndpointPatchRecoveryBoundaryLoopCount +=
-                                candidatePlan.EndpointPatchRecoveryBoundaryLoopCount;
-                            telemetry.EndpointPatchRecoveryBoundaryCrossingCount +=
-                                candidatePlan.EndpointPatchRecoveryBoundaryCrossingCount;
-                            telemetry.EndpointPatchRecoveryNoLocalRemovalCount +=
-                                candidatePlan.EndpointPatchRecoveryNoLocalRemovalCount;
-                            telemetry.EndpointPatchRecoveryCapCreationCount +=
-                                candidatePlan.EndpointPatchRecoveryCapCreationCount;
-                            telemetry.EndpointPatchRecoveryIncidentBandJoinCount +=
-                                candidatePlan.EndpointPatchRecoveryIncidentBandJoinCount;
-                            telemetry.EndpointPatchRecoveryStitchTopologyCount +=
-                                candidatePlan.EndpointPatchRecoveryStitchTopologyCount;
-                            telemetry.EndpointPatchRecoveryLocalityCount +=
-                                candidatePlan.EndpointPatchRecoveryLocalityCount;
-                            telemetry.EndpointPatchRecoveryBandIntegrityCount +=
-                                candidatePlan.EndpointPatchRecoveryBandIntegrityCount;
-                            telemetry.EndpointPatchRecoveryPreparedMinimumParityCount +=
-                                candidatePlan.EndpointPatchRecoveryPreparedMinimumParityCount;
-                            telemetry.EndpointPatchRecoveryMaterializationSignatureCount +=
-                                candidatePlan.EndpointPatchRecoveryMaterializationSignatureCount;
-                            telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius,
-                                    candidatePlan.EndpointPatchRecoveryMaximumRemovedVertexRadius);
-                            telemetry.EndpointPatchRecoveryMaximumIntersectionRadius =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumIntersectionRadius,
-                                    candidatePlan.EndpointPatchRecoveryMaximumIntersectionRadius);
-                            telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius,
-                                    candidatePlan.EndpointPatchRecoveryMaximumReplacementVertexRadius);
-                            telemetry.EndpointPatchRecoveryRetainedOutsideRadiusCount +=
-                                candidatePlan.EndpointPatchRecoveryRetainedOutsideRadiusCount;
-                            telemetry.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter +=
-                                candidatePlan.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
-                            telemetry.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter +=
-                                candidatePlan.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
-                            telemetry.EndpointPatchRecoveryLocalSupportSampleCount +=
-                                candidatePlan.EndpointPatchRecoveryLocalSupportSampleCount;
-                            if (candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident > 0)
-                            {
-                                telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident =
-                                    telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident == 0
-                                        ? candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident
-                                        : Mathf.Min(
-                                            telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident,
-                                            candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident);
-                            }
-                            telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta,
-                                    candidatePlan.EndpointPatchRecoveryGlobalMinusLocalSupportDelta);
-                            telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius,
-                                    candidatePlan.EndpointPatchRecoveryControllingSupportRadius);
-                            telemetry.EndpointPatchRecoveryMaximumAxialInfluence =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumAxialInfluence,
-                                    candidatePlan.EndpointPatchRecoveryMaximumAxialInfluence);
-                            if (candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence > 0f)
-                            {
-                                telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence =
-                                    float.IsInfinity(
-                                        telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence)
-                                        ? candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence
-                                        : Mathf.Min(
-                                            telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence,
-                                            candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence);
-                            }
-                            telemetry.EndpointPatchRecoveryFacesSubdivided +=
-                                candidatePlan.EndpointPatchRecoveryFacesSubdivided;
-                            telemetry.EndpointPatchRecoveryLocalFragmentCount +=
-                                candidatePlan.EndpointPatchRecoveryLocalFragmentCount;
-                            telemetry.EndpointPatchRecoveryRemoteRemainderCount +=
-                                candidatePlan.EndpointPatchRecoveryRemoteRemainderCount;
-                            telemetry.EndpointPatchRecoverySyntheticIncidentFragmentCount +=
-                                candidatePlan.EndpointPatchRecoverySyntheticIncidentFragmentCount;
-                            telemetry.EndpointPatchRecoveryMaximumCellVertexCount =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumCellVertexCount,
-                                    candidatePlan.EndpointPatchRecoveryCellVertexCount);
-                            telemetry.EndpointPatchRecoveryMaximumCellFaceCount =
-                                Mathf.Max(
-                                    telemetry.EndpointPatchRecoveryMaximumCellFaceCount,
-                                    candidatePlan.EndpointPatchRecoveryCellFaceCount);
-                            if (candidatePlan.EndpointPatchRecoveryPrepared)
-                            {
-                                telemetry.EndpointPatchRecoveryPreparedCount++;
-                            }
-                            else
-                            {
-                                telemetry.EndpointPatchRecoveryRejectCount++;
-                            }
+                            telemetry.EndpointConflictGuardRejectCount++;
                         }
-                        if (preparationBuilt && candidatePlan != null &&
-                            candidatePlan.Valid)
+                    }
+                    if (candidatePlan != null &&
+                        candidatePlan.EndpointPatchRecoveryAttempted)
+                    {
+                        telemetry.EndpointPatchRecoveryAttemptCount +=
+                            candidatePlan.EndpointPatchRecoveryAttemptCount;
+                        telemetry.EndpointPatchRecoveryMilliseconds +=
+                            candidatePlan.EndpointPatchRecoveryMilliseconds;
+                        telemetry.EndpointPatchRecoveryUnsupportedStarCount +=
+                            candidatePlan.EndpointPatchRecoveryUnsupportedStarCount;
+                        telemetry.EndpointPatchRecoveryPatchExtractionCount +=
+                            candidatePlan.EndpointPatchRecoveryPatchExtractionCount;
+                        telemetry.EndpointPatchRecoveryDisconnectedPatchCount +=
+                            candidatePlan.EndpointPatchRecoveryDisconnectedPatchCount;
+                        telemetry.EndpointPatchRecoveryBoundaryLoopCount +=
+                            candidatePlan.EndpointPatchRecoveryBoundaryLoopCount;
+                        telemetry.EndpointPatchRecoveryBoundaryCrossingCount +=
+                            candidatePlan.EndpointPatchRecoveryBoundaryCrossingCount;
+                        telemetry.EndpointPatchRecoveryNoLocalRemovalCount +=
+                            candidatePlan.EndpointPatchRecoveryNoLocalRemovalCount;
+                        telemetry.EndpointPatchRecoveryCapCreationCount +=
+                            candidatePlan.EndpointPatchRecoveryCapCreationCount;
+                        telemetry.EndpointPatchRecoveryIncidentBandJoinCount +=
+                            candidatePlan.EndpointPatchRecoveryIncidentBandJoinCount;
+                        telemetry.EndpointPatchRecoveryStitchTopologyCount +=
+                            candidatePlan.EndpointPatchRecoveryStitchTopologyCount;
+                        telemetry.EndpointPatchRecoveryLocalityCount +=
+                            candidatePlan.EndpointPatchRecoveryLocalityCount;
+                        telemetry.EndpointPatchRecoveryBandIntegrityCount +=
+                            candidatePlan.EndpointPatchRecoveryBandIntegrityCount;
+                        telemetry.EndpointPatchRecoveryPreparedMinimumParityCount +=
+                            candidatePlan.EndpointPatchRecoveryPreparedMinimumParityCount;
+                        telemetry.EndpointPatchRecoveryMaterializationSignatureCount +=
+                            candidatePlan.EndpointPatchRecoveryMaterializationSignatureCount;
+                        telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumRemovedVertexRadius,
+                                candidatePlan.EndpointPatchRecoveryMaximumRemovedVertexRadius);
+                        telemetry.EndpointPatchRecoveryMaximumIntersectionRadius =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumIntersectionRadius,
+                                candidatePlan.EndpointPatchRecoveryMaximumIntersectionRadius);
+                        telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumReplacementVertexRadius,
+                                candidatePlan.EndpointPatchRecoveryMaximumReplacementVertexRadius);
+                        telemetry.EndpointPatchRecoveryRetainedOutsideRadiusCount +=
+                            candidatePlan.EndpointPatchRecoveryRetainedOutsideRadiusCount;
+                        telemetry.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter +=
+                            candidatePlan.EndpointPatchRecoverySelectedFaceCountBeforeLocalFilter;
+                        telemetry.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter +=
+                            candidatePlan.EndpointPatchRecoverySelectedFaceCountAfterLocalFilter;
+                        telemetry.EndpointPatchRecoveryLocalSupportSampleCount +=
+                            candidatePlan.EndpointPatchRecoveryLocalSupportSampleCount;
+                        if (candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident > 0)
                         {
-                            acceptedPreflight = preflight;
-                            acceptedPlan = candidatePlan;
-                            acceptedCandidateRank = candidateRank;
-                            ApplyCornerDamageIntegrationPlanEvidence(
-                                preflightStatus,
-                                candidatePlan);
-                            AppendCornerDamageSearchAttempt(
-                                searchAttempts,
-                                candidateRank,
-                                preflight.ResolvedUniformScale,
-                                "candidate-preparation-certified",
-                                preflightStatus);
-                            break;
+                            telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident =
+                                telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident == 0
+                                    ? candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident
+                                    : Mathf.Min(
+                                        telemetry.EndpointPatchRecoveryMinimumSamplesPerIncident,
+                                        candidatePlan.EndpointPatchRecoveryMinimumSamplesPerIncident);
                         }
-
-                        telemetry.AuthoritativeSolveRejectCount++;
-                        if (IsCornerDamageSearchDeadlineExceeded())
+                        telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumGlobalMinusLocalSupportDelta,
+                                candidatePlan.EndpointPatchRecoveryGlobalMinusLocalSupportDelta);
+                        telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumControllingSupportRadius,
+                                candidatePlan.EndpointPatchRecoveryControllingSupportRadius);
+                        telemetry.EndpointPatchRecoveryMaximumAxialInfluence =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumAxialInfluence,
+                                candidatePlan.EndpointPatchRecoveryMaximumAxialInfluence);
+                        if (candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence > 0f)
                         {
-                            telemetry.DeadlineAbortCount++;
+                            telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence =
+                                float.IsInfinity(
+                                    telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence)
+                                    ? candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence
+                                    : Mathf.Min(
+                                        telemetry.EndpointPatchRecoveryMinimumAllowedAxialInfluence,
+                                        candidatePlan.EndpointPatchRecoveryMinimumAllowedAxialInfluence);
                         }
-                        string preparationDiagnostic = candidatePlan == null
-                            ? "candidate preparation result was unavailable"
-                            : candidatePlan.Diagnostic;
-                        preflightStatus.PreviewApplied = false;
-                        preflightStatus.Diagnostic = preparationDiagnostic;
+                        telemetry.EndpointPatchRecoveryFacesSubdivided +=
+                            candidatePlan.EndpointPatchRecoveryFacesSubdivided;
+                        telemetry.EndpointPatchRecoveryLocalFragmentCount +=
+                            candidatePlan.EndpointPatchRecoveryLocalFragmentCount;
+                        telemetry.EndpointPatchRecoveryRemoteRemainderCount +=
+                            candidatePlan.EndpointPatchRecoveryRemoteRemainderCount;
+                        telemetry.EndpointPatchRecoverySyntheticIncidentFragmentCount +=
+                            candidatePlan.EndpointPatchRecoverySyntheticIncidentFragmentCount;
+                        telemetry.EndpointPatchRecoveryMaximumCellVertexCount =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumCellVertexCount,
+                                candidatePlan.EndpointPatchRecoveryCellVertexCount);
+                        telemetry.EndpointPatchRecoveryMaximumCellFaceCount =
+                            Mathf.Max(
+                                telemetry.EndpointPatchRecoveryMaximumCellFaceCount,
+                                candidatePlan.EndpointPatchRecoveryCellFaceCount);
+                        if (candidatePlan.EndpointPatchRecoveryPrepared)
+                        {
+                            telemetry.EndpointPatchRecoveryPreparedCount++;
+                        }
+                        else
+                        {
+                            telemetry.EndpointPatchRecoveryRejectCount++;
+                        }
+                    }
+                    if (preparationBuilt && candidatePlan != null &&
+                        candidatePlan.Valid)
+                    {
+                        acceptedPreflight = preflight;
+                        acceptedPlan = candidatePlan;
+                        acceptedCandidateRank = candidateRank;
                         ApplyCornerDamageIntegrationPlanEvidence(
                             preflightStatus,
                             candidatePlan);
-                        string preparationFailureStage =
-                            candidatePlan != null &&
-                            candidatePlan.EndpointConflictGuardAttempted &&
-                            !candidatePlan.EndpointConflictGuardPassed &&
-                            candidatePlan.EndpointConflictGuardConflictCount > 0
-                                ? "endpoint-conflict-guard"
-                                : "candidate-preparation";
                         AppendCornerDamageSearchAttempt(
                             searchAttempts,
                             candidateRank,
                             preflight.ResolvedUniformScale,
-                            preparationFailureStage,
+                            "candidate-preparation-certified",
                             preflightStatus);
-                        RetainCornerDamageSearchFailure(
-                            preflightStatus,
-                            preparationFailureStage,
-                            ref bestFailure,
-                            ref bestFailurePriority,
-                            ref bestFailureStage,
-                            ref bestFailureReason);
-                        continue;
+                        break;
                     }
+
+                    telemetry.AuthoritativeSolveRejectCount++;
+                    if (IsCornerDamageSearchDeadlineExceeded())
+                    {
+                        telemetry.DeadlineAbortCount++;
+                    }
+                    string preparationDiagnostic = candidatePlan == null
+                        ? "candidate preparation result was unavailable"
+                        : candidatePlan.Diagnostic;
+                    preflightStatus.PreviewApplied = false;
+                    preflightStatus.Diagnostic = preparationDiagnostic;
+                    ApplyCornerDamageIntegrationPlanEvidence(
+                        preflightStatus,
+                        candidatePlan);
+                    string preparationFailureStage =
+                        candidatePlan != null &&
+                        candidatePlan.EndpointConflictGuardAttempted &&
+                        !candidatePlan.EndpointConflictGuardPassed &&
+                        candidatePlan.EndpointConflictGuardConflictCount > 0
+                            ? "endpoint-conflict-guard"
+                            : "candidate-preparation";
+                    AppendCornerDamageSearchAttempt(
+                        searchAttempts,
+                        candidateRank,
+                        preflight.ResolvedUniformScale,
+                        preparationFailureStage,
+                        preflightStatus);
+                    RetainCornerDamageSearchFailure(
+                        preflightStatus,
+                        preparationFailureStage,
+                        ref bestFailure,
+                        ref bestFailurePriority,
+                        ref bestFailureStage,
+                        ref bestFailureReason);
+                    // The chip transaction already certified. Do not let
+                    // bevel success influence corner selection.
+                    break;
                 }
 
                 AppendCornerDamageSearchAttempt(
@@ -1776,6 +2393,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     ref bestFailurePriority,
                     ref bestFailureStage,
                     ref bestFailureReason);
+                if (transaction != null && transaction.Succeeded)
+                {
+                    // A valid chip is authoritative even when the ordinary
+                    // bevel pass has no certifiable result.
+                    break;
+                }
             }
 
             if (acceptedPreflight == null || acceptedPlan == null)
@@ -1800,8 +2423,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     bestFailureReason,
                     searchAttempts.ToString(),
                     telemetry);
-                return ReturnCornerDamageBaselineFallback(
+                return ReturnCornerDamageChipFirstFallback(
+                    recipe,
+                    surfaceFeatures,
                     baseline,
+                    chipFallbackCandidateRank,
                     failureStatus,
                     out previewStatus,
                     out unifiedStatus);
@@ -1835,8 +2461,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     budgetStatus.Diagnostic,
                     searchAttempts.ToString(),
                     telemetry);
-                return ReturnCornerDamageBaselineFallback(
+                return ReturnCornerDamageChipFirstFallback(
+                    recipe,
+                    surfaceFeatures,
                     baseline,
+                    acceptedCandidateRank,
                     budgetStatus,
                     out previewStatus,
                     out unifiedStatus);
@@ -1848,7 +2477,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             bool completed = TryCompleteCornerDamageIntegrationPlan(
                 acceptedPlan,
                 acceptedPreflight.ExpectedMandatoryCount,
-                baselineStatus,
                 out double completeBuildMilliseconds,
                 out string completeBuildFailureStage);
             telemetry.PlanMaterializationMilliseconds +=
@@ -1916,8 +2544,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     completionStatus.Diagnostic,
                     searchAttempts.ToString(),
                     telemetry);
-                return ReturnCornerDamageBaselineFallback(
+                return ReturnCornerDamageChipFirstFallback(
+                    recipe,
+                    surfaceFeatures,
                     baseline,
+                    acceptedCandidateRank,
                     completionStatus,
                     out previewStatus,
                     out unifiedStatus);
@@ -2041,8 +2672,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 finalStatus.Diagnostic,
                 searchAttempts.ToString(),
                 telemetry);
-            return ReturnCornerDamageBaselineFallback(
+            return ReturnCornerDamageChipFirstFallback(
+                recipe,
+                surfaceFeatures,
                 baseline,
+                acceptedCandidateRank,
                 finalStatus,
                 out previewStatus,
                 out unifiedStatus);
@@ -2121,6 +2755,153 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 baselineStopwatch.Elapsed.TotalMilliseconds);
         }
 
+        private static MeshData ReturnCornerDamageChipFirstFallback(
+            MassRecipe recipe,
+            MassSurfaceFeatureSettings surfaceFeatures,
+            CornerDamageBaselineBundle baseline,
+            int candidateRank,
+            CornerDamagePreviewStatus failureStatus,
+            out CornerDamagePreviewStatus previewStatus,
+            out UnifiedEdgeWearPreviewStatus unifiedStatus)
+        {
+            if (candidateRank >= 0)
+            {
+                ResetCornerDamagePreviewCapture();
+                System.Diagnostics.Stopwatch stopwatch =
+                    System.Diagnostics.Stopwatch.StartNew();
+                MeshData chipMesh = null;
+                UnifiedEdgeWearPreviewStatus chipUnified = default;
+                InvalidOperationException chipException = null;
+                try
+                {
+                    using (new CornerDamageSearchAttemptScope(
+                               candidateRank,
+                               1f))
+                    {
+                        chipMesh = GenerateInternal(
+                            recipe,
+                            surfaceFeatures,
+                            EdgeWearEvaluationMode.CornerDamageGeometryPreview,
+                            -1,
+                            out _,
+                            out _,
+                            out chipUnified);
+                    }
+                }
+                catch (InvalidOperationException exception)
+                {
+                    chipException = exception;
+                }
+                finally
+                {
+                    stopwatch.Stop();
+                }
+
+                CornerDamagePreviewStatus chipStatus =
+                    CompleteCornerDamagePreviewCapture(
+                        recipe,
+                        default,
+                        chipUnified,
+                        0d,
+                        stopwatch.Elapsed.TotalMilliseconds);
+                if (chipException == null && chipMesh != null &&
+                    chipStatus != null && chipStatus.PreviewApplied)
+                {
+                    chipStatus.PreviewKind =
+                        CornerDamagePreviewKind.WithEdgeWear;
+                    chipStatus.ExpectedCapRingEdgeCount = 0;
+                    chipStatus.MandatoryCandidateCount = 0;
+                    chipStatus.MandatorySelectedCount = 0;
+                    chipStatus.MandatoryBuiltCount = 0;
+                    chipStatus.MandatoryCapRingIdentities =
+                        Array.Empty<int>();
+                    chipStatus.CapRingCommittedScale = 0f;
+                    chipStatus.CapRingRequestedWidth = 0f;
+                    string preservedFailureReason =
+                        failureStatus == null
+                            ? "fresh ordinary bevel pass did not certify"
+                            : !string.IsNullOrEmpty(
+                                failureStatus.SearchFailureReason) &&
+                              !string.Equals(
+                                  failureStatus.SearchFailureReason,
+                                  "none",
+                                  StringComparison.Ordinal)
+                                ? failureStatus.SearchFailureReason
+                                : !string.IsNullOrEmpty(
+                                    failureStatus.Diagnostic)
+                                    ? failureStatus.Diagnostic
+                                    : "fresh ordinary bevel pass did not certify";
+                    string preservedFailureStage =
+                        failureStatus == null ||
+                        string.IsNullOrEmpty(
+                            failureStatus.SearchFailureStage) ||
+                        string.Equals(
+                            failureStatus.SearchFailureStage,
+                            "none",
+                            StringComparison.Ordinal)
+                            ? "direct-ordinary-build"
+                            : failureStatus.SearchFailureStage;
+                    chipStatus.Diagnostic =
+                        "closed chip-only fallback retained: " +
+                        preservedFailureReason;
+                    chipStatus.Report =
+                        (chipStatus.Report ?? string.Empty) +
+                        Environment.NewLine +
+                        "C1B.1 fallback=closed-chip-only; mandatoryRing=disabled";
+                    if (failureStatus != null)
+                    {
+                        chipStatus.PreflightCandidateCount =
+                            failureStatus.PreflightCandidateCount;
+                        chipStatus.PreflightSelectedCount =
+                            failureStatus.PreflightSelectedCount;
+                        chipStatus.PreflightSelectedGraphEdgeCount =
+                            failureStatus.PreflightSelectedGraphEdgeCount;
+                        chipStatus.PreflightCandidateConservationValid =
+                            failureStatus.PreflightCandidateConservationValid;
+                        chipStatus.PreflightTopologyReady =
+                            failureStatus.PreflightTopologyReady;
+                        chipStatus.PreflightWidthSolutionReady =
+                            failureStatus.PreflightWidthSolutionReady;
+                        chipStatus.IntegrationPreflightDiagnostic =
+                            failureStatus.IntegrationPreflightDiagnostic;
+                    }
+
+                    CornerDamageSearchTelemetry fallbackTelemetry =
+                        CopyCornerDamageSearchTelemetry(failureStatus);
+                    fallbackTelemetry.FullFallbackBuildCount = 1;
+                    fallbackTelemetry.GeometrySearchReuseCount++;
+                    ApplyCornerDamageSearchSummary(
+                        chipStatus,
+                        failureStatus == null
+                            ? chipStatus.CandidateCornerCount
+                            : failureStatus.CandidateCornerCount,
+                        failureStatus == null
+                            ? 1
+                            : failureStatus.AttemptedCornerCount,
+                        failureStatus == null
+                            ? 1
+                            : failureStatus.AttemptedConfigurationCount,
+                        candidateRank,
+                        0f,
+                        preservedFailureStage,
+                        preservedFailureReason,
+                        failureStatus == null
+                            ? string.Empty
+                            : failureStatus.SearchAttemptSummary,
+                        fallbackTelemetry);
+                    previewStatus = chipStatus;
+                    unifiedStatus = chipUnified;
+                    return chipMesh;
+                }
+            }
+
+            return ReturnCornerDamageBaselineFallback(
+                baseline,
+                failureStatus,
+                out previewStatus,
+                out unifiedStatus);
+        }
+
         private static MeshData ReturnCornerDamageBaselineFallback(
             CornerDamageBaselineBundle baseline,
             CornerDamagePreviewStatus failureStatus,
@@ -2172,50 +2953,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 preflight.Diagnostic ?? string.Empty;
         }
 
-        private static void ApplyCornerDamageIntegrationPreflightRetention(
-            CornerDamageIntegrationPreflightRecord preflight,
-            UnifiedEdgeWearPreviewStatus baselineStatus)
-        {
-            if (preflight == null)
-            {
-                return;
-            }
-
-            HashSet<int> baseline = CollectCertifiedOrdinaryEdgeIdentities(
-                baselineStatus.DebugEdges);
-            HashSet<int> predicted = new HashSet<int>(
-                preflight.PredictedOrdinaryIdentities ??
-                    Array.Empty<int>());
-            HashSet<int> affected = preflight.Transaction == null
-                ? new HashSet<int>()
-                : new HashSet<int>(
-                    preflight.Transaction.AffectedOriginalEdgeIndices);
-            List<int> lost = new List<int>();
-            foreach (int identity in baseline)
-            {
-                if (affected.Contains(identity))
-                {
-                    continue;
-                }
-                preflight.PredictedUnrelatedBaselineCount++;
-                if (predicted.Contains(identity))
-                {
-                    preflight.PredictedUnrelatedRetainedCount++;
-                }
-                else
-                {
-                    lost.Add(identity);
-                }
-            }
-            lost.Sort();
-            preflight.PredictedCollateralLostIdentities = lost.ToArray();
-            preflight.PredictedCollateralLostCount = lost.Count;
-        }
-
         private static bool TryPrepareCornerDamageIntegrationPlan(
             MassRecipe recipe,
             CornerDamageIntegrationPreflightRecord preflight,
-            UnifiedEdgeWearPreviewStatus baselineStatus,
             out CornerDamageIntegrationPlan plan,
             out double elapsedMilliseconds)
         {
@@ -2282,7 +3022,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     preflight.MinimumStableEdgeLength,
                     preflight.MinimumStableFaceArea,
                     coverage,
-                    false,
                     out PlaneCutBevelSolvedPlan solvedPlan);
                 EdgeWearCoverageAudit effectiveCoverage =
                     solvedPlan == null
@@ -2296,32 +3035,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     solvedPlan,
                     effectiveCoverage,
                     true);
-                HashSet<int> baseline =
-                    CollectCertifiedOrdinaryEdgeIdentities(
-                        baselineStatus.DebugEdges);
-                HashSet<int> affected = new HashSet<int>(
-                    preflight.Transaction.AffectedOriginalEdgeIndices);
-                HashSet<int> ordinarySet = new HashSet<int>(ordinary);
+                // C1B.1: the post-chip graph owns a fresh identity space.
+                // There is deliberately no comparison with the unchipped
+                // ordinary-bevel baseline.
                 List<int> lost = new List<int>();
                 int unrelatedBaselineCount = 0;
                 int unrelatedRetainedCount = 0;
-                foreach (int identity in baseline)
-                {
-                    if (affected.Contains(identity))
-                    {
-                        continue;
-                    }
-                    unrelatedBaselineCount++;
-                    if (ordinarySet.Contains(identity))
-                    {
-                        unrelatedRetainedCount++;
-                    }
-                    else
-                    {
-                        lost.Add(identity);
-                    }
-                }
-                lost.Sort();
 
                 plan.SolvedPlan = solvedPlan;
                 plan.PlaneAudit = audit;
@@ -2362,14 +3081,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 }
                 ResetCornerDamageEndpointPatchSupportAndAxialEvidence(
                     plan);
-                if (!TryPassCornerDamageEndpointConflictGuard(plan))
-                {
-                    plan.Diagnostic = string.IsNullOrEmpty(
-                            plan.EndpointConflictGuardDiagnostic)
-                        ? "minimum-width foreign-plane endpoint-conflict guard rejected the candidate"
-                        : plan.EndpointConflictGuardDiagnostic;
-                    return false;
-                }
+                // C1B.1: do not run the identity-preserving endpoint splice
+                // guard. The ordinary bevel kernel owns viability, width
+                // reduction, deferral, and rejection on the rebuilt chip mesh.
+                plan.EndpointConflictGuardAttempted = false;
+                plan.EndpointConflictGuardPassed = false;
+                plan.EndpointConflictGuardDiagnostic =
+                    "not applicable to fresh post-chip ordinary beveling";
 
                 plan.Valid = true;
                 plan.Diagnostic =
@@ -2462,6 +3180,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             plan.EndpointPatchRecoveryLocalFragmentSignature = string.Empty;
             plan.EndpointPatchRecoveryRemoteRemainderSignature = string.Empty;
             plan.EndpointPatchRecoveryCellFailureSource = string.Empty;
+            plan.EndpointPatchRecoveryBoundaryComponentCount = 0;
+            plan.EndpointPatchRecoveryClosedCycleCount = 0;
+            plan.EndpointPatchRecoveryOpenChainCount = 0;
+            plan.EndpointPatchRecoveryBranchVertexCount = 0;
+            plan.EndpointPatchRecoveryTransitionFaceCount = 0;
+            plan.EndpointPatchRecoveryResidualOpenEdgeCount = 0;
+            plan.EndpointPatchRecoveryMechanismSignature = string.Empty;
+            plan.EndpointPatchRecoveryModifiedIdentitySignature = string.Empty;
         }
 
         private static bool TryPassCornerDamageEndpointConflictGuard(
@@ -2744,17 +3470,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         int conflictVertexIndex = midpointParameter < 0.5f
                             ? victimGraphEdge.VertexA
                             : victimGraphEdge.VertexB;
-                        if (TryPrepareCornerDamageEndpointPatchRecovery(
+                        bool recoveryPrepared =
+                            TryPrepareCornerDamageBevelTerminationRecovery(
                                 plan,
                                 orderedCandidates,
                                 scaledCandidates,
                                 victim,
                                 foreign,
-                                conflictVertexIndex))
+                                conflictVertexIndex);
+                        if (recoveryPrepared)
                         {
                             plan.EndpointConflictGuardPassed = true;
                             plan.EndpointConflictGuardDiagnostic =
-                                "minimum-width endpoint conflict recovered by a bounded local endpoint face patch";
+                                "minimum-width endpoint conflict recovered by conflict-local bevel termination";
                             return true;
                         }
 
@@ -2768,7 +3496,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                             midpointParameter.ToString("G6") +
                             " beyond endpoint allowance " +
                             endpointAllowance.ToString("G6") +
-                            "; local conflict cluster exhausted legal retreat; bounded endpoint-patch recovery: " +
+                            "; local conflict cluster exhausted legal retreat; conflict-local bevel termination: " +
                             plan.EndpointPatchRecoveryDiagnostic;
                         return false;
                     }
@@ -3010,7 +3738,6 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private static bool TryCompleteCornerDamageIntegrationPlan(
             CornerDamageIntegrationPlan plan,
             int expectedMandatoryCount,
-            UnifiedEdgeWearPreviewStatus baselineStatus,
             out double elapsedMilliseconds,
             out string failureStage)
         {
@@ -3073,33 +3800,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int[] finalMandatory = CollectCornerDamagePlanIdentities(
                     effectiveCoverage,
                     true);
-                HashSet<int> baseline =
-                    CollectCertifiedOrdinaryEdgeIdentities(
-                        baselineStatus.DebugEdges);
-                HashSet<int> affected = new HashSet<int>(
-                    plan.Transaction.AffectedOriginalEdgeIndices);
-                HashSet<int> finalOrdinarySet =
-                    new HashSet<int>(finalOrdinary);
+                // C1B.1: materialization is certified against the
+                // rebuilt post-chip topology only. Historical edge retention
+                // is neither required nor meaningful.
                 List<int> lost = new List<int>();
                 int unrelatedBaselineCount = 0;
                 int unrelatedRetainedCount = 0;
-                foreach (int identity in baseline)
-                {
-                    if (affected.Contains(identity))
-                    {
-                        continue;
-                    }
-                    unrelatedBaselineCount++;
-                    if (finalOrdinarySet.Contains(identity))
-                    {
-                        unrelatedRetainedCount++;
-                    }
-                    else
-                    {
-                        lost.Add(identity);
-                    }
-                }
-                lost.Sort();
 
                 plan.PreviewSoup = previewSoup;
                 plan.UnifiedStatus = unifiedStatus;
@@ -3164,7 +3870,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         PlaneCutEndpointPatchRejectionKind.MaterializationSignature;
                     plan.EndpointPatchRecoveryMaterializationSignatureCount++;
                     plan.EndpointPatchRecoveryDiagnostic =
-                        "prepared bounded endpoint patch failed authoritative materialization: " +
+                        "prepared conflict-local bevel termination failed authoritative materialization: " +
                         (audit.Diagnostic ?? string.Empty);
                 }
 
@@ -3261,14 +3967,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 source.TryResolveAuthoredSurfaceGroup(
                     vertexIndex,
                     out int surfaceGroup);
-                clone.AddTriangle(
+                clone.AddTriangleWithSurfaceContributions(
                     source.Positions[vertexIndex],
                     source.Positions[vertexIndex + 1],
                     source.Positions[vertexIndex + 2],
                     source.ResolveFeature(vertexIndex),
                     source.ResolveFeatureStrength(vertexIndex),
                     normal,
-                    surfaceGroup);
+                    surfaceGroup,
+                    source.ResolvePrimarySurfaceContribution(vertexIndex),
+                    source.ResolveSecondarySurfaceContribution(vertexIndex),
+                    source.TryResolveProvenance(
+                        vertexIndex,
+                        out PolygonFaceProvenanceKind provenanceKind,
+                        out int provenanceIndex)
+                            ? provenanceKind
+                            : PolygonFaceProvenanceKind.None,
+                    provenanceIndex);
             }
             return clone;
         }
@@ -3514,6 +4229,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 plan.EndpointPatchRecoveryRemoteRemainderSignature ?? string.Empty;
             status.EndpointPatchRecoveryCellFailureSource =
                 plan.EndpointPatchRecoveryCellFailureSource ?? string.Empty;
+            status.EndpointPatchRecoveryBoundaryComponentCount =
+                plan.EndpointPatchRecoveryBoundaryComponentCount;
+            status.EndpointPatchRecoveryClosedCycleCount =
+                plan.EndpointPatchRecoveryClosedCycleCount;
+            status.EndpointPatchRecoveryOpenChainCount =
+                plan.EndpointPatchRecoveryOpenChainCount;
+            status.EndpointPatchRecoveryBranchVertexCount =
+                plan.EndpointPatchRecoveryBranchVertexCount;
+            status.EndpointPatchRecoveryTransitionFaceCount =
+                plan.EndpointPatchRecoveryTransitionFaceCount;
+            status.EndpointPatchRecoveryResidualOpenEdgeCount =
+                plan.EndpointPatchRecoveryResidualOpenEdgeCount;
+            status.EndpointPatchRecoveryMechanismSignature =
+                plan.EndpointPatchRecoveryMechanismSignature ?? string.Empty;
+            status.EndpointPatchRecoveryModifiedIdentitySignature =
+                plan.EndpointPatchRecoveryModifiedIdentitySignature ?? string.Empty;
             status.EndpointPatchRecoveryDiagnostic =
                 plan.EndpointPatchRecoveryDiagnostic ?? string.Empty;
         }
@@ -4052,6 +4783,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             if (!status.TransactionCertified)
             {
                 return "transaction-certification";
+            }
+            if (status.PreviewApplied)
+            {
+                return "none";
             }
             if (status.ExpectedCapRingEdgeCount <= 0 ||
                 status.MandatoryCandidateCount !=

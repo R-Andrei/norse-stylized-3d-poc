@@ -480,4 +480,61 @@
                 mask *= 1.0 - upperSuppress;
                 return saturate(pow(mask, 1.06));
             }
+            float3 ResolveGeneratedMassWholeSurfaceNormalWS(
+                Varyings input,
+                float3 baseNormalWS)
+            {
+                float strength = saturate(_GeneratedMassSurfaceNormalStrength);
+                if (strength <= 0.0001)
+                {
+                    return normalize(baseNormalWS);
+                }
+
+                float scale = max(0.05, _GeneratedMassSurfaceNormalScale);
+                float3 broadCoordinate = ResolveGeneratedMassMaskCoordinate(
+                    input,
+                    scale * 0.72,
+                    173.0);
+                float3 mediumCoordinate = ResolveGeneratedMassMaskCoordinate(
+                    input,
+                    scale * 1.85,
+                    241.0);
+                float epsilon = 0.085;
+
+                float3 tetraA = float3( epsilon,  epsilon,  epsilon);
+                float3 tetraB = float3( epsilon, -epsilon, -epsilon);
+                float3 tetraC = float3(-epsilon,  epsilon, -epsilon);
+                float3 tetraD = float3(-epsilon, -epsilon,  epsilon);
+
+                float b0 = PS3D_ValueNoise31(broadCoordinate + tetraA);
+                float b1 = PS3D_ValueNoise31(broadCoordinate + tetraB);
+                float b2 = PS3D_ValueNoise31(broadCoordinate + tetraC);
+                float b3 = PS3D_ValueNoise31(broadCoordinate + tetraD);
+                float3 broadGradient = float3(
+                    b0 + b1 - b2 - b3,
+                    b0 - b1 + b2 - b3,
+                    b0 - b1 - b2 + b3) / max(0.0001, 4.0 * epsilon);
+
+                float m0 = PS3D_ValueNoise31(mediumCoordinate + tetraA);
+                float m1 = PS3D_ValueNoise31(mediumCoordinate + tetraB);
+                float m2 = PS3D_ValueNoise31(mediumCoordinate + tetraC);
+                float m3 = PS3D_ValueNoise31(mediumCoordinate + tetraD);
+                float3 mediumGradient = float3(
+                    m0 + m1 - m2 - m3,
+                    m0 - m1 + m2 - m3,
+                    m0 - m1 - m2 + m3) / max(0.0001, 4.0 * epsilon);
+
+                float3 gradientOS = broadGradient * 0.78 + mediumGradient * 0.38;
+                float3 normalOS = normalize((float3)input.normalOS);
+                float3 tangentGradientOS =
+                    gradientOS - normalOS * dot(gradientOS, normalOS);
+
+                // Strength is true slope amplitude. The top of the Inspector range
+                // is deliberately exaggerated so 0 and 1 cannot look identical.
+                float slopeAmplitude = strength * 1.85;
+                float3 perturbedNormalOS = normalize(
+                    normalOS - tangentGradientOS * slopeAmplitude);
+                return normalize(TransformObjectToWorldNormal(perturbedNormalOS));
+            }
+
 #endif // PS3D_PIXELSURFACEGENERATEDMASSCORE_HLSL

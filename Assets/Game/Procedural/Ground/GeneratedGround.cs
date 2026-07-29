@@ -1310,6 +1310,19 @@ namespace ProgrammaticStylized3D.Geometry.Ground
                 false);
         }
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// Forces the next explicit editor regeneration request to execute the
+        /// structural Ground pass even when the cached signature is unchanged.
+        /// The caller must immediately follow this with the authoritative
+        /// regeneration or production-bake request.
+        /// </summary>
+        public void EditorForceNextStructuralRegeneration()
+        {
+            groundGeometryInitialized = false;
+        }
+#endif
+
         private bool RequestRegeneration(
             GroundRegenerationRequestOrigin origin,
             bool allowPlayStartupCoalescing)

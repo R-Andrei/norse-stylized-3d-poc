@@ -9,9 +9,36 @@ Shader "Hidden/PS3D/Weather LightRay Composite"
             "Queue" = "Overlay"
         }
 
+        HLSLINCLUDE
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+        #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
+        #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+        #define WEATHER_LIGHT_RAY_ENABLE_DEPTH_EVALUATION 1
+        #include "Assets/Game/Rendering/Weather/Includes/WeatherLightRayCommon.hlsl"
+
+        TEXTURE2D_X(_WeatherLightRayMaskTexture);
+        TEXTURE2D_X(_WeatherLightRaySoftenedTexture);
+        float WeatherLightRaySampleRaw(float2 screenUV)
+        {
+            return SAMPLE_TEXTURE2D_X(
+                _WeatherLightRayMaskTexture,
+                sampler_PointClamp,
+                screenUV).r;
+        }
+
+        float WeatherLightRaySampleSoftened(float2 screenUV)
+        {
+            return SAMPLE_TEXTURE2D_X(
+                _WeatherLightRaySoftenedTexture,
+                sampler_LinearClamp,
+                screenUV).r;
+        }
+
+        ENDHLSL
+
         Pass
         {
-            Name "WeatherLightRayComposite"
+            Name "WeatherLightRayContinuousBeamComposite"
             ZWrite Off
             ZTest Always
             Cull Off
@@ -20,109 +47,90 @@ Shader "Hidden/PS3D/Weather LightRay Composite"
             HLSLPROGRAM
             #pragma target 3.5
             #pragma vertex Vert
-            #pragma fragment Frag
+            #pragma fragment FragComposite
 
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.core/Runtime/Utilities/Blit.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
-            #include "Assets/Game/Rendering/Weather/Includes/WeatherLightRayCommon.hlsl"
-
-            TEXTURE2D_X(_WeatherLightRayMaskTexture);
-            TEXTURE2D_X(_WeatherLightRayScatterTexture);
-
-            float4 WeatherLightRaySampleMaskDepthAware(float2 screenUV)
-            {
-                float rawCentreDepth = SampleSceneDepth(screenUV);
-                float centreValid = WeatherLightRayRawDepthIsValid(
-                    rawCentreDepth);
-                float centreEyeDepth = centreValid > 0.5
-                    ? LinearEyeDepth(rawCentreDepth, _ZBufferParams)
-                    : 1e20;
-                float2 texel = _WeatherLightRayScatterDirection.zw;
-                float4 accumulated = 0.0;
-                float accumulatedWeight = 0.0;
-                [unroll]
-                for (int index = 0; index < 4; index++)
-                {
-                    float2 sampleOffset = float2(
-                        (index & 1) != 0 ? 0.5 : -0.5,
-                        (index & 2) != 0 ? 0.5 : -0.5);
-                    float2 sampleUV = screenUV + sampleOffset * texel;
-                    float4 mask = SAMPLE_TEXTURE2D_X(
-                        _WeatherLightRayMaskTexture,
-                        sampler_LinearClamp,
-                        sampleUV);
-                    float rawSampleDepth = SampleSceneDepth(sampleUV);
-                    float sampleValid = WeatherLightRayRawDepthIsValid(
-                        rawSampleDepth);
-                    float depthWeight = 1.0;
-                    if (centreValid > 0.5 && sampleValid > 0.5)
-                    {
-                        float sampleEyeDepth = LinearEyeDepth(
-                            rawSampleDepth,
-                            _ZBufferParams);
-                        float threshold = max(
-                            0.35,
-                            centreEyeDepth * 0.02);
-                        depthWeight = exp2(
-                            -abs(sampleEyeDepth - centreEyeDepth) /
-                            threshold * 4.0);
-                    }
-                    accumulated += mask * depthWeight;
-                    accumulatedWeight += depthWeight;
-                }
-
-                return accumulated / max(0.0001, accumulatedWeight);
-            }
-
-            float4 Frag(Varyings input) : SV_Target
+            float4 FragComposite(Varyings input) : SV_Target
             {
                 float2 screenUV = input.texcoord;
                 float4 source = SAMPLE_TEXTURE2D_X(
                     _BlitTexture,
                     sampler_LinearClamp,
                     screenUV);
-                float4 mask = WeatherLightRaySampleMaskDepthAware(screenUV);
-                float scatter = SAMPLE_TEXTURE2D_X(
-                    _WeatherLightRayScatterTexture,
-                    sampler_LinearClamp,
-                    screenUV).r;
+                float rawBeam =
+                    WeatherLightRaySampleRaw(screenUV);
+                float softenedBeam =
+                    WeatherLightRaySampleSoftened(screenUV);
+                float surfaceInfluence =
+                    WeatherLightRayEvaluateSurfaceInfluence(screenUV);
 
                 if (_WeatherLightRayDebugMode > 0.5 &&
                     _WeatherLightRayDebugMode < 1.5)
                 {
-                    return float4(mask.rrr, 1.0);
+                    return float4(rawBeam.xxx, 1.0);
                 }
                 if (_WeatherLightRayDebugMode > 1.5 &&
                     _WeatherLightRayDebugMode < 2.5)
                 {
-                    return float4(0.0, mask.b, 0.0, 1.0);
-                }
-                if (_WeatherLightRayDebugMode > 2.5 &&
-                    _WeatherLightRayDebugMode < 3.5)
-                {
-                    return float4(mask.a, 0.0, mask.a, 1.0);
+                    float boundaryMarker;
+                    float diameterMarker;
+                    float endpointMarker;
+                    float centreMarker;
+                    WeatherLightRayEvaluateFootprintMarkers(
+                        screenUV,
+                        boundaryMarker,
+                        diameterMarker,
+                        endpointMarker,
+                        centreMarker);
+                    float3 footprintColour = float3(
+                        0.0,
+                        surfaceInfluence,
+                        surfaceInfluence * 0.65);
+                    float3 markerColour = max(
+                        float3(
+                            max(boundaryMarker, diameterMarker),
+                            0.0,
+                            centreMarker),
+                        float3(
+                            endpointMarker,
+                            endpointMarker,
+                            0.0));
+                    return float4(
+                        max(footprintColour, markerColour),
+                        1.0);
                 }
                 if (_WeatherLightRayDebugMode > 3.5 &&
                     _WeatherLightRayDebugMode < 4.5)
                 {
-                    return float4(scatter.xxx, 1.0);
-                }
-                if (_WeatherLightRayDebugMode > 4.5)
-                {
-                    return float4(mask.ggg, 1.0);
+                    return float4(softenedBeam.xxx, 1.0);
                 }
 
                 float3 rayColour = max(
                     0.0,
                     _WeatherLightRayColour.rgb);
-                float structuredAtmosphere = max(mask.r, scatter);
-                float3 contribution = rayColour * (
-                    structuredAtmosphere * _WeatherLightRayIntensity.y +
-                    mask.g * _WeatherLightRayIntensity.z +
-                    mask.b * _WeatherLightRayIntensity.w +
-                    mask.a * _WeatherLightRayCloudParameters.w);
-                return float4(source.rgb + contribution, source.a);
+                float3 atmosphereContribution = rayColour *
+                    softenedBeam *
+                    max(0.0, _WeatherLightRayIntensity.y);
+                float3 positiveRayColour = max(
+                    0.0,
+                    rayColour);
+                float maximumRayChannel = max(
+                    positiveRayColour.r,
+                    max(positiveRayColour.g, positiveRayColour.b));
+                float3 normalizedRayColour = maximumRayChannel > 0.0001
+                    ? positiveRayColour / maximumRayChannel
+                    : 0.0;
+                float3 boundedSceneColour = saturate(source.rgb);
+                float3 fullPowerSurfaceTarget = 1.0 -
+                    (1.0 - boundedSceneColour) *
+                    (1.0 - normalizedRayColour * 0.28);
+                float3 boundedSurfaceLift = max(
+                    0.0,
+                    fullPowerSurfaceTarget - boundedSceneColour);
+                float3 surfaceLitScene = source.rgb +
+                    boundedSurfaceLift * saturate(surfaceInfluence);
+                return float4(
+                    surfaceLitScene + atmosphereContribution,
+                    source.a);
             }
             ENDHLSL
         }

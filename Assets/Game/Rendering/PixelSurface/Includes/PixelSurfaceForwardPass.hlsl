@@ -56,14 +56,24 @@
                 float isGroundSurface = ResolveSurfaceContractIsGround();
                 float exposureMask =
                     saturate((float)input.color.g) * contractMask;
-                float massCreviceMask =
-                    ResolveShaderCreviceBaseMask(input) * contractMask;
+
+                // Generated Mass exposure, crevice/base and dirt are compiled
+                // into the mesh channels. Recomputing them from generated-face
+                // orientation reclassifies bevels and chip transitions before
+                // lighting, which creates fixed bright/dark feature bands.
+                float generatedMassMask = (1.0 - isGroundSurface) * contractMask;
+                float resolvedCreviceMask = lerp(
+                    ResolveShaderCreviceBaseMask(input),
+                    saturate((float)input.color.b),
+                    generatedMassMask);
                 float creviceMask =
-                    lerp(massCreviceMask, 0.0, isGroundSurface);
-                float massDirtDepositMask =
-                    ResolveShaderDirtDepositMask(input) * contractMask;
+                    lerp(resolvedCreviceMask * contractMask, 0.0, isGroundSurface);
+                float resolvedDirtDepositMask = lerp(
+                    ResolveShaderDirtDepositMask(input),
+                    saturate((float)input.materialMasks.y),
+                    generatedMassMask);
                 float dirtDepositMask =
-                    lerp(massDirtDepositMask, 0.0, isGroundSurface);
+                    lerp(resolvedDirtDepositMask * contractMask, 0.0, isGroundSurface);
                 float baseMask = creviceMask * (1.0 - exposureMask);
                 float groundDampDeposit = ResolveGroundDampDepositMask(input);
                 float groundShore = ResolveGroundShoreMask(input);
@@ -463,7 +473,16 @@
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                half3 normalWS = normalize(input.normalWS);
+                half3 geometricNormalWS = normalize(input.normalWS);
+                half3 normalWS = geometricNormalWS;
+                float generatedMassSurface =
+                    1.0 - ResolveSurfaceContractIsGround();
+                if (generatedMassSurface > 0.5)
+                {
+                    normalWS = (half3)ResolveGeneratedMassWholeSurfaceNormalWS(
+                        input,
+                        normalWS);
+                }
                 half flatNormalStrength =
                     saturate((half)_FlatNormalStrength);
                 if (flatNormalStrength > 0.001h)
@@ -491,39 +510,47 @@
                 }
 
                 half3 albedo = ResolvePixelSurfaceColor(input);
-                albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
+                if (generatedMassSurface <= 0.5)
+                {
+                    albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
+                }
                 albedo = PS3D_ApplyValuePreservingTint(
                     albedo,
                     _GeneratedMassOverallRockTint.rgb,
                     _GeneratedMassOverallRockTintStrength);
-                albedo = ApplyGeneratedMassGeometryEdgeWearResponse(
-                    albedo,
-                    input);
 
                 InputData inputData = BuildInputData(input, normalWS);
                 SurfaceData surfaceData = BuildSurfaceData(albedo);
                 half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
 
-                // Keep URP/PBR lighting, shadows, local lights and specular,
-                // but reduce how much RGB light colour can override the rock's
-                // chosen material hue. This preserves brightness/form from PBR
-                // while letting light tint remain an adjustable influence.
-                half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));
-                half3 pbrLightingRatio = pbrColor.rgb / safeAlbedo;
-                half lightingLuma =
-                    dot(
-                        pbrLightingRatio,
-                        half3(0.2126h, 0.7152h, 0.0722h));
-                half3 neutralLitColor =
-                    albedo * max(0.0h, lightingLuma);
+                // GM-SURFACE.5E baseline parity: Generated Masses use raw URP/PBR
+                // output. Do not apply bevel-specific albedo painting, directional
+                // pre-light value shaping, post-PBR light-colour reconstruction, or
+                // shadow-side normal readability while validating geometry lighting.
+                half3 finalRgb;
+                if (generatedMassSurface > 0.5)
+                {
+                    finalRgb = pbrColor.rgb;
+                }
+                else
+                {
+                    half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));
+                    half3 pbrLightingRatio = pbrColor.rgb / safeAlbedo;
+                    half lightingLuma =
+                        dot(
+                            pbrLightingRatio,
+                            half3(0.2126h, 0.7152h, 0.0722h));
+                    half3 neutralLitColor =
+                        albedo * max(0.0h, lightingLuma);
 
-                half lightingTintInfluence =
-                    saturate((half)_GeneratedMassLightingTintInfluence);
-                half3 finalRgb =
-                    lerp(
-                        neutralLitColor,
-                        pbrColor.rgb,
-                        lightingTintInfluence);
+                    half lightingTintInfluence =
+                        saturate((half)_GeneratedMassLightingTintInfluence);
+                    finalRgb =
+                        lerp(
+                            neutralLitColor,
+                            pbrColor.rgb,
+                            lightingTintInfluence);
+                }
 
                 finalRgb = MixFog(finalRgb, inputData.fogCoord);
                 return half4(finalRgb, pbrColor.a);

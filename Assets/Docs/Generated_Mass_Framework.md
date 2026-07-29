@@ -1,825 +1,116 @@
 # Generated Mass Framework
 
-This document defines the stable Generated Mass feature contract. It is not a progress log.
+Status: canonical overview
 
+## Purpose
 
-## Weather cloud-shadow receiver contract — source integrated; Unity visual validation pending
+Generated Mass creates deterministic stylized rock geometry from recipes and surface-feature settings. The module owns base shape generation, structural feature geometry, final mesh channels, and the bridge to shared rock materials.
 
-Generated Mass is a required receiver of the Weather-owned cloud-shadow illumination field. Rocks and future Pixel Surface props must shade coherently with adjacent Ground, Vegetation, River, actors, and buildings at the same world position. Generated Mass does not own cloud seed, coverage, phase, direction, speed, or transmission.
+## Canonical documents
 
-Cloud integration is renderer-only. It may attenuate the approved environmental-sun contribution in the Pixel Surface forward-lighting path, but it must not change deterministic generation, convex topology, edge-wear selection, corner damage, chipping, feature-atlas data, UV channels, normals, collision, placement, material identity, wetness ownership, or geometry budgets. Open-sun rendering must remain equivalent to the accepted no-cloud baseline.
+- `Generated_Mass_Surface_Response_Architecture.md` — production geometry, normals, feature responses, performance limits.
+- `Generated_Mass_Incremental_Selection_Architecture.md` — frozen corner/bevel selection and ranked-discard contract.
+- `Generated_Mass_Incremental_Selection_Implementation_Plan.md` — closure record and remaining selection-related maintenance.
+- `Generated_Mass_Edge_Wear_Code_Inventory.md` — current code ownership map.
+- `Generated_Mass_Edge_Wear_Recovery_Architecture.md` — retained historical recovery conclusions only.
+- `Generated_Mass_Feature_Implementation_Checklist.md` — concise completed/active work list.
 
-The live receiver audit reported that `PS3D/Pixel Surface Lit` declared `_LIGHT_COOKIES`, but source review found that the custom ForwardLit pass inherited the keyword in `Shader.keywordSpace` through its URP Lit fallback and did not contain its own cookie variant pragma. V0.2 therefore adds only `#pragma multi_compile_fragment _ _LIGHT_COOKIES` to `SH_PixelSurfaceLit.shader`; its existing `UniversalFragmentPBR` path performs the actual cookie-aware main-light evaluation. Generated Mass geometry, generation, editor, feature-atlas, forward-lighting includes, and material contracts remain unchanged. The production shader family must continue to declare directional-cookie receiver support for the editor compliance audit. V0 uses the authoritative sun's URP main-light cookie exactly once; Generated Mass must not add a separate vertex cloud field or final-colour cloud multiplier. Future Generated Mass material or Shader Graph adapters are not production-compatible until they receive the same cookie or are explicitly exempted. Exact runtime files remain governed by `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`; hybrid optimization is deferred until measured cookie cost justifies it.
+## Current production state
 
-The sole canonical progress ledger is:
+GM-SURFACE.2 makes certified bevel and corner-chip geometry ordinary Generated Mass output whenever the serialized structural settings enable it. `BaseGeometryOnly` is retained for disabled features and deterministic safe fallback. Diagnostic preview actions evaluate the same construction system but do not own production output.
 
-```text
-Docs/Generated_Mass_Feature_Implementation_Checklist.md
-```
-
-## Feature goal
-
-Generated Mass produces deterministic convex stylized rock and mass geometry suitable for the isometric URP project. Edge wear must create real faceted bevel geometry, preserve the closed mass surface, remain inexpensive at runtime, vary with deliberate natural irregularity rather than uniform machine-like strips, support later artistic normal shaping, and carry explicit feature data to the final mesh and material response.
-
-## Geometry budgets
-
-Accepted final-mesh budgets remain:
-
-| Tier | Vertex budget | Atlas guidance |
-|---|---:|---|
-| Standard | no more than 1,600 vertices | 256 when an atlas is actually required |
-| High | no more than 3,000 vertices | 256; 512 only for unusually large assets |
-| Hero | no more than 8,000 vertices | 512 when justified |
-
-Quality tiers must not change the apparent edge-wear band width solely because of texture resolution.
-
-## Canonical generation order
+## Final framework direction
 
 ```text
-base convex mass
-    -> deterministic source cuts and polygon-face representation
-    -> micro-topology normalization
-    -> normalized source topology graph
-    -> deterministic sparse source-corner damage
-    -> certified corner cap and original-edge descendant identity
-    -> ordinary and cap-ring bevel candidate selection
-    -> requested width and corner feasibility solve
-    -> certified scalar bevel construction
-    -> topology, manifold, face-quality, volume, and render validation
-    -> final polygon triangulation
-    -> authored bevel/cap normals and geometric normals
-    -> dimensions and immutable placement frame
-    -> final MeshData and render-channel validation
-    -> Unity tangent recalculation
-    -> uniform UV2.z-marked bevel-surface response
-    -> sparse edge chips/notches [later]
-    -> final artistic normal shaping [after all accepted worn geometry]
-    -> face/crack/crevice and final rendering finish [later]
+recipe + surface settings
+→ base geometry
+→ certified chips and bevels
+→ final topology and geometric normals
+→ compact primary/secondary feature fields
+→ shared whole-rock triplanar normal response
+→ bounded feature-localized material responses
 ```
 
-Edge wear may not mutate the source polygon set unless the selected construction has passed its explicit production gate.
-
-## Edge-wear control ownership
-
-- **Amount** controls the strength or prominence of the edge-wear response and gates generated bevel geometry at zero; it does not rank topology eligibility.
-- **Width** controls the uniform geometric bevel-depth reference used before per-edge macro variation.
-- **Bevel Coverage** controls deterministic edge-selection density.
-- **Macro Variation Coverage** controls which fraction of ordinary eligible canonical source edges participates in edge-to-edge width variation.
-- **Macro Variation Strength** is a normalized `0..1` authoring control. The canonical resolver maps it linearly to the Unity-certified internal amplitude `0..0.55`; control Strength `1` therefore reproduces the previously accepted effective Strength `0.55` result.
-- **Softness** controls the current marked-bevel shader response and must not secretly expand geometric width.
-- **Response Strength**, **Brightness Lift**, **Worn Edge Tint**, and **Tint Influence** control the current UV2.z-marked visual response.
-- The former EW-S1 **Edge Surface Variation Strength**, **Edge Surface Variation Scale**, **Edge Normal Breakup**, and **Edge Material Breakup** controls are removed. They drove object-space waves rather than a stable source-edge-relative signal and did not justify their active fragment cost.
-- **Chipping** means a bounded local interruption or notch in an otherwise valid wear band. It remains a separate sparse geometry feature.
-- **Corner damage** means sparse flattening, crushing, or removal of a junction. It is separate from bevel-surface response and edge chips.
-
-`EW-V1A.3b` is the accepted and frozen scalar geometry, Macro-width, and uniform bevel-response baseline for explicit editor preview/audit evaluation. Public Macro Strength `0..1` maps to effective amplitude `0..0.55`; the deterministic participation and width hashes apply downward-only reduction through the smooth dihedral permission: `15°` shallow, `90°` sharp, and `0.35` sharp-edge permission. Zero Macro Coverage or Strength restores exact uniform requests; participating edges remain constant-width along each edge. EW-V2A geometric Micro, EW-V1A.2c/d/e Macro protection, and EW-S1 object-space breakup are removed. Ordinary production geometry remains unchanged. Controls must have visible, testable responsibilities and meaningful tooltips; stale or disconnected controls are not exposed.
-
-## Current construction boundary
-
-`EW-V1A.3b` is the accepted deterministic scalar and dihedral-biased width baseline. `EW-B4.2R13A.9a` remains its exact uniform zero-control fallback. The EW-V1A.3b initial requested width rule applies to successfully classified convex edges; all topology, viability, coexistence, micro-topology normalization, recovery, canonical identity, and render-channel contracts remain mandatory for the representative suite:
+No per-rock atlases or generated normal maps are allowed. Runtime shaders evaluate at most two structural contributions and do not iterate arbitrary feature lists.
 
-```text
-current preview: passed
-topology matrix: 33/33
-artistic-preview matrix: 33/33
-recovery fixtures: 5/5
-unresolved fixtures: 0
-negative exclusion: 1/1
-```
-
-The accepted geometry still runs through explicit editor preview/audit modes on a deep clone. Ordinary `MassGenerator.Generate(...)` remains `EdgeWearEvaluationMode.None`, and:
-
-```text
-geometryCommit=disabled
-```
-
-remains active. V1A acceptance therefore freezes deterministic edge-to-edge average-width irregularity on the editor visual/geometry foundation; it is not production promotion and it is not completion of the full edge-wear visual feature.
-
-The retained legacy replacement/strip/patch path, rejected intermediate plane/junction experiments, rejected EW-V2A multi-plane profile path, and rejected EW-S1 object-space breakup remain diagnostic history only. The active render path is the uniform bevel-face response. EW-V1A.3b and EW-C1A.1a.8 remain accepted and frozen. EW-C1A.2a passed its seed-8889 integration gate. EW-C1A.3 owns the compact Corner Chipping authoring workflow and 33-case validation stage. EW-C1A.3e fixed plan/emission identity parity but remained too slow. EW-C1A.3f split solve-only candidate preparation from one shell materialization, but its Unity run proved that the public wrapper could discard a valid ordinary baseline mesh/status and return production geometry with default unified status after corner failure. EW-C1A.3g retains the ordinary baseline as one mesh/status/timing bundle, treats solve-only output as non-authoritative preparation, permits exactly one complete shell build, derives final identities and retention from the completed coverage, emits only the stored certified soup/status, and returns the exact ordinary baseline on every corner failure. Its Unity report accepted that ownership boundary and exposed the remaining dominant failure as endpoint-adjacent foreign bevel-plane splits that survive conflict-cluster retreat to legal minimum widths. EW-C1A.3h adds a preparation-only proof guard for that exact class: it reconstructs the victim/foreign shared rail from the actual prepared planes, clips it against the post-cut convex source shell and all retained candidate half-spaces after only the implicated endpoint-star cluster retreats to its legal floors, applies the authoritative width-derived endpoint allowance, and rejects only a persistent interior split. Ranked preparation continues after a proof rejection; at most one guard-clear candidate receives the complete authoritative build. Its Unity run proved the guard predictive but exposed repeated integration-preflight work as the remaining matrix cost. EW-C1A.3i introduces one editor-search-scoped replay cache: normalized micro-topology is built once, and isolated viability is copied only for unaffected ordinary edges whose stable identity, ordered or reversed endpoints, owner normals, structural measurements, requested width, minimum style width, and locality evidence match exactly. Every missing or uncertain match runs the unchanged full audit. Production `EdgeWearEvaluationMode.None` remains unchanged. C1A.3j is runtime-rejected after `0/104` prepared recoveries. C1A.3k is also runtime-rejected after `0/104` prepared endpoint-star boundaries: its two/three-band eligibility was exercised, but the additional infinite half-space still reached unrelated geometry or exceeded local influence. C1A.3l replaced that global plane ownership with one bounded local face-patch replacement, but its first Unity run rejected `102/104` attempts because locality was applied to every original selected-face vertex. C1A.3m correctly limited locality to removed vertices, local intersections, and generated replacement/cap geometry, permitting `620` retained remote vertices, but still prepared `0/104` patches because candidate placement remained anchored to maximum support across complete incident bevel faces and the endpoint-patch path still used a legacy global-junction influence validator. C1A.3n anchors the same bounded replacement to deterministic endpoint-local support samples for every incident bevel identity and certifies patch influence directly along the implicated incident source edges. The development contracts remain `<= 4 s` target, `5 s` hard maximum per enabled rock, `35 s` corner matrix, and `90 s` research suite.
-
-## Post-baseline edge-wear visual contract
-
-The active and planned sequence is:
-
-```text
-EW-V1A.2f  normalized scalar safety baseline [superseded by frozen V1A.3b]
-EW-V1A.3b  dihedral-biased macro hierarchy and S1 removal [accepted and frozen]
-EW-S1      object-space normal/material breakup [rejected and removed]
-EW-C1A-RO2 pre-bevel order and ownership audit [complete]
-EW-C1A.1  transactional pre-bevel cut and provenance proof [implemented; transaction accepted]
-EW-C1A.1a one polygon, one render surface [accepted and frozen]
-EW-C1A.2a committed corner cut, provenance bridge, and mandatory cap-ring preview [Unity seed-8889 accepted]
-EW-C1A.2b corner controls, live settings, and Scene marker [seed-8889 proof complete]
-EW-C1A.2c chip-only geometry endpoint and post-chip integration proof [seed-8889 proof complete]
-EW-C1A.3  unified authoring workflow and first 33-case gate [implemented; Unity result 14/33]
-EW-C1A.3a deterministic fully certified single-corner search [superseded by C1A.3b]
-EW-C1A.3b bounded staged certification [superseded by C1A.3c]
-EW-C1A.3c predictive complete preflight and one-final-build search [superseded by C1A.3e]
-EW-C1A.3d validator de-duplication and research scheduling [implemented; Unity scheduling accepted]
-EW-C1A.3e authoritative integration plan and topology-baseline reuse [implemented; identity parity accepted, performance failed]
-EW-C1A.3f solve/materialization split [runtime rejected: ordinary preview status/mesh ownership failed]
-EW-C1A.3g complete authoritative build and truthful baseline fallback [implemented; Unity validation pending]
-EW-C2      sparse edge chips and notches [later]
-EW-N1      final artistic normal shaping [after geometry]
-EW-F1      face finish, cracks, and crevices [later]
-```
-
-These are distinct responsibilities.
-
-- EW-V1A.2f freezes **Macro Variation Coverage**, deterministic identities, and effective Strength `0..0.55`. EW-V1A.3b restores the EW-V1A.3 rule that multiplies only the downward reduction by a nonincreasing dihedral permission. At maximum Strength and minimum sampled multiplier, the shallow lower bound remains `0.7525x` and the `90°+` lower bound is approximately `0.913375x`. Nonparticipants remain exactly `1.0x`, width remains constant along each edge, zero on either control restores the R13A.9a uniform request path, and Coverage `1` authorizes every ordinary evaluated edge.
-- The retained shader response uses only the UV2.z bevel mask, Response Strength, Brightness Lift, Worn Edge Tint, Tint Influence, and Softness. It performs no object-space wave, bevel-normal perturbation, or bevel-specific smoothness variation.
-- Universal geometric within-edge taper and EW-S1 object-space breakup are retired. Neither may be reintroduced without a stable edge-relative data path, visual evidence, and explicit performance approval.
-- Corner damage and chips remain sparse geometry features because shaders cannot alter silhouette or create actual missing material.
-- Variation remains deterministic from existing recipe seeds. V1A.3b adds no per-frame mesh work, serialized seed, feature atlas, or mesh channel.
-
-### EW-V1A.1 implementation boundary
-
-- Width identity and participation identity are independent deterministic streams from shape seed and canonical original source-edge index.
-- Participation uses a stable threshold set: increasing Coverage adds edges without reshuffling earlier participants; Coverage `1` authorizes every ordinary evaluated edge.
-- Participating edges receive the V1A width sample blended by Strength. Nonparticipants retain the base request exactly.
-- The per-edge request enters before footprint and isolated viability, then remains authoritative through corner solving, recovery, explicit bounded preview, and final certified shell construction.
-- Minimum-style clamping and every existing topology/quality/recovery gate remain authoritative.
-- Artistic selection weights and seed stream are unchanged; any selection difference must arise from truthful width-dependent viability, not a new ranking policy.
-- The one-click suite directly checks zero-by-Strength parity, zero-by-Coverage parity, repeated determinism, full-Coverage compatibility, participant bounds, and active distribution before the existing matrices and fixtures.
-- Macro controls are not part of `ProductionGenerationState`; `EdgeWearEvaluationMode.None`, Play Mode generation, collider ownership, and active-gameplay cost are unchanged.
-- V1A.1 does not implement within-edge taper, lobes, drift, chips, notches, normal shaping, or shader finish.
-
-## Topology invariants
-
-A production mass must have:
-
-- zero open edges;
-- zero non-manifold edges;
-- zero T-junctions;
-- finite vertices, unit normals, and finite unit tangents;
-- non-degenerate retained faces;
-- consistent outward winding;
-- positive enclosed volume;
-- deterministic output for identical inputs.
-
-A bevel plane must either produce one surviving `ConvexEdgeWear` face or be proven redundant because earlier cuts already removed its source edge and satisfy its half-space.
-
-## Feature-data contract
-
-Bevel faces use:
-
-```text
-PolygonFaceFeature.ConvexEdgeWear
-```
-
-and preserve the selected edge’s feature strength through triangulation. Final material response may use brightness lift, optional tint, falloff contrast, and smoothness offset, but shader response must not compensate for invalid geometry.
-
-## Atlas policy
-
-Edge-wear atlases are optional diagnostic or feature-specific inputs. Final bevel visibility must not depend on the previously rejected low-resolution boundary atlas path.
+## Frozen selection policy
 
-Atlas generation is justified only when a retained material feature needs it. Geometry construction, boundary ownership, and bevel width must remain mesh-defined.
-
-## Performance policy
-
-- Prefer deterministic dirty-time construction over per-frame work.
-- Generated rocks are static after generation unless explicitly regenerated.
-- Lifecycle restoration first attempts to re-adopt a certified production mesh whose stored production state and generation-contract version match the current recipe.
-- A missing, stale, preview, or uncertified mesh may rebuild once; later lifecycle callbacks must reuse the accepted result instead of repeating the rebuild.
-- Ordinary `OnEnable` and `OnValidate` synchronize generated state rather than unconditionally regenerating.
-- Material-only changes update renderer state without rebuilding geometry, recooking the collider, recalculating the world-triangle fingerprint, or notifying geometry consumers.
-- River-interaction authoring changes notify consumers without rebuilding production geometry.
-- Feature-atlas diagnostics are tracked separately from production geometry and may refresh atlas data without recooking an unchanged collider.
-- Lifecycle restoration may rebuild a transient production mesh, but ordinary generation must not run diagnostic-grade edge-wear reconstruction or audits.
-- Expensive validation is explicit editor/diagnostic-only and never runs from `OnEnable`, ordinary `OnValidate`, script reload, or Play Mode transitions.
-- Collider recooking occurs only when geometry was rebuilt or the collider lost its certified mesh binding.
-- Exact world-triangle fingerprints are invalidated by geometry changes and calculated lazily on the first consumer request.
-- Any normal-generation semantic change must increment the production-generation contract version before old generated state may be reused. GM-R12B.1D advances this contract from `1` to `2`.
-- Production geometry must respect the accepted tier budgets.
-- Do not add per-frame full-mesh rebuilds.
-- Cache reusable deterministic data when it materially reduces regeneration cost.
-- Macro irregularity and sparse damage are dirty-time geometry concerns. V1A.3 adds only constant scalar work per evaluated convex edge and removes the former EW-S1 fragment-wave path; it adds no per-frame mesh work, texture sampling, or feature-atlas updates.
-
-## Editor and diagnostics contract
+- corner chips outrank ordinary bevel preservation;
+- ordinary bevels are opportunistic;
+- incompatible ordinary candidates are reduced deterministically by ranking;
+- zero surviving ordinary bevels is valid;
+- every accepted result requires complete geometry, topology, render-channel, and performance certification;
+- no combinatorial global subset optimization is active.
 
-- Ordinary production generation emits no edge-wear audit.
-- Automatic lifecycle synchronization emits no per-object Console summary; performance evidence uses Profiler markers.
-- The authoritative markers are `GeneratedMass.Synchronize`, `GeneratedMass.GenerateProduction`, `GeneratedMass.BindCollider`, `GeneratedMass.ComputeFingerprint`, and `GeneratedMass.NotifyConsumers`.
-- Explicit plane-cut preview emits one dedicated compact plane-cut result per intentionally evaluated mass.
-- The legacy replacement/strip/patch compact audit is explicit, single-object, opt-in evidence.
-- Detailed evidence is opt-in, deduplicated, and capped to representative failures.
-- Diagnostics must never alter production eligibility unless explicitly promoted.
-- Editor-only previews must be clearly labeled and must not become serialized artistic controls accidentally.
-- Existing layers, tags, components, asset names, and serialized structures may not change without approval.
-- Live render-channel integrity audits are explicit, single-object, editor-only actions over the already-generated `MeshFilter.sharedMesh`; they must never run from generation, `OnEnable`, `OnValidate`, Play Mode transitions, or per frame.
-- Diagnostic proof meshes and materials must use `HideAndDontSave`, must not serialize or replace the production mesh, and must restore the source renderer when removed or when selection changes.
-- A render-channel repair may not be promoted from a proof clone until the exact failing triangle/channel is measured and the smallest-blast-radius ownership boundary is justified. GM-R12B.1D proved Generated Mass zero normals and promotes a Generated Mass-only normalization/validation repair; shared `MeshData`, `MeshBuilder`, UV construction, and shader behavior remain unchanged.
+## Geometry and material ownership
 
-## Validation contract
+Geometry owns silhouette and macro structural shape. Shared material response owns whole-rock grain and sub-triangle detail. Mesh normals describe geometry only.
 
-Every geometry implementation patch requires:
+## Runtime constraints
 
-1. Zero Unity compiler errors and warnings introduced by the patch.
-2. Deterministic regeneration of the representative mass set.
-3. Exact topology and geometry audit results.
-4. Confirmation that unrelated compact fields remain unchanged.
-5. Confirmation of the live/clone boundary.
-6. Visual inspection before any production promotion.
-7. Vertex-budget inspection after production promotion.
+- no per-frame mesh reconstruction;
+- no unbounded shader loops;
+- no one-renderer-per-feature architecture;
+- deterministic outputs;
+- no scene/prefab/material mutation during source-only patches;
+- diagnostics longer than a brief moment must remain incremental, cancellable, responsive, and checkpointed.
 
-## Edge-wear recovery closure contract
+## Next work items
 
-- Historical editor fixtures may resolve as either a certified materialized bevel or a finite infeasibility result under the solver's complete current discrete admissible-width schedule. A discrete result must not be described as a continuous mathematical proof.
-- No recovery diagnostic may add geometry attempts unless a separately approved method change declares the performance impact.
-- Finalized corner recovery may use only exact recorded zeroing participants and their last positive widths. Width-recovery-provisional edges are not valid corner-augmentation initiators.
-- Negative artistic fixtures are first-class regression gates. Seed `8889`, maximum width, source edge `40` is intentionally excluded and must remain inactive, uncertified, and unmaterialized. This fixture is editor-only and may not create a seed-specific production branch.
-- Optional recovery remains subordinate to the immutable certified baseline. It may not reduce certified count, replace unrelated baseline identity, weaken topology/geometry/render guards, or erase a valid preview.
+1. GM-SURFACE.2 productionize certified bevel/chip geometry. **Completed.**
+2. Pack the completed semantic primary/secondary contribution model into final mesh channels.
+3. Add shared triplanar whole-rock normal detail.
+4. Add convex/chip responses, then concave creases through the same contract.
 
-## Edge-wear micro-topology normalization contract
 
-- Explicit edge-wear preview and audit transactions may consume a connected micro-topology component when it contains at least one internal manifold seed edge no longer than the canonical minimum useful style scale and every expanded component edge plus the complete component diameter remains below the global minimum certified bevel footprint.
-- Normalization is forbidden in production `EdgeWearEvaluationMode.None`; it never rewrites the authored/generated base mass mesh or any serialized asset.
-- Every candidate collapse maps the component to one existing component vertex. Invented midpoint vertices and hull expansion are forbidden. Candidate choice is deterministic by minimum squared displacement, then minimum volume loss, then lowest original graph-vertex index.
-- The temporary convex hull must be closed, manifold, finite, positive-volume, contained by the original bounds, lose no more than the bounded micro-volume allowance, and preserve every non-component source edge after endpoint remapping. Any failure leaves the original topology unchanged.
-- Stable original source-edge identity remains authoritative for reports, fixtures, and overlays. Consumed edges are retained as diagnostic records with `micro-topology-suppressed` and overlay code `M`; any new transition edge created by the normalized hull is structural-ineligible, receives only a synthetic non-colliding diagnostic ID, and cannot become a bevel candidate.
-- Every eligible component retains one bounded diagnostic record containing seed/all edge IDs, graph vertices, diameter, every canonical-vertex attempt, displacement, resulting volume/loss, exact blocker, and selected candidate.
-- The normalized faces are the source of truth for viability, artistic selection, shared-corner solving, coexistence, and final bevel construction. All existing topology, convexity, source-provenance, bounds, volume, face-quality, triangulation, normal, tangent, and render-channel certification remains mandatory.
-- Seed `8889` maximum-width micro component `14/24/30` is the canonical validation fixture. Suppressing that invisible triangular component is authorized only if original edges `13` and `23` certify, edge `39` remains certified, and edge `40` remains inactive and uncertified.
+## Structural surface-response stream
 
-## Documentation ownership
+GM-SURFACE.4 compiles the generation-time primary and secondary semantic contributions into `TEXCOORD4` on every final Generated Mass vertex. The 16-byte layout stores primary type/strength and secondary type/strength. The current response role and direction are derived later by the shared shader; feature identity and generation-only provenance are deliberately discarded. `TEXCOORD3` is not reused because the old diagnostic feature-atlas path still occupies it.
 
-| Document | Sole responsibility |
-|---|---|
-| `Generated_Mass_Feature_Implementation_Checklist.md` | Canonical progress log, methods tried, validation outcomes, active blocker, and next step. |
-| `Generated_Mass_Edge_Wear_Recovery_Architecture.md` | Current architecture, invariants, rationale, and promotion gates. |
-| `Generated_Mass_Edge_Wear_Code_Inventory.md` | Current files, methods, and dependency boundaries. |
-| `Generated_Mass_Framework.md` | Stable feature, control, performance, and validation contract. |
 
-Other documents may reference the canonical progress ledger, but must not maintain competing or complementary patch histories.
+## Current surface-lighting status
 
+GM-SURFACE.5A makes whole-rock normal strength visibly meaningful and corrects generated-face mask ownership. Convex bevels and chip caps are lit by their geometric normals while legacy broad exposure/crevice/dirt masks are suppressed on those generated surfaces. Explicit convex accents and exposed-chip material response remain GM-SURFACE.6 work.
 
-## Generated Mass render-normal integrity contract
+### Current generated-face lighting correction — GM-SURFACE.5B
 
-- Every authored or geometric render normal is normalized explicitly from any finite, mathematically non-zero vector using double-precision magnitude evaluation. Triangle acceptance remains governed by the existing scale-relative geometry tests; no edge-length-squared threshold may be reused for a cross-product-squared normal test.
-- Accepted triangles may not silently fall back to an unrelated axis normal. Only a truly zero or non-finite geometric normal is a deterministic generation failure; tiny but scale-valid triangles must normalize successfully.
-- Generated Mass validates all authored `MeshData` channels before mesh application and validates final Unity normals/tangents after tangent reconstruction.
-- Final normals and tangent XYZ vectors must be finite and unit length; tangent handedness must be finite and approximately `-1` or `+1`.
-- These guards run only when Generated Mass geometry is built or explicitly regenerated. They add no per-frame work and do not alter shared procedural-mesh consumers.
+Ordinary convex bevels use a bounded object-space rounded-normal proxy because
+the current fixed 16-byte structural stream does not carry adjacent source-face
+normals. Shaded whole-rock normal relief receives a weak non-emissive
+hemispherical readability term, and convex faces receive a restrained
+light-dependent lift. Source faces and chip caps retain their distinct normal
+policies. This correction adds no texture, draw call, variable feature loop or
+mesh stream.
 
 
-## Scale-correct render-normal clarification
+## GM-SURFACE.5C — Generated-face material-mask inheritance
 
-- Triangle validity is established by the generator's existing finite and scale-relative geometry tests. Render-normal normalization may not introduce an unrelated absolute triangle-size cutoff.
-- A cross product may be normalized when it is finite and mathematically non-zero, even when its magnitude is below Unity's `Vector3.normalized` epsilon or below an edge-length threshold.
-- Production and explicit editor diagnostics must use equivalent robust normalization semantics so an accepted production triangle and its audit cannot disagree solely because of normalization thresholds.
-- UV-conditioning metrics are diagnostic warnings when all final channels and 3D geometry remain finite and valid; they are not independently a production failure.
+The dark-band bevel defect was confirmed to be a pre-light material-mask ownership defect, not a mesh-normal defect. Generated bevel and chip faces must not recompute Exposure, Crevice/Base, or DirtDeposit from their own new face normal, and the shader must not suppress those masks as a compensation. During final mesh emission, generated triangles now inherit the source-face material-mask samples present on their shared boundaries. Shader-side convex/chip mask suppression and the GM-SURFACE.5B convex lighting compensation are retired. Whole-rock normal response remains independent.
 
-## Edge-wear boundary-terminal and provisional-retention contract
+## GM-SURFACE.5D generated-face material-channel correction
 
-- An isolated support rail terminates at the unique nearest forward intersection with the complete boundary of its exact owner source face. The solver may resolve a different boundary segment than the endpoint-adjacent assumption only through exact owner-plane polygon intersection and exact target-face provenance.
-- A rail may not be clamped across a material segment miss, routed through an invented support chain, or allowed to bypass displacement, topology, containment, bounds, volume, face-quality, or render-channel certification.
-- Requested-width fraction remains the normal viability gate. A locally certified edge below that fraction may be provisional only when it remains certified at the canonical minimum style floor.
-- Every width-provisional edge remains forced off in the immutable certified baseline. Only an artistically eligible provisional edge whose source length supports at least two complete requested bevel footprints may become a material width-recovery target. Tiny or barely structural provisional edges remain baseline-only exclusions.
-- Material width recovery is decided from one immutable post-selection target set. Each target receives exactly one non-branching complete-shell trial with every other baseline exclusion unchanged; successful targets are committed sequentially so later trials must preserve the certified baseline plus every earlier material recovery. Ordinary non-provisional generation retains the direct path and pays no recovery cost.
-- Corner-collapse participants and terminal plane-band victim/foreign pairs are branchable conflicts. Final render-normal/winding failure rejects a branch and never weakens the normal guard.
-- Valid conflict states are ordered by certified count, accepted artistic score, certified width, and deterministic source-edge order. No seed or source-edge ID is production policy.
+The final Generated Mass mesh owns its pre-light exposure, crevice/base, and dirt masks. The Pixel Surface renderer reads `Color.g`, `Color.b`, and `UV2.y` directly for Generated Masses and does not reclassify bevel or chip faces from their new normals. Generated boundary vertices retain their local source-boundary samples; generated interior vertices interpolate those samples instead of receiving one triangle-wide average. This keeps material treatment continuous while leaving geometric normals solely responsible for light orientation.
 
-## GM-R12B.1E validation closeout
+## Current Generated Mass lighting baseline — GM-SURFACE.5E
 
-- The scale-correct normal contract is runtime-proven on `Rock_14`, `Rock_18`, seed `8889` ordinary output, and seed `8889` unified bevel-preview output.
-- Representative audits report zero missing, zero, non-finite, or non-unit normals/tangents; the black-triangle and Bloom-orb artifact no longer reproduces.
-- Finite UV-conditioning findings remain explicit warnings when 3D geometry and final render channels are valid.
-- GM-R12B.1E is closed by its ordinary and bevel-preview runtime audits. R13A.9a is now the accepted recovery baseline: current preview passed; both `33/33` matrices passed; micro-topology component `14/24/30` is normalized; seed-8889 edges `13/23/39` are certified; edge `40` remains excluded; recovery fixtures passed `5/5`; unresolved fixtures are zero; and no case timed out or cancelled. R13A.9 remains a rejected intermediate.
+Generated Masses currently return raw URP `UniversalFragmentPBR` lighting. Bevel-specific pre-light colour painting, directional pre-PBR value shaping, post-PBR light-colour reconstruction and shadow-side normal readability are quarantined during parity validation against `SG_PixelSurfaceLit`. Geometry and compiled material masks are unchanged.
 
-## Edge-wear conflict-search execution contract
+## Validated generated-face material-mask continuity
 
-- A Generated Mass edge-wear evaluation may own only one active full-shell conflict frontier. A provisional corner/full-shell search may not recursively invoke the plane-kernel coexistence search.
-- Ordinary non-provisional cases retain the existing plane-kernel coexistence owner. Provisional cases disable kernel recursion and return exact failure evidence to their single active frontier.
-- Explicit editor validation searches are capped at 128 states and five seconds. State-budget exhaustion, time-budget exhaustion, and user cancellation are distinct reported outcomes; none may commit partial geometry.
-- A synchronous matrix case must poll the cancelable editor progress callback between search states and clear the transient callback after the case.
-- Priority ordering is fewest exclusions, lowest removed accepted artistic score, lowest removed certified width, then deterministic source-edge order. The first fully certified state is committed; exhaustive post-success optimization is forbidden.
+Committed ordinary bevel polygons compile exposure (`Color.g`), crevice/base (`Color.b`), and dirt-deposit (`UV2.y`) values during dirty-triggered mesh construction. After the existing source-boundary/interior inheritance pass, duplicated render vertices are reconciled by emitted bevel provenance and quantized local position. Internal triangulation therefore cannot assign different material-mask values to the same logical bevel point.
 
-R13A.9a is the accepted runtime baseline over the immutable certified-baseline architecture. R13A.9 remains a rejected intermediate because it missed both intended target executions and triggered an unrelated five-second material-recovery search. The recovery architecture is frozen unless new visible evidence demonstrates a meaningful edge that the current certified baseline wrongly excludes.
+The contract is validated on two distinct accepted production meshes: 204 triangles / 35 logical bevels and 188 triangles / 34 logical bevels. Both retained exact immutable geometry fingerprints, complete bevel mapping, zero source-face mask changes, zero internal mask jumps, zero upload mismatches, and zero degenerate-triangle regression. The reconciliation modifies only the three generated-face mask channels and does not modify positions, indices, normals, structural feature values, UV0, provenance, source-face masks, or shader behavior.
 
+The permanent bevel-shading evidence suite keeps capture, geometry-fingerprint, source-face preservation, degenerate parity, logical mapping, shared-edge continuity, normal, parent-cone, and upload checks. Clean passes use a compact report; failures retain full per-bevel evidence.
 
-## Certified baseline augmentation contract
+## Residual bevel-shading status — GM-SURFACE.5G-H2
 
-- Optional edge-wear recovery is an augmentation of a fully certified ordinary shell, never a replacement generator. The baseline corner solution, plane audit, preview geometry, and lifecycle evidence remain immutable fallback state.
-- Every selected width-provisional edge is omitted from baseline certification. Materially significant targets are captured once from selected graph-edge identity and immutable preflight/artistic evidence before any trial mutates lifecycle state. Finalized corner-inactive and retained-hull targets remain separate non-material classes.
-- Material targets execute first in deterministic graph-edge order. Each receives one complete-shell trial with kernel coexistence recursion disabled, no child frontier, and all other baseline exclusions unchanged. A successful trial must build the target and preserve every edge built by the current certified working baseline; it then becomes the working baseline for the next material target.
-- Only retained-hull and exact corner-participant targets enter the existing bounded non-material frontier. That frontier may commit only a fully certified superior state; material recoveries are protected from later branch deferral, and only a recovered corner target may authorize loss of its exact recorded conflict participants.
-- Every material target reports immutable eligibility, baseline deferral, attempted, completed, certified, and exact failure state. A material target may become `width-recovery-proven-infeasible` only after its one target trial completes without timeout or cancellation. Timeout, state exhaustion, cancellation, or no acceptable augmented state must retain the latest certified baseline and may not erase a live preview, produce an empty matrix record, or be reported as collateral loss.
-- Baseline evaluation and recovery may never own nested full-shell search frontiers. Material target trials disable kernel coexistence recursion and create no frontier children. Non-material augmentation retains the existing bounded editor-validation state, time, and cancellation safeguards.
+GM-SURFACE.5G remains a partial production correction: shared-edge generated-mask values are continuous and geometry is preserved, but low-light visual faceting remains on a subset of bevels. The active comprehensive audit evaluates value and structural gradients, triangle quality, geometric and render normals, tangents, parent envelopes, direct-light sensitivity, upload parity, and immutable geometry in one incremental run. Shader-side procedural noise, feature-atlas filtering, ambient/SH, shadows, SSAO, PBR specular and post-processing remain explicitly identified as visual-isolation follow-ups when CPU evidence is insufficient.
 
-## Retained-point multi-support recovery contract
+## GM-SURFACE.5I — certified bevel triangulation quality
 
-- R13A.4 is the stable incomplete geometry baseline. R13A.5 sampled split-plane geometry is rejected and is not baseline behavior.
-- Multi-support recovery uses the convex hull of all original source vertices except the two selected-edge endpoints plus the four exact solved rail points.
-- Every emitted new facet must be a global supporting plane of that retained point set. The complete new facet set must form one connected bevel band and preserve all four rails.
-- Both owner faces and only source faces in the selected endpoints' vertex stars may change. Every source face must retain one unique provenance record.
-- Complete topology, strict intersection, containment, convexity, bounds, volume, face-quality, triangulation, and render-channel validation remain mandatory.
+Finalized one-surface polygons no longer accept the first stable boundary fan. Production evaluates the best stable fan and the complete certified general triangulation, then chooses deterministically by maximum aspect ratio, minimum internal angle, minimum area, authored-normal agreement, and stable tie-breaking. Existing tolerance-collinear reinsertion remains a last fallback only when no complete certified candidate exists. Polygon boundaries, selected bevels, render normals, provenance, surface groups, material channels, and shaders are unchanged. This is geometry-quality cleanup and does not close the separate material/shader-dependent residual shading investigation.
 
-## Finalized corner-recovery and augmentation contract
+### GM-SURFACE.5I-H1 final-emission safety gate
 
-- A corner recovery provisional is captured only from the exact conflict event that actually transitioned that edge to zero at the finalized `corner-width-inactive` state. It records the last positive width, collapsed shared edge, zeroing stage, uniform scale, the complete participant set, and the exact zeroed-edge set.
-- A width-provisional edge authorizes augmentation only when it is artistically eligible and its source length supports at least two complete requested bevel footprints. This material-significance gate excludes tiny provisional edges without seed or source-edge policy. Certified retained-hull and finalized corner-inactive recovery remain valid trigger classes.
-- Recovery targets are protected. A material candidate must increase certified count and preserve every edge built by the current working baseline; successful material targets are committed sequentially and protected from later non-material deferral. Corner recovery may remove only the exact participant set of a recovered corner target.
-- Timeout, cancellation, exhaustion, or no acceptable recovery retains the current certified working baseline and its edge identity.
-
-The accepted runtime gate is the R13A.9a one-click suite: current preview passed; topology and artistic-preview matrices passed `33/33`; outlier closure passed `5/5`; unresolved is `0`; negative exclusion passed `1/1`; state was preserved; and no timeout or cancellation occurred. This closes basic bevel/recovery work and opens EW-V1 macro irregularity as the next feature.
-
-
-## EW-V1A.2 construction-width retention status
-
-V1A.1 control cleanup is Unity-validated: its one-click suite passed zero-control parity, determinism, distribution, both `33/33` matrices, recovery `5/5`, unresolved `0`, and negative exclusion `1/1`. Active-width inspection nevertheless exposed an incomplete bounded-width schedule: an isolated rail could succeed at one width, owner/support construction could fail, and the edge could be excluded without testing smaller construction widths.
-
-EW-V1A.2 preserves the frozen geometry contracts and extends only the existing finite width schedule:
-
-- rail failure and rail-success/construction failure share one maximum of twelve attempts;
-- every next attempt is `0.75` of the last solved width, bounded by the existing minimum stable width;
-- only the existing `owner-face-support-insufficient` class may continue after a rail success;
-- the first fully certified lower width wins and is reported as ordinary width reduction;
-- minimum/budget exhaustion remains a truthful complete infeasibility proof;
-- topology, face-quality, containment, volume/bounds, artistic, footprint, shallow-angle, micro-suppression, coexistence, and production behavior are not relaxed.
-
-The editor macro contract additionally rejects unresolved owner/support exclusions and unproven losses of zero-macro certified meaningful edges. Unity validated the intended edge-10 recovery, but the minimum-tier matrix remained `32/33`; EW-V1A.2a owns that final classification closure. R13A.9a remains the accepted uniform baseline.
-
-
-## EW-V1A.2a stable-width classification status
-
-V1A.2 is runtime-proven for its intended active case: seed `8889` source edge `10` remains selected and certifies at a reduced width. The same suite passed macro parity, determinism, distribution, retention, recovery `5/5`, unresolved `0`, and negative exclusion `1/1`, but both matrices stopped at `32/33` on seed `8889` at the minimum Width tier.
-
-The remaining rule is conservative and local:
-
-- a reduced isolated result at the absolute `minimumStableEdgeLength` floor is excluded before corner solving;
-- widths below `minimumStyleWidth` remain allowed under the existing `minimumStyleWidth * 0.25` recovery policy;
-- the stable floor, width schedule, geometry kernels, macro controls, artistic scoring, and production path remain unchanged;
-- a captured corner blocker replaces an empty or `none` batch primary failure.
-
-EW-V1A.2a runtime validation passed both matrices `33/33`, preserved the active edge-10 certification, and passed macro and negative-exclusion contracts. That suite remained failed only because two non-certification-required historical fixtures used the new stable-floor terminal reason. EW-V1A.2b subsequently mapped that exact corroborated audit state in the editor resolver and passed the complete acceptance suite; production geometry remained unchanged.
-
-
-## EW-V1A.2b fixture-resolution status
-
-The stable-floor terminal reason is a production viability conclusion, but its historical outlier acceptance is editor-only. The resolver requires matching viability/final reasons plus isolated-success, positive-width, and fully inactive/unmaterialized evidence before reporting `stable-width-floor-proven-infeasible`. Certification-required visual fixtures cannot pass through this route.
-
-No production generation, geometry, recovery, control, or rendering contract changes in V1A.2b.
-
-
-## EW-V1A accepted freeze status
-
-`EW-V1A.2b` passed its complete Unity acceptance gate: current preview; macro zero parity, determinism, distribution, and retention; topology `33/33`; artistic preview `33/33`; outlier closure `5/5`; unresolved `0`; negative exclusion `1/1`; and no cancellation or terminal failure. At the accepted active validation setting, Coverage was `1`, Strength was `0.55`, 39 ordinary edges participated, and the current shell certified `31/31` selected edges.
-
-The accepted V1A geometry boundary is deterministic variation between edges only. Universal geometric taper/lobes/drift are retired after EW-V2A visual and performance rejection. EW-S1 owns broad shader-only bevel normal/material breakup; sparse corner damage is the next geometry owner, followed by sparse chips/notches and later face/crack finish.
-
-## EW-S1 historical shader-surface contract — rejected and removed by EW-V1A.3
-
-- Geometric Micro Variation fields, Inspector controls, settings transport, multi-plane profile construction, depth isolation/backoff, selective admission, and Micro-specific suite contracts are removed.
-- The scalar V1A.2b bevel shell and Macro edge-to-edge variation are authoritative. EW-S1 does not change candidates, selected edges, solved widths, corners, planes, topology, vertices, triangles, colliders, or geometry fingerprints.
-- Actual generated bevel triangles continue to be identified by UV2.z. No new mesh channel is allocated.
-- `Edge Surface Variation Strength` is the master. At zero, the shader returns the original normal, albedo response, and smoothness path before evaluating analytic waves.
-- `Edge Surface Variation Scale` changes feature size; `Edge Normal Breakup` changes lighting-normal perturbation; `Edge Material Breakup` changes bevel-only value, worn-edge response, and smoothness.
-- The response uses two broad analytic object-space waves with Surface Seed phase. It adds no texture samples and is branch-masked by `_GeneratedMassGeometryEdgeWearEnabled`, UV2.z, and nonzero Strength.
-- The shared PixelSurface shader remains safe for Ground because Generated Ground does not set the generated-mass edge-wear enable flag and the shader default is zero.
-- EW-S1 cannot alter silhouette, create chips, or damage corners. Those remain later sparse geometry work.
-## EW-V1A.2c full-range Macro retention closure
-
-`EW-V1A.2b` remains the accepted Strength `0.55` geometry baseline. The EW-S1 Unity run at Strength `0.67` exposed a separate full-range retention defect: seed 8889 source edge `38` remained independently certifiable but became `corner-width-inactive` without complete infeasibility evidence.
-
-`EW-V1A.2c` corrects recovery ordering without changing Macro sampling, corner equations, plane construction, topology, shader response, production generation, or geometry budgets. `TryAuditCertifiedBaselineAugmentation` now preserves corner-inactive candidates and exact conflict participants from the original certified baseline before material-width recovery can replace that baseline. Post-material corner candidates are merged with the preserved set. `CollectCornerInactiveRecoveryEdges` treats the exact `ChamferCornerConflictRecord` as authoritative and no longer requires pre-populated lifecycle evidence before applying that evidence.
-
-The editor contract adds a fixed seed-local Strength sweep at `0`, `0.25`, `0.55`, `0.67`, and `1`. Every zero-Macro baseline-certified artistic edge must remain certified or carry complete bounded width/corner-recovery infeasibility evidence at each sample. `corner-recovery-proven-infeasible` is accepted only for a geometrically eligible, independently certified-width edge that is inactive and unmaterialized after the bounded full-shell recovery frontier is exhausted.
-
-Status: rejected and removed from active code by EW-V1A.2f after the `EW-V1A.2c-suite` failed at Strength `0.67` and `1`. The patch improved evidence ordering but still owned only the current-strength baseline; it could not preserve an edge defined by the separate zero-strength run.
-
-
-## EW-V1A.2d zero-baseline protected Macro solve
-
-`EW-V1A.2d` moves the retention baseline into generator ownership. For a nonzero Macro request, the generator reruns candidate construction and isolated viability with a local zero-strength settings value, then fully certifies that protected solution through the same corner, plane-shell, topology, face-quality, containment, render-channel, material-width, and bounded recovery path. Ordinary trial clones retain their previous sharing behavior; only the protected-Macro path deep-clones viability-owned width data.
-
-Before a requested-strength result is returned, its certified graph-edge set is compared with the protected set. A loss triggers four deterministic local trials (`0.25/0.5/0.75/1`) that blend only the lost edge and the exact corner-conflict participants toward their protected requested widths. When an exact conflict is unavailable, the participant set is limited to the lost edge's two endpoint vertex stars. A trial is accepted only if the complete protected set and the already-certified requested-strength set both remain built.
-
-If no local trial certifies, the fully certified zero-Macro solution is returned with explicit `full-zero-baseline-fallback` evidence rather than silently deleting an accepted edge. The separate Macro distribution contract remains active, so a broad fallback cannot be misreported as successful variation.
-
-The Macro hash, salts, sampled multiplier range, selection score/order/count, corner equations, scalar plane construction, junction solver, EW-S1 shader response, serialized authoring, production `EdgeWearEvaluationMode.None`, and active-gameplay cost are unchanged. Dirty editor evaluation performs one additional protected scalar certification for nonzero Macro and bounded local trials only when a protected loss occurs.
-
-Status: rejected and removed from active code by EW-V1A.2f after Unity proved that full-zero fallback preserved retention but erased Macro distribution.
-
-
-## EW-V1A.2e asymmetric local Macro preservation
-
-EW-V1A.2d is superseded by Unity evidence. It preserved the zero-Macro edge set only by returning the complete zero-Macro shell, which made Macro distribution fail.
-
-EW-V1A.2e preserves the independently certified zero-Macro edge set without replacing unaffected requested-Macro state:
-
-- every trial starts from the strongest valid requested-Macro outcome, including committed material-width and non-material recovery;
-- initially lost protected edges are mandatory local adjustments;
-- protected targets use exact certified solved/materialized width, not zero-Macro requested width;
-- for adjusted edges only, current local and isolated certified-width ceilings are raised to the independently certified protected target when required; unrelated viability evidence remains current;
-- remaining conflict/star participants are searched as deterministic asymmetric subsets, ordered by minimum normalized deviation from current requested-Macro widths;
-- an accepted trial must retain the union of protected and current built edges and pass the complete existing shell/render certification;
-- a nonzero current Macro result must retain at least one varied participant;
-- full-zero fallback remains explicit safety output and is contract-failing for nonzero Macro.
-
-The search was dirty-time only, used no new geometry algorithm, changed no Macro sampling or corner equations, and capped optional subset participants at eight. Runtime evidence showed a 256-state case could remain synchronous for more than one minute, cancellation was not responsive inside the state loop, and all searched states still fell back to zero Macro. Status: rejected and removed from active code by EW-V1A.2f.
-## EW-V1A.2f normalized certified Macro boundary
-
-EW-V1A.2f restores the exact EW-S1/V1A.2b scalar generation, corner, recovery, and diagnostic ownership after rejecting EW-V1A.2c/d/e. Active code contains no generator-owned zero-Macro duplicate evaluation, protected-edge lifecycle, local restoration state enumeration, full-zero Macro fallback, or fixed five-sample retention sweep.
-
-The authoring contract is deliberately normalized:
-
-```text
-control Strength:   0 .. 1
-effective amplitude: 0 .. 0.55
-control 1:           accepted old effective Strength 0.55
-```
-
-The scaling occurs once inside `ResolveEdgeWearMacroRequestedWidth`. Coverage, deterministic participation and width hashes, sampled multiplier stream, minimum-style clamping, artistic selection, corner equations, scalar plane construction, topology certification, and production `EdgeWearEvaluationMode.None` are unchanged.
-
-The one-click suite evaluates its canonical matrices at Coverage `1`, control Strength `1`, and reports both control and effective Strength. It measures current-preview and Macro-contract elapsed milliseconds, retains per-case matrix timing, stops before matrices when current preview or the Macro contract fails, and stops before the artistic matrix when the topology matrix fails. Fail-fast still writes the combined failure report and terminal reason.
-
-Unity acceptance passed: the normalized maximum reports zero parity, angle mapping, determinism, active distribution, and scalar retention; both matrices passed `33/33`; outlier closure passed `5/5`; negative exclusion passed `1/1`; cancellation is `0`; and terminal reason is `none`. EW-V1A.3b is therefore frozen. `EW-C1A-RO2` completed the required read-only ownership/construction audit and persistent implementation-order plan. `EW-C1A.1` is implemented and the seed-8889 transaction report certified trial `0`; that diagnostic transaction is accepted. EW-C1A.1a.8 passed the complete Unity gate and is frozen. EW-C1A.2 is the active preview-only corner-chip implementation.
-
-
-## EW-V1A.3b authoritative dihedral, rendering, and freeze boundary
-
-- EW-V1A.3b is accepted and frozen after the complete Unity suite passed. It does not change candidate selection, corner equations, isolated schedules, recovery, plane construction, junction solving, topology certification, mesh output, or production evaluation.
-- The canonical Macro sampler still derives participation and width identities from Shape Seed plus canonical original source-edge identity. Public Strength remains normalized to effective amplitude `0..0.55`.
-- Early-ineligible records retain deterministic shallow-angle initialization for diagnostic continuity. After successful convex classification, the resolver consumes measured dihedral and atomically overwrites the final multiplier, requested width, footprint requirement, and length-to-width ratio before width-dependent gates.
-- Angle permission is `Lerp(1, 0.35, SmoothStep(0, 1, InverseLerp(15°, 90°, dihedral)))`. It is nonincreasing, so fixed-sample requested width cannot decrease as dihedral rises.
-- The four EW-S1 breakup controls, property bindings, shader properties, object-space waves, normal perturbation, material variation, and smoothness offset are absent. Stale serialized keys may remain inert until Unity resaves affected assets.
-- Uniform bevel response remains numerically the former zero-variation branch and continues to use the UV2.z mask, Response Strength, Brightness Lift, Worn Edge Tint, Tint Influence, and Softness.
-- Active GPU cost improves analytically through removed fragment arithmetic. No numerical improvement is claimed until profiler evidence exists.
-
-
-## EW-V1A.3a rejection and EW-V1A.3b restoration
-
-EW-V1A.3a is rejected as a freeze baseline. Its Unity suite stopped after `28/33` topology cases with fail-fast status. The tiered Macro ranges, convexity-priority cluster reduction, priority telemetry, and global materialized-scale inversion contract are removed from active code.
-
-EW-V1A.3b restores the complete EW-V1A.3 geometry and recovery implementation. The only runtime-report difference is the `EW-V1A.3b` contract label. The continuous request rule remains:
-
-```text
-effectiveStrength = Clamp01(controlStrength) * 0.55
-angle01 = InverseLerp(15, 90, dihedral)
-sharpness = SmoothStep(0, 1, angle01)
-anglePermission = Lerp(1, 0.35, sharpness)
-multiplier = 1 - (1 - sampledMultiplier) * effectiveStrength * anglePermission
-```
-
-Seed-8889 source edge `10` remains a documented isolated-construction limitation. It requests approximately `0.02250936` at essentially full Macro multiplier but certifies only `0.00725466711` under the existing foreign-vertex, rail, and hull constraints. EW-V1A.3b does not weaken those constraints. Joint vertex-star recovery is deferred.
-
-The complete EW-V1A.3b suite passed, so Macro width work is frozen. `EW-C1A-RO2` completed the ownership and ordering audit and approved pre-bevel corner removal. `EW-C1A.1 — Pre-bevel corner-cut transaction and provenance proof` is implemented and accepted as an explicit editor diagnostic. It does not replace the accepted preview mesh. EW-C1A.1a.8 is accepted and frozen. C1A.2 is implemented as an explicit editor-only preview pending Unity compile and visual acceptance.
-
-## EW-C1A pre-bevel geometry and final-normal ownership
-
-The ordering audit approves corner removal before bevel candidate construction. The exact insertion point is inside `MassGenerator.EdgeWear.Orchestration.cs::ApplyGeneratedEdgeWearBevels`, immediately after `NormalizeEdgeWearMicroTopology` provides the normalized `PolygonFace` list and before `BuildEdgeWearBevelCandidates` consumes it.
-
-The stable order is:
-
-```text
-normalized PolygonFace source
-    -> one transactional corner cut
-    -> one certified CornerDamageCap
-    -> original-edge descendant and cap-ring identity maps
-    -> ordinary plus cap-ring bevel construction
-    -> final triangulation
-    -> authored/geometric normal assignment
-    -> MeshData validation
-    -> Unity tangent recalculation
-```
-
-Source `PolygonFace.Normal` values are plane ownership inputs and may be used during clipping. They are not the final render-normal channel. Final render normals are resolved by `MassGenerator.MeshOutput.cs::BuildMeshData` only after the complete triangle soup exists. `MeshBuilder.ApplyToMesh` sets the final normal channel and calls `Mesh.RecalculateTangents()` only after final vertices, triangles, and UVs have been assigned.
-
-A raw corner cut with an un-bevelled sharp cap ring is not an accepted visual result. C1A.1 may create it only inside diagnostic evidence. C1A.2 must bevel eligible cap-ring edges before visual acceptance.
-
-The first three corner-damage stages are:
-
-1. `EW-C1A.1`: deterministic candidate selection, cloned four-depth cut transaction, one cap, topology/volume certification, and identity proof; accepted preview remains unchanged. The implemented owner is `EdgeWearEvaluationMode.CornerDamageTransactionAudit`, exposed through `MassGenerator.GenerateCornerDamageTransactionAudit` and `GeneratedMassEditor` as `Run EW-C1A.1 Corner Transaction Audit`. The report is saved to `Library/GeneratedMassCornerDamageTransactionAudit.txt`, copied to the clipboard, and can be revealed from the same Inspector section.
-2. `EW-C1A.2`: retain the certified damaged polyhedron and stable output-edge identities, feed that exact result into ordinary bevel construction, force every dedicated non-Macro cap-ring candidate before ordinary coverage selection, compare unrelated built bevel identities against the frozen unified baseline, and expose the first editor-only visual preview. Any partial cap ring or collateral bevel loss falls back to production geometry.
-3. `EW-C1A.3`: expose one normal Corner Chipping authoring group, route the existing edge-wear preview through the certified pre-bevel chip when enabled, remove duplicate corner-preview Inspector workflows, and certify disabled/default/maximum-depth behavior across the 33-case matrix.
-
-The initial cap-ring width is bounded by:
-
-```text
-min(0.50 * ordinaryRequestedWidth,
-    0.25 * acceptedCornerDepth,
-    0.20 * shortestCapRingEdgeLength)
-```
-
-Cap-ring width remains constant and does not participate in Macro variation in C1A.
-
-No final artistic normal-shaping phase occurs before corner damage and chips. `EW-N1` follows all accepted topology-changing edge-wear geometry so it does not need to be rebuilt after every silhouette feature.
-
-## EW-C1A.1a / EW-C1A.1a.4 — Polygon render ownership and complete triangulation
-
-The final shell triangulator treats one `PolygonFace` as one visual surface. `TryTriangulateBoundedPreviewFaces` calls `TryTriangulateBoundedOneSurfaceFace` for source faces, junction faces, bevel faces, endpoint caps, and future `CornerDamageCap` faces. Every emitted triangle receives one authoritative polygon normal and one stable authored surface-group identity.
-
-A stable direct boundary fan remains the preferred path. It tests every boundary anchor, requires every triangle to satisfy area and normalized render-normal agreement `>= 0.5`, and preserves the existing deterministic ranking by minimum normal agreement, minimum triangle area, and stable anchor order.
-
-EW-C1A.1a.4 supersedes the projected-centre fallback from EW-C1A.1a.2/.3. If no direct anchor certifies, the ordered polygon is projected onto its authoritative plane and solved by complete interval dynamic programming:
-
-```text
-state S(i,j)
-    -> test every split i < k < j
-    -> require S(i,k), S(k,j), and triangle(i,k,j)
-    -> reject diagonals that intersect unrelated boundary segments
-    -> require the diagonal midpoint inside/on the retained simple loop
-    -> rank complete solutions by:
-         1. highest minimum triangle area
-         2. highest minimum normal agreement
-         3. lowest split index
-```
-
-The containment check uses the existing tolerance-aware `IsBoundedPointInsideOrOnPolygon` owner because the retained loop may include a slight reflex vertex removed only from the convexity-check copy. Both modes emit exactly `n - 2` triangles and introduce zero synthetic/internal fan vertices. Every selected triangle must remain finite, exceed the minimum area, orient to the authored normal, and satisfy the unchanged final `0.5` agreement guard. The dynamic solver is `O(n^3)` dirty-time with `O(n^2)` temporary state and has no per-frame owner.
-
-The old centre-fan mode and its derived direct/fallback face counts are no longer authoritative. The propagated internal-fan counters return to literal zero-only certification. Current telemetry reports the truthful `direct-preferred/general-complete` policy, exact triangle/authored-channel counts, and complete failure evidence through `PolygonSurfaceFailureReason` when no solution exists.
-
-This remains a render-ownership correction, not a topology merge. Distinct polygon records remain distinct surfaces. It changes no source mass, cut plane, bevel candidate, Macro width, recovery scale, mesh channel, shader, material, serialized control, or runtime behavior. `ValidateGeneratedMassMeshData` and its `0.5` guard remain unchanged.
-
-The full-suite Macro report passed strength-zero, coverage-zero, current, and maximum probes together with topology and preview `33/33`, outliers `5/5`, and negative exclusion `1/1`. EW-C1A.1a.8 is frozen; EW-C1A.2 consumes that render infrastructure without modifying it.
-
-
-## EW-C1A.1a.5 tolerance-collinear render triangulation
-
-EW-C1A.1a.4 remains the authoritative direct-first/general-complete polygon triangulator. EW-C1A.1a.5 adds a bounded third path only when the complete retained loop has no certified direct or DP solution and the failure includes raw geometric-normal disagreement caused by a tolerance-collinear boundary subdivision.
-
-The third path is render-triangulation normalization, not geometry modification:
-
-```text
-complete retained PolygonFace stays unchanged
-working projected index loop may remove tolerance-collinear vertices
-simplified loop is triangulated through existing direct/DP owners
-removed vertices are reinserted in reverse order by subdividing their preserved parent boundary edge
-final output uses every original retained vertex and boundary segment
-final triangle count remains n - 2
-```
-
-Every final triangle still carries one polygon-authored normal, one stable surface group, feature identity, and feature strength. Every final triangle must pass finite/area/winding and normalized authored-normal agreement `>= 0.5`. `MassGenerator.MeshOutput.cs` remains unchanged and retains the final `0.5` guard.
-
-The path is deterministic dirty-time work. It adds no control, serialized state, shader/material input, mesh channel, source topology mutation, collider mutation, or per-frame cost.
-
-
-## EW-C1A.1a.6 explicit-normalization parity
-
-EW-C1A.1a.5 triangulation ownership is unchanged. Direct boundary fan, complete interval DP, and bounded tolerance-collinear reinsertion remain the only active render-triangulation paths.
-
-The one-surface triangle producer now uses `MassGenerator.Types.cs::TryNormalizeMassVector` for both candidate agreement evaluation and final oriented geometric-normal resolution. This matches the existing Generated Mass mesh-output contract: finite mathematically non-zero vectors are normalized through double-precision magnitude evaluation and explicit division rather than Unity's small-vector `Vector3.normalized` cutoff.
-
-Minimum triangle area, `OneSurfaceMinimumRenderNormalDot`, exact `n - 2` output, original-boundary preservation, authored polygon normal/group ownership, and the final `MassGenerator.MeshOutput.cs` `0.5` agreement guard remain unchanged. This is a numerical parity correction only; it adds no topology, fallback, control, serialized state, shader/material input, dependency, or per-frame work.
-
-## EW-C1A.1a.7 final transformed-space authored normals
-
-EW-C1A.1a.6 closes the zero-Macro triangulation regression. Its Unity report passes zero parity, angle mapping, determinism, distribution, and retention, then advances to topology `32/33`. The sole remaining failure is seed `6667` at maximum width in final `MeshData` render-normal validation.
-
-Authored `PolygonFace.Normal` values remain construction-space plane ownership. They are not copied unchanged into the final mesh after dimensions, lean, and grounding. `MassGenerator.MeshOutput.cs::BuildMeshData` now resolves one final render normal per authored surface group from the already transformed triangle positions:
-
-```text
-for every triangle in authored surface group G:
-    geometricCross = cross(finalB - finalA, finalC - finalA)
-    orient geometricCross toward the stored construction-space authored normal
-    accumulate the raw cross in double precision
-finalGroupNormal(G) = explicitNormalize(accumulatedCross)
-```
-
-Raw crosses preserve area weighting. Every triangle in the group is then wound against the rebuilt final group normal and must independently satisfy geometric/render-normal agreement `>= 0.5` before emission. `ValidateGeneratedMassMeshData` remains unchanged and repeats the same `0.5` contract across the complete final mesh.
-
-This is final render-space ownership, not artistic normal shaping. It changes no positions, indices, source polygons, triangulation, surface-group IDs, feature channels, material-variation hashes, transforms, shaders, materials, serialized controls, or per-frame behavior. Exposure and deposit masks consume the corrected final shared normal because those masks are emitted with the final mesh.
-
-Unity passed Macro preservation, topology and preview `33/33`, outliers `5/5`, negative exclusion `1/1`, and the former-X visual gate. EW-C1A.1a is frozen. EW-C1A.2 now owns visible corner-cut, mandatory cap-ring bevel, collateral-retention proof, and chip-shape preview. EW-N1 artistic normal response remains later.
-
-## EW-C1A.1a.8 deterministic shared-normal feasibility
-
-EW-C1A.1a.7 remains the final-position owner: grouped triangle normals are derived only after dimensions, lean, grounding, and recentering. EW-C1A.1a.8 changes only how one shared final group normal is selected when the area-weighted candidate does not satisfy every grouped triangle.
-
-For final, explicitly normalized triangle normals `n_i` already oriented into the construction-authored hemisphere, the required contract is:
-
-```text
-choose unit N
-maximize min_i dot(N, n_i)
-accept only when min_i dot(N, n_i) >= 0.5
-```
-
-The resolver evaluates the current area-weighted candidate, every triangle normal, every finite normalized pair sum, and both finite equal-angle centres for every triangle-normal triple. This set is complete for deciding whether a spherical cap of radius at most `60°` exists. Candidate ranking is deterministic: exact highest minimum dot, exact highest area-weighted average dot, lowest defining triangle indices, then stable candidate kind.
-
-A below-threshold result is reported as the best enumerated feasibility candidate, not as the exact unconstrained maximin centre. The failure still proves that no shared normal can satisfy the required `0.5` threshold. Evidence includes encoded and decoded surface-group provenance, triangle count, area-weighted and best-feasibility scores, defining/worst triangle indices, original authored normal, selected candidate normal, and every grouped triangle normal and area weight.
-
-The resolver performs `O(m^4)` dirty-time work and `O(m)` temporary group storage for a group of `m` triangles. It adds no per-frame path. `BuildMeshData` winding, `ValidateTransformedAuthoredSurfaceTriangle`, `ValidateGeneratedMassMeshData`, the exact `0.5` threshold, source polygons, triangulation, positions, indices, surface-group IDs, feature/material channels, shaders, materials, and serialized controls remain unchanged.
-
-This final bounded C1A.1a infrastructure gate passed and is frozen. EW-C1A.2 consumes the existing polygon render ownership unchanged. A future proven below-threshold group would require a separately approved placement-deformation plan; it would not authorize another triangulation or normal-threshold workaround.
-
-
-## EW-C1A.2 / EW-C1A.3 corner-chip authoring and preview ownership
-
-The corner feature has one authoring group and two existing authoring actions with distinct purposes:
-
-```text
-Rebuild Corner Chip Preview
-    -> certified cut only
-    -> semantic damaged polygons triangulated directly
-    -> no ordinary bevel candidates or cap-ring bevel
-
-Rebuild Edge-Wear Bevel Preview
-    -> corner disabled: frozen ordinary unified preview
-    -> corner enabled: certified corner cut first
-       -> damaged topology and stable identities
-       -> ordinary candidates from current edge-wear settings
-       -> mandatory complete cap-ring candidates
-       -> unified shell and unrelated-bevel retention proof
-```
-
-There is no separate corner-plus-edge-wear Inspector action, preview selector, report-control group, or corner-specific debug foldout. `GeneratedMassEditor` writes and copies the raw corner report automatically. The ordinary edge-wear preview is the integration preview whenever Corner Chipping is enabled. Internal compatibility APIs may remain, but they do not create another user workflow.
-
-The successful transaction retains its exact semantic prepared `PolygonFace` list, `CornerDamageCap`, accepted depth, stable identity by damaged output `EdgeKey`, generated cap-ring identities, and the original identities of the three shortened parent edges. The construction path uses one geometry-identical dense `SourceFace` clone. Candidate construction reads the committed identity map before Macro sampling. Cap-ring candidates are mandatory, Macro-free, and bypass ordinary artistic filtering and coverage while still passing every geometry, coexistence, topology, face-quality, one-surface, and final render-normal gate.
-
-Selection is:
-
-```text
-all mandatory cap-ring candidates ordered by generated identity
-+ ceil(ordinary candidate count * existing ordinary coverage)
-```
-
-The complete edge-wear preview is rejected unless exactly one certified cap exists, every generated cap-ring identity becomes a mandatory candidate, every mandatory candidate is selected and built, the unified corner shell certifies, and every baseline-built original edge outside the three affected parent identities remains certified. Rejection preserves the complete report and does not expose a raw or partially softened cap.
-
-### Semantic/construction provenance boundary
-
-The semantic accepted list retains `PolygonFaceProvenanceKind.CornerDamageCap` and remains the transaction/report authority. `TryCommitCornerDamageTransactionResult` builds and certifies a construction-only face list by copying every semantic polygon and assigning `SourceFace` provenance index equal to its face-list position. Face count, vertex order, vertex values, feature, and feature strength remain unchanged. The bounded-bevel pipeline consumes only that construction list. Telemetry reports both `semanticCapFaces` and `constructionSourceProvenance=attributed/expected`.
-
-### Corner Chipping controls
-
-`MassSurfaceFeatureSettings` and `GeneratedMass` transport six clamped values: enable, requested depth fraction, deterministic depth variation, top-facing selection preference, cap-ring width scale, and cap-ring wear-strength scale. Existing constructor callers remain source-compatible through trailing optional defaults, and existing masses remain disabled by default. Production `EdgeWearEvaluationMode.None` does not consume the enable flag.
-
-The transaction precedes candidate discovery. Requested depth is resolved from the selected corner's shortest incident edge; variation zero reproduces the requested fraction exactly before bounded fallback factors. Shortened original edges retain ordinary width, Macro, coverage, and response. New cap-ring edges remain mandatory and Macro-free; their requested width is current ordinary Edge Wear Width times Cap-Ring Width Scale, bounded by accepted-depth and shortest-cap-edge limits. Their material strength is ordinary edge-wear amount times Cap-Ring Wear Strength.
-
-The Scene overlay uses one `Corner Chip` label for the raw preview or the ordinary edge-wear preview after chipping. The report records requested/resolved/accepted depth, retry ratio, selected corner, semantic cap, construction attribution, ring identities, ring width limits, and retention evidence where applicable.
-
-### EW-C1A.3 single-chip matrix
-
-The existing one-click edge-wear validation suite owns an additional asynchronous 33-case stage over the accepted 11 seeds:
-
-```text
-Disabled       corner off; exact MeshData and unified-status parity
-Default        depth 0.18, variation 0.15
-Maximum Depth  depth 0.35, variation 0
-```
-
-Disabled cases compare the corner-aware unified entry point against the frozen ordinary unified entry point at exact vertex, index, UV, colour, normal, debug-edge, and status level. Enabled cases compare the raw and integrated transaction selection, require one semantic cap, dense construction provenance, a complete mandatory cap ring, zero unrelated bevel loss, and valid final normal/tangent channels. The matrix uses temporary editor meshes only to validate Unity tangent recalculation. It adds no button, serialized setting, production path, per-frame work, shader work, persistent cache, texture, buffer, or mesh channel.
-
-
-### EW-C1A.3a deterministic full-feature selection
-
-Corner selection is preference ordering, not unconditional commitment. Every eligible normalized source corner is ranked by repeated application of the unchanged C1A score and epsilon tie contract, with normalized graph vertex index as the stable tie-break. This preserves the previous rank-0 choice exactly while producing a deterministic fallback order. Editor preview then evaluates candidates in that order until one complete feature passes.
-
-For each ranked corner, the existing four bounded cut-depth trials remain authoritative. A transaction-certified corner is tested with one uniform cap-ring schedule:
-
-```text
-1.0 -> 0.75 -> 0.5625 -> 0.421875 -> 0.31640625 -> 0.25
-```
-
-The multiplier applies to the common ring request before the unchanged candidate and shell solvers. It never permits a partial ring. One ordinary unified baseline is reused for the search. A corner is accepted only when the existing corner preview capture proves one semantic cap, dense construction provenance, all mandatory ring identities candidate/selected/built, a certified post-chip shell, zero unrelated baseline-bevel loss, and valid final render channels. Transaction, ring, construction, or retention failure advances deterministically to the next applicable scale or corner.
-
-The raw chip preview first resolves this same fully certified corner, then emits only that accepted semantic cut. Raw and integrated endpoints therefore remain visually distinct but must independently resolve the same candidate rank, graph vertex, depth trial, accepted depth, and generated ring identities. Search state is editor-only and scoped; disabled authoring, ordinary audits, and production `EdgeWearEvaluationMode.None` retain their prior behavior.
-
-Search telemetry records candidate and attempt counts, accepted rank, committed ring scale, the deepest deterministic failure stage, and a concise attempt trace. The search adds explicit dirty-time work only. For each eligible corner it performs at most the existing four transaction trials and, after transaction certification, at most six integrated ring attempts. It adds no per-frame, shader, texture, buffer, mesh-channel, serialized-control, or production-generation cost.
-
-### EW-C1A.3d validation-suite scheduling
-
-`GeneratedMassEditor` owns the validation-only de-duplication boundary. The one-click suite performs the exhaustive 33-case topology matrix once, derives deterministic artistic rank/score fingerprints from those captured records without another mesh build, runs the 33-case corner matrix next, then deeply materializes only seeds `1`, `2223`, `8889`, and `5727` at minimum/default/maximum width (`12` cases). Each sentinel must match its topology-derived fingerprint. The focused Artistic Preview Parity Matrix remains exhaustive `33/33` when invoked directly.
-
-The suite reports stage status as `passed`, `failed`, or `not-run`, per-stage elapsed time, remaining budget before expensive stages, prepared-record reuse, corner baseline builds/cache uses, and sentinel coverage. Its research-only total hard stop is `90 s`; the single enabled-rock corner gate remains `4 s` and the corner matrix remains `35 s`. This patch changes no generation result, candidate policy, settings, Inspector controls, production path, or per-frame work.
-
-### EW-C1A.3c complete integration preflight and one-final-build search
-
-The candidate filter now stops before shell construction while proving the same selected post-chip topology that the final build will consume. `CornerDamageIntegrationPreflight` performs the normalized corner transaction, complete ordinary and mandatory candidate discovery, ordinary coverage selection, shared cap-ring scale resolution, topology-context construction, candidate-conservation checking, and the existing non-emitting explicit corner-width solution. It records predicted active ordinary identities and all three mandatory generated identities, then compares those ordinary identities with the one cached ordinary baseline for the seed.
-
-Ranked corners are searched using preflight only. The first record with a complete ring, valid topology/context, valid candidate conservation, solved widths, and zero predicted unrelated loss is retained. The search then executes exactly one `CornerDamageIntegrationPreview` build at that corner and common ring scale. A final mismatch in selected transaction, mandatory completion, retention counts, or certified ordinary identity set reports `integration-preflight-mismatch`; it never launches a fallback or another complete candidate build.
-
-The matrix passes cached baseline build time and the largest observed integration duration for that seed into the admission gate before the sole final build. Enabled cases have a `4 s` hard budget, the corner matrix has a `35 s` hard stop, and the complete one-click suite has a `58 s` boundary with a `3 s` final-evidence reserve. Reports expose preflight candidates/selection/topology/width/mandatory/retention evidence, mismatch count, exact stage timings, and total-suite elapsed/budget state. These are editor dirty-time gates only; controls, Inspector actions, serialized defaults, production generation, shaders, mesh channels, and per-frame behavior are unchanged.
-
-### EW-C1A.3b bounded staged certification
-
-The C1A.3a exhaustive outer scale loop is retired. One staged search now separates cheap rejection from complete construction:
-
-```text
-per-seed ordinary baseline cache
--> ranked-corner transaction
--> mandatory three-edge isolated ring preflight
--> resolve one common schedule scale
--> one complete integrated build
--> optional one-step lower fallback
--> accept or advance to next corner
-```
-
-`CornerDamageRingPreflight` is an editor-only internal evaluation mode. Candidate collection skips every ordinary edge and evaluates only the three generated cap-ring edges through the existing structural, locality, topology-context, and isolated-width audit. The common ring scale is the largest schedule value not exceeding the minimum certified-width ratio across all three mandatory edges. If no common scale at or above `0.25` exists, the corner is rejected before shell construction.
-
-The 33-case matrix caches one ordinary baseline mesh/status per seed. Disabled policy returns that exact cached pair. Default and maximum-depth each execute one staged integrated search; they do not call the raw geometry endpoint. Determinism is verified by a lightweight repeated transaction fingerprint for the accepted rank. The interactive raw preview reuses one staged certification result and performs only one additional geometry emission for that accepted rank.
-
-The editor contract enforces a `5 s` hard budget per corner case and `55 s` hard stop for the complete corner matrix, with `2 s` and `40 s` targets respectively. A budget breach reports `performance-budget`, returns control, and prevents an over-budget valid mesh from being accepted. Telemetry distinguishes baseline builds/cache uses, transaction and ring-preflight attempts, complete/fallback builds, geometry reuse, stage timings, and case/matrix budget flags. These are editor-only safety limits; no production or per-frame owner exists.
-
-## EW-C1A.3e authoritative corner-integration plan
-
-Editor preview certification has one owner. A ranked candidate first produces a prepared preflight state containing the committed corner transaction, damaged polygon faces, topology context, coverage lifecycle, solved widths, and stability limits. The complete shell kernel consumes that state once and returns an immutable integration plan containing the certified triangle soup, unified preview status, exact ordinary and mandatory stable identities, unrelated-retention evidence, and deterministic plan hash.
-
-Final integrated preview generation may only consume that accepted plan. It clones the committed soup/status into the ordinary mesh-emission pipeline and must not rerun candidate discovery, isolated viability, width solving, coexistence, cap-ring scale selection, or shell construction. Emission validates the exact planned identity sets and hash. Missing or unexpected ordinary/mandatory identities are hard failures; counts alone never establish parity.
-
-The editor validation matrix reuses the ordinary unified baseline explicitly materialized alongside each topology default case. The all-geometric topology audit mesh is not relabeled as an ordinary baseline. Reuse is allowed only when the full recipe, edge-wear, Macro, crease, and evaluation-mode fingerprint matches. A mismatch performs a local baseline build rather than accepting stale data. This cache is suite-local and has no production/runtime ownership.
-
-## EW-C1A.3g complete authoritative build and truthful baseline fallback
-
-Corner candidate certification has three explicit editor-only ownership phases:
-
-```text
-ranked corner transaction and complete preflight
-    -> solve-only candidate preparation
-       -> prepared candidate widths, planes, rails, context, coverage, and estimated identities
-       -> no clean-shell authority and no triangulation authority
-    -> first prepared candidate satisfying predictive mandatory/retention gates
-       -> exactly one complete clean-shell construction
-       -> final conflict reduction and retained-candidate ownership
-       -> topology/face-quality/volume/bounds certification
-       -> exactly one triangulation and preview-soup creation
-       -> final ordinary/mandatory identities, unrelated retention, and authoritative hash
-    -> emission consumes the stored certified soup/status only
-```
-
-Prepared identities are ranking and diagnostic evidence only. `MaterializePlaneCutBevelSolvedPlan` is the first boundary that can own final retained identities because conflict reduction, clean-shell construction, certification, triangulation, and coverage finalization still occur there. The completed shell therefore replaces the prepared identity estimate as the authoritative `CornerDamageIntegrationPlan`. Final emission compares the stored final identity sets and hash against the status produced from the same stored soup; it does not rerun discovery, solving, conflict reduction, or shell construction.
-
-The ordinary baseline is one inseparable editor-only bundle containing `MeshData`, `UnifiedEdgeWearPreviewStatus`, and build duration. Cached reuse requires both a non-null mesh and an applied status. Every unsuccessful corner-enabled exit returns that exact baseline mesh and status while retaining a failed `CornerDamagePreviewStatus` with its actual stage, diagnostic, attempts, and telemetry. No failure path substitutes production geometry or clears the valid ordinary unified status.
-
-Only one complete authoritative build is permitted per enabled rock. If that build fails mandatory-ring completion, unrelated retention, render certification, deadline, or emission validation, the search returns the ordinary baseline and does not try a second complete candidate. Solve-only preparation may continue across ranked candidates before the one complete-build commitment.
-
-Editor-only deadline probes remain inert outside corner search. The topology matrix keeps its exhaustive audit widths, while the suite-local corner cache continues to store the semantically separate ordinary unified baseline at exact authored settings. This adds no persistent cache, player callback, per-frame work, shader work, or production behavior.
-## EW-C1A.3h minimum-width foreign-plane endpoint-conflict preparation guard
-
-C1A.3h does not move the C1A.3g authority boundary. `PlaneCutBevelSolvedPlan` remains non-authoritative prepared state, and only the one completed materialized shell owns final identities, coverage, topology, render validity, and soup. The new guard operates between prepared identity/retention certification and `plan.Valid`.
-
-For each ordered victim/foreign retained bevel-plane pair, the guard builds the same local conflict cluster used by complete width reduction: the victim and foreign edges plus every retained candidate incident to either edge endpoint. Only that cluster is retreated to each candidate's existing legal minimum scale; all non-cluster candidates remain at prepared width. The victim plane, foreign plane, and the victim's two owner source-face planes define the candidate shared rail. That rail is clipped against every post-cut source-face half-space and every non-defining retained candidate half-space. Parallel, non-finite, degenerate, or otherwise inconclusive geometry is never rejected and proceeds to the authoritative build.
-
-A candidate is rejected only when the clipped rail has finite non-zero span and its projected midpoint lies strictly beyond the authoritative endpoint allowance:
-
-```text
-clamp(max(victimWidth * 4, minimumStableEdgeLength * 0.5) / victimEdgeLength, 0.03, 0.25)
-```
-
-This is a permissive proof: if the foreign split survives after the complete local cluster has already reached its legal floors, the complete shell cannot resolve that same class through additional width retreat. A proof rejection continues deterministic ranked preparation without mesh construction or triangulation. The first guard-clear candidate receives the sole complete authoritative build. A later complete-build foreign-plane/geometric-floor failure is recorded as a guard false negative; it still returns the exact ordinary C1A.3g baseline and never launches a second complete build.
-
-The guard is editor/dirty-time only. It adds no serialized state, control, asset, runtime callback, per-frame work, shader work, material work, or production-generation behavior. The `<= 4 s` target, `<5 s` hard case, `35 s` corner matrix, and `90 s` research suite remain mandatory.
-
-## EW-C1A.3i cached normalized foundation and guarded isolated-viability replay
-
-C1A.3i preserves the complete C1A.3g/C1A.3h authority and fallback model. Ranked candidates still receive their own corner transaction, affected-edge rebuild, mandatory-ring preparation, endpoint-conflict proof, and at most one complete authoritative shell build. The optimization is confined to rank-invariant and exactly matched preparation evidence within one editor search.
-
-`NormalizeEdgeWearMicroTopology` now produces one search-scoped immutable foundation on the first integration-preflight attempt. Later ranked attempts reuse that result rather than repeating the same source normalization. Candidate construction continues to clone and augment the foundation, so corner-generated faces, cap ownership, lifecycle records, coverage, contexts, and solved plans remain candidate-local.
-
-After a full isolated bounded-edge audit succeeds for an unaffected ordinary edge, its viability evidence may be copied into a later candidate only when all replay keys match exactly:
-
-- stable original source-edge identity;
-- endpoints and owner normals, allowing only exact paired reversal;
-- edge length and dihedral;
-- requested width and minimum style width;
-- locality retain/removal interval, feasible and guard margins, minimum removal, limiting position, and limiting projection;
-- exclusion from the current corner transaction's affected original identities.
-
-Mandatory edges, affected ordinary edges, missing records, changed geometry, changed widths, changed locality evidence, failed prior audits, and every uncertain comparison execute the unchanged full isolated audit. Cached viability is copied into the current lifecycle record; mutable coverage, topology, transaction, and candidate objects are never shared.
-
-The cache is thread-local, non-serialized, and scoped to one corner-enabled editor search. It is discarded after the search, adds no persistent memory, and is inert in production generation. Diagnostics report foundation builds/reuses and isolated replay attempts, hits, misses, and full evaluations so the 33-case matrix can verify that decisions remain stable while repeated preparation cost falls.
-
-## EW-C1A.3n endpoint-anchored support and patch-native axial certification
-
-C1A.3n retains the accepted C1A.3g exact baseline/fallback authority, C1A.3h endpoint-conflict proof guard, C1A.3i editor-only preparation replay, and the bounded C1A.3l/C1A.3m selected-face replacement and authoritative splice. The C1A.3m Unity matrix completed `33/33` within budget but remained `17/33`: `104` endpoint-patch attempts, `0` prepared/applied, with `66` locality, `25` extraction, `10` disconnected-patch, `1` boundary-crossing, and `2` incident-band-join rejections. Exact cut-locality is retained because it correctly permitted `620` distant retained vertices and exposed later construction gates.
-
-Candidate boundary placement is now endpoint-owned. `TryBuildPlaneCutEndpointPatchCandidate(...)` computes the existing target cutback and local radius first, then gathers support independently for every incident bevel identity from bevel-face vertices inside that radius, closest local segment points, and exact segment/sphere entry or exit points. Every incident identity must contribute finite local support. The boundary uses the maximum projection only across those local samples. Full incident-face support is recorded only as diagnostic evidence, including its delta from the selected local support and the identity/radius of the controlling local sample.
-
-The bounded endpoint patch no longer calls the historical global-junction `IsPlaneCutJunctionInfluenceLocal(...)`. A patch-native axial validator measures the ordered stitch loop and generated cap against each incident source edge from the implicated endpoint. Allowed consumption uses the existing incident width, prepared cut depth, plane tolerance, minimum stable edge length, and the same bounded `3%..25%` source-length envelope used by the endpoint-conflict contract. Negative influence behind the source endpoint, excessive forward consumption, and opposite-end reach are rejected. The historical global-junction validator remains unchanged for its historical owner and the global solver remains declaration-only.
-
-Diagnostics record total and minimum local support samples, per-incident sample counts, local radius and projection, global support and global-minus-local delta, controlling support identity/radius, maximum and allowed axial influence, rejected edge/endpoint, and the ordered axial influence signature. No controls, serialized state, assets, shaders, endpoint allowances, width floors, cache keys, or production behavior change.
-
-## EW-C1A.3m exact cut-locality endpoint face-patch replacement
-
-C1A.3m preserves the accepted C1A.3g baseline/fallback owner, C1A.3h proof guard, C1A.3i editor-only preparation replay, and C1A.3l bounded selected-face replacement/splice authority. The C1A.3l Unity matrix completed safely but prepared `0/104` replacements because `102/104` attempts applied locality to every original selected-face vertex. Long retained portions of locally clipped faces were therefore treated as modified geometry. C1A.3m changes only that ownership rule.
-
-The replacement owner remains `PlaneCutEndpointPatchReplacement`. Selection still starts from incident bevel faces crossed by the boundary, rejects non-incident bevel ownership, and requires one connected component with one closed degree-two untouched stitch loop. Component growth now crosses only shared edges whose removed segment or plane intersection is local to the implicated endpoint. A distant positive vertex can no longer pull unrelated face area into the patch merely because another face in the component is affected.
-
-Locality is certified against geometry actually changed by the replacement. Positive-side vertices that will be removed, exact edge-plane intersections, generated cap vertices, and generated replacement vertices must remain inside the endpoint-star radius. Original negative/on-plane vertices that survive unchanged may extend outside the radius and are counted diagnostically. Evidence records maximum removed, intersection, and replacement radii; retained-outside count; selected-face counts before and after cut-local filtering; and the exact failure source (`removed-vertex`, `intersection`, `cap`, or `replacement`).
-
-Only selected faces are clipped. Surviving polygons retain original feature and provenance; untouched faces remain geometrically unchanged; one `BoundedEndpointCap` supplies connecting geometry without replacing incident identities. Prepared and legal-minimum trials must still agree on incident identities, selected provenance, and boundary topology. `MaterializePlaneCutBevelSolvedPlan(...)` remains sole final authority and exact-signature splice owner. Signature mismatch or any final certification failure is a recovery false positive and returns the exact C1A.3g ordinary baseline. No runtime control, serialized state, shader path, global junction search, second complete build, or production-generation behavior is added.
-
-## Historical runtime-rejected EW-C1A.3l full-face-extent locality implementation
-
-The initial C1A.3l bounded replacement architecture compiled after its signature-propagation hotfix and completed the `33/33` matrix within budget, but remained `17/33`: `104` recovery attempts, `0` prepared/applied, `102` locality rejections, and `2` conservative non-incident-bevel extraction rejections. No attempt reached cap, stitch, band-integrity, parity, or materialization checks. Its selected-face-only clipping and authoritative splice are retained; only its full-original-face locality interpretation is superseded by C1A.3m.
-
-## Historical runtime-rejected EW-C1A.3k endpoint-star half-space recovery
-
-C1A.3j is runtime-rejected as a recovery design. C1A.3k is also runtime-rejected: its complete Unity matrix remained `17/33`, attempted `104` supported two/three-band endpoint stars, and prepared/applied `0/104`. Thirteen terminal outcomes could not remove a local endpoint without affecting unrelated geometry; three exceeded locality/shared-axis limits. Performance remained within budget, so C1A.3i remains the accepted preparation-performance baseline.
-
-The rejected C1A.3k design preserved the C1A.3g authority/fallback boundary, C1A.3h proof guard, and C1A.3i editor-search replay cache. After the guard proves a persistent minimum-width victim/foreign split, recovery gathers the complete retained incident star at the implicated source vertex. Only deterministic stars containing two or three bands are supported; larger, mismatched, ambiguous, or incomplete stars remain normal ranked rejections.
-
-The endpoint-star boundary is derived from the actual prepared edge-only shell support through the existing bounded local junction-plane constructor. Fixed normal ownership is limited to the bevel-normal sum, source-face-normal sum, and radial directions; fixed depth factors are `0.60/0.90`. There is no queue, global candidate search, deferred-edge branch, edge backtracking, or independent solver budget. The first fixed boundary that preserves unrelated source vertices and passes exact dual-width certification is stored as the sole prepared junction.
-
-The identical boundary must emit one stable provenance-owned cap, join every incident bevel band, remain inside existing locality/shared-axis limits, and pass face quality, closed topology, bevel-band integrity, triangulation, and render-validity checks at prepared and legal-minimum widths. Final materialization consumes the immutable prepared boundary and remains solely authoritative for retained identities, coverage, topology, and soup. Unsupported or failed stars continue ranked preparation; a final mismatch is a recovery false positive and returns the exact ordinary baseline. Production generation, serialized state, Inspector controls, shaders, materials, and runtime cost remain unchanged.
-
-## EW-C1A.3o bounded endpoint-cell subface reconstruction
-
-C1A.3o keeps the accepted C1A.3g exact-baseline fallback, C1A.3h minimum-width endpoint-conflict guard, C1A.3i preparation/replay cache, and single authoritative materialization. It changes only the optional recovery used after the guard proves that ordinary bevel planes collide near the corner-chip transaction at a shared endpoint.
-
-The recovery unit is now an endpoint-local subface rather than a complete polygon face. One axial limit plane is derived for every retained incident source edge from the existing patch-native endpoint-consumption allowance. Their source-side half-spaces form a bounded endpoint cell. Each intersected source or incident-bevel polygon is partitioned sequentially by those axial planes, producing an endpoint-local polygon and untouched remote remainders. The junction boundary clips only the endpoint-local polygon. Remote remainders preserve the original feature, strength, provenance identity, authored normal, and exact cached split positions.
-
-If the failed edge-only shell no longer contains a required incident bevel polygon, the recovery constructs an isolated shell for that prepared bevel candidate and extracts only its fragment inside the same endpoint cell. This synthetic local fragment retains the original source-edge identity and does not create a new authored bevel identity.
-
-A prepared replacement contains the exact cell-limit signature, matched source-face signatures, local-fragment and remote-remainder signatures, cell split signature, synthetic incident identities, one bounded connecting cap, and topology metrics. Prepared and legal-minimum widths must retain the same incident identities and subface topology counts. The one authoritative build must reproduce the selected source faces, verify the stored cell/replacement signatures, replace only those faces with the stored local fragments and remote remainders, and then pass every existing identity, coverage, manifold, triangulation, render-channel, and soup gate. Any mismatch is a recovery false positive and returns the exact ordinary baseline.
-
-This patch does not change edge-width policy, endpoint allowance, corner selection, controls, production generation, shaders, materials, cloud integration, or unrelated geometry systems.
+Quality-aware bevel retriangulation is fail-closed. Every selected triangle must pass final-position duplicate, coincidence, finite-value, scale-relative area, winding, and authored-normal checks. A lower aspect ratio can never justify an invalid emitted triangle. Runtime validation reports uploaded-mesh and logical-bevel degenerate counts from the same accepted build.

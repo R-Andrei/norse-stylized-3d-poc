@@ -1204,16 +1204,10 @@ namespace ProgrammaticStylized3D.Rivers
 
         private string ResolveBirthActivityStatus()
         {
-            int activeCommands = birthCommandsThisFrame +
-                pendingMaterialBirths.Count;
+            int activeCommands = birthCommandsThisFrame;
             if (activeCommands > 0)
             {
                 return $"active {activeCommands} cmds";
-            }
-
-            if (activeFoamCompositionEventCount > 0)
-            {
-                return "active composition / 0 cmds";
             }
 
             if (lastBirthCommandAt < 0.0)

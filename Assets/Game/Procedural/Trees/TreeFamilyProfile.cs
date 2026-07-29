@@ -100,15 +100,11 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField]
         private TreeFloatRange surfaceTorsionDegrees = new TreeFloatRange(-25f, 25f);
 
-        [InspectorName("Trunk Twist Ridge Count")]
-        [SerializeField]
-        private TreeIntRange twistRidgeCount = new TreeIntRange(5, 7);
-
-        [InspectorName("Trunk Twist Ridge Depth")]
-        [SerializeField]
-        private TreeFloatRange twistRidgeDepth = new TreeFloatRange(0.06f, 0.12f);
-
         [Header("Root Buttress")]
+        [InspectorName("Root Buttress Count")]
+        [SerializeField]
+        private TreeIntRange rootButtressCount = new TreeIntRange(4, 6);
+
         [SerializeField]
         private TreeFloatRange rootButtressStrength = new TreeFloatRange(0.3f, 0.6f);
 
@@ -151,8 +147,7 @@ namespace ProgrammaticStylized3D.Trees
         public TreeFloatRange LeanDirectionDegrees => leanDirectionDegrees;
         public TreeFloatRange TwistDegrees => surfaceTorsionDegrees;
         public TreeFloatRange SurfaceTorsionDegrees => surfaceTorsionDegrees;
-        public TreeIntRange TwistRidgeCount => twistRidgeCount;
-        public TreeFloatRange TwistRidgeDepth => twistRidgeDepth;
+        public TreeIntRange RootButtressCount => rootButtressCount;
         public TreeFloatRange RootButtressStrength => rootButtressStrength;
         public TreeFloatRange RootButtressHeight => rootButtressHeight;
         public TreeFloatRange RootFlareScale => rootFlareScale;
@@ -196,34 +191,301 @@ namespace ProgrammaticStylized3D.Trees
             switch (family)
             {
                 case TreeFamily.Pine:
-                    twistRidgeCount = new TreeIntRange(4, 6);
-                    twistRidgeDepth = new TreeFloatRange(0.025f, 0.07f);
                     rootButtressStrength = new TreeFloatRange(0.12f, 0.30f);
                     rootButtressHeight = new TreeFloatRange(0.08f, 0.16f);
                     rootFlareScale = new TreeFloatRange(1.05f, 1.18f);
                     break;
                 case TreeFamily.Twisted:
-                    twistRidgeCount = new TreeIntRange(6, 8);
-                    twistRidgeDepth = new TreeFloatRange(0.16f, 0.30f);
                     rootButtressStrength = new TreeFloatRange(0.45f, 0.80f);
                     rootButtressHeight = new TreeFloatRange(0.18f, 0.35f);
                     rootFlareScale = new TreeFloatRange(1.20f, 1.55f);
                     break;
                 case TreeFamily.Dead:
-                    twistRidgeCount = new TreeIntRange(5, 7);
-                    twistRidgeDepth = new TreeFloatRange(0.12f, 0.24f);
                     rootButtressStrength = new TreeFloatRange(0.40f, 0.75f);
                     rootButtressHeight = new TreeFloatRange(0.16f, 0.32f);
                     rootFlareScale = new TreeFloatRange(1.18f, 1.48f);
                     break;
                 default:
-                    twistRidgeCount = new TreeIntRange(5, 7);
-                    twistRidgeDepth = new TreeFloatRange(0.07f, 0.14f);
                     rootButtressStrength = new TreeFloatRange(0.30f, 0.65f);
                     rootButtressHeight = new TreeFloatRange(0.12f, 0.25f);
                     rootFlareScale = new TreeFloatRange(1.15f, 1.40f);
                     break;
             }
+        }
+
+        internal void ApplyTreeGen2C1Defaults(TreeFamily family)
+        {
+            switch (family)
+            {
+                case TreeFamily.Pine:
+                    surfaceTorsionDegrees = new TreeFloatRange(-10f, 10f);
+                    break;
+                case TreeFamily.Twisted:
+                    surfaceTorsionDegrees = new TreeFloatRange(-240f, -160f);
+                    break;
+                case TreeFamily.Dead:
+                    surfaceTorsionDegrees = new TreeFloatRange(-180f, -100f);
+                    break;
+                default:
+                    surfaceTorsionDegrees = new TreeFloatRange(-20f, 20f);
+                    break;
+            }
+        }
+
+        internal bool ApplyTreeGen2C1Migration(TreeFamily family)
+        {
+            if ((family == TreeFamily.Twisted || family == TreeFamily.Dead) &&
+                ApproximatelyRange(surfaceTorsionDegrees, -110f, 110f))
+            {
+                ApplyTreeGen2C1Defaults(family);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal void ApplyTreeGen2C2Defaults(TreeFamily family)
+        {
+            switch (family)
+            {
+                case TreeFamily.Twisted:
+                    surfaceTorsionDegrees =
+                        new TreeFloatRange(-420f, -280f);
+                    break;
+                case TreeFamily.Dead:
+                    surfaceTorsionDegrees =
+                        new TreeFloatRange(-330f, -210f);
+                    break;
+            }
+        }
+
+        internal bool ApplyTreeGen2C2Migration(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted &&
+                ApproximatelyRange(surfaceTorsionDegrees, -240f, -160f))
+            {
+                ApplyTreeGen2C2Defaults(family);
+                return true;
+            }
+
+            if (family == TreeFamily.Dead &&
+                ApproximatelyRange(surfaceTorsionDegrees, -180f, -100f))
+            {
+                ApplyTreeGen2C2Defaults(family);
+                return true;
+            }
+
+            return false;
+        }
+
+        internal void ApplyTreeGen2C3Defaults(TreeFamily family)
+        {
+            switch (family)
+            {
+                case TreeFamily.Pine:
+                    rootButtressCount = new TreeIntRange(3, 5);
+                    break;
+                case TreeFamily.Twisted:
+                    rootButtressCount = new TreeIntRange(4, 6);
+                    rootButtressStrength = new TreeFloatRange(0.45f, 1.00f);
+                    rootFlareScale = new TreeFloatRange(1.20f, 1.70f);
+                    break;
+                case TreeFamily.Dead:
+                    rootButtressCount = new TreeIntRange(4, 6);
+                    rootButtressStrength = new TreeFloatRange(0.40f, 0.95f);
+                    rootFlareScale = new TreeFloatRange(1.18f, 1.68f);
+                    break;
+                default:
+                    rootButtressCount = new TreeIntRange(4, 6);
+                    rootButtressStrength = new TreeFloatRange(0.30f, 0.85f);
+                    rootFlareScale = new TreeFloatRange(1.15f, 1.55f);
+                    break;
+            }
+        }
+
+        internal bool ApplyTreeGen2C3Migration(TreeFamily family)
+        {
+            rootButtressCount = family == TreeFamily.Pine
+                ? new TreeIntRange(3, 5)
+                : new TreeIntRange(4, 6);
+            bool changed = true;
+            if (family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.45f, 0.80f),
+                    new TreeFloatRange(0.45f, 1.00f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.20f, 1.55f),
+                    new TreeFloatRange(1.20f, 1.70f));
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.40f, 0.75f),
+                    new TreeFloatRange(0.40f, 0.95f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.18f, 1.48f),
+                    new TreeFloatRange(1.18f, 1.68f));
+            }
+            else if (family == TreeFamily.Common)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.30f, 0.65f),
+                    new TreeFloatRange(0.30f, 0.85f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.15f, 1.40f),
+                    new TreeFloatRange(1.15f, 1.55f));
+            }
+
+            return changed;
+        }
+
+        internal void ApplyTreeGen2C5Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted)
+            {
+                rootButtressStrength = new TreeFloatRange(0.38f, 0.82f);
+                rootFlareScale = new TreeFloatRange(1.18f, 1.52f);
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                rootButtressStrength = new TreeFloatRange(0.36f, 0.80f);
+                rootFlareScale = new TreeFloatRange(1.16f, 1.48f);
+            }
+            else if (family == TreeFamily.Common)
+            {
+                rootButtressStrength = new TreeFloatRange(0.25f, 0.70f);
+                rootFlareScale = new TreeFloatRange(1.12f, 1.42f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C5Migration(TreeFamily family)
+        {
+            bool changed = false;
+            if (family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.45f, 1.00f),
+                    new TreeFloatRange(0.38f, 0.82f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.20f, 1.70f),
+                    new TreeFloatRange(1.18f, 1.52f));
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.40f, 0.95f),
+                    new TreeFloatRange(0.36f, 0.80f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.18f, 1.68f),
+                    new TreeFloatRange(1.16f, 1.48f));
+            }
+            else if (family == TreeFamily.Common)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.30f, 0.85f),
+                    new TreeFloatRange(0.25f, 0.70f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.15f, 1.55f),
+                    new TreeFloatRange(1.12f, 1.42f));
+            }
+
+            return changed;
+        }
+
+        internal void ApplyTreeGen2C6Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted)
+            {
+                rootButtressStrength = new TreeFloatRange(0.38f, 0.92f);
+                rootFlareScale = new TreeFloatRange(1.18f, 1.55f);
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                rootButtressStrength = new TreeFloatRange(0.36f, 0.88f);
+                rootFlareScale = new TreeFloatRange(1.16f, 1.52f);
+            }
+            else if (family == TreeFamily.Common)
+            {
+                rootButtressStrength = new TreeFloatRange(0.25f, 0.82f);
+                rootFlareScale = new TreeFloatRange(1.12f, 1.45f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C6Migration(TreeFamily family)
+        {
+            bool changed = false;
+            if (family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.38f, 0.82f),
+                    new TreeFloatRange(0.38f, 0.92f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.18f, 1.52f),
+                    new TreeFloatRange(1.18f, 1.55f));
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.36f, 0.80f),
+                    new TreeFloatRange(0.36f, 0.88f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.16f, 1.48f),
+                    new TreeFloatRange(1.16f, 1.52f));
+            }
+            else if (family == TreeFamily.Common)
+            {
+                changed |= ReplaceIfMatches(
+                    ref rootButtressStrength,
+                    new TreeFloatRange(0.25f, 0.70f),
+                    new TreeFloatRange(0.25f, 0.82f));
+                changed |= ReplaceIfMatches(
+                    ref rootFlareScale,
+                    new TreeFloatRange(1.12f, 1.42f),
+                    new TreeFloatRange(1.12f, 1.45f));
+            }
+
+            return changed;
+        }
+
+        private static bool ReplaceIfMatches(
+            ref TreeFloatRange value,
+            TreeFloatRange expected,
+            TreeFloatRange replacement)
+        {
+            if (Mathf.Abs(value.Minimum - expected.Minimum) > 0.0001f ||
+                Mathf.Abs(value.Maximum - expected.Maximum) > 0.0001f)
+            {
+                return false;
+            }
+
+            value = replacement;
+            return true;
+        }
+
+        private static bool ApproximatelyRange(
+            TreeFloatRange range,
+            float minimum,
+            float maximum)
+        {
+            return Mathf.Abs(range.Minimum - minimum) <= 0.0001f &&
+                Mathf.Abs(range.Maximum - maximum) <= 0.0001f;
         }
 
         internal void Set(
@@ -320,6 +582,214 @@ namespace ProgrammaticStylized3D.Trees
         public TreeIntRange BranchesPerTier => branchesPerTier;
         public TreeFloatRange TierIrregularity => tierIrregularity;
         public TreeFloatRange SideBias => sideBias;
+
+        internal void ApplyTreeGen2C3Defaults(
+            TreeFamily family,
+            int branchOrder)
+        {
+            if (branchOrder == 1 && family == TreeFamily.Twisted)
+            {
+                count = new TreeIntRange(7, 13);
+                lengthRatio = new TreeFloatRange(0.20f, 0.46f);
+                radiusRatio = new TreeFloatRange(0.34f, 0.60f);
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Twisted)
+            {
+                count = new TreeIntRange(2, 3);
+                lengthRatio = new TreeFloatRange(0.24f, 0.40f);
+                radiusRatio = new TreeFloatRange(0.28f, 0.46f);
+            }
+            else if (branchOrder == 1 && family == TreeFamily.Dead)
+            {
+                count = new TreeIntRange(12, 20);
+                lengthRatio = new TreeFloatRange(0.14f, 0.32f);
+                radiusRatio = new TreeFloatRange(0.32f, 0.60f);
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Dead)
+            {
+                count = new TreeIntRange(2, 4);
+                lengthRatio = new TreeFloatRange(0.18f, 0.30f);
+                radiusRatio = new TreeFloatRange(0.26f, 0.44f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C3Migration(
+            TreeFamily family,
+            int branchOrder)
+        {
+            bool changed = false;
+            if (branchOrder == 1 && family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(5, 11),
+                    new TreeIntRange(7, 13));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.25f, 0.55f),
+                    new TreeFloatRange(0.20f, 0.46f));
+                changed |= ReplaceIfMatches(
+                    ref radiusRatio,
+                    new TreeFloatRange(0.28f, 0.55f),
+                    new TreeFloatRange(0.34f, 0.60f));
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(1, 2),
+                    new TreeIntRange(2, 3));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.24f, 0.42f),
+                    new TreeFloatRange(0.24f, 0.40f));
+                changed |= ReplaceIfMatches(
+                    ref radiusRatio,
+                    new TreeFloatRange(0.24f, 0.42f),
+                    new TreeFloatRange(0.28f, 0.46f));
+            }
+            else if (branchOrder == 1 && family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(9, 17),
+                    new TreeIntRange(12, 20));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.16f, 0.38f),
+                    new TreeFloatRange(0.14f, 0.32f));
+                changed |= ReplaceIfMatches(
+                    ref radiusRatio,
+                    new TreeFloatRange(0.25f, 0.52f),
+                    new TreeFloatRange(0.32f, 0.60f));
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(1, 3),
+                    new TreeIntRange(2, 4));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.20f, 0.34f),
+                    new TreeFloatRange(0.18f, 0.30f));
+                changed |= ReplaceIfMatches(
+                    ref radiusRatio,
+                    new TreeFloatRange(0.22f, 0.38f),
+                    new TreeFloatRange(0.26f, 0.44f));
+            }
+
+            return changed;
+        }
+
+        internal void ApplyTreeGen2C5Defaults(
+            TreeFamily family,
+            int branchOrder)
+        {
+            if (branchOrder == 1 && family == TreeFamily.Twisted)
+            {
+                count = new TreeIntRange(10, 14);
+                lengthRatio = new TreeFloatRange(0.18f, 0.38f);
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Twisted)
+            {
+                count = new TreeIntRange(3, 4);
+                lengthRatio = new TreeFloatRange(0.20f, 0.34f);
+            }
+            else if (branchOrder == 1 && family == TreeFamily.Dead)
+            {
+                count = new TreeIntRange(14, 20);
+                lengthRatio = new TreeFloatRange(0.12f, 0.26f);
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Dead)
+            {
+                count = new TreeIntRange(3, 4);
+                lengthRatio = new TreeFloatRange(0.16f, 0.26f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C5Migration(
+            TreeFamily family,
+            int branchOrder)
+        {
+            bool changed = false;
+            if (branchOrder == 1 && family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(7, 13),
+                    new TreeIntRange(10, 14));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.20f, 0.46f),
+                    new TreeFloatRange(0.18f, 0.38f));
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(2, 3),
+                    new TreeIntRange(3, 4));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.24f, 0.40f),
+                    new TreeFloatRange(0.20f, 0.34f));
+            }
+            else if (branchOrder == 1 && family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(12, 20),
+                    new TreeIntRange(14, 20));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.14f, 0.32f),
+                    new TreeFloatRange(0.12f, 0.26f));
+            }
+            else if (branchOrder == 2 && family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref count,
+                    new TreeIntRange(2, 4),
+                    new TreeIntRange(3, 4));
+                changed |= ReplaceIfMatches(
+                    ref lengthRatio,
+                    new TreeFloatRange(0.18f, 0.30f),
+                    new TreeFloatRange(0.16f, 0.26f));
+            }
+
+            return changed;
+        }
+
+        private static bool ReplaceIfMatches(
+            ref TreeFloatRange value,
+            TreeFloatRange expected,
+            TreeFloatRange replacement)
+        {
+            if (Mathf.Abs(value.Minimum - expected.Minimum) > 0.0001f ||
+                Mathf.Abs(value.Maximum - expected.Maximum) > 0.0001f)
+            {
+                return false;
+            }
+
+            value = replacement;
+            return true;
+        }
+
+        private static bool ReplaceIfMatches(
+            ref TreeIntRange value,
+            TreeIntRange expected,
+            TreeIntRange replacement)
+        {
+            if (value.Minimum != expected.Minimum ||
+                value.Maximum != expected.Maximum)
+            {
+                return false;
+            }
+
+            value = replacement;
+            return true;
+        }
 
         internal void Set(
             TreeIntRange countRange,
@@ -447,6 +917,157 @@ namespace ProgrammaticStylized3D.Trees
                     directionalBiasStrength = new TreeFloatRange(0f, 0.22f);
                     break;
             }
+        }
+
+        internal void ApplyTreeGen2C3Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted)
+            {
+                initialElevationDegrees = new TreeFloatRange(8f, 34f);
+                archDirection = new TreeFloatRange(0.15f, 1f);
+                archStrength = new TreeFloatRange(0.12f, 0.36f);
+                lateSag = new TreeFloatRange(0.02f, 0.18f);
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                initialElevationDegrees = new TreeFloatRange(10f, 38f);
+                archDirection = new TreeFloatRange(0.20f, 1f);
+                archStrength = new TreeFloatRange(0.12f, 0.34f);
+                lateSag = new TreeFloatRange(0f, 0.16f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C3Migration(TreeFamily family)
+        {
+            bool changed = false;
+            if (family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref initialElevationDegrees,
+                    new TreeFloatRange(-17.744672f, 22.293629f),
+                    new TreeFloatRange(8f, 34f));
+                changed |= ReplaceIfMatches(
+                    ref archDirection,
+                    new TreeFloatRange(-1f, 1f),
+                    new TreeFloatRange(0.15f, 1f));
+                changed |= ReplaceIfMatches(
+                    ref archStrength,
+                    new TreeFloatRange(0.16f, 0.46f),
+                    new TreeFloatRange(0.12f, 0.36f));
+                changed |= ReplaceIfMatches(
+                    ref lateSag,
+                    new TreeFloatRange(0f, 0.35f),
+                    new TreeFloatRange(0.02f, 0.18f));
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref initialElevationDegrees,
+                    new TreeFloatRange(-15.109575f, 24.227745f),
+                    new TreeFloatRange(10f, 38f));
+                changed |= ReplaceIfMatches(
+                    ref archDirection,
+                    new TreeFloatRange(-1f, 0.8f),
+                    new TreeFloatRange(0.20f, 1f));
+                changed |= ReplaceIfMatches(
+                    ref archStrength,
+                    new TreeFloatRange(0.12f, 0.42f),
+                    new TreeFloatRange(0.12f, 0.34f));
+                changed |= ReplaceIfMatches(
+                    ref lateSag,
+                    new TreeFloatRange(0f, 0.30f),
+                    new TreeFloatRange(0f, 0.16f));
+            }
+
+            return changed;
+        }
+
+        internal void ApplyTreeGen2C5Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted)
+            {
+                startHeight = new TreeFloatRange(0.24f, 0.40f);
+                endHeight = new TreeFloatRange(0.74f, 0.94f);
+                initialElevationDegrees = new TreeFloatRange(14f, 38f);
+                azimuthSymmetry = new TreeFloatRange(0.80f, 0.96f);
+                directionalBiasStrength = new TreeFloatRange(0.02f, 0.18f);
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                startHeight = new TreeFloatRange(0.30f, 0.48f);
+                endHeight = new TreeFloatRange(0.74f, 0.94f);
+                initialElevationDegrees = new TreeFloatRange(14f, 40f);
+                azimuthSymmetry = new TreeFloatRange(0.70f, 0.92f);
+                directionalBiasStrength = new TreeFloatRange(0.02f, 0.20f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C5Migration(TreeFamily family)
+        {
+            bool changed = false;
+            if (family == TreeFamily.Twisted)
+            {
+                changed |= ReplaceIfMatches(
+                    ref startHeight,
+                    new TreeFloatRange(0.20f, 0.36f),
+                    new TreeFloatRange(0.24f, 0.40f));
+                changed |= ReplaceIfMatches(
+                    ref endHeight,
+                    new TreeFloatRange(0.72f, 0.94f),
+                    new TreeFloatRange(0.74f, 0.94f));
+                changed |= ReplaceIfMatches(
+                    ref initialElevationDegrees,
+                    new TreeFloatRange(8f, 34f),
+                    new TreeFloatRange(14f, 38f));
+                changed |= ReplaceIfMatches(
+                    ref azimuthSymmetry,
+                    new TreeFloatRange(0.10f, 0.52f),
+                    new TreeFloatRange(0.80f, 0.96f));
+                changed |= ReplaceIfMatches(
+                    ref directionalBiasStrength,
+                    new TreeFloatRange(0.30f, 0.82f),
+                    new TreeFloatRange(0.02f, 0.18f));
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                changed |= ReplaceIfMatches(
+                    ref startHeight,
+                    new TreeFloatRange(0.18f, 0.38f),
+                    new TreeFloatRange(0.30f, 0.48f));
+                changed |= ReplaceIfMatches(
+                    ref endHeight,
+                    new TreeFloatRange(0.68f, 0.94f),
+                    new TreeFloatRange(0.74f, 0.94f));
+                changed |= ReplaceIfMatches(
+                    ref initialElevationDegrees,
+                    new TreeFloatRange(10f, 38f),
+                    new TreeFloatRange(14f, 40f));
+                changed |= ReplaceIfMatches(
+                    ref azimuthSymmetry,
+                    new TreeFloatRange(0.15f, 0.65f),
+                    new TreeFloatRange(0.70f, 0.92f));
+                changed |= ReplaceIfMatches(
+                    ref directionalBiasStrength,
+                    new TreeFloatRange(0.18f, 0.74f),
+                    new TreeFloatRange(0.02f, 0.20f));
+            }
+
+            return changed;
+        }
+
+        private static bool ReplaceIfMatches(
+            ref TreeFloatRange value,
+            TreeFloatRange expected,
+            TreeFloatRange replacement)
+        {
+            if (Mathf.Abs(value.Minimum - expected.Minimum) > 0.0001f ||
+                Mathf.Abs(value.Maximum - expected.Maximum) > 0.0001f)
+            {
+                return false;
+            }
+
+            value = replacement;
+            return true;
         }
 
         internal void ApplyTreeGen2BMigration(
@@ -663,6 +1284,73 @@ namespace ProgrammaticStylized3D.Trees
         public float CrownEnvelopeOvershoot =>
             Mathf.Clamp(crownEnvelopeOvershoot, 0f, 0.5f);
 
+        internal void ApplyTreeGen2C3Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted)
+            {
+                secondarySurvivalProbability = 0.84f;
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                secondarySurvivalProbability = 0.82f;
+            }
+        }
+
+        internal bool ApplyTreeGen2C3Migration(TreeFamily family)
+        {
+            float expected = family == TreeFamily.Twisted
+                ? 0.72f
+                : family == TreeFamily.Dead
+                    ? 0.62f
+                    : secondarySurvivalProbability;
+            float replacement = family == TreeFamily.Twisted
+                ? 0.84f
+                : family == TreeFamily.Dead
+                    ? 0.82f
+                    : secondarySurvivalProbability;
+            if (family != TreeFamily.Twisted && family != TreeFamily.Dead)
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(secondarySurvivalProbability - expected) > 0.0001f)
+            {
+                return false;
+            }
+
+            secondarySurvivalProbability = replacement;
+            return true;
+        }
+
+        internal void ApplyTreeGen2C5Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted || family == TreeFamily.Dead)
+            {
+                secondarySurvivalProbability = 0.90f;
+            }
+        }
+
+        internal bool ApplyTreeGen2C5Migration(TreeFamily family)
+        {
+            float expected = family == TreeFamily.Twisted
+                ? 0.84f
+                : family == TreeFamily.Dead
+                    ? 0.82f
+                    : secondarySurvivalProbability;
+            if (family != TreeFamily.Twisted && family != TreeFamily.Dead)
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(secondarySurvivalProbability - expected) > 0.0001f)
+            {
+                return false;
+            }
+
+            secondarySurvivalProbability = 0.90f;
+            return true;
+        }
+
         internal void Set(
             float trunkDisplacementRatio,
             float trunkSegmentTurn,
@@ -708,6 +1396,65 @@ namespace ProgrammaticStylized3D.Trees
         public TreeFloatRange DeadBranchProbability => deadBranchProbability;
         public TreeFloatRange BreakProbability => breakProbability;
 
+        internal void ApplyTreeGen2C3Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted || family == TreeFamily.Dead)
+            {
+                missingBranchProbability = new TreeFloatRange(0.03f, 0.12f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C3Migration(TreeFamily family)
+        {
+            TreeFloatRange expected;
+            if (family == TreeFamily.Twisted)
+            {
+                expected = new TreeFloatRange(0.05f, 0.22f);
+            }
+            else if (family == TreeFamily.Dead)
+            {
+                expected = new TreeFloatRange(0.08f, 0.24f);
+            }
+            else
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(missingBranchProbability.Minimum - expected.Minimum) > 0.0001f ||
+                Mathf.Abs(missingBranchProbability.Maximum - expected.Maximum) > 0.0001f)
+            {
+                return false;
+            }
+
+            missingBranchProbability = new TreeFloatRange(0.03f, 0.12f);
+            return true;
+        }
+
+        internal void ApplyTreeGen2C5Defaults(TreeFamily family)
+        {
+            if (family == TreeFamily.Twisted || family == TreeFamily.Dead)
+            {
+                missingBranchProbability = new TreeFloatRange(0.02f, 0.08f);
+            }
+        }
+
+        internal bool ApplyTreeGen2C5Migration(TreeFamily family)
+        {
+            if (family != TreeFamily.Twisted && family != TreeFamily.Dead)
+            {
+                return false;
+            }
+
+            if (Mathf.Abs(missingBranchProbability.Minimum - 0.03f) > 0.0001f ||
+                Mathf.Abs(missingBranchProbability.Maximum - 0.12f) > 0.0001f)
+            {
+                return false;
+            }
+
+            missingBranchProbability = new TreeFloatRange(0.02f, 0.08f);
+            return true;
+        }
+
         internal void Set(
             TreeFloatRange missingRange,
             TreeFloatRange deadRange,
@@ -725,7 +1472,7 @@ namespace ProgrammaticStylized3D.Trees
     public sealed class TreeFamilyProfile : ScriptableObject
     {
         public const int CurrentProfileVersion = 4;
-        public const int CurrentBarkGrammarVersion = 1;
+        public const int CurrentBarkGrammarVersion = 6;
 
         [Header("Identity")]
         [SerializeField]
@@ -835,6 +1582,11 @@ namespace ProgrammaticStylized3D.Trees
 
             ApplyTreeGen2BDefaults(targetFamily);
             ApplyTreeGen2CDefaults(targetFamily);
+            ApplyTreeGen2C1Defaults(targetFamily);
+            ApplyTreeGen2C2Defaults(targetFamily);
+            ApplyTreeGen2C3Defaults(targetFamily);
+            ApplyTreeGen2C5Defaults(targetFamily);
+            ApplyTreeGen2C6Defaults(targetFamily);
         }
 
         public bool UpgradeManagedDefaults(TreeFamily expectedFamily)
@@ -853,9 +1605,39 @@ namespace ProgrammaticStylized3D.Trees
                 changed = true;
             }
 
-            if (barkGrammarVersion < CurrentBarkGrammarVersion)
+            if (barkGrammarVersion < 1)
             {
                 ApplyTreeGen2CDefaults(expectedFamily);
+                changed = true;
+            }
+
+            if (barkGrammarVersion < 2)
+            {
+                changed |= ApplyTreeGen2C1Migration(expectedFamily);
+            }
+
+            if (barkGrammarVersion < 3)
+            {
+                changed |= ApplyTreeGen2C2Migration(expectedFamily);
+            }
+
+            if (barkGrammarVersion < 4)
+            {
+                changed |= ApplyTreeGen2C3Migration(expectedFamily);
+            }
+
+            if (barkGrammarVersion < 5)
+            {
+                changed |= ApplyTreeGen2C5Migration(expectedFamily);
+            }
+
+            if (barkGrammarVersion < 6)
+            {
+                changed |= ApplyTreeGen2C6Migration(expectedFamily);
+            }
+
+            if (barkGrammarVersion < CurrentBarkGrammarVersion)
+            {
                 barkGrammarVersion = CurrentBarkGrammarVersion;
                 changed = true;
             }
@@ -875,6 +1657,104 @@ namespace ProgrammaticStylized3D.Trees
         {
             trunk ??= new TreeTrunkSettings();
             trunk.ApplyTreeGen2CDefaults(targetFamily);
+        }
+
+        private void ApplyTreeGen2C1Defaults(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            trunk.ApplyTreeGen2C1Defaults(targetFamily);
+        }
+
+        private bool ApplyTreeGen2C1Migration(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            return trunk.ApplyTreeGen2C1Migration(targetFamily);
+        }
+
+        private void ApplyTreeGen2C2Defaults(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            trunk.ApplyTreeGen2C2Defaults(targetFamily);
+        }
+
+        private bool ApplyTreeGen2C2Migration(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            return trunk.ApplyTreeGen2C2Migration(targetFamily);
+        }
+
+        private void ApplyTreeGen2C3Defaults(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            primaryBranches ??= new TreePrimaryBranchSettings();
+            secondaryBranches ??= new TreeBranchOrderSettings();
+            damage ??= new TreeDamageSettings();
+            structuralConstraints ??= new TreeStructuralConstraintSettings();
+            trunk.ApplyTreeGen2C3Defaults(targetFamily);
+            primaryBranches.ApplyTreeGen2C3Defaults(targetFamily, 1);
+            primaryBranches.ApplyTreeGen2C3Defaults(targetFamily);
+            secondaryBranches.ApplyTreeGen2C3Defaults(targetFamily, 2);
+            damage.ApplyTreeGen2C3Defaults(targetFamily);
+            structuralConstraints.ApplyTreeGen2C3Defaults(targetFamily);
+        }
+
+        private bool ApplyTreeGen2C3Migration(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            primaryBranches ??= new TreePrimaryBranchSettings();
+            secondaryBranches ??= new TreeBranchOrderSettings();
+            damage ??= new TreeDamageSettings();
+            structuralConstraints ??= new TreeStructuralConstraintSettings();
+            bool changed = trunk.ApplyTreeGen2C3Migration(targetFamily);
+            changed |= primaryBranches.ApplyTreeGen2C3Migration(targetFamily, 1);
+            changed |= primaryBranches.ApplyTreeGen2C3Migration(targetFamily);
+            changed |= secondaryBranches.ApplyTreeGen2C3Migration(targetFamily, 2);
+            changed |= damage.ApplyTreeGen2C3Migration(targetFamily);
+            changed |= structuralConstraints.ApplyTreeGen2C3Migration(targetFamily);
+            return changed;
+        }
+
+        private void ApplyTreeGen2C5Defaults(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            primaryBranches ??= new TreePrimaryBranchSettings();
+            secondaryBranches ??= new TreeBranchOrderSettings();
+            damage ??= new TreeDamageSettings();
+            structuralConstraints ??= new TreeStructuralConstraintSettings();
+            trunk.ApplyTreeGen2C5Defaults(targetFamily);
+            primaryBranches.ApplyTreeGen2C5Defaults(targetFamily, 1);
+            primaryBranches.ApplyTreeGen2C5Defaults(targetFamily);
+            secondaryBranches.ApplyTreeGen2C5Defaults(targetFamily, 2);
+            damage.ApplyTreeGen2C5Defaults(targetFamily);
+            structuralConstraints.ApplyTreeGen2C5Defaults(targetFamily);
+        }
+
+        private bool ApplyTreeGen2C5Migration(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            primaryBranches ??= new TreePrimaryBranchSettings();
+            secondaryBranches ??= new TreeBranchOrderSettings();
+            damage ??= new TreeDamageSettings();
+            structuralConstraints ??= new TreeStructuralConstraintSettings();
+            bool changed = trunk.ApplyTreeGen2C5Migration(targetFamily);
+            changed |= primaryBranches.ApplyTreeGen2C5Migration(targetFamily, 1);
+            changed |= primaryBranches.ApplyTreeGen2C5Migration(targetFamily);
+            changed |= secondaryBranches.ApplyTreeGen2C5Migration(targetFamily, 2);
+            changed |= damage.ApplyTreeGen2C5Migration(targetFamily);
+            changed |= structuralConstraints.ApplyTreeGen2C5Migration(targetFamily);
+            return changed;
+        }
+
+        private void ApplyTreeGen2C6Defaults(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            trunk.ApplyTreeGen2C6Defaults(targetFamily);
+        }
+
+        private bool ApplyTreeGen2C6Migration(TreeFamily targetFamily)
+        {
+            trunk ??= new TreeTrunkSettings();
+            return trunk.ApplyTreeGen2C6Migration(targetFamily);
         }
 
         private void ApplyTreeGen2BMigration(TreeFamily targetFamily)
@@ -907,13 +1787,12 @@ namespace ProgrammaticStylized3D.Trees
             ValidateRange(trunk.SpiralStrength, "Trunk spiral strength", failures, 0f, 1f);
             ValidateRange(trunk.SpiralTurns, "Trunk spiral turns", failures, 0f, 8f);
             ValidateRange(trunk.SpiralDirection, "Trunk spiral direction", failures, -1f, 1f);
-            if (!trunk.TwistRidgeCount.IsValid ||
-                trunk.TwistRidgeCount.Minimum < 3 ||
-                trunk.TwistRidgeCount.Maximum > 10)
+            if (!trunk.RootButtressCount.IsValid ||
+                trunk.RootButtressCount.Minimum < 3 ||
+                trunk.RootButtressCount.Maximum > 8)
             {
-                failures.Add("Trunk twist ridge-count range must be ordered from 3 through 10.");
+                failures.Add("Root buttress-count range must be ordered from 3 through 8.");
             }
-            ValidateRange(trunk.TwistRidgeDepth, "Trunk twist ridge depth", failures, 0f, 0.45f);
             ValidateRange(trunk.RootButtressStrength, "Root buttress strength", failures, 0f, 1.5f);
             ValidateRange(trunk.RootButtressHeight, "Root buttress height", failures, 0.01f, 0.6f);
             ValidateRange(trunk.RootFlareScale, "Root flare scale", failures, 1f, 2.5f);
