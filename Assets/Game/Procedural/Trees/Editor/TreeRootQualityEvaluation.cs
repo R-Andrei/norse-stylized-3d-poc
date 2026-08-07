@@ -15,14 +15,14 @@ namespace ProgrammaticStylized3D.Trees.Editor
     internal static class TreeRootQualityEvaluation
     {
         private const string OutputDirectory =
-            "Library/PS3D/Trees/RootMassCandidateEvaluation";
+            "Library/PS3D/Trees/RootMassRegressionEvaluation";
         private const string CaptureDirectoryName = "Captures";
         private const string ReportFileName =
-            "TreeRootMassCandidateEvaluationReport.md";
+            "TreeRootMassRegressionEvaluationReport.md";
         private const string CsvFileName =
-            "TreeRootMassCandidateEvaluation.csv";
+            "TreeRootMassRegressionEvaluation.csv";
         private const string BoardFileName =
-            "TreeRootMassCandidateEvaluationBoard.html";
+            "TreeRootMassRegressionEvaluationBoard.html";
         private const int CloseCaptureWidth = 640;
         private const int CloseCaptureHeight = 640;
         private const int GameCaptureHeight = 432;
@@ -62,7 +62,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
             internal Representative Representative;
             internal string Label;
             internal string Slug;
-            internal TreeRootMassCandidateStrategy? CandidateStrategy;
             internal float? AxialTwist;
             internal float? RootThickness;
             internal float? RootReach;
@@ -177,7 +176,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (representatives.Count != 1)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4A] The root-mass candidate evaluation requires the initialized Wych Elm Leaning curated gallery representative. Found " +
+                    "[TREE-ROOTS.4B] The root-mass production regression requires the initialized Wych Elm Leaning curated gallery representative. Found " +
                     representatives.Count + ". Rebuild the curated recipe gallery first.");
                 return false;
             }
@@ -186,7 +185,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (mainCamera == null)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4A] No enabled MainCamera-tagged Camera was found. The evaluation requires the current game-camera projection for its context captures.");
+                    "[TREE-ROOTS.4B] No enabled MainCamera-tagged Camera was found. The regression requires the current game-camera projection for its context captures.");
                 return false;
             }
 
@@ -260,7 +259,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             lastReportPath = reportPath;
             lastBoardPath = boardPath;
             currentProgress = 0f;
-            currentDetail = "Preparing first root-mass candidate case";
+            currentDetail = "Preparing first root-mass production regression case";
             currentEta = "ETA calculating";
             WriteCheckpoint(activeJob, "RUNNING", null);
             EditorApplication.update += Tick;
@@ -268,7 +267,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             EditorApplication.quitting += AbortForQuit;
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
             Debug.Log(
-                "[TREE-ROOTS.4A] Incremental 15-case root-mass candidate evaluation started. Output: " +
+                "[TREE-ROOTS.4B] Incremental 10-case root-mass production regression started. Output: " +
                 boardPath);
             return true;
         }
@@ -429,7 +428,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             switch (stage)
             {
                 case EvaluationStage.Build:
-                    return "building temporary production/candidate bark";
+                    return "building temporary production bark";
                 case EvaluationStage.BeginCloseCapture:
                 case EvaluationStage.WaitCloseCapture:
                     return "capturing close root view";
@@ -477,24 +476,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
             result.Definition = generation.Definition;
             result.Mesh = new Mesh
             {
-                name = "TREE-ROOTS.4A " +
+                name = "TREE-ROOTS.4B " +
                     evaluationCase.Representative.Name + " " +
                     evaluationCase.Label,
                 hideFlags = HideFlags.HideAndDontSave
             };
             TreeBarkMeshSettings settings =
                 TreeBarkMeshSettings.CreateRecipeOnlyDefaults();
-            result.Bark = evaluationCase.CandidateStrategy.HasValue
-                ? TreeBarkMeshGenerator.BuildForRootMassCandidate(
-                    result.Definition,
-                    settings,
-                    result.Mesh,
-                    evaluationCase.CandidateStrategy.Value,
-                    evaluationCase.RootThickness)
-                : TreeBarkMeshGenerator.Build(
-                    result.Definition,
-                    settings,
-                    result.Mesh);
+            result.Bark = TreeBarkMeshGenerator.Build(
+                result.Definition,
+                settings,
+                result.Mesh);
             result.BarkPassed = result.Bark != null && result.Bark.Passed;
             result.TopologyPassed = result.BarkPassed &&
                 result.Bark.TopologyAudit != null &&
@@ -586,7 +578,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 previewSceneCreated = true;
 
                 var treeObject = new GameObject(
-                    "TREE-ROOTS.4A Capture Tree")
+                    "TREE-ROOTS.4B Capture Tree")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -619,7 +611,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 CreateCaptureLights(previewScene);
 
                 var cameraObject = new GameObject(
-                    "TREE-ROOTS.4A Capture Camera")
+                    "TREE-ROOTS.4B Capture Camera")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -664,7 +656,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     RenderTextureFormat.ARGB32,
                     RenderTextureReadWrite.sRGB)
                 {
-                    name = "TREE-ROOTS.4A Async Capture",
+                    name = "TREE-ROOTS.4B Async Capture",
                     hideFlags = HideFlags.HideAndDontSave,
                     antiAliasing = 1,
                     useMipMap = false,
@@ -787,7 +779,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             GameObject ground = GameObject.CreatePrimitive(
                 PrimitiveType.Plane);
-            ground.name = "TREE-ROOTS.4A Capture Ground";
+            ground.name = "TREE-ROOTS.4B Capture Ground";
             ground.hideFlags = HideFlags.HideAndDontSave;
             SceneManager.MoveGameObjectToScene(ground, previewScene);
             Collider collider = ground.GetComponent<Collider>();
@@ -822,12 +814,12 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.4A Key Light",
+                "TREE-ROOTS.4B Key Light",
                 Quaternion.Euler(48f, -35f, 0f),
                 1.25f);
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.4A Fill Light",
+                "TREE-ROOTS.4B Fill Light",
                 Quaternion.Euler(25f, 145f, 0f),
                 0.48f);
         }
@@ -1165,7 +1157,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     ? F(bark.EvaluatedRootThickness)
                     : F(Mathf.Min(
                         evaluationCase.RootThickness ?? baseline.RootThickness,
-                        1f)),
+                        2f)),
                 F(evaluationCase.RootReach ?? baseline.RootReach),
                 F(evaluationCase.RootHeight ?? baseline.RootHeight),
                 F(evaluationCase.ButtressPersistence ??
@@ -1305,19 +1297,19 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (outcome == "COMPLETE")
             {
                 Debug.Log(
-                    "[TREE-ROOTS.4A] Root-mass candidate evaluation complete. Board: " +
+                    "[TREE-ROOTS.4B] Root-mass production regression complete. Board: " +
                     job.BoardPath);
             }
             else if (outcome == "FAILED")
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4A] Root-mass candidate evaluation failed. Partial output: " +
+                    "[TREE-ROOTS.4B] Root-mass production regression failed. Partial output: " +
                     job.ReportPath + "\n" + failure);
             }
             else
             {
                 Debug.LogWarning(
-                    "[TREE-ROOTS.4A] Root-mass candidate evaluation cancelled. Partial output: " +
+                    "[TREE-ROOTS.4B] Root-mass production regression cancelled. Partial output: " +
                     job.ReportPath);
             }
         }
@@ -1337,7 +1329,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             string failure)
         {
             var report = new StringBuilder();
-            report.AppendLine("# TREE-ROOTS.4A — Root Mass + Foot-Trajectory Candidate Evaluation");
+            report.AppendLine("# TREE-ROOTS.4B — Production Root-Mass Regression");
             report.AppendLine();
             report.Append("- Outcome: **").Append(outcome).AppendLine("**");
             report.Append("- Generated UTC: ")
@@ -1345,9 +1337,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.Append("- Completed cases: ")
                 .Append(job.Results.Count).Append(" / ")
                 .AppendLine(job.Cases.Count.ToString());
-            report.AppendLine("- Production Current remains bark algorithm 26; candidate cases are temporary evaluation-only builds.");
-            report.AppendLine("- Candidate contract: fixed q^4 support profile, bounded shared-base merge after support saturation, and a quadratic foot-shape envelope with either no plateau or a 2% Root Height plateau.");
-            report.AppendLine("- Ground-foot directional anchoring remains the accepted TREE-ROOTS.3 production envelope in every candidate case.");
+            report.AppendLine("- Every case uses ordinary Production Current bark algorithm 27.");
+            report.AppendLine("- Production contract: fixed q^4 support profile, bounded shared-base merge after support saturation, and immediate quadratic foot-shape amplitude with no production plateau.");
+            report.AppendLine("- Ground-foot directional anchoring remains the accepted TREE-ROOTS.3 production envelope and is independent from the promoted foot-shape amplitude.");
             report.AppendLine("- Captures per successful case: neutral close-root three-quarter view; exact game-camera context view.");
             report.AppendLine("- Contract: temporary validation definitions and meshes only; no scene objects, recipes, exact-control snapshots, generated gallery meshes, or serialized assets are modified.");
             report.Append("- Game camera: ")
@@ -1376,7 +1368,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     .Append(" | ").Append(F(evaluationCase.RootThickness ?? baseline.RootThickness))
                     .Append("/").Append(bark != null
                         ? F(bark.EvaluatedRootThickness)
-                        : F(Mathf.Min(evaluationCase.RootThickness ?? baseline.RootThickness, 1f)))
+                        : F(Mathf.Min(evaluationCase.RootThickness ?? baseline.RootThickness, 2f)))
                     .Append(" | ").Append(F(evaluationCase.RootReach ?? baseline.RootReach))
                     .Append(" / ").Append(F(evaluationCase.RootHeight ?? baseline.RootHeight))
                     .Append(" / ").Append(F(evaluationCase.ButtressPersistence ?? baseline.ButtressTransition))
@@ -1403,10 +1395,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.AppendLine();
             report.AppendLine("## Decision use");
             report.AppendLine();
-            report.AppendLine("- Compare Production — Operator Profile against Preferred and Fallback operator-profile cases first.");
-            report.AppendLine("- Preferred is promotable only if topology passes and its close-root outline enters the ground cleanly without the production bulb/vertical nose.");
-            report.AppendLine("- Fallback exists only to recover the smallest necessary amplitude plateau if immediate quadratic decay creates first-strip topology failures.");
-            report.AppendLine("- Thickness 1.5/2.0 cases are candidate-only range probes; they do not alter the public 0.1–1.0 control contract.");
+            report.AppendLine("- All cases are production regression anchors for the promoted root-mass response.");
+            report.AppendLine("- Thickness 1.5 / 2.0 and Reach 2.0 / Thickness 2.0 directly exercise the expanded public Thickness range and high-mass base merge.");
+            report.AppendLine("- Any topology failure, grounded-foot regression, or unexpected loss of distinct root crests blocks promotion closure.");
 
             File.WriteAllText(job.ReportPath, report.ToString(), Encoding.UTF8);
         }
@@ -1416,16 +1407,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
             var html = new StringBuilder();
             html.AppendLine("<!doctype html>");
             html.AppendLine("<html><head><meta charset=\"utf-8\">");
-            html.AppendLine("<title>TREE-ROOTS.4A Root Mass + Foot-Trajectory Candidate</title>");
+            html.AppendLine("<title>TREE-ROOTS.4B Production Root-Mass Regression</title>");
             html.AppendLine("<style>");
             html.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;background:#171717;color:#eee;margin:24px}h1,h2{margin:0 0 12px}h2{margin-top:32px;border-bottom:1px solid #555;padding-bottom:6px}.meta{color:#bbb;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.card{background:#242424;border:1px solid #444;border-radius:8px;padding:12px}.card.fail{border-color:#a44}.title{font-weight:700;margin-bottom:8px}.values{font-size:12px;color:#bbb;margin-bottom:8px}.views{display:grid;grid-template-columns:1fr 1fr;gap:8px}.views img{width:100%;height:auto;background:#111;border:1px solid #444}.caption{font-size:11px;color:#aaa;text-align:center;margin-top:3px}.missing{aspect-ratio:1/1;background:#111;display:flex;align-items:center;justify-content:center;color:#a88;border:1px solid #633}.finding{font-size:12px;color:#d9b0b0;margin-top:8px}</style>");
             html.AppendLine("</head><body>");
-            html.AppendLine("<h1>TREE-ROOTS.4A — Root Mass + Foot-Trajectory Candidate</h1>");
+            html.AppendLine("<h1>TREE-ROOTS.4B — Production Root-Mass Regression</h1>");
             html.Append("<div class=\"meta\">Outcome: ")
                 .Append(Html(outcome)).Append(" · Completed ")
                 .Append(job.Results.Count).Append(" / ")
                 .Append(job.Cases.Count)
-                .AppendLine(" cases · Production versus immediate-quadratic and 2%-plateau candidate root shapes. Public controls remain unchanged.</div>");
+                .AppendLine(" cases · Production Current regression across the promoted root-mass response and expanded Root Thickness range.</div>");
 
             for (int representativeIndex = 0;
                 representativeIndex < job.Representatives.Count;
@@ -1605,125 +1596,76 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (representatives == null || representatives.Count != 1)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.4A expected one Wych Elm representative.");
+                    "TREE-ROOTS.4B expected one Wych Elm representative.");
             }
 
             Representative twisted = representatives[0];
-            var cases = new List<EvaluationCase>(15);
+            var cases = new List<EvaluationCase>(10);
             AddCase(
                 cases,
                 twisted,
                 "Production — Operator Profile",
                 "Production_OperatorProfile",
-                candidateStrategy: null,
-                axialTwist: 400f,
-                rootThickness: 0.9f,
-                rootReach: 1.2f,
-                rootHeight: 0.2874f,
-                buttressPersistence: 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Preferred — Operator Profile",
-                "Preferred_OperatorProfile",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
                 400f, 0.9f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Fallback — Operator Profile",
-                "Fallback_OperatorProfile",
-                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
-                400f, 0.9f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Preferred — Thickness 0.5",
-                "Preferred_Thickness05",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Thickness 0.5",
+                "Production_Thickness05",
                 400f, 0.5f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Thickness 1.0",
-                "Preferred_Thickness10",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Thickness 1.0",
+                "Production_Thickness10",
                 400f, 1.0f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Thickness 1.5",
-                "Preferred_Thickness15",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Thickness 1.5",
+                "Production_Thickness15",
                 400f, 1.5f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Thickness 2.0",
-                "Preferred_Thickness20",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Thickness 2.0",
+                "Production_Thickness20",
                 400f, 2.0f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Fallback — Thickness 2.0",
-                "Fallback_Thickness20",
-                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
-                400f, 2.0f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Preferred — Reach 2.0 / Thickness 0.9",
-                "Preferred_Reach20_Thickness09",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
-                400f, 0.9f, 2.0f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Preferred — Reach 2.0 / Thickness 2.0",
-                "Preferred_Reach20_Thickness20",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Reach 2.0 / Thickness 2.0",
+                "Production_Reach20_Thickness20",
                 400f, 2.0f, 2.0f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Fallback — Reach 2.0 / Thickness 2.0",
-                "Fallback_Reach20_Thickness20",
-                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
-                400f, 2.0f, 2.0f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Preferred — Twist 0",
-                "Preferred_Twist0",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Twist 0",
+                "Production_Twist0",
                 0f, 0.9f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Twist -400",
-                "Preferred_TwistNegative400",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Twist -400",
+                "Production_TwistNegative400",
                 -400f, 0.9f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Persistence 0",
-                "Preferred_Persistence0",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Persistence 0",
+                "Production_Persistence0",
                 400f, 0.9f, 1.2f, 0.2874f, 0f);
             AddCase(
                 cases,
                 twisted,
-                "Preferred — Persistence 1",
-                "Preferred_Persistence1",
-                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                "Production — Persistence 1",
+                "Production_Persistence1",
                 400f, 0.9f, 1.2f, 0.2874f, 1f);
 
-            if (cases.Count != 15)
+            if (cases.Count != 10)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.4A expected 15 cases but built " +
+                    "TREE-ROOTS.4B expected 10 cases but built " +
                     cases.Count + ".");
             }
 
@@ -1735,7 +1677,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
             Representative representative,
             string label,
             string slug,
-            TreeRootMassCandidateStrategy? candidateStrategy = null,
             float? axialTwist = null,
             float? rootThickness = null,
             float? rootReach = null,
@@ -1748,7 +1689,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 Representative = representative,
                 Label = label,
                 Slug = slug,
-                CandidateStrategy = candidateStrategy,
                 AxialTwist = axialTwist,
                 RootThickness = rootThickness,
                 RootReach = rootReach,
@@ -1759,16 +1699,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
         private static string ModeLabel(EvaluationCase evaluationCase)
         {
-            if (evaluationCase == null ||
-                !evaluationCase.CandidateStrategy.HasValue)
-            {
-                return "Production Current";
-            }
-
-            return evaluationCase.CandidateStrategy.Value ==
-                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau
-                    ? "Candidate — 2% plateau"
-                    : "Candidate — no plateau";
+            return "Production Current";
         }
 
         private static void ApplyOverrides(

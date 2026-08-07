@@ -15,6 +15,14 @@ Generated Mass creates deterministic stylized rock geometry from recipes and sur
 - `Generated_Mass_Edge_Wear_Recovery_Architecture.md` — retained historical recovery conclusions only.
 - `Generated_Mass_Feature_Implementation_Checklist.md` — concise completed/active work list.
 
+## Active lighting defect invariant
+
+The unresolved Generated Mass lighting defect is **surface-orientation response incoherence**, not general darkness and not specular magnitude. Under the same directional light, individual source faces and bevel faces in the HLSL material can be brighter or darker in an order that contradicts their orientation to that light. A bevel geometrically between two parent faces can render darker than both or brighter than both; source faces can likewise invert the expected bright-to-dark progression.
+
+The legacy `M_PixelStone` / `SG_PixelSurfaceLit` behavior is the visual reference: surface response changes coherently as face orientation changes relative to the light, and bevel response bridges its parent surfaces instead of randomly escaping their directional-light ordering.
+
+Whole-object luminance, ambient strength, F0/specular strength, exposure, or average BRDF residual are secondary measurements. They cannot close this defect unless **per-surface and parent–bevel–parent orientation ordering is correct**. Future diagnostics and fixes must evaluate that ordering directly.
+
 ## Current production state
 
 GM-SURFACE.2 makes certified bevel and corner-chip geometry ordinary Generated Mass output whenever the serialized structural settings enable it. `BaseGeometryOnly` is retained for disabled features and deterministic safe fallback. Diagnostic preview actions evaluate the same construction system but do not own production output.
@@ -187,3 +195,12 @@ The 5N-H2 identity and lighting readback infrastructure is retained. Runtime evi
 H3 replaces that approximation with one auxiliary audit-mode-14 stored-normal capture. The preflight compares the exact interpolated GPU normal field pixel-by-pixel against the controlled mode-12 Lambert response, evaluates configured and opposite light directions plus a best scalar fit, and only queues the existing ownership matrix after this exact contract passes. The 209 decision cases remain unchanged; the added normal capture raises auxiliary validation passes to four and total render/readback passes to 213.
 
 This remains editor-only, incremental, cancellable, and asynchronous. Production materials, shared shaders, geometry, scenes, prefabs, profiles, layers, tags, and runtime rendering cost are unchanged.
+
+
+## GM-SURFACE.5O cold-grey production parity trial — visually insufficient
+
+The completed 5N-H3 matrix showed that F0 `0.04` matches the legacy neutral stored-normal BRDF and that generated whole-surface normal perturbation changes parity metrics. Those are valid measurements, but they do **not** define the active defect.
+
+The 2026-08-07 side-by-side visual validation after 5O still shows the actual failure: individual HLSL source faces and bevels do not remain coherently ordered by surface orientation to the same light. Marked bevels remain darker than both parents where an intermediate response is expected, while other bevel/surface regions become brighter or darker in the wrong orientation order. The legacy material remains coherent in the same comparison.
+
+Therefore 5O is **rejected as a root-cause correction for the active surface-orientation defect**. Its F0 and generated-normal changes may alter magnitude, but neither general darkness nor specular parity may be used as the problem definition or as closure evidence. Subsequent work must directly trace the value used for each fragment's directional response back to that fragment's actual surface orientation and compare parent–bevel–parent ordering.

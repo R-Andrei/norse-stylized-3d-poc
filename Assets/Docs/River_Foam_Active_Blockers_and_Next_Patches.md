@@ -5471,3 +5471,214 @@ Unavailable validation and concrete next action:
 
 - Unity 6000.5.0f1 compute/water-shader import: apply the changed files and provide the complete Console output if compilation/import fails.
 - Play Mode visual validation: with both Shore suppression controls at `1`, inspect Foam Motion Field and confirm the stationary band touches the visible shore without the prior one-cell white gaps.
+
+## RIVER-FOAM-MATERIAL-C0 — Material Contract Simplification Direction
+
+Status: documentation-only architecture freeze; no production code, shader, serialized asset, scene, prefab, material, resource, kernel, dispatch, or runtime behavior changes in C0.
+
+### Objective
+
+Freeze the accepted direction for simplifying the Layer C transport/visibility contract before any destructive cleanup or Life-Only implementation.
+
+The current implementation exposes three independent experimental selectors:
+
+- `Material Transport Scheme`: Donor Cell / TVD Superbee / Bulk-Phase Residual TVD;
+- `Final Foam Visibility Mode`: Concentration + Lifetime / Lifecycle-Faithful;
+- `Presence Footprint`: Coverage-Only / Presence-Amplitude.
+
+The accepted retained baseline is exactly:
+
+```text
+Bulk-Phase Residual TVD
++
+Lifecycle-Faithful
++
+Coverage-Only
+=
+C × P × L Baseline
+```
+
+C0 records that the three legacy selectors are to be consolidated into one future user-facing `Material Contract` selector. The initial consolidated option will be `C × P × L Baseline`; a later independent patch will add `Life Only`.
+
+### Approved files
+
+Documentation only:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Rendering_Roadmap.md`
+
+No other file is authorized for C0.
+
+### Gate 1 reviewed evidence
+
+Current source state reviewed before this plan entry:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+  - `StylizedRiverFoamTransportScheme` exposes `DonorCell`, `TvdSuperbee`, and `BulkPhaseResidualTvd`.
+  - `StylizedRiverFinalFoamVisibilityMode` exposes `ConcentrationAndLifetime` and `LifecycleFaithful`.
+  - `StylizedRiverFoamPresenceFootprintMode` exposes `Current` (`Coverage-Only`) and `PresenceAmplitude`.
+  - Serialized defaults currently retain independent fields for all three selectors.
+  - `foamChipSoftEdgeStart` is explicitly Presence-Amplitude-only authoring.
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+  - `DrawFoamTransportVisibilityContract()` exposes the three selectors independently and summarizes their combined result.
+  - Presence-Amplitude-only and Coverage-Only-only Chipping authoring branches remain present.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+  - `FoamTransportUsesTvdSuperbee()` returns true for both standalone TVD Superbee and Bulk-Phase Residual TVD.
+  - Therefore the Superbee reconstruction and its donor/upwind mechanics are shared dependencies of the retained Bulk-Phase baseline and are not safe to delete merely because the standalone TVD selector is retired.
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+  - Final visibility still branches between Lifecycle-Faithful and Concentration + Lifetime.
+  - Chipping/shape code still contains protected Coverage-Only compatibility arithmetic and dedicated Presence-Amplitude behavior.
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs`
+  - diagnostics still report all three selectors independently;
+  - its Lifecycle-Faithful text contains a known stale description (`smoothstep(0.02, 0.10, C)`) that does not match the current production `RiverWaterFoamResolveMeaningfulCoverageFootprint()` implementation, which returns saturated Coverage directly. C1 must reconcile this report to the retained production path rather than preserving stale wording.
+
+Historical documents contain many superseded transport/visibility A/B experiments. They remain historical evidence; C0 does not rewrite or erase those records.
+
+### Accepted architecture direction
+
+#### C × P × L Baseline
+
+The retained baseline must preserve the current accepted combination exactly:
+
+1. **Transport:** Bulk-Phase Residual TVD.
+   - Keep the global Bulk Phase, integer shift, residual subtraction, and current one-dispatch/no-extra-field contract.
+   - Keep the Superbee reconstruction and donor/upwind mechanics required by Bulk-Phase Residual TVD.
+   - Remove only obsolete selectable transport alternatives and code that exists exclusively to select or execute those alternatives.
+2. **Final visibility:** Lifecycle-Faithful.
+   - Make the existing Lifecycle-Faithful production route unconditional in C1.
+   - Remove Concentration + Lifetime selection and code that exists exclusively for that obsolete mode.
+3. **Presence footprint:** Coverage-Only.
+   - Make the existing Coverage-Only production route unconditional in C1.
+   - Remove Presence-Amplitude selection and code/authoring that exists exclusively for that obsolete mode.
+
+C1 is a consolidation/removal patch only. It must not change persistent material packing or the semantics of Coverage, Presence, Remaining Life, or Material Pattern.
+
+#### Life Only
+
+`Life Only` is a later material-contract option and is explicitly outside C0 and C1 implementation scope.
+
+Accepted conceptual direction for that future patch:
+
+- persistent Foam material is binary at Foam-cell resolution;
+- Remaining Life is the sole persistent material-existence/lifecycle authority;
+- no weak-versus-strong Foam distinction is required;
+- no fractional cell-occupancy material meaning is required by the desired visual contract;
+- shader-side Chipping, Strands, erosion, fragmentation, and breakup remain rendering concerns rather than persistent density/occupancy state;
+- transport cannot simply reuse fractional C × P × L flux semantics unchanged, so Life-Only transport/collision/movement rules require a focused implementation audit before C2 code is authorized.
+
+### Invariants
+
+- C0 changes documentation only.
+- The current runtime remains Bulk-Phase/visibility/presence selectable until C1 is implemented.
+- `C × P × L Baseline` must mean the exact current accepted combination, not a reinterpretation or retune.
+- Shared algorithms required by the retained baseline remain even if their historical selector is removed.
+- Historical A/B documentation remains historical; current architecture sections must identify the future authoritative replacement without falsifying prior results.
+- C1 and C2 remain separate regression boundaries.
+
+### Non-goals
+
+C0 does not:
+
+- remove enums, serialized fields, Inspector controls, shader properties, bindings, diagnostics, or branches;
+- modify Foam packing;
+- modify transport mathematics;
+- modify lifecycle;
+- modify Final Foam rendering;
+- implement Life Only;
+- change serialized defaults;
+- edit scenes, prefabs, materials, caches, or generated assets.
+
+### Planned follow-up patches
+
+#### RIVER-FOAM-MATERIAL-C1 — Baseline Contract Consolidation
+
+Planned objective: replace the three independent selectors with one `Material Contract` selector containing only `C × P × L Baseline`, while deleting only code proven exclusive to obsolete modes.
+
+Required preservation rule:
+
+> If an algorithm is still called by Bulk-Phase Residual TVD, Lifecycle-Faithful, or Coverage-Only, it is retained even if its name originated in a retired experimental mode.
+
+Expected removals include, subject to C1 Gate 1 proof:
+
+- Donor Cell as a selectable production mode;
+- standalone TVD Superbee as a selectable production mode;
+- transport-mode branching that is not required by the retained Bulk-Phase path;
+- Concentration + Lifetime selector and exclusive render branch;
+- Presence-Amplitude selector and exclusive render/chipping/authoring plumbing;
+- obsolete three-selector Inspector summary/status/diagnostic plumbing.
+
+C1 acceptance criterion: with `Material Contract = C × P × L Baseline`, simulation and rendering are behaviorally identical to the pre-C1 combination `Bulk-Phase Residual TVD + Lifecycle-Faithful + Coverage-Only`.
+
+#### RIVER-FOAM-MATERIAL-C2 — Life-Only Binary Cellular Contract
+
+Planned objective: add `Life Only` to the consolidated selector and implement its independent persistent-state/transport/render contract only after a focused transport audit.
+
+C2 must not be merged into C1.
+
+### File-by-file C0 sequence
+
+1. **This document** — record objective, evidence, invariants, non-goals, and C1/C2 boundaries before modifying any other canonical document.
+2. `River_Foam_Stage6_Architecture.md` — add the authoritative current/future material-contract direction and supersession note for the three-selector experiment surface.
+3. `River_Foam_Fixed_Metric_Dependency_Register.md` — record which legacy dependencies are retained versus candidates for deletion, especially the retained Superbee/upwind dependency of Bulk-Phase Residual TVD.
+4. `River_Rendering_Roadmap.md` — update the current roadmap so C0 -> C1 -> C2 is the active sequence while preserving historical P12/P13 entries as historical evidence.
+
+### Risks
+
+1. **Over-deletion in C1:** names such as `Superbee` or donor/upwind may look obsolete while still being required by Bulk-Phase Residual TVD. Mitigation: dependency proof before deletion; retain any shared path.
+2. **Behavioral drift hidden by consolidation:** making one route unconditional can accidentally alter arithmetic order or defaults. Mitigation: C1 requires exact before/after baseline comparison.
+3. **Historical-document confusion:** old experiments must remain readable without appearing current. Mitigation: add explicit supersession/current-direction statements rather than rewriting historical evidence.
+4. **Life-Only scope bleed:** cleanup could accidentally begin changing packed material semantics. Mitigation: C1 explicitly forbids material-state redesign; C2 owns it.
+
+### C0 acceptance criteria
+
+- Exactly the four approved Markdown files change.
+- No production/source/shader/serialized file changes.
+- All four documents identify `Bulk-Phase Residual TVD + Lifecycle-Faithful + Coverage-Only` as the retained `C × P × L Baseline` direction.
+- All four documents identify one future `Material Contract` selector as the replacement for the three current selectors.
+- C1 is explicitly cleanup/consolidation only.
+- C2 is explicitly the separate Life-Only behavior patch.
+- Documents explicitly prohibit deleting Superbee/upwind mechanics still required by Bulk-Phase Residual TVD.
+
+### C0 validation and status
+
+- Gate 1 review: complete.
+- Gate 2 plan: complete with this entry.
+- Gate 3 documentation updates: pending.
+- Gate 4 scope/consistency audit: pending.
+- Unity validation: not required because C0 changes Markdown only.
+
+### C0 implementation and Gate 4 audit record
+
+C0 documentation updates completed exactly within the approved four-file Markdown scope.
+
+Intentional differences from the pre-C0 documentation state:
+
+1. `River_Foam_Active_Blockers_and_Next_Patches.md` now owns the active C0 plan, reviewed dependency evidence, accepted retained baseline, C1 safe-removal rules, and separate C2 Life-Only boundary.
+2. `River_Foam_Stage6_Architecture.md` now identifies `C × P × L Baseline` as the future retained single-contract baseline while explicitly preserving the current three-selector runtime until C1.
+3. `River_Foam_Fixed_Metric_Dependency_Register.md` now records safe-removal dependency rules, including the requirement to retain Superbee and donor/upwind mechanics still used by Bulk-Phase Residual TVD.
+4. `River_Rendering_Roadmap.md` now makes C0 -> C1 -> C2 the active material-contract migration sequence without rewriting historical P12/P13 experiment records.
+
+Offline Gate 4 evidence:
+
+```text
+Changed files: exactly the 4 approved Markdown paths
+Production/source/shader/serialized files changed: 0
+Canonical C0 consistency audit: 27/27 PASS
+Balanced Markdown code fences: PASS in all 4 files
+Retained baseline named in all 4 files: PASS
+Single Material Contract direction named in all 4 files: PASS
+C1/C2 separation named in all 4 files: PASS
+Shared Superbee/donor-upwind preservation rule represented in all 4 files: PASS
+```
+
+Final C0 status:
+
+- Gate 1 review: **complete**.
+- Gate 2 canonical plan: **complete**.
+- Gate 3 documentation implementation: **complete**.
+- Gate 4 scope/consistency audit: **complete; 27/27 PASS**.
+- Unity validation: **not required; documentation-only patch**.
+
+No C1 production cleanup or C2 Life-Only implementation is included in C0.

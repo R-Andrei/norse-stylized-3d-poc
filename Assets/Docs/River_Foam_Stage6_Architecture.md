@@ -65,6 +65,36 @@ Foam > Layer E — Rendering > General Composition
 Both controls are serialized, independent, and rebound live. Every current transport selection dispatches exactly one full-field material kernel per CFL substep and allocates no transport-specific full-field texture. `Bulk-Phase Residual TVD` adds only scalar phase/shift state and two material-property values for previous/current presentation phase. No mode changes cache topology or adds a Debug View. P12 snapshot/sweep and Coverage reports include the selected values. Visual compactness and the D5 performance/accounting evidence are accepted. The one-time D5 ABBA suite is retired from the Inspector; its result is frozen below.
 
 
+### Current material-contract consolidation direction — RIVER-FOAM-MATERIAL-C0
+
+C0 supersedes the three-selector experiment surface as the **future architecture direction** while leaving the current implementation unchanged until C1. Historical P12 transport/visibility experiments remain valid historical evidence.
+
+The accepted retained production combination is:
+
+```text
+Bulk-Phase Residual TVD
++
+Lifecycle-Faithful
++
+Coverage-Only
+=
+C × P × L Baseline
+```
+
+The future user-facing contract is one selector:
+
+```text
+Material Contract
+  C × P × L Baseline
+  Life Only        // added later by C2, not by C1
+```
+
+`RIVER-FOAM-MATERIAL-C1` is cleanup/consolidation only. It will remove the obsolete independent selectors and code proven exclusive to their rejected alternatives, while preserving arithmetic and behavior of the exact accepted combination above. In particular, the Superbee reconstruction and donor/upwind mechanics remain part of Bulk-Phase Residual TVD and **must not be deleted** merely because standalone `TVD Superbee` and `Donor Cell` cease to be selectable modes. C1 also keeps the current packed Coverage/Presence/Remaining-Life/Pattern material state unchanged.
+
+`RIVER-FOAM-MATERIAL-C2` is a separate later behavior patch. Its accepted direction is a binary Foam-cell material contract in which Remaining Life is the sole persistent material-existence/lifecycle authority; no weak/strong Foam or fractional material-occupancy meaning is required by the target visual contract. C2 requires an independent transport audit because the current residual TVD solver is fractional by construction and cannot be treated as Life-Only without explicit whole-cell movement/collision semantics.
+
+Until C1 is implemented, the current serialized selectors and their runtime branches remain operational and authoritative source behavior. C0 is documentation only.
+
 ### Mode-specific Chip-edge ownership — P12g/P12j
 
 P12f is rejected: its hardened-mask derivative produced exterior and false interior contours, and its per-pixel edge multiplication fragmented connected candidates. P12g replaced only the Presence-Amplitude path; Unity accepted its single exterior eligibility contour and direct carve, but rejected its doubled-diameter production permission as over-broad. P12h is also rejected because one projected reach still created a second production area outside the displayed mask. P12i removes every derived admission region.

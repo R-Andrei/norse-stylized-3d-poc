@@ -51,6 +51,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             internal readonly Dictionary<int, Vector3> PreMaskSourceFaceMasks = new();
         }
 
+        // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+        // Parent normals are causal evidence for the unresolved lighting defect.
+        // The target is whether each bevel/source surface responds coherently to
+        // the same light according to orientation, including parent-bevel-parent
+        // brightness ordering. These records are not merely geometry metadata.
         public sealed class LogicalBevelRecord
         {
             public int LogicalBevelId;
@@ -69,6 +74,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public float Strength;
         }
 
+        // Final triangle identity/normal data must remain sufficient to ask the
+        // GM-SURFACE.5P question per surface: given this triangle's actual normal
+        // and one known light direction, is its observed response ordered like the
+        // legacy reference and its neighboring/parent surfaces? Whole-rock average
+        // brightness or specular parity is not a substitute for that evidence.
         public sealed class FinalTriangleRecord
         {
             public int TriangleIndex;

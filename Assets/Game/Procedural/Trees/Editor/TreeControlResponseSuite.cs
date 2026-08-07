@@ -141,7 +141,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "Primary,Secondary,Tertiary,Dead,Broken,BoundsX,BoundsY,BoundsZ," +
                 "PrimaryAttachmentMin,PrimaryAttachmentMax,RootCrest,RootHalfWidthDegrees," +
                 "RootHalfChord,RequestedRootSupportDegrees,EmittedRootSupportDegrees," +
-                "RootSupportClamped,RootZoneIntervals,MeasuredAxialTwist,Failure");
+                "RootSupportClamped,EvaluatedRootThickness,GroundBaseMergeFactor," +
+                "FootShapePlateauEnd,RootZoneIntervals,MeasuredAxialTwist,Failure");
             writer.Flush();
 
             activeJob = new Job
@@ -581,13 +582,42 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 case "rootThickness":
                     if (minimum.Bark.GroundRootHalfExtensionAngularWidthDegrees +
                             FloatTolerance >=
-                        maximum.Bark.GroundRootHalfExtensionAngularWidthDegrees)
+                        neutral.Bark.GroundRootHalfExtensionAngularWidthDegrees)
                     {
-                        failure = "Root Thickness did not broaden half-extension width.";
+                        failure =
+                            "Root Thickness did not broaden individual half-extension width before support saturation.";
+                        return false;
+                    }
+                    if (neutral.Bark.GroundRootBaseMergeFactor >
+                            FloatTolerance)
+                    {
+                        failure =
+                            "Root Thickness neutral H4 anchor unexpectedly merged the lower base.";
+                        return false;
+                    }
+                    if (maximum.Bark.GroundRootBaseMergeFactor <=
+                            neutral.Bark.GroundRootBaseMergeFactor +
+                            FloatTolerance)
+                    {
+                        failure =
+                            "Root Thickness did not increase shared lower-base merge after support saturation.";
+                        return false;
+                    }
+                    if (maximum.Bark.RequestedRootSupportAngularWidthDegrees <=
+                            maximum.Bark.EmittedRootSupportAngularWidthDegrees +
+                            FloatTolerance ||
+                        !maximum.Bark.RootSupportWidthClampedByCount)
+                    {
+                        failure =
+                            "Root Thickness high sample did not enter the support-saturated shared-base stage.";
                         return false;
                     }
                     if (!Approximately(
                             minimum.Bark.GroundButtressCrestMultiplier,
+                            neutral.Bark.GroundButtressCrestMultiplier,
+                            0.002f) ||
+                        !Approximately(
+                            neutral.Bark.GroundButtressCrestMultiplier,
                             maximum.Bark.GroundButtressCrestMultiplier,
                             0.002f))
                     {
@@ -1267,7 +1297,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
             if (property == "rootThickness")
             {
-                return sampleIndex == 0 ? 0.10f : sampleIndex == 1 ? 0.50f : 1f;
+                return sampleIndex == 0 ? 0.10f : sampleIndex == 1 ? 0.50f : 2f;
             }
             if (property == "rootHeight")
             {
@@ -1690,6 +1720,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 sample.Bark != null ? F(sample.Bark.RequestedRootSupportAngularWidthDegrees) : string.Empty,
                 sample.Bark != null ? F(sample.Bark.EmittedRootSupportAngularWidthDegrees) : string.Empty,
                 sample.Bark != null ? sample.Bark.RootSupportWidthClampedByCount.ToString() : string.Empty,
+                sample.Bark != null ? F(sample.Bark.EvaluatedRootThickness) : string.Empty,
+                sample.Bark != null ? F(sample.Bark.GroundRootBaseMergeFactor) : string.Empty,
+                sample.Bark != null ? F(sample.Bark.RootFootShapePlateauEndNormalized) : string.Empty,
                 sample.Bark != null ? sample.Bark.RootZoneLongitudinalIntervals.ToString() : string.Empty,
                 sample.Bark != null ? F(sample.Bark.MeasuredAxialTwistDegrees) : string.Empty,
                 sample.Failure

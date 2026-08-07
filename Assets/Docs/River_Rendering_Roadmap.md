@@ -1543,3 +1543,25 @@ D8.15 supersedes all earlier roadmap descriptions of Shore Coverage and the fixe
 - Ribbon starts at the selected cell-zero centre, keeps one logical `1 x 1` head for the entire event, follows the existing current visible-shore edge column by column, births each traversed cell once, and terminates after the final cell duration.
 - Automatic Birth Sources shows the current head continuously, independently from one-time material birth.
 - The implementation adds no shoreline calculation, path resource, transport work, lifecycle work, or rendering pass. Source capacity scales once at resource initialization.
+
+
+## RIVER-FOAM-MATERIAL-C0 — Material Contract Simplification Direction
+
+C0 is the active documentation-only material-contract direction. It does not change production source, shader, serialized data, or runtime behavior.
+
+The accepted retained baseline is the exact existing combination:
+
+```text
+Bulk-Phase Residual TVD
++ Lifecycle-Faithful
++ Coverage-Only
+= C × P × L Baseline
+```
+
+The roadmap now replaces the three independent transport/visibility/presence selectors with a staged single-selector migration:
+
+1. **C0 — documentation freeze:** record the retained baseline and dependency boundaries.
+2. **C1 — Baseline Contract Consolidation:** expose one `Material Contract` control containing only `C × P × L Baseline`; remove only obsolete selectors and code proven exclusive to Donor Cell selectable mode, standalone TVD Superbee selectable mode, Concentration + Lifetime, and Presence-Amplitude. Preserve all shared mechanics required by the retained baseline, including Superbee and donor/upwind logic used by Bulk-Phase Residual TVD. Persistent C/P/L/Pattern packing remains unchanged.
+3. **C2 — Life-Only Binary Cellular Contract:** add `Life Only` as a second Material Contract option after a focused transport audit. The target contract is binary Foam-cell material with Remaining Life as the sole persistent existence/lifecycle authority; render-side Chipping/Strands/erosion remain visual breakup rather than persistent density/occupancy state.
+
+C1 and C2 are intentionally separate regression boundaries. Historical P12/P13 entries describing Donor Cell, TVD Superbee, Concentration + Lifetime, Coverage-Only, and Presence-Amplitude remain historical evidence and are not rewritten as if those experiments never existed.

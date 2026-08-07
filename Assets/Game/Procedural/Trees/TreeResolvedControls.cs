@@ -331,7 +331,7 @@ namespace ProgrammaticStylized3D.Trees
             axialTwist = FiniteClamp(axialTwist, -1080f, 1080f);
             rootCount = Mathf.Clamp(rootCount, 3, 8);
             rootReach = FiniteClamp(rootReach, 0f, 2f);
-            rootThickness = FiniteClamp(rootThickness, 0.10f, 1f);
+            rootThickness = FiniteClamp(rootThickness, 0.10f, 2f);
             rootHeight = FiniteClamp(rootHeight, 0.01f, 0.40f);
             buttressTransition = FiniteClamp(buttressTransition, 0f, 1f);
             primaryBranchCount = Mathf.Clamp(primaryBranchCount, 0, 64);

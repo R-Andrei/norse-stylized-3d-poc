@@ -3243,9 +3243,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassLightingTintInfluenceId,
                 Mathf.Clamp01(lightingTintInfluence));
+            // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+            // The unresolved defect is NOT whole-rock darkness and NOT specular
+            // magnitude. It is incoherent per-surface/per-bevel response to the
+            // same light: observed brightness ordering can contradict surface
+            // orientation and parent-bevel-parent ordering.
+            //
+            // This GM-SURFACE.5O cold-grey zero-normal publication is retained
+            // only as the current visual-trial state. Visual validation showed
+            // that it did not repair the orientation-ordering defect. Do not
+            // treat this bypass, F0 tuning, or average brightness as root-cause
+            // closure. Future fixes must validate response versus actual face
+            // orientation under the same light.
             materialProperties.SetFloat(
                 GeneratedMassSurfaceNormalStrengthId,
-                Mathf.Clamp01(surfaceNormalStrength));
+                stoneSurfaceProfile == StoneSurfaceProfile.ColdGreyStone
+                    ? 0f
+                    : Mathf.Clamp01(surfaceNormalStrength));
             materialProperties.SetFloat(
                 GeneratedMassSurfaceNormalScaleId,
                 Mathf.Clamp(surfaceNormalScale, 0.1f, 8f));

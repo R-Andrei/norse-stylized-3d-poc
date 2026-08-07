@@ -480,6 +480,14 @@
                 mask *= 1.0 - upperSuppress;
                 return saturate(pow(mask, 1.06));
             }
+            // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+            // This function may perturb N and therefore directional response,
+            // but the active defect is not "too much normal detail" in general.
+            // The defect is that individual source/bevel surfaces can render in
+            // a brightness order that contradicts their orientation to the same
+            // light. Disabling this function was tested and did not close that
+            // defect. Any future change here must be judged by per-surface and
+            // parent-bevel-parent orientation ordering, not whole-rock luminance.
             float3 ResolveGeneratedMassWholeSurfaceNormalWS(
                 Varyings input,
                 float3 baseNormalWS)

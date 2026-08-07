@@ -14395,7 +14395,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 27726
+      generationTicks: 24838
     dependencyFingerprint: 5D981AF1FC249918
     trunkFingerprint: 89416B361DDFB0B0
     branchFingerprint: 70863E926B304DFD
@@ -14404,9 +14404,9 @@ MonoBehaviour:
     structuralFingerprint: 3262CD3A9D8A3EB9
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:18
+  lastGenerationTimestamp: 2026-08-07 16:24:42
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:18\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:42\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -14433,7 +14433,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 71 / 12 / 29 / 29\r\nRejected/dead/broken/foliage-eligible:
     9 / 1 / 0 / 69\r\nControl points / curve samples: 456 / 1812\r\nTotal branch
-    length: 184.632 m\r\nRadius range: 0.0060 .. 0.6567 m\r\nGeneration time: 2.773
+    length: 184.632 m\r\nRadius range: 0.0060 .. 0.6567 m\r\nGeneration time: 2.484
     ms\r\nCurve constraints: maxSegmentTurn=19.82 maxAccumulatedTurn=172.10 maxArc/Chord=1.108
     backwardViolations=0\r\nCrown envelope: violatingBranches=17 maximumOvershoot=0.277\r\nLocal
     bounds: center=(0.871, 7.098, 1.767) size=(12.125, 15.510, 11.478)\r\nFootprint
@@ -14445,29 +14445,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -3685994261365153540, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 22192566}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 8402
-  generatedBarkTriangleCount: 13290
-  generatedBarkFingerprint: 3E2FED2AE8ABD412
+  generatedBarkVertexCount: 8371
+  generatedBarkTriangleCount: 13230
+  generatedBarkFingerprint: 6F0EB37A6C108A1B
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Twisted 5
 
     Branches meshed: 71
 
     Vertices
-    / triangles: 8402 / 13290
+    / triangles: 8371 / 13230
 
     Tip/base caps: 72
 
     Alternate tube-quad diagonals:
-    4115
+    4083
 
     Phase-aligned render rings: 0
 
@@ -14483,7 +14483,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 91 / 90 / 6.00
+    / buttress samples per lobe: 90 / 89 / 6.00
 
     Trunk axial twist degrees:
     378.96
@@ -14518,7 +14518,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 22.20 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.937 / 1.000 / 1.301 / 0.321
+    crest / valley / half crest / half extension ratio: 1.937 / 1.000 / 1.324 / 0.346
 
     Root
     profile half-height angular width scale: 0.855
@@ -14541,10 +14541,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Twisted
 
-    Bark input fingerprint: ECE90E7F5356163F
+    Bark input fingerprint: 3CA07B83F3D4C681
 
     Bark
-    geometry fingerprint: 3E2FED2AE8ABD412
+    geometry fingerprint: 6F0EB37A6C108A1B
 
     Repeatability rebuild: PASS
 
@@ -14579,12 +14579,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 8468 / 4504
+    validated side triangles: 8468 / 4444
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 3228 / 2950
+    boundary edges / welded seam edges: 3226 / 2948
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 70/70 / 70 / 0
@@ -29261,7 +29261,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 26362
+      generationTicks: 164565
     dependencyFingerprint: E1898B9EFFE8E028
     trunkFingerprint: 0375356B9147FAF0
     branchFingerprint: A8D9BBFC490D4F17
@@ -29270,9 +29270,9 @@ MonoBehaviour:
     structuralFingerprint: DFC5214AF474E6A7
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:11
+  lastGenerationTimestamp: 2026-08-07 16:24:22
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:11\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:22\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -29299,7 +29299,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 76 / 14 / 33 / 28\r\nRejected/dead/broken/foliage-eligible:
     0 / 2 / 2 / 71\r\nControl points / curve samples: 472 / 1888\r\nTotal branch
-    length: 90.253 m\r\nRadius range: 0.0060 .. 0.3914 m\r\nGeneration time: 2.636
+    length: 90.253 m\r\nRadius range: 0.0060 .. 0.3914 m\r\nGeneration time: 16.457
     ms\r\nCurve constraints: maxSegmentTurn=7.14 maxAccumulatedTurn=53.39 maxArc/Chord=1.035
     backwardViolations=0\r\nCrown envelope: violatingBranches=30 maximumOvershoot=0.515\r\nLocal
     bounds: center=(0.322, 3.697, -0.097) size=(4.437, 8.177, 5.528)\r\nFootprint
@@ -29311,29 +29311,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 7203833373107805986, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1935284342}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 6628
-  generatedBarkTriangleCount: 10243
-  generatedBarkFingerprint: 1D0D65EC380ACE73
+  generatedBarkVertexCount: 6607
+  generatedBarkTriangleCount: 10203
+  generatedBarkFingerprint: 17BC898D31340832
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Common 1
 
     Branches meshed: 76
 
     Vertices
-    / triangles: 6628 / 10243
+    / triangles: 6607 / 10203
 
     Tip/base caps: 77
 
     Alternate tube-quad diagonals:
-    2268
+    2311
 
     Phase-aligned render rings: 0
 
@@ -29349,7 +29349,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 74 / 73 / 6.00
+    / buttress samples per lobe: 73 / 72 / 6.00
 
     Trunk axial twist degrees:
     11.33
@@ -29384,7 +29384,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 7.73 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.572 / 1.000 / 1.184 / 0.321
+    / valley / half crest / half extension ratio: 1.572 / 1.000 / 1.198 / 0.346
 
     Root
     profile half-height angular width scale: 0.862
@@ -29407,10 +29407,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: F40ED8D0D0583DEB
+    Bark input fingerprint: FA14C0079F08CD25
 
     Bark
-    geometry fingerprint: 1D0D65EC380ACE73
+    geometry fingerprint: 17BC898D31340832
 
     Repeatability rebuild: PASS
 
@@ -29445,12 +29445,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 6518 / 3382
+    validated side triangles: 6518 / 3342
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 2707 / 2402
+    boundary edges / welded seam edges: 2705 / 2400
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 75/75 / 75 / 0
@@ -30288,7 +30288,7 @@ MonoBehaviour:
   stableSlotIdentity: Pine:2
   generatedInstance: {fileID: 1924536726}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:34
+  lastSpawnTimestamp: 2026-08-07 16:24:31
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Pine 2
@@ -30435,7 +30435,7 @@ MonoBehaviour:
   stableSlotIdentity: Dead:2
   generatedInstance: {fileID: 1805460967}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:22
+  lastSpawnTimestamp: 2026-08-07 16:24:47
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Dead 2
@@ -47390,7 +47390,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 32150
+      generationTicks: 65824
     dependencyFingerprint: 8ECEF1CB27AB303A
     trunkFingerprint: F9926E1C97152BC3
     branchFingerprint: F207FBD4F68C6522
@@ -47399,9 +47399,9 @@ MonoBehaviour:
     structuralFingerprint: 9AAF42256EAF15DA
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:11
+  lastGenerationTimestamp: 2026-08-07 16:24:39
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:11\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:39\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -47428,7 +47428,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 90 / 12 / 28 / 49\r\nRejected/dead/broken/foliage-eligible:
     3 / 2 / 1 / 86\r\nControl points / curve samples: 589 / 2340\r\nTotal branch
-    length: 208.439 m\r\nRadius range: 0.0060 .. 0.7886 m\r\nGeneration time: 3.215
+    length: 208.439 m\r\nRadius range: 0.0060 .. 0.7886 m\r\nGeneration time: 6.582
     ms\r\nCurve constraints: maxSegmentTurn=13.45 maxAccumulatedTurn=224.28 maxArc/Chord=1.091
     backwardViolations=0\r\nCrown envelope: violatingBranches=22 maximumOvershoot=0.328\r\nLocal
     bounds: center=(-0.283, 7.301, -1.004) size=(12.881, 16.178, 12.294)\r\nFootprint
@@ -47440,29 +47440,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -8752216897387879996, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 43979188}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 8985
-  generatedBarkTriangleCount: 13915
-  generatedBarkFingerprint: 5F463CD1D64A3768
+  generatedBarkVertexCount: 8954
+  generatedBarkTriangleCount: 13855
+  generatedBarkFingerprint: F94785A39231AA4A
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Twisted 3
 
     Branches meshed: 90
 
     Vertices
-    / triangles: 8985 / 13915
+    / triangles: 8954 / 13855
 
     Tip/base caps: 91
 
     Alternate tube-quad diagonals:
-    4270
+    4249
 
     Phase-aligned render rings: 0
 
@@ -47478,7 +47478,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 91 / 90 / 6.00
+    / buttress samples per lobe: 90 / 89 / 6.00
 
     Trunk axial twist degrees:
     373.19
@@ -47513,7 +47513,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 14.07 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.803 / 1.000 / 1.258 / 0.321
+    crest / valley / half crest / half extension ratio: 1.803 / 1.000 / 1.278 / 0.346
 
     Root
     profile half-height angular width scale: 0.904
@@ -47536,10 +47536,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Twisted
 
-    Bark input fingerprint: B65BE3202A503897
+    Bark input fingerprint: 2B09F86BA993218D
 
     Bark
-    geometry fingerprint: 5F463CD1D64A3768
+    geometry fingerprint: F94785A39231AA4A
 
     Repeatability rebuild: PASS
 
@@ -47574,12 +47574,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 9120 / 4414
+    validated side triangles: 9120 / 4354
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 3693 / 3352
+    boundary edges / welded seam edges: 3691 / 3350
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 89/89 / 89 / 0
@@ -50704,7 +50704,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 4668
+      generationTicks: 4799
     dependencyFingerprint: 44EFFDD69A9968BB
     trunkFingerprint: BEF8BEDBEDE9CAF3
     branchFingerprint: 5A2556FDC089C69F
@@ -50713,9 +50713,9 @@ MonoBehaviour:
     structuralFingerprint: 7308BE2F103AB07A
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:24
+  lastGenerationTimestamp: 2026-08-07 16:24:50
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:24\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:50\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -50742,7 +50742,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 16 / 12 / 3 / 0\r\nRejected/dead/broken/foliage-eligible:
     7 / 15 / 6 / 0\r\nControl points / curve samples: 78 / 312\r\nTotal branch length:
-    51.976 m\r\nRadius range: 0.0060 .. 0.4291 m\r\nGeneration time: 0.467 ms\r\nCurve
+    51.976 m\r\nRadius range: 0.0060 .. 0.4291 m\r\nGeneration time: 0.480 ms\r\nCurve
     constraints: maxSegmentTurn=4.85 maxAccumulatedTurn=41.79 maxArc/Chord=1.014
     backwardViolations=0\r\nCrown envelope: violatingBranches=0 maximumOvershoot=0.000\r\nLocal
     bounds: center=(0.081, 6.694, -0.142) size=(8.021, 14.247, 6.835)\r\nFootprint
@@ -50754,29 +50754,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -1391133268792908066, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 482749834}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 2654
-  generatedBarkTriangleCount: 4438
-  generatedBarkFingerprint: 620C7F66BF8B122D
+  generatedBarkVertexCount: 2650
+  generatedBarkTriangleCount: 4430
+  generatedBarkFingerprint: E0D33279CA89F0AD
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Dead 5
 
     Branches meshed: 16
 
     Vertices
-    / triangles: 2654 / 4438
+    / triangles: 2650 / 4430
 
     Tip/base caps: 17
 
     Alternate tube-quad diagonals:
-    829
+    868
 
     Phase-aligned render rings: 43
 
@@ -50827,7 +50827,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 5.73 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.354 / 1.000 / 1.114 / 0.322
+    / valley / half crest / half extension ratio: 1.354 / 1.000 / 1.123 / 0.347
 
     Root
     profile half-height angular width scale: 0.804
@@ -50850,10 +50850,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Dead
 
-    Bark input fingerprint: 4F424D23A3B0A200
+    Bark input fingerprint: 09287E34A41D75C6
 
     Bark geometry
-    fingerprint: 620C7F66BF8B122D
+    fingerprint: E0D33279CA89F0AD
 
     Repeatability rebuild: PASS
 
@@ -50888,7 +50888,7 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 1838 / 2492
+    validated side triangles: 1838 / 2484
 
     Tangent-basis failures: 0
 
@@ -69654,7 +69654,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 33876
+      generationTicks: 35398
     dependencyFingerprint: F71E580758ABB62D
     trunkFingerprint: 3EE33B05111744DD
     branchFingerprint: 319ED1CEA43045A5
@@ -69663,9 +69663,9 @@ MonoBehaviour:
     structuralFingerprint: 8F931E4B0D7F9786
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:13
+  lastGenerationTimestamp: 2026-08-07 16:24:41
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:13\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:41\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -69692,7 +69692,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 102 / 12 / 36 / 53\r\nRejected/dead/broken/foliage-eligible:
     4 / 4 / 2 / 95\r\nControl points / curve samples: 663 / 2636\r\nTotal branch
-    length: 154.865 m\r\nRadius range: 0.0060 .. 0.6856 m\r\nGeneration time: 3.388
+    length: 154.865 m\r\nRadius range: 0.0060 .. 0.6856 m\r\nGeneration time: 3.540
     ms\r\nCurve constraints: maxSegmentTurn=19.70 maxAccumulatedTurn=173.69 maxArc/Chord=1.119
     backwardViolations=0\r\nCrown envelope: violatingBranches=40 maximumOvershoot=0.365\r\nLocal
     bounds: center=(0.038, 4.693, 0.133) size=(7.714, 10.758, 7.854)\r\nFootprint
@@ -69704,29 +69704,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 11
+  generationRevision: 12
   generatedBarkMesh: {fileID: -5485935369721600990, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 547257162}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 9503
-  generatedBarkTriangleCount: 14567
-  generatedBarkFingerprint: 2A906C07E8940773
+  generatedBarkVertexCount: 9441
+  generatedBarkTriangleCount: 14447
+  generatedBarkFingerprint: 20D0023933D63196
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Twisted 4
 
     Branches meshed: 102
 
     Vertices
-    / triangles: 9503 / 14567
+    / triangles: 9441 / 14447
 
     Tip/base caps: 103
 
     Alternate tube-quad
-    diagonals: 4317
+    diagonals: 4259
 
     Phase-aligned render rings: 0
 
@@ -69742,7 +69742,7 @@ MonoBehaviour:
     T / authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 86 / 85 / 6.00
+    / buttress samples per lobe: 84 / 83 / 6.00
 
     Trunk axial twist degrees:
     310.68
@@ -69777,7 +69777,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 20.55 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.929 / 1.000 / 1.298 / 0.321
+    crest / valley / half crest / half extension ratio: 1.929 / 1.000 / 1.321 / 0.346
 
     Root
     profile half-height angular width scale: 0.939
@@ -69800,10 +69800,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Twisted
 
-    Bark input fingerprint: 939566F61B907F1B
+    Bark input fingerprint: 90A61AA8638F93A1
 
     Bark
-    geometry fingerprint: 2A906C07E8940773
+    geometry fingerprint: 20D0023933D63196
 
     Repeatability rebuild: PASS
 
@@ -69838,12 +69838,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 9942 / 4204
+    validated side triangles: 9942 / 4084
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 4029 / 3648
+    boundary edges / welded seam edges: 4025 / 3644
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 101/101 / 101 / 0
@@ -70128,7 +70128,7 @@ MonoBehaviour:
   stableSlotIdentity: Common:5
   generatedInstance: {fileID: 760738143}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:22
+  lastSpawnTimestamp: 2026-08-07 16:24:29
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Common 5
@@ -70347,7 +70347,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 5000
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: -2.4405384e-30, y: 1.83716e-40, z: 1.744874e-39, w: 1.5985219e-32}
+  m_BoundingSphereOverride: {x: 5.497558e+11, y: 6.7406024e+22, z: 4.7710492e-20, w: 1.102131e-39}
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
@@ -70387,7 +70387,7 @@ MonoBehaviour:
   m_AdditionalLightsShadowResolutionTier: 2
   m_CustomShadowLayers: 0
   m_LightCookieSize: {x: 128, y: 128}
-  m_LightCookieOffset: {x: 872.8704, y: -933.921}
+  m_LightCookieOffset: {x: 838.17664, y: -1031.6091}
   m_SoftShadowQuality: 1
   m_RenderingLayersMask:
     serializedVersion: 0
@@ -71780,7 +71780,7 @@ MonoBehaviour:
   stableSlotIdentity: Twisted:5
   generatedInstance: {fileID: 65150582}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:19
+  lastSpawnTimestamp: 2026-08-07 16:24:44
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Twisted 5
@@ -72248,7 +72248,7 @@ MonoBehaviour:
   stableSlotIdentity: Common:1
   generatedInstance: {fileID: 107030957}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:12
+  lastSpawnTimestamp: 2026-08-07 16:24:23
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Common 1
@@ -81194,7 +81194,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 15377
+      generationTicks: 16296
     dependencyFingerprint: 533D8EBCBF43F07D
     trunkFingerprint: 783ED6468B746F7E
     branchFingerprint: 551AA866C82806BF
@@ -81203,9 +81203,9 @@ MonoBehaviour:
     structuralFingerprint: F6AB7720712612EA
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:22
+  lastGenerationTimestamp: 2026-08-07 16:24:28
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:22\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:28\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -81232,7 +81232,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 47 / 12 / 22 / 12\r\nRejected/dead/broken/foliage-eligible:
     0 / 1 / 0 / 45\r\nControl points / curve samples: 288 / 1152\r\nTotal branch
-    length: 87.319 m\r\nRadius range: 0.0060 .. 0.3159 m\r\nGeneration time: 1.538
+    length: 87.319 m\r\nRadius range: 0.0060 .. 0.3159 m\r\nGeneration time: 1.630
     ms\r\nCurve constraints: maxSegmentTurn=13.86 maxAccumulatedTurn=105.85 maxArc/Chord=1.247
     backwardViolations=0\r\nCrown envelope: violatingBranches=15 maximumOvershoot=0.572\r\nLocal
     bounds: center=(1.801, 3.872, 0.519) size=(4.234, 8.375, 4.720)\r\nFootprint
@@ -81244,29 +81244,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 4216710829846910912, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1877950349}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 6542
-  generatedBarkTriangleCount: 10527
-  generatedBarkFingerprint: 680F4CF5A0F51344
+  generatedBarkVertexCount: 6511
+  generatedBarkTriangleCount: 10467
+  generatedBarkFingerprint: B4E9E5028D5918EE
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Common 5
 
     Branches meshed: 47
 
     Vertices
-    / triangles: 6542 / 10527
+    / triangles: 6511 / 10467
 
     Tip/base caps: 48
 
     Alternate tube-quad diagonals:
-    2429
+    2458
 
     Phase-aligned render rings: 1
 
@@ -81282,7 +81282,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 74 / 73 / 6.00
+    / buttress samples per lobe: 73 / 72 / 6.00
 
     Trunk axial twist degrees:
     12.70
@@ -81317,7 +81317,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 14.76 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.682 / 1.000 / 1.219 / 0.321
+    crest / valley / half crest / half extension ratio: 1.682 / 1.000 / 1.236 / 0.346
 
     Root
     profile half-height angular width scale: 0.876
@@ -81340,10 +81340,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 522A4829256C8C00
+    Bark input fingerprint: 0736C1FCCB062456
 
     Bark
-    geometry fingerprint: 680F4CF5A0F51344
+    geometry fingerprint: B4E9E5028D5918EE
 
     Repeatability rebuild: PASS
 
@@ -81378,12 +81378,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 6736 / 3554
+    validated side triangles: 6736 / 3494
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 2367 / 2170
+    boundary edges / welded seam edges: 2365 / 2168
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 46/46 / 46 / 0
@@ -81996,7 +81996,7 @@ MonoBehaviour:
   stableSlotIdentity: Pine:4
   generatedInstance: {fileID: 1539366886}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:37
+  lastSpawnTimestamp: 2026-08-07 16:24:34
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Pine 4
@@ -97552,7 +97552,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 28774
+      generationTicks: 28647
     dependencyFingerprint: A3DFBFAEE419CED4
     trunkFingerprint: 6A90AD5C010D8C50
     branchFingerprint: 463071B637D30141
@@ -97561,9 +97561,9 @@ MonoBehaviour:
     structuralFingerprint: DFF9DE1BB1AAD338
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:39
+  lastGenerationTimestamp: 2026-08-07 16:24:34
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:39\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:34\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -97590,7 +97590,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 86 / 28 / 34 / 23\r\nRejected/dead/broken/foliage-eligible:
     0 / 1 / 0 / 84\r\nControl points / curve samples: 517 / 2068\r\nTotal branch
-    length: 139.109 m\r\nRadius range: 0.0060 .. 0.3801 m\r\nGeneration time: 2.877
+    length: 139.109 m\r\nRadius range: 0.0060 .. 0.3801 m\r\nGeneration time: 2.865
     ms\r\nCurve constraints: maxSegmentTurn=4.63 maxAccumulatedTurn=34.64 maxArc/Chord=1.019
     backwardViolations=0\r\nCrown envelope: violatingBranches=34 maximumOvershoot=0.694\r\nLocal
     bounds: center=(0.003, 5.434, 0.702) size=(6.531, 11.628, 6.439)\r\nFootprint
@@ -97602,29 +97602,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -5757888649210472765, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1685706394}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 7736
-  generatedBarkTriangleCount: 11845
-  generatedBarkFingerprint: 2944862745ECDCF4
+  generatedBarkVertexCount: 7706
+  generatedBarkTriangleCount: 11785
+  generatedBarkFingerprint: A2706EECA97916F2
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Pine 5
 
     Branches meshed: 86
 
     Vertices
-    / triangles: 7736 / 11845
+    / triangles: 7706 / 11785
 
     Tip/base caps: 87
 
     Alternate tube-quad diagonals:
-    2596
+    2674
 
     Phase-aligned render rings: 85
 
@@ -97675,7 +97675,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 5.15 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.251 / 1.000 / 1.081 / 0.322
+    / valley / half crest / half extension ratio: 1.251 / 1.000 / 1.087 / 0.347
 
     Root
     profile half-height angular width scale: 0.656
@@ -97698,10 +97698,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 22263145AA639631
+    Bark input fingerprint: 98D903CC0305936B
 
     Bark
-    geometry fingerprint: 2944862745ECDCF4
+    geometry fingerprint: A2706EECA97916F2
 
     Repeatability rebuild: PASS
 
@@ -97736,7 +97736,7 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 8622 / 2826
+    validated side triangles: 8622 / 2766
 
     Tangent-basis failures: 0
 
@@ -98382,7 +98382,7 @@ MonoBehaviour:
   stableSlotIdentity: Twisted:1
   generatedInstance: {fileID: 1895592659}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:45
+  lastSpawnTimestamp: 2026-08-07 16:24:37
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Twisted 1
@@ -98595,7 +98595,7 @@ MonoBehaviour:
   stableSlotIdentity: Dead:4
   generatedInstance: {fileID: 1440555488}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:24
+  lastSpawnTimestamp: 2026-08-07 16:24:49
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Dead 4
@@ -99640,7 +99640,7 @@ MonoBehaviour:
   stableSlotIdentity: Pine:1
   generatedInstance: {fileID: 1725030616}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:27
+  lastSpawnTimestamp: 2026-08-07 16:24:30
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Pine 1
@@ -99953,7 +99953,7 @@ MonoBehaviour:
   stableSlotIdentity: Dead:5
   generatedInstance: {fileID: 345465108}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:25
+  lastSpawnTimestamp: 2026-08-07 16:24:50
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Dead 5
@@ -100495,7 +100495,7 @@ MonoBehaviour:
   stableSlotIdentity: Common:3
   generatedInstance: {fileID: 1996507593}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:16
+  lastSpawnTimestamp: 2026-08-07 16:24:26
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Common 3
@@ -103630,7 +103630,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 5690
+      generationTicks: 4362
     dependencyFingerprint: 1EC36198398A9447
     trunkFingerprint: 4BEC16E75E36A846
     branchFingerprint: 1ADA47CD49475D03
@@ -103639,9 +103639,9 @@ MonoBehaviour:
     structuralFingerprint: 287508D10BB97D3C
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:19
+  lastGenerationTimestamp: 2026-08-07 16:24:44
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:19\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:44\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -103668,7 +103668,7 @@ MonoBehaviour:
     controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 15 / 11 / 3 / 0\r\nRejected/dead/broken/foliage-eligible:
     5 / 12 / 6 / 0\r\nControl points / curve samples: 73 / 292\r\nTotal branch length:
-    33.229 m\r\nRadius range: 0.0060 .. 0.3121 m\r\nGeneration time: 0.569 ms\r\nCurve
+    33.229 m\r\nRadius range: 0.0060 .. 0.3121 m\r\nGeneration time: 0.436 ms\r\nCurve
     constraints: maxSegmentTurn=11.36 maxAccumulatedTurn=60.22 maxArc/Chord=1.035
     backwardViolations=0\r\nCrown envelope: violatingBranches=0 maximumOvershoot=0.000\r\nLocal
     bounds: center=(0.367, 4.302, -0.132) size=(4.732, 9.228, 5.475)\r\nFootprint
@@ -103680,29 +103680,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 1456109442920756102, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1150089848}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 3555
-  generatedBarkTriangleCount: 6228
-  generatedBarkFingerprint: 71CD73E05A8398BB
+  generatedBarkVertexCount: 3530
+  generatedBarkTriangleCount: 6180
+  generatedBarkFingerprint: FD9F721A36903608
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Dead 1
 
     Branches meshed: 15
 
     Vertices
-    / triangles: 3555 / 6228
+    / triangles: 3530 / 6180
 
     Tip/base caps: 16
 
     Alternate tube-quad diagonals:
-    1279
+    1375
 
     Phase-aligned render rings: 0
 
@@ -103718,7 +103718,7 @@ MonoBehaviour:
     authored P/S/T: 36 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 76 / 75 / 6.00
+    / buttress samples per lobe: 75 / 74 / 6.00
 
     Trunk axial twist degrees:
     5.31
@@ -103753,7 +103753,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 17.92 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.562 / 1.000 / 1.181 / 0.322
+    crest / valley / half crest / half extension ratio: 1.562 / 1.000 / 1.195 / 0.347
 
     Root
     profile half-height angular width scale: 0.875
@@ -103776,10 +103776,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Dead
 
-    Bark input fingerprint: D018E5E936644E57
+    Bark input fingerprint: ECE68F25FCD23C2D
 
     Bark geometry
-    fingerprint: 71CD73E05A8398BB
+    fingerprint: FD9F721A36903608
 
     Repeatability rebuild: PASS
 
@@ -103814,12 +103814,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 1940 / 4162
+    validated side triangles: 1940 / 4114
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 820 / 740
+    boundary edges / welded seam edges: 818 / 738
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 14/14 / 14 / 0
@@ -107445,7 +107445,7 @@ MonoBehaviour:
   stableSlotIdentity: Dead:3
   generatedInstance: {fileID: 1466600812}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:23
+  lastSpawnTimestamp: 2026-08-07 16:24:48
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Dead 3
@@ -111637,7 +111637,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 7901
+      generationTicks: 7520
     dependencyFingerprint: 5C8C26ECE68BCFA1
     trunkFingerprint: 5BAC91760B998AA5
     branchFingerprint: 484F1B81906E14FF
@@ -111646,9 +111646,9 @@ MonoBehaviour:
     structuralFingerprint: 4384BB24FC12D392
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:23
+  lastGenerationTimestamp: 2026-08-07 16:24:48
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:23\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:48\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -111675,7 +111675,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 27 / 21 / 5 / 0\r\nRejected/dead/broken/foliage-eligible:
     5 / 26 / 13 / 0\r\nControl points / curve samples: 121 / 484\r\nTotal branch
-    length: 85.831 m\r\nRadius range: 0.0060 .. 0.2931 m\r\nGeneration time: 0.790
+    length: 85.831 m\r\nRadius range: 0.0060 .. 0.2931 m\r\nGeneration time: 0.752
     ms\r\nCurve constraints: maxSegmentTurn=9.80 maxAccumulatedTurn=65.59 maxArc/Chord=1.056
     backwardViolations=0\r\nCrown envelope: violatingBranches=0 maximumOvershoot=0.000\r\nLocal
     bounds: center=(0.097, 5.772, -0.396) size=(8.656, 13.411, 9.127)\r\nFootprint
@@ -111687,29 +111687,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 7448296736253714084, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1775053473}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 4134
-  generatedBarkTriangleCount: 6817
-  generatedBarkFingerprint: 1F92E85B62721B2B
+  generatedBarkVertexCount: 4103
+  generatedBarkTriangleCount: 6757
+  generatedBarkFingerprint: E6082709C0D9CD74
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Dead 4
 
     Branches meshed: 27
 
     Vertices
-    / triangles: 4134 / 6817
+    / triangles: 4103 / 6757
 
     Tip/base caps: 28
 
     Alternate tube-quad diagonals:
-    1549
+    1614
 
     Phase-aligned render rings: 161
 
@@ -111725,7 +111725,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 79 / 78 / 6.00
+    / buttress samples per lobe: 78 / 77 / 6.00
 
     Trunk axial twist degrees:
     0.63
@@ -111760,7 +111760,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 11.31 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.331 / 1.000 / 1.107 / 0.322
+    crest / valley / half crest / half extension ratio: 1.331 / 1.000 / 1.115 / 0.347
 
     Root
     profile half-height angular width scale: 0.693
@@ -111783,10 +111783,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Dead
 
-    Bark input fingerprint: 71E71FE1AAFB4F9A
+    Bark input fingerprint: C5AAE5A49BC8B118
 
     Bark geometry
-    fingerprint: 1F92E85B62721B2B
+    fingerprint: E6082709C0D9CD74
 
     Repeatability rebuild: PASS
 
@@ -111821,12 +111821,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 3548 / 3106
+    validated side triangles: 3548 / 3046
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 1341 / 1216
+    boundary edges / welded seam edges: 1339 / 1214
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 26/26 / 26 / 0
@@ -115644,7 +115644,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 6326
+      generationTicks: 6514
     dependencyFingerprint: 3D464A9EDF906104
     trunkFingerprint: 142D362D2A0A2953
     branchFingerprint: 32CE45A116A75B6B
@@ -115653,9 +115653,9 @@ MonoBehaviour:
     structuralFingerprint: EE193E81129E4079
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:22
+  lastGenerationTimestamp: 2026-08-07 16:24:47
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:22\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:47\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -115682,7 +115682,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 21 / 12 / 8 / 0\r\nRejected/dead/broken/foliage-eligible:
     6 / 20 / 5 / 0\r\nControl points / curve samples: 110 / 440\r\nTotal branch length:
-    49.066 m\r\nRadius range: 0.0060 .. 0.2977 m\r\nGeneration time: 0.633 ms\r\nCurve
+    49.066 m\r\nRadius range: 0.0060 .. 0.2977 m\r\nGeneration time: 0.651 ms\r\nCurve
     constraints: maxSegmentTurn=16.79 maxAccumulatedTurn=76.65 maxArc/Chord=1.077
     backwardViolations=0\r\nCrown envelope: violatingBranches=0 maximumOvershoot=0.000\r\nLocal
     bounds: center=(-0.102, 4.396, -0.061) size=(5.089, 9.544, 3.143)\r\nFootprint
@@ -115694,29 +115694,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -4979069219453769200, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 2027613330}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 3540
-  generatedBarkTriangleCount: 5907
-  generatedBarkFingerprint: C3136C2D1C53D52E
+  generatedBarkVertexCount: 3510
+  generatedBarkTriangleCount: 5847
+  generatedBarkFingerprint: 8498D21E77704F33
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Dead 3
 
     Branches meshed: 21
 
     Vertices
-    / triangles: 3540 / 5907
+    / triangles: 3510 / 5847
 
     Tip/base caps: 22
 
     Alternate tube-quad diagonals:
-    995
+    1053
 
     Phase-aligned render rings: 22
 
@@ -115767,7 +115767,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 23.80 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.274 / 1.000 / 1.088 / 0.322
+    crest / valley / half crest / half extension ratio: 1.274 / 1.000 / 1.095 / 0.347
 
     Root
     profile half-height angular width scale: 0.689
@@ -115790,10 +115790,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Dead
 
-    Bark input fingerprint: 3581326DC9FA2109
+    Bark input fingerprint: DCD97E0C30CC0DB7
 
     Bark geometry
-    fingerprint: C3136C2D1C53D52E
+    fingerprint: 8498D21E77704F33
 
     Repeatability rebuild: PASS
 
@@ -115828,7 +115828,7 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 2738 / 3034
+    validated side triangles: 2738 / 2974
 
     Tangent-basis failures: 0
 
@@ -116547,7 +116547,7 @@ MonoBehaviour:
   stableSlotIdentity: Pine:3
   generatedInstance: {fileID: 1650361918}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:35
+  lastSpawnTimestamp: 2026-08-07 16:24:33
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Pine 3
@@ -116820,7 +116820,7 @@ MonoBehaviour:
   stableSlotIdentity: Twisted:3
   generatedInstance: {fileID: 295546415}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:12
+  lastSpawnTimestamp: 2026-08-07 16:24:41
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Twisted 3
@@ -130976,7 +130976,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 30376
+      generationTicks: 27154
     dependencyFingerprint: DF30AAC58A68F9BF
     trunkFingerprint: 577866B5C6E7FFFF
     branchFingerprint: AA343C4BFEA8FF40
@@ -130985,9 +130985,9 @@ MonoBehaviour:
     structuralFingerprint: FDF1E3E45B6F8750
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:36
+  lastGenerationTimestamp: 2026-08-07 16:24:33
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:36\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:33\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -131014,7 +131014,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 83 / 30 / 29 / 23\r\nRejected/dead/broken/foliage-eligible:
     1 / 0 / 3 / 79\r\nControl points / curve samples: 491 / 1964\r\nTotal branch
-    length: 165.747 m\r\nRadius range: 0.0060 .. 0.2402 m\r\nGeneration time: 3.038
+    length: 165.747 m\r\nRadius range: 0.0060 .. 0.2402 m\r\nGeneration time: 2.715
     ms\r\nCurve constraints: maxSegmentTurn=7.78 maxAccumulatedTurn=50.24 maxArc/Chord=1.029
     backwardViolations=0\r\nCrown envelope: violatingBranches=35 maximumOvershoot=0.712\r\nLocal
     bounds: center=(-0.015, 6.976, 0.104) size=(7.704, 14.433, 8.643)\r\nFootprint
@@ -131026,29 +131026,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 9
+  generationRevision: 10
   generatedBarkMesh: {fileID: 3530536776602852798, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 570512844}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 8595
-  generatedBarkTriangleCount: 13339
-  generatedBarkFingerprint: D66B694A53783ABB
+  generatedBarkVertexCount: 8554
+  generatedBarkTriangleCount: 13259
+  generatedBarkFingerprint: B15454DB9CB4A747
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Pine 4
 
     Branches meshed: 83
 
     Vertices
-    / triangles: 8595 / 13339
+    / triangles: 8554 / 13259
 
     Tip/base caps: 84
 
     Alternate tube-quad diagonals:
-    3505
+    3552
 
     Phase-aligned render rings: 349
 
@@ -131064,7 +131064,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 80 / 79 / 6.00
+    / buttress samples per lobe: 79 / 78 / 6.00
 
     Trunk axial twist degrees:
     -2.05
@@ -131099,7 +131099,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 8.57 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.397 / 1.000 / 1.128 / 0.322
+    / valley / half crest / half extension ratio: 1.397 / 1.000 / 1.138 / 0.347
 
     Root
     profile half-height angular width scale: 0.696
@@ -131122,10 +131122,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: C25732BB1F633323
+    Bark input fingerprint: CD041A4CDD8C07B1
 
     Bark
-    geometry fingerprint: D66B694A53783ABB
+    geometry fingerprint: B15454DB9CB4A747
 
     Repeatability rebuild: PASS
 
@@ -131160,12 +131160,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 9672 / 3294
+    validated side triangles: 9672 / 3214
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 3517 / 3182
+    boundary edges / welded seam edges: 3515 / 3180
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 82/82 / 82 / 0
@@ -132174,7 +132174,7 @@ MonoBehaviour:
   stableSlotIdentity: Twisted:4
   generatedInstance: {fileID: 374627803}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:14
+  lastSpawnTimestamp: 2026-08-07 16:24:42
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Twisted 4
@@ -140986,7 +140986,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 13324
+      generationTicks: 13626
     dependencyFingerprint: 31A1D64B53A34907
     trunkFingerprint: 279883A3133285CB
     branchFingerprint: 7BB0C8C425EF66BC
@@ -140995,9 +140995,9 @@ MonoBehaviour:
     structuralFingerprint: 03FF1C57173443C6
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:34
+  lastGenerationTimestamp: 2026-08-07 16:24:32
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:34\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:32\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -141024,7 +141024,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 42 / 17 / 19 / 5\r\nRejected/dead/broken/foliage-eligible:
     8 / 7 / 5 / 30\r\nControl points / curve samples: 236 / 944\r\nTotal branch length:
-    60.642 m\r\nRadius range: 0.0060 .. 0.2531 m\r\nGeneration time: 1.332 ms\r\nCurve
+    60.642 m\r\nRadius range: 0.0060 .. 0.2531 m\r\nGeneration time: 1.363 ms\r\nCurve
     constraints: maxSegmentTurn=5.01 maxAccumulatedTurn=32.02 maxArc/Chord=1.017
     backwardViolations=0\r\nCrown envelope: violatingBranches=21 maximumOvershoot=0.531\r\nLocal
     bounds: center=(0.231, 4.627, -0.113) size=(4.716, 9.760, 4.755)\r\nFootprint
@@ -141036,29 +141036,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 1379601679907022554, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1220105399}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 4717
-  generatedBarkTriangleCount: 7522
-  generatedBarkFingerprint: C1F3FC8BF51FC149
+  generatedBarkVertexCount: 4651
+  generatedBarkTriangleCount: 7392
+  generatedBarkFingerprint: 917341E5C0D6B096
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Pine 3
 
     Branches meshed: 42
 
     Vertices
-    / triangles: 4717 / 7522
+    / triangles: 4651 / 7392
 
     Tip/base caps: 43
 
     Alternate tube-quad diagonals:
-    1686
+    1746
 
     Phase-aligned render rings: 138
 
@@ -141074,7 +141074,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 76 / 75 / 6.00
+    / buttress samples per lobe: 75 / 74 / 6.00
 
     Trunk axial twist degrees:
     4.24
@@ -141109,7 +141109,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 5.60 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.245 / 1.000 / 1.079 / 0.322
+    / valley / half crest / half extension ratio: 1.245 / 1.000 / 1.085 / 0.347
 
     Root
     profile half-height angular width scale: 0.632
@@ -141132,10 +141132,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 4FFC46BC447C3E03
+    Bark input fingerprint: 10CA9FCE71AF16B9
 
     Bark
-    geometry fingerprint: C1F3FC8BF51FC149
+    geometry fingerprint: 917341E5C0D6B096
 
     Repeatability rebuild: PASS
 
@@ -141170,12 +141170,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 4352 / 2956
+    validated side triangles: 4352 / 2826
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 1742 / 1566
+    boundary edges / welded seam edges: 1740 / 1564
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 41/41 / 41 / 0
@@ -141272,7 +141272,7 @@ MonoBehaviour:
   stableSlotIdentity: Twisted:2
   generatedInstance: {fileID: 1980036212}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:56
+  lastSpawnTimestamp: 2026-08-07 16:24:39
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Twisted 2
@@ -142319,13 +142319,13 @@ MonoBehaviour:
     four shadow pads, rebuild/removal, Weather wind, cloud shading, and Play Mode
     stability before TREE-GALLERY.FREEZE.\r\n"
   lastUnifiedGenerationPassed: 1
-  unifiedGenerationRevision: 33
+  unifiedGenerationRevision: 34
   lastGeneratedTreeCount: 20
-  lastUnifiedGenerationTimestamp: 2026-08-05 01:48:25
+  lastUnifiedGenerationTimestamp: 2026-08-07 16:24:51
   lastUnifiedGenerationReport: '[TREE-CONTROLS.4 Live Recipe Gallery Generation]
 
     Generated:
-    2026-08-05 01:47:11
+    2026-08-07 16:24:22
 
     Path: curated recipe intervals -> stable slot seed
     -> exact instance controls -> recipe-only generator -> bark mesh
@@ -142451,7 +142451,7 @@ MonoBehaviour:
 
     Operation failures: 0
 
-    Elapsed: 74.35
+    Elapsed: 28.61
     s
 
     Status: PASS
@@ -156311,7 +156311,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 29483
+      generationTicks: 29628
     dependencyFingerprint: 48283DD8C4857A3A
     trunkFingerprint: 69AD8406BDBA4E1C
     branchFingerprint: 4496F208D08D6E0A
@@ -156320,9 +156320,9 @@ MonoBehaviour:
     structuralFingerprint: 2E3ED0694579B91D
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:26
+  lastGenerationTimestamp: 2026-08-07 16:24:29
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:26\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:29\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -156349,7 +156349,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 80 / 28 / 30 / 21\r\nRejected/dead/broken/foliage-eligible:
     0 / 3 / 1 / 75\r\nControl points / curve samples: 477 / 1908\r\nTotal branch
-    length: 98.310 m\r\nRadius range: 0.0060 .. 0.3430 m\r\nGeneration time: 2.948
+    length: 98.310 m\r\nRadius range: 0.0060 .. 0.3430 m\r\nGeneration time: 2.963
     ms\r\nCurve constraints: maxSegmentTurn=5.41 maxAccumulatedTurn=39.38 maxArc/Chord=1.030
     backwardViolations=0\r\nCrown envelope: violatingBranches=31 maximumOvershoot=0.694\r\nLocal
     bounds: center=(0.272, 4.633, 0.204) size=(4.963, 9.951, 5.370)\r\nFootprint
@@ -156361,29 +156361,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -717972813650403819, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1890117529}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 7159
-  generatedBarkTriangleCount: 11005
-  generatedBarkFingerprint: 0091883194F62649
+  generatedBarkVertexCount: 7119
+  generatedBarkTriangleCount: 10925
+  generatedBarkFingerprint: 6EB5C91B16303B44
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Pine 1
 
     Branches meshed: 80
 
     Vertices
-    / triangles: 7159 / 11005
+    / triangles: 7119 / 10925
 
     Tip/base caps: 81
 
     Alternate tube-quad diagonals:
-    2367
+    2434
 
     Phase-aligned render rings: 98
 
@@ -156434,7 +156434,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 6.13 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.245 / 1.000 / 1.079 / 0.322
+    / valley / half crest / half extension ratio: 1.245 / 1.000 / 1.085 / 0.347
 
     Root
     profile half-height angular width scale: 0.709
@@ -156457,10 +156457,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: E7A688867D71EC22
+    Bark input fingerprint: BEDB77B8AF4A324C
 
     Bark
-    geometry fingerprint: 0091883194F62649
+    geometry fingerprint: 6EB5C91B16303B44
 
     Repeatability rebuild: PASS
 
@@ -156495,7 +156495,7 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 7766 / 2870
+    validated side triangles: 7766 / 2790
 
     Tangent-basis failures: 0
 
@@ -167977,7 +167977,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 21831
+      generationTicks: 27993
     dependencyFingerprint: B7C01DCF6B6B66E2
     trunkFingerprint: 526C9D51BBC05686
     branchFingerprint: 0137A329ABA05DF7
@@ -167986,9 +167986,9 @@ MonoBehaviour:
     structuralFingerprint: E4ADD0D39C7D22E1
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:12
+  lastGenerationTimestamp: 2026-08-07 16:24:24
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:12\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:24\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -168015,7 +168015,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 63 / 13 / 29 / 20\r\nRejected/dead/broken/foliage-eligible:
     2 / 0 / 2 / 60\r\nControl points / curve samples: 387 / 1548\r\nTotal branch
-    length: 68.005 m\r\nRadius range: 0.0060 .. 0.3939 m\r\nGeneration time: 2.183
+    length: 68.005 m\r\nRadius range: 0.0060 .. 0.3939 m\r\nGeneration time: 2.799
     ms\r\nCurve constraints: maxSegmentTurn=12.49 maxAccumulatedTurn=74.21 maxArc/Chord=1.026
     backwardViolations=0\r\nCrown envelope: violatingBranches=30 maximumOvershoot=0.447\r\nLocal
     bounds: center=(0.451, 3.649, -0.245) size=(4.688, 8.086, 4.737)\r\nFootprint
@@ -168027,29 +168027,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 4848665852071630748, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1328946737}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 6183
-  generatedBarkTriangleCount: 9768
-  generatedBarkFingerprint: 9C4A5A7706C1E576
+  generatedBarkVertexCount: 6152
+  generatedBarkTriangleCount: 9708
+  generatedBarkFingerprint: 5FE62FAABD469EA3
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Common 2
 
     Branches meshed: 63
 
     Vertices
-    / triangles: 6183 / 9768
+    / triangles: 6152 / 9708
 
     Tip/base caps: 64
 
     Alternate tube-quad diagonals:
-    1984
+    2093
 
     Phase-aligned render rings: 0
 
@@ -168065,7 +168065,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 77 / 76 / 6.00
+    / buttress samples per lobe: 76 / 75 / 6.00
 
     Trunk axial twist degrees:
     0.20
@@ -168100,7 +168100,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 14.31 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.704 / 1.000 / 1.226 / 0.322
+    crest / valley / half crest / half extension ratio: 1.704 / 1.000 / 1.244 / 0.346
 
     Root
     profile half-height angular width scale: 0.992
@@ -168123,10 +168123,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 50304271008539CF
+    Bark input fingerprint: 59B6A9AE34D3B1F5
 
     Bark
-    geometry fingerprint: 9C4A5A7706C1E576
+    geometry fingerprint: 5FE62FAABD469EA3
 
     Repeatability rebuild: PASS
 
@@ -168161,12 +168161,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 5714 / 3754
+    validated side triangles: 5714 / 3694
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 2344 / 2084
+    boundary edges / welded seam edges: 2342 / 2082
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 62/62 / 62 / 0
@@ -172722,7 +172722,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 8273
+      generationTicks: 9636
     dependencyFingerprint: A67B344572A6D4CE
     trunkFingerprint: 9E809C4E00BBE699
     branchFingerprint: 730D72740461A9C1
@@ -172731,9 +172731,9 @@ MonoBehaviour:
     structuralFingerprint: 3FB4636BDB0988E1
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:48:21
+  lastGenerationTimestamp: 2026-08-07 16:24:45
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:48:21\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:45\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -172760,7 +172760,7 @@ MonoBehaviour:
     controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 24 / 10 / 11 / 2\r\nRejected/dead/broken/foliage-eligible:
     9 / 22 / 4 / 1\r\nControl points / curve samples: 140 / 552\r\nTotal branch length:
-    84.351 m\r\nRadius range: 0.0060 .. 0.5486 m\r\nGeneration time: 0.827 ms\r\nCurve
+    84.351 m\r\nRadius range: 0.0060 .. 0.5486 m\r\nGeneration time: 0.964 ms\r\nCurve
     constraints: maxSegmentTurn=19.29 maxAccumulatedTurn=162.58 maxArc/Chord=1.121
     backwardViolations=0\r\nCrown envelope: violatingBranches=0 maximumOvershoot=0.000\r\nLocal
     bounds: center=(2.495, 5.667, 1.166) size=(6.781, 12.430, 10.520)\r\nFootprint
@@ -172772,17 +172772,17 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -494396966183271144, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1467104516}
   lastBarkMeshPassed: 1
   generatedBarkVertexCount: 4572
   generatedBarkTriangleCount: 7788
-  generatedBarkFingerprint: 8BFC9B7D9991AA33
+  generatedBarkFingerprint: EA353F97399E8E3E
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Dead 2
 
@@ -172794,7 +172794,7 @@ MonoBehaviour:
     Tip/base caps: 25
 
     Alternate tube-quad diagonals:
-    2847
+    2833
 
     Phase-aligned render rings: 0
 
@@ -172845,7 +172845,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 30.45 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.726 / 1.000 / 1.233 / 0.321
+    crest / valley / half crest / half extension ratio: 1.726 / 1.000 / 1.251 / 0.346
 
     Root
     profile half-height angular width scale: 0.954
@@ -172868,10 +172868,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Dead
 
-    Bark input fingerprint: 01D734D03BFB7503
+    Bark input fingerprint: F0C2F114C8AD33C9
 
     Bark geometry
-    fingerprint: 8BFC9B7D9991AA33
+    fingerprint: EA353F97399E8E3E
 
     Repeatability rebuild: PASS
 
@@ -174134,7 +174134,7 @@ MonoBehaviour:
   stableSlotIdentity: Common:2
   generatedInstance: {fileID: 1787134543}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:13
+  lastSpawnTimestamp: 2026-08-07 16:24:25
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Common 2
@@ -195991,7 +195991,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 43900
+      generationTicks: 50099
     dependencyFingerprint: EFC8E9E900019BA8
     trunkFingerprint: 20E67ED8360E3BB5
     branchFingerprint: 41429A5ED9C00867
@@ -196000,9 +196000,9 @@ MonoBehaviour:
     structuralFingerprint: F16FE61343EDDEA7
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:44
+  lastGenerationTimestamp: 2026-08-07 16:24:36
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:44\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:36\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -196029,7 +196029,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 122 / 14 / 44 / 63\r\nRejected/dead/broken/foliage-eligible:
     8 / 6 / 7 / 108\r\nControl points / curve samples: 782 / 3108\r\nTotal branch
-    length: 270.336 m\r\nRadius range: 0.0060 .. 0.8226 m\r\nGeneration time: 4.390
+    length: 270.336 m\r\nRadius range: 0.0060 .. 0.8226 m\r\nGeneration time: 5.010
     ms\r\nCurve constraints: maxSegmentTurn=25.49 maxAccumulatedTurn=165.86 maxArc/Chord=1.196
     backwardViolations=0\r\nCrown envelope: violatingBranches=21 maximumOvershoot=0.345\r\nLocal
     bounds: center=(4.019, 6.780, -1.220) size=(9.682, 15.206, 10.195)\r\nFootprint
@@ -196041,17 +196041,17 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 34
+  generationRevision: 38
   generatedBarkMesh: {fileID: -6330274453180891019, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 208423351}
   lastBarkMeshPassed: 1
   generatedBarkVertexCount: 12748
   generatedBarkTriangleCount: 19638
-  generatedBarkFingerprint: D938F7E24C4D5F5A
+  generatedBarkFingerprint: 8145FA4E2C31F59D
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Twisted 1
 
@@ -196063,7 +196063,7 @@ MonoBehaviour:
     Tip/base caps: 123
 
     Alternate tube-quad
-    diagonals: 5846
+    diagonals: 5830
 
     Phase-aligned render rings: 0
 
@@ -196114,7 +196114,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 26.60 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.900 / 1.000 / 1.287 / 0.319
+    crest / valley / half crest / half extension ratio: 1.900 / 1.000 / 1.309 / 0.344
 
     Root
     profile half-height angular width scale: 0.993
@@ -196137,10 +196137,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Twisted
 
-    Bark input fingerprint: 643F565E58853462
+    Bark input fingerprint: 438D86DCE3BFCC28
 
     Bark
-    geometry fingerprint: D938F7E24C4D5F5A
+    geometry fingerprint: 8145FA4E2C31F59D
 
     Repeatability rebuild: PASS
 
@@ -206149,7 +206149,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 17575
+      generationTicks: 18624
     dependencyFingerprint: 5D52F4D7CC0BE391
     trunkFingerprint: 78B9158376A659F4
     branchFingerprint: 90AFEB700A999D86
@@ -206158,9 +206158,9 @@ MonoBehaviour:
     structuralFingerprint: 26B2FDEA3B47F49D
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:33
+  lastGenerationTimestamp: 2026-08-07 16:24:30
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:33\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:30\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -206187,7 +206187,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 56 / 20 / 23 / 12\r\nRejected/dead/broken/foliage-eligible:
     1 / 2 / 1 / 52\r\nControl points / curve samples: 332 / 1328\r\nTotal branch
-    length: 91.105 m\r\nRadius range: 0.0060 .. 0.3679 m\r\nGeneration time: 1.758
+    length: 91.105 m\r\nRadius range: 0.0060 .. 0.3679 m\r\nGeneration time: 1.862
     ms\r\nCurve constraints: maxSegmentTurn=7.40 maxAccumulatedTurn=50.12 maxArc/Chord=1.048
     backwardViolations=0\r\nCrown envelope: violatingBranches=30 maximumOvershoot=0.786\r\nLocal
     bounds: center=(0.055, 3.862, -0.021) size=(6.571, 8.460, 3.858)\r\nFootprint
@@ -206199,29 +206199,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 2424114320808689701, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 794086501}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 6064
-  generatedBarkTriangleCount: 9543
-  generatedBarkFingerprint: 6FF72B367A2BE97C
+  generatedBarkVertexCount: 6034
+  generatedBarkTriangleCount: 9483
+  generatedBarkFingerprint: 7E44DFF6476F3235
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Pine 2
 
     Branches meshed: 56
 
     Vertices
-    / triangles: 6064 / 9543
+    / triangles: 6034 / 9483
 
     Tip/base caps: 57
 
     Alternate tube-quad diagonals:
-    1988
+    2062
 
     Phase-aligned render rings: 81
 
@@ -206272,7 +206272,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 8.31 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.265 / 1.000 / 1.085 / 0.322
+    / valley / half crest / half extension ratio: 1.265 / 1.000 / 1.092 / 0.347
 
     Root
     profile half-height angular width scale: 0.619
@@ -206295,10 +206295,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: E75A4AF3D24FD31D
+    Bark input fingerprint: 7C1210DE8B439443
 
     Bark
-    geometry fingerprint: 6FF72B367A2BE97C
+    geometry fingerprint: 7E44DFF6476F3235
 
     Repeatability rebuild: PASS
 
@@ -206333,7 +206333,7 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 6282 / 2990
+    validated side triangles: 6282 / 2930
 
     Tangent-basis failures: 0
 
@@ -211245,7 +211245,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 7776
+      generationTicks: 8044
     dependencyFingerprint: 92471A22E6BE289B
     trunkFingerprint: 0062E680094330D4
     branchFingerprint: 44E5181B8C84579F
@@ -211254,9 +211254,9 @@ MonoBehaviour:
     structuralFingerprint: 62ABB2E8BE91BF88
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:19
+  lastGenerationTimestamp: 2026-08-07 16:24:26
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:19\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:26\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -211283,7 +211283,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 24 / 8 / 9 / 6\r\nRejected/dead/broken/foliage-eligible: 4
     / 3 / 6 / 16\r\nControl points / curve samples: 136 / 544\r\nTotal branch length:
-    55.782 m\r\nRadius range: 0.0060 .. 0.4138 m\r\nGeneration time: 0.778 ms\r\nCurve
+    55.782 m\r\nRadius range: 0.0060 .. 0.4138 m\r\nGeneration time: 0.804 ms\r\nCurve
     constraints: maxSegmentTurn=21.62 maxAccumulatedTurn=116.27 maxArc/Chord=1.044
     backwardViolations=0\r\nCrown envelope: violatingBranches=8 maximumOvershoot=0.610\r\nLocal
     bounds: center=(1.357, 5.328, -0.456) size=(4.380, 11.484, 8.168)\r\nFootprint
@@ -211295,29 +211295,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -9169203133913717661, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 452222785}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 3767
-  generatedBarkTriangleCount: 6304
-  generatedBarkFingerprint: C82A070472FF5EA5
+  generatedBarkVertexCount: 3751
+  generatedBarkTriangleCount: 6274
+  generatedBarkFingerprint: F33F715B3039AB6F
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Common 4
 
     Branches meshed: 24
 
     Vertices
-    / triangles: 3767 / 6304
+    / triangles: 3751 / 6274
 
     Tip/base caps: 25
 
     Alternate tube-quad diagonals:
-    1358
+    1400
 
     Phase-aligned render rings: 5
 
@@ -211333,7 +211333,7 @@ MonoBehaviour:
     authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 75 / 74 / 6.00
+    / buttress samples per lobe: 74 / 73 / 6.00
 
     Trunk axial twist degrees:
     -6.80
@@ -211368,7 +211368,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 27.21 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.645 / 1.000 / 1.207 / 0.322
+    crest / valley / half crest / half extension ratio: 1.645 / 1.000 / 1.223 / 0.347
 
     Root
     profile half-height angular width scale: 0.897
@@ -211391,10 +211391,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 6679D21B3330DAFF
+    Bark input fingerprint: EB8A28B9F35EED39
 
     Bark
-    geometry fingerprint: C82A070472FF5EA5
+    geometry fingerprint: F33F715B3039AB6F
 
     Repeatability rebuild: PASS
 
@@ -211429,12 +211429,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 2666 / 3500
+    validated side triangles: 2666 / 3470
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 1132 / 1032
+    boundary edges / welded seam edges: 1130 / 1030
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 23/23 / 23 / 0
@@ -211531,7 +211531,7 @@ MonoBehaviour:
   stableSlotIdentity: Dead:1
   generatedInstance: {fileID: 1200500320}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:48:20
+  lastSpawnTimestamp: 2026-08-07 16:24:45
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Dead 1
@@ -231320,7 +231320,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 40629
+      generationTicks: 37793
     dependencyFingerprint: DCB6C0AFB8BEF496
     trunkFingerprint: 52D76F9011D505FD
     branchFingerprint: 7D59D0EE6A83908D
@@ -231329,9 +231329,9 @@ MonoBehaviour:
     structuralFingerprint: BFAB13BF280A6D1B
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:55
+  lastGenerationTimestamp: 2026-08-07 16:24:38
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:55\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:38\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -231358,7 +231358,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 109 / 13 / 36 / 59\r\nRejected/dead/broken/foliage-eligible:
     4 / 1 / 5 / 102\r\nControl points / curve samples: 703 / 2800\r\nTotal branch
-    length: 315.458 m\r\nRadius range: 0.0060 .. 0.9034 m\r\nGeneration time: 4.063
+    length: 315.458 m\r\nRadius range: 0.0060 .. 0.9034 m\r\nGeneration time: 3.779
     ms\r\nCurve constraints: maxSegmentTurn=19.53 maxAccumulatedTurn=157.42 maxArc/Chord=1.257
     backwardViolations=1\r\nCrown envelope: violatingBranches=39 maximumOvershoot=0.499\r\nLocal
     bounds: center=(-0.451, 7.616, -0.845) size=(14.669, 17.038, 17.605)\r\nFootprint
@@ -231370,29 +231370,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: -2330797419274893487, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1108005759}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 11240
-  generatedBarkTriangleCount: 17212
-  generatedBarkFingerprint: 8AE52F9E10CA9A48
+  generatedBarkVertexCount: 11178
+  generatedBarkTriangleCount: 17092
+  generatedBarkFingerprint: 84C9E2E5E785433F
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Twisted 2
 
     Branches meshed: 109
 
     Vertices
-    / triangles: 11240 / 17212
+    / triangles: 11178 / 17092
 
     Tip/base caps: 110
 
     Alternate tube-quad
-    diagonals: 5069
+    diagonals: 5010
 
     Phase-aligned render rings: 0
 
@@ -231408,7 +231408,7 @@ MonoBehaviour:
     T / authored P/S/T: 30 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 89 / 88 / 6.00
+    / buttress samples per lobe: 87 / 86 / 6.00
 
     Trunk axial twist degrees:
     356.26
@@ -231443,7 +231443,7 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 32.19 / 21.60
 
     Root profile ground
-    crest / valley / half crest / half extension ratio: 1.899 / 1.000 / 1.288 / 0.320
+    crest / valley / half crest / half extension ratio: 1.899 / 1.000 / 1.310 / 0.345
 
     Root
     profile half-height angular width scale: 0.842
@@ -231466,10 +231466,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_Twisted
 
-    Bark input fingerprint: 6A185D496165AA3C
+    Bark input fingerprint: DD4AED3AC1616A2A
 
     Bark
-    geometry fingerprint: 8AE52F9E10CA9A48
+    geometry fingerprint: 84C9E2E5E785433F
 
     Repeatability rebuild: PASS
 
@@ -231504,12 +231504,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 12400 / 4364
+    validated side triangles: 12400 / 4244
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 4830 / 4422
+    boundary edges / welded seam edges: 4826 / 4418
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 108/108 / 108 / 0
@@ -243133,7 +243133,7 @@ MonoBehaviour:
       calibrationWidthRatio: 1
       calibrationDepthRatio: 1
       calibrationWithinTolerance: 1
-      generationTicks: 20473
+      generationTicks: 22025
     dependencyFingerprint: E840FC340EA5AE48
     trunkFingerprint: 4067A8915F63BB97
     branchFingerprint: 584C555BC2D53FD9
@@ -243142,9 +243142,9 @@ MonoBehaviour:
     structuralFingerprint: 3A8700965877479B
     warnings: []
   lastGenerationPassed: 1
-  lastGenerationTimestamp: 2026-08-05 01:47:15
+  lastGenerationTimestamp: 2026-08-07 16:24:25
   lastGenerationReport: "[TREE-CONTROLS.4 Recipe-Only Exact Structural Generation]\r\nGenerated:
-    2026-08-05 01:47:15\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
+    2026-08-07 16:24:25\r\nGenerator version: 7\r\nGenerator seed-compatibility version:
     3\r\nOutput: branch graph, transported curve frames, resolved authoring parameters,
     fingerprints, and diagnostics only; no bark/foliage meshes are created\r\n\r\n[Authoring
     Inputs]\r\nGeneration path: Standalone recipe -> exact instance controls\r\nReference
@@ -243171,7 +243171,7 @@ MonoBehaviour:
     (41 controls; zero family/calibration behavioral reads).\r\n\r\n[Structure Metrics]\r\nBranches
     total/order 1/2/3: 64 / 13 / 26 / 24\r\nRejected/dead/broken/foliage-eligible:
     0 / 0 / 2 / 61\r\nControl points / curve samples: 397 / 1588\r\nTotal branch
-    length: 96.764 m\r\nRadius range: 0.0060 .. 0.3162 m\r\nGeneration time: 2.047
+    length: 96.764 m\r\nRadius range: 0.0060 .. 0.3162 m\r\nGeneration time: 2.203
     ms\r\nCurve constraints: maxSegmentTurn=7.12 maxAccumulatedTurn=57.51 maxArc/Chord=1.056
     backwardViolations=0\r\nCrown envelope: violatingBranches=31 maximumOvershoot=0.531\r\nLocal
     bounds: center=(0.242, 4.555, -0.055) size=(6.616, 9.743, 6.498)\r\nFootprint
@@ -243183,29 +243183,29 @@ MonoBehaviour:
     | Structure remained inside recipe-generation safety and sample budgets.\r\nPASS
     | Reference calibration not applicable to this recipe.\r\nPASS | Curve progression
     and transported-frame diagnostics were recorded.\r\n\r\nStatus: PASS\r\n"
-  generationRevision: 5
+  generationRevision: 6
   generatedBarkMesh: {fileID: 2464261654279955938, guid: 56417040eee81574eb986321dd84ae2d, type: 2}
   generatedBarkObject: {fileID: 1708097850}
   lastBarkMeshPassed: 1
-  generatedBarkVertexCount: 6618
-  generatedBarkTriangleCount: 10501
-  generatedBarkFingerprint: D9E9B89FB132F882
+  generatedBarkVertexCount: 6599
+  generatedBarkTriangleCount: 10465
+  generatedBarkFingerprint: 1DCD22EEE6DF8527
   lastBarkMeshReport: '[TREE-CONTROLS.4 Control-Contract Generated Bark Mesh]
 
     Bark
-    algorithm version: 25
+    algorithm version: 27
 
     Slot: Common 3
 
     Branches meshed: 64
 
     Vertices
-    / triangles: 6618 / 10501
+    / triangles: 6599 / 10465
 
     Tip/base caps: 65
 
     Alternate tube-quad diagonals:
-    2193
+    2292
 
     Phase-aligned render rings: 1
 
@@ -243221,7 +243221,7 @@ MonoBehaviour:
     authored P/S/T: 36 / 8/6/5
 
     Effective trunk rings / root-zone intervals
-    / buttress samples per lobe: 73 / 72 / 6.00
+    / buttress samples per lobe: 72 / 71 / 6.00
 
     Trunk axial twist degrees:
     9.42
@@ -243256,22 +243256,22 @@ MonoBehaviour:
     branch-segment turn / sampled limit: 7.80 / 21.60
 
     Root profile ground crest
-    / valley / half crest / half extension ratio: 1.581 / 1.000 / 1.187 / 0.322
+    / valley / half crest / half extension ratio: 1.581 / 1.032 / 1.201 / 0.346
 
     Root
     profile half-height angular width scale: 0.999
 
     Ground root half-extension
-    full angular width / chord width: 43.28 degrees / 0.301 m
+    full angular width / chord width: 41.72 degrees / 0.291 m
 
     Root support
     requested / emitted / count clamp: 63.52 / 60.00 degrees / YES
 
     Root profile
-    top root-only / maximum crest turn: 0.1577 / 6.73 degrees
+    top root-only / maximum crest turn: 0.1577 / 7.75 degrees
 
     Cross-section
-    max / root width / depth: 1.581 / 1.000 / 0.933
+    max / root width / depth: 1.581 / 1.000 / 0.928
 
     Root inset / blend radii
     / radius scale / collar / rings: 0.180 / 2.500 / 1.200 / 0.480 / 3
@@ -243279,10 +243279,10 @@ MonoBehaviour:
     Material:
     MAT_TreeBark_CommonPine
 
-    Bark input fingerprint: 1844FEE308CE8D9A
+    Bark input fingerprint: B661F413A9E9A458
 
     Bark
-    geometry fingerprint: D9E9B89FB132F882
+    geometry fingerprint: 1DCD22EEE6DF8527
 
     Repeatability rebuild: PASS
 
@@ -243317,12 +243317,12 @@ MonoBehaviour:
     side / weak side / cap orientation failures: 0 / 0 / 0
 
     Radial / contour
-    validated side triangles: 6226 / 3970
+    validated side triangles: 6226 / 3934
 
     Tangent-basis failures: 0
 
     Raw
-    boundary edges / welded seam edges: 2477 / 2218
+    boundary edges / welded seam edges: 2475 / 2216
 
     Expected/matched embedded
     roots / welded boundary loops / unexpected loops: 63/63 / 63 / 0
@@ -244415,7 +244415,7 @@ MonoBehaviour:
   stableSlotIdentity: Common:4
   generatedInstance: {fileID: 1942670235}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:20
+  lastSpawnTimestamp: 2026-08-07 16:24:28
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Common 4
@@ -244899,7 +244899,7 @@ MonoBehaviour:
   stableSlotIdentity: Pine:5
   generatedInstance: {fileID: 890177797}
   lastSpawnPassed: 1
-  lastSpawnTimestamp: 2026-08-05 01:47:40
+  lastSpawnTimestamp: 2026-08-07 16:24:35
   lastSpawnReport: '[TREE-CONTROLS.4 Gallery Slot]
 
     Slot: Pine 5

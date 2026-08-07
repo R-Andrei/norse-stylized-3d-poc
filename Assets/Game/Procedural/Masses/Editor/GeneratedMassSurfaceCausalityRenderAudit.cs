@@ -18,6 +18,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     /// material; all light/renderer overrides are restored before waiting for
     /// asynchronous GPU readback.
     /// </summary>
+    // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+    // This audit exists first to explain wrong per-surface directional response:
+    // source faces and bevels can be brighter/darker in an order that contradicts
+    // their orientation to the same light. Global darkness, average residual, F0,
+    // and specular magnitude are secondary evidence only. No ownership label can
+    // close the defect unless surface-orientation and parent-bevel-parent ordering
+    // are coherent against the legacy reference.
     internal sealed class GeneratedMassSurfaceCausalityRenderAudit : IDisposable
     {
         internal const int CaptureSize = 384;
@@ -2494,6 +2501,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return value;
             }
 
+            // GM-SURFACE.5P: these aggregate ownership labels are diagnostic
+            // contributors, not the acceptance criterion for the visible defect.
+            // A parameter can reduce mean RGB error and still leave individual
+            // source/bevel surfaces ordered incorrectly for their orientation.
+            // Parent/bevel ordering evidence and per-surface light response remain
+            // mandatory before any production fix may be called successful.
             bool brdfPrimary =
                 value.NeutralDiffuseMeanAbsoluteResidual <= 0.05f &&
                 value.StageAF0ResidualReduction >= 0.70f &&
@@ -4048,6 +4061,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     continue;
                 }
 
+                // GM-SURFACE.5P: this is direct evidence for the active defect.
+                // The user-visible failure is precisely that a bevel can escape
+                // the response expected from its two parent surface orientations
+                // under the same light. Preserve darker-than-both/brighter-than-
+                // both classification even when whole-object brightness matches.
                 float minimum = Mathf.Min(parentA, parentB);
                 float maximum = Mathf.Max(parentA, parentB);
                 float range = maximum - minimum;

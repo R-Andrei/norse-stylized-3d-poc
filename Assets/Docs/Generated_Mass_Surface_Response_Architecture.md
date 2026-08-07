@@ -9,6 +9,26 @@ This document owns the current Generated Mass decisions for production bevel/chi
 
 Repository code overrides this document if they differ; such disagreement is a defect.
 
+
+## Non-negotiable active defect definition — surface-orientation lighting coherence
+
+**This is the primary Generated Mass lighting defect. Do not reframe it as a general brightness, exposure, ambient-light, indirect-light, smoothness, or specular-intensity problem.**
+
+The defective HLSL material does not preserve a coherent relationship between **surface orientation relative to the same incident light** and the resulting visible lighting response. Individual source faces and ordinary bevel faces can be ordered incorrectly:
+
+- a surface that faces the light more directly can render darker than a less-directly-facing neighboring surface;
+- a surface that faces the light less directly can render brighter than a more-directly-facing neighboring surface;
+- an ordinary bevel whose geometric orientation lies between its two parent faces can render darker than both parents or brighter than both parents instead of producing the expected intermediate directional-light response;
+- adjacent bevel segments can change brightness ordering in ways that are not explained by their geometric orientation to the light.
+
+The accepted visual reference is the legacy `M_PixelStone` / `SG_PixelSurfaceLit` response on comparable Generated Mass geometry: as a face turns toward or away from the same directional light, its illumination changes coherently, and bevels visually bridge the directional-light responses of their adjacent parent surfaces.
+
+Absolute object luminance is **not** the acceptance criterion. A globally darker or brighter rock can still be directionally correct. Conversely, matching average luminance, dielectric F0, overall exposure, ambient strength, or specular energy does **not** solve the defect if individual surface/bevel responses remain incorrectly ordered by orientation.
+
+For controlled diffuse evidence, the invariant is explicit: fragment response must follow the fragment normal's `max(dot(N, L), 0)` ordering. For actual-material evidence, artistic layers may modify magnitude, but they must not introduce unexplained parent/bevel or neighboring-face ordering inversions relative to the accepted legacy behavior.
+
+Any diagnosis, report, patch, or recommendation that discusses only whole-object darkness, average residual, specular strength, or global lighting parity without directly checking **per-surface orientation ordering** is insufficient to close this defect.
+
 ## Current implementation state
 
 GM-SURFACE.5 adds the first shared whole-rock normal layer. It is a bounded four-sample object-space procedural gradient evaluated only for the Generated Mass surface contract. Each rock supplies only strength and scale through its existing material property block. The layer allocates no unique textures, performs no feature loop, and is independent of the primary/secondary structural feature stream. Convex and chip-specific modules remain deferred to GM-SURFACE.6.
@@ -176,6 +196,10 @@ The following are explicitly rejected:
 - `Generated_Mass_Feature_Implementation_Checklist.md` owns active/completed work status only.
 - Historical recovery detail must not present superseded states as current architecture.
 
+
+## Historical lighting-work guard
+
+GM-SURFACE.5A through the earlier mask/readability/parity patches record real historical defects and experiments, but **none of those historical labels redefine the active GM-SURFACE.5P defect**. In particular, earlier "dark-band", mask-inheritance, shadow-readability, whole-rock-normal, BRDF/F0, and general-darkness findings must not be substituted for the current acceptance criterion: individual source faces and bevels must respond coherently to the same light according to their surface orientation, with parent–bevel–parent ordering consistent with the legacy reference.
 
 ## GM-SURFACE.5A — reference direction and lighting-foundation correction
 
@@ -1259,3 +1283,139 @@ The correction adds one 384×384 editor-only floating-point normal capture and o
 - [x] Summary/report/case accounting reconciled.
 - [x] Final scope/compliance audit complete.
 - [ ] Unity compilation and runtime validation complete.
+
+
+## GM-SURFACE.5O — Cold-grey production lighting parity trial
+
+### Status
+
+- [x] Review complete and implementation plan recorded before production edits.
+- [x] Production material F0 correction implemented.
+- [x] Cold-grey whole-surface generated-normal perturbation bypass implemented.
+- [x] Canonical framework/checklist reconciled.
+- [x] Final scope/compliance/static audit complete.
+- [x] 2026-08-07 visual validation completed: **trial is visually insufficient and rejected as a root-cause correction for the active surface-orientation ordering defect.**
+- [ ] Behavioral rollback/supersession is separate future production work; 5P does not change rendering behavior.
+
+### Objective
+
+Historical 5O objective: test the two production changes directly supported by the completed 5N-H3 parity metrics. **This objective is superseded as a root-cause framing by GM-SURFACE.5P.** The active defect is not general BRDF/specular parity or whole-object darkness; it is incorrect per-surface and per-bevel response ordering relative to surface orientation under the same light.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Docs/Generated_Mass_Surface_Response_Architecture.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Game/Procedural/Masses/GeneratedMass.cs`
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat`
+
+Create, delete, move, or rename: none.
+
+### Reviewed evidence
+
+- The completed 5N-H3 runtime matrix finished 209/209 decision cases with zero readback errors, full case coverage, a valid pixelwise Lambert preflight, and no completeness failure.
+- Neutral stored-normal direct lighting proves F0 0.04 reproduces the legacy control to numerical precision while F0 0.16 introduces over-response and bevel/parent ordering inversions.
+- Actual-material Stage B/C evidence shows removing the generated whole-surface normal perturbation improves parity by approximately 38–41 percent on average, but does not independently explain the full remaining mismatch.
+- `Assets/Game/Procedural/Masses/GeneratedMass.cs`, `ApplyMaterialProperties`: the component publishes the serialized whole-surface normal strength through a renderer property block after applying the active stone profile material.
+- `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat`, `_SpecularStrength`: the cold-grey production material currently serializes 0.16.
+
+### Acceptance criteria
+
+1. The cold-grey production material serializes `_SpecularStrength = 0.04` and no other material property changes.
+2. `ApplyMaterialProperties` publishes `_GeneratedMassSurfaceNormalStrength = 0` only when `stoneSurfaceProfile` is `ColdGreyStone`; all other stone profiles continue publishing their serialized authored strength unchanged.
+3. No shared shader/include, geometry, triangulation, scene, prefab, recipe, layer, tag, or diagnostic matrix change is introduced.
+4. Active-gameplay per-frame cost does not increase; the profile conditional executes only when the existing material-property publication path runs.
+5. Unity validation must confirm the cold-grey rocks actually render with the new F0 and without the generated normal perturbation, and the visual comparison must determine whether the residual dark bias remains.
+
+### File-by-file sequence
+
+1. `Assets/Docs/Generated_Mass_Surface_Response_Architecture.md` — record this plan first and later record final evidence/status.
+2. `Assets/Game/Demo/Materials/Stone/M_PixelStone_HLSL_ColdGrey.mat` — change only `_SpecularStrength` from 0.16 to 0.04.
+3. `Assets/Game/Procedural/Masses/GeneratedMass.cs` — publish zero whole-surface normal strength for `ColdGreyStone`; preserve the authored control for every other profile.
+4. `Assets/Docs/Generated_Mass_Framework.md` — record the temporary production parity baseline and unresolved residual-darkness boundary.
+5. `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md` — record implementation/validation state and the fact that GM-SURFACE.5 whole-rock normals remain available outside the cold-grey parity trial.
+
+### Invariants and non-goals
+
+- This is a production visual trial, not a new diagnostic pass.
+- Do not compensate the remaining darkness with ambient, indirect, exposure, albedo, or direct-light multipliers in this patch.
+- Do not change smoothness, diffuse wrap, direct strength, pixel variation, material masks, or generated geometry.
+- Do not delete the whole-rock normal feature or its authoring fields; only cold-grey production publication is bypassed for this trial.
+- Other stone profiles retain their current F0 values and generated-normal behavior.
+
+### Risks and validation
+
+- Existing serialized `surfaceNormalStrength` values must remain untouched; the trial is implemented at renderer-property publication so current scene instances immediately receive the bypass without serialized scene migration.
+- The F0 correction is material-local; shared shader defaults remain unchanged.
+- Static validation will compare the material YAML and `ApplyMaterialProperties` diff against the pre-edit baseline, scan for scope drift, and verify no shared shader files changed.
+- Unity compilation and visual/runtime validation remain authoritative and pending after packaging.
+- Offline final audit passed: exact five-file scope, material scalar-only delta, cold-grey-only normal bypass, shared shader/diagnostic byte parity, other stone-material byte parity, and C# structural/preprocessor balance.
+
+## GM-SURFACE.5P — surface-orientation defect-definition freeze
+
+### Status
+
+- Approved by the user on 2026-08-07.
+- Documentation/comment-only implementation complete.
+- Final scope/comment-only/static audit passed.
+- No rendering behavior change is authorized or introduced by this patch.
+
+### Objective
+
+Make the active defect impossible to misclassify in future work. The canonical problem is **per-surface and per-bevel directional-light response ordering versus geometric/stored surface orientation**, using the legacy material as the behavioral reference. General darkness and specular magnitude are secondary measurements only.
+
+### Acceptance criteria
+
+1. All canonical Generated Mass surface-response documents state the orientation-ordering defect before historical diagnostic conclusions.
+2. Production Generated Mass material publication, whole-surface normal construction, forward lighting, and shader entry points carry source comments warning that global brightness/specular tuning is not the target defect.
+3. Bevel provenance capture and both surface-causality diagnostic classes explicitly state that parent/bevel ordering and face-orientation response are the causal target.
+4. The GM-SURFACE.5O F0/normal trial is recorded as visually insufficient for the active defect; its existence must not be interpreted as proof that specularity or whole-rock darkness owns the defect.
+5. No shader math, material value, geometry, serialized asset, scene, prefab, profile, layer, tag, diagnostic threshold, or runtime behavior changes in 5P.
+
+### Approved files
+
+- `Assets/Docs/Generated_Mass_Surface_Response_Architecture.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Game/Procedural/Masses/GeneratedMass.cs`
+- `Assets/Game/Procedural/Masses/MassGenerator.BevelShadingDiagnosticCapture.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassSurfaceCausalityRenderAudit.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassBevelShadingDiagnosticSuite.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceForwardPass.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceGeneratedMassCore.hlsl`
+- `Assets/Game/Rendering/PixelSurface/Shaders/SH_PixelSurfaceLit.shader`
+
+### Reviewed evidence
+
+- User-supplied side-by-side visual validation on 2026-08-07 identifies the legacy bright-gray material as coherent and the new dark-gray HLSL material as incoherent at the individual-face/bevel level under the same scene light direction.
+- The completed 5N-H3 suite directly records `WithinParentEnvelope`, `DarkerThanBothParents`, and `BrighterThanBothParents` bevel relationships and per-triangle light-direction evidence.
+- The 5N-H3 matrix proved that changing F0 can remove a neutral BRDF mismatch, but the subsequent 5O visual trial did not repair the active per-surface orientation-ordering defect. F0 parity therefore cannot be treated as closure of this issue.
+- The generated whole-surface normal ablation can change response magnitude, but the active acceptance criterion remains correct orientation-driven ordering for source faces and bevels.
+
+### Invariants and non-goals
+
+- The defect is not defined by whole-rock darkness.
+- The defect is not defined by specular intensity or F0.
+- The defect is not defined by whether one isolated bevel is absolutely dark or bright.
+- The defect is whether **individual surfaces respond coherently to the same light according to their orientation**, including parent–bevel–parent ordering.
+- 5P does not select a new root cause and does not author a rendering fix.
+- 5P does not silently validate or invalidate geometry; geometry remains a separate evidence domain.
+- 5P does not revert the 5O trial values; behavioral rollback or replacement requires its own explicit production patch.
+
+### File-by-file sequence
+
+1. Freeze this definition and the 5P plan in the canonical architecture document.
+2. Mirror the invariant into the framework and implementation checklist, and mark the 5O visual result as insufficient for defect closure.
+3. Add the same invariant as comments at Generated Mass material publication and whole-surface normal construction boundaries.
+4. Add the invariant at the production forward-lighting and shader entry boundaries.
+5. Add the invariant to generation-time bevel provenance capture and both editor diagnostic classes, especially parent-envelope/order analysis and report interpretation.
+6. Audit the final diff for comment/document-only behavior and verify no executable token or serialized value changed.
+
+### Risks and validation
+
+The primary risk is future semantic drift: a later agent may optimize average brightness or specular parity and declare success while orientation-order inversions remain visible. The final audit therefore checks both wording consistency and executable-code identity after stripping added comments. Unity runtime validation is not required for a comment/document-only patch, but the next rendering patch must validate the actual face/bevel orientation-order behavior visually and numerically.
+
+Final 5P audit result: exactly ten approved files differ from the post-5O baseline; all seven source/shader diffs are line-comment/XML-comment/blank-line only with zero changed executable lines; the three canonical documents contain the frozen orientation-ordering invariant; the cold-grey material and all files outside the approved scope are byte-identical to the post-5O baseline.
+

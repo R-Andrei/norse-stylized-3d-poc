@@ -389,7 +389,7 @@ namespace ProgrammaticStylized3D.Trees
 
             rootCount.ClampAndOrder(3, 8);
             rootReach.ClampAndOrder(0f, 2f);
-            rootThickness.ClampAndOrder(0.10f, 1f);
+            rootThickness.ClampAndOrder(0.10f, 2f);
             rootHeight.ClampAndOrder(0.01f, 0.40f);
             buttressTransition.ClampAndOrder(0f, 1f);
 

@@ -15,6 +15,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     /// <summary>
     /// Integrated Generated Mass surface-causality audit.
     ///
+    /// GM-SURFACE.5P: the active defect is wrong per-surface/per-bevel response
+    /// ordering relative to orientation under the same light. Whole-rock darkness,
+    /// F0/specular magnitude, exposure, or average residual are not the definition
+    /// of success. Parent-bevel-parent and neighboring-face orientation ordering
+    /// must match the coherent legacy behavior before the defect can be closed.
+    ///
     /// The production triangulation is deliberately not modified here. The
     /// suite captures the committed production mesh, classifies final triangles
     /// through one canonical double-precision contract, audits alternative
@@ -835,6 +841,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine("decision=" + ResolveDecision(job));
             builder.AppendLine();
 
+            // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+            // Interpret this report around per-surface orientation response and
+            // parent-bevel-parent ordering. Whole-object darkness, F0/specular
+            // magnitude, exposure, ambient response, and aggregate residuals are
+            // secondary evidence and cannot close the defect while ordering
+            // inversions remain visible.
             builder.AppendLine("[Interpretation contract]");
             builder.AppendLine("- literal degeneracy, numerical under-resolution, and extreme sliver conditioning are separate classifications.");
             builder.AppendLine("- every uploaded and captured triangle is evaluated by MassGenerator.EvaluateFinalTriangleQuality; Vector3.normalized is not a validity oracle.");

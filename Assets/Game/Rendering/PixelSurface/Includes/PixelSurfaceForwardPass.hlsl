@@ -1,6 +1,14 @@
 #ifndef PS3D_PIXELSURFACEFORWARDPASS_HLSL
 #define PS3D_PIXELSURFACEFORWARDPASS_HLSL
 
+// GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
+// Generated Mass is failing per-surface directional-light coherence. The target
+// is NOT global darkness, exposure, ambient strength, or specular magnitude.
+// Under the same light, each source face and bevel must respond according to its
+// own orientation; a bevel between two parent orientations must not randomly
+// become darker than both or brighter than both. Do not accept average-luminance
+// or BRDF parity as closure while orientation/order inversions remain.
+
 #if defined(_SURFACE_CAUSALITY_AUDIT)
             int ResolveSurfaceCausalityMode()
             {
@@ -596,6 +604,12 @@
                 // output. Do not apply bevel-specific albedo painting, directional
                 // pre-light value shaping, post-PBR light-colour reconstruction, or
                 // shadow-side normal readability while validating geometry lighting.
+                //
+                // GM-SURFACE.5P: the acceptance target is per-fragment orientation
+                // response and parent-bevel-parent ordering under one light. A global
+                // brightness/specular adjustment can improve averages while leaving
+                // the actual defect untouched, so never close this issue from the
+                // whole-object PBR magnitude alone.
                 half3 finalRgb;
                 if (generatedMassSurface > 0.5)
                 {

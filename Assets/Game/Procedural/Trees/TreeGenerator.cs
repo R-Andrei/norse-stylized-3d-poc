@@ -832,7 +832,7 @@ namespace ProgrammaticStylized3D.Trees
                 p.RootReach < 0f ||
                 !TreeDeterministicUtility.IsFinite(p.RootThickness) ||
                 p.RootThickness < 0.1f ||
-                p.RootThickness > 1f)
+                p.RootThickness > 2f)
             {
                 failures.Add(
                     "Recipe-only Root Reach/Thickness values are invalid.");

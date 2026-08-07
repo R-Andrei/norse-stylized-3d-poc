@@ -109,7 +109,7 @@ namespace ProgrammaticStylized3D.Trees
                 TreeControlSection.Roots,
                 "roots",
                 "Roots",
-                "Root Count changes count. Root Reach changes ground-level radial projection. Root Thickness requests absolute angular breadth without changing reach; emitted breadth is clamped only when necessary to prevent neighbouring roots from overlapping. Root Height changes the ground-level root envelope. Buttress Persistence controls how far root-owned buttress lobes and their aligned frame persist before the trunk becomes circular. The final root geometry retains visible ground widening and true zero valleys.",
+                "Root Count changes count. Root Reach changes ground-level radial projection. Root Thickness first broadens each buttress, then merges the lower base between neighbouring roots after individual support reaches its Root Count sector limit; it does not change crest reach. Root Height changes the ground-level root envelope. Buttress Persistence controls how far root-owned buttress lobes and their aligned frame persist before the trunk becomes circular. The final root geometry retains grounded widening and distinct root crests while high Thickness can form a broad shared base.",
                 false),
             new TreeControlSectionDescriptor(
                 TreeControlSection.PrimaryBranchPlacement,
@@ -183,7 +183,7 @@ namespace ProgrammaticStylized3D.Trees
 
             Integer(TreeControlSection.Roots, "tree.root.count", "rootCount", "Root Count", "Number of buttresses around the trunk. Count does not redefine requested angular width; emitted width is clamped and reported only when the requested support would overlap adjacent roots.", 3, 8),
             Float(TreeControlSection.Roots, "tree.root.reach", "rootReach", "Root Reach", "Ground-level outward projection measured as added radius relative to the local trunk radius.", 0f, 2f),
-            Float(TreeControlSection.Roots, "tree.root.thickness", "rootThickness", "Root Thickness", "Absolute angular breadth of each buttress. 0.5 reproduces accepted H4 breadth; lower values narrow and higher values broaden without changing Root Reach.", 0.10f, 1f),
+            Float(TreeControlSection.Roots, "tree.root.thickness", "rootThickness", "Root Thickness", "Root breadth and lower-base mass. 0.5 reproduces accepted H4 breadth; higher values broaden individual support until neighbouring sectors meet, then progressively merge the lower base without changing Root Reach crest amplitude.", 0.10f, 2f),
             Float(TreeControlSection.Roots, "tree.root.height", "rootHeight", "Root Height", "Vertical extent of the ground-level root and buttress envelope as a fraction of tree height.", 0.01f, 0.40f),
             Float(TreeControlSection.Roots, "tree.root.buttress-transition", "buttressTransition", "Buttress Persistence", "Controls how far root-owned buttress lobes persist up the trunk. Zero transitions to a circular trunk at the earliest safe endpoint; one carries the root-owned lobes to the trunk tip.", 0f, 1f),
 

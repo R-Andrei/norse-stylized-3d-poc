@@ -117,6 +117,35 @@ P12d machine evidence proved that the lateral path is connected and stable, whil
 
 Unity C# compilation, D3D11 import, GPU runtime behavior, comparative cost, and visual acceptance remain authoritative and pending.
 
+### 2.1.11A Material-contract simplification dependency freeze — `RIVER-FOAM-MATERIAL-C0`
+
+C0 records the dependency boundary required before removing the P12 transport/visibility A/B surface. No runtime implementation changes occur in C0.
+
+Accepted retained baseline:
+
+```text
+Bulk-Phase Residual TVD + Lifecycle-Faithful + Coverage-Only
+= C × P × L Baseline
+```
+
+Future ownership becomes one `Material Contract` selector. C1 initially exposes only `C × P × L Baseline`; C2 later adds `Life Only`.
+
+Safe-removal dependency rules for C1:
+
+| Legacy surface | C1 disposition | Dependency rule |
+| --- | --- | --- |
+| Donor Cell selectable mode | remove selector/exclusive branch | retain donor/upwind mechanics still called by Bulk-Phase Residual TVD |
+| TVD Superbee selectable mode | remove selector/exclusive branch | retain Superbee reconstruction because Bulk-Phase Residual TVD currently uses it |
+| Bulk-Phase Residual TVD | retain, make unconditional baseline transport | preserve phase, integer shift, residual subtraction, current single-dispatch/no-extra-field contract |
+| Concentration + Lifetime | remove selector/exclusive render branch | retain only helpers proven used elsewhere |
+| Lifecycle-Faithful | retain, make unconditional baseline visibility | preserve current production arithmetic |
+| Presence-Amplitude | remove selector/exclusive render/chipping/authoring plumbing | retain only helpers/properties proven shared with Coverage-Only |
+| Coverage-Only | retain, make unconditional baseline footprint | preserve current production arithmetic and current packed material state |
+
+C1 must not change Coverage, Presence, Remaining Life, or Material Pattern packing/transport semantics. Its acceptance boundary is exact behavior equivalence with the pre-C1 combination `Bulk-Phase Residual TVD + Lifecycle-Faithful + Coverage-Only`.
+
+C2 owns the later material-state redesign. Its accepted conceptual direction is Remaining-Life-only binary cell material. Fractional residual-TVD transport dependencies must be re-audited before C2 implementation; they are not candidates for blind deletion in C1.
+
 ### 2.1.12 Patch 12f/P12g/P12h dependency disposition
 
 Unity rejected P12f. `preChipMask` is produced by two independent hardening ramps, and derivative normalization detected both as edges. The production edge path also multiplied every candidate by the narrow edge band at each fragment, clipping connected candidates into partial stripes.

@@ -41,6 +41,10 @@ Shader "PS3D/Pixel Surface Lit"
         _GeneratedMassDirtDepositTint("Dirt Deposit Tint", Color) = (0.50, 0.50, 0.50, 1)
         _GeneratedMassDirtDepositTintStrength("Dirt Deposit Tint Strength", Range(0, 1)) = 0
 
+        // GM-SURFACE.5P: Generated Mass lighting acceptance is surface-orientation
+        // coherence, not whole-object brightness. Controls in this block may change
+        // magnitude but cannot be considered a fix while face/bevel ordering versus
+        // the same light remains wrong.
         [Header(Generated Stone Colour Authority)]
         _GeneratedMassOverallRockTint("Overall Rock Tint", Color) = (0.50, 0.50, 0.50, 1)
         _GeneratedMassOverallRockTintStrength("Overall Rock Tint Strength", Range(0, 1)) = 0
@@ -118,6 +122,10 @@ Shader "PS3D/Pixel Surface Lit"
         _MonolithicFlatten("Monolithic Flatten", Range(0, 1)) = 0
         _MonolithicSmoothnessBoost("Monolithic Smoothness Boost", Range(0, 1)) = 0.18
 
+        // GM-SURFACE.5P: _SpecularStrength/F0 is NOT the active problem definition.
+        // The unresolved defect is wrong per-surface/per-bevel response ordering
+        // relative to orientation under the same light. F0 may affect magnitude,
+        // but matching it must not be treated as defect closure.
         [Header(Lighting)]
         _Smoothness("Smoothness", Range(0, 1)) = 0.2
         _SpecularStrength("Specular Strength", Range(0, 1)) = 0.16

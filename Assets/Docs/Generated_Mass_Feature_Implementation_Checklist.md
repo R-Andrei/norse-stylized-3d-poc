@@ -2,6 +2,14 @@
 
 Status: active concise checklist
 
+## Non-negotiable active lighting acceptance criterion
+
+- [ ] **Do not close the lighting defect from whole-object darkness, average luminance, F0/specular parity, ambient response, or exposure.**
+- [ ] Under one controlled light direction, verify that each source face responds coherently to its own orientation relative to the light.
+- [ ] For every sampled ordinary bevel, verify parent–bevel–parent response ordering against the bevel and parent surface orientations; a geometrically intermediate bevel must not randomly become darker than both parents or brighter than both parents.
+- [ ] Use the legacy material behavior as the visual reference for coherent bright-to-dark progression as surfaces rotate relative to the same light.
+- [ ] Any candidate fix that improves global brightness while leaving orientation-order inversions is a failed fix for this defect.
+
 ## Completed and frozen
 
 - [x] Base Generated Mass deterministic construction.
@@ -83,6 +91,10 @@ Status: active concise checklist
 - [x] One renderer/material pass per feature.
 - [x] Edge-wear-only normal architecture.
 - [x] Persistent per-rock feature database.
+
+## Historical surface-lighting work guard
+
+The 5A–5O checklist contains valid historical fixes and diagnostic experiments. Do not infer the active root cause from their names. The current unresolved acceptance criterion is GM-SURFACE.5P surface-orientation response ordering: neighboring source faces and bevels must brighten/darken coherently with their orientation to the same light.
 
 ## GM-SURFACE.5B — completed pending Unity validation
 
@@ -364,3 +376,25 @@ The corrected delivery may include the unchanged remaining GM-SURFACE.5J files s
 - [x] Complete final scope, symbol, matrix, unchanged-production, and package-integrity audit.
 - [ ] Compile in Unity 6000.5.0f1 with no new errors or warnings.
 - [ ] Run the complete suite and require the pixelwise Lambert contract plus all existing ownership-matrix contracts before selecting a production visual correction.
+
+
+## GM-SURFACE.5O — Cold-grey production lighting parity trial — rejected as root-cause fix
+
+- [x] Record the production-trial plan before implementation.
+- [x] Change the cold-grey material dielectric F0 from 0.16 to 0.04.
+- [x] Bypass generated whole-surface normal perturbation only for the ColdGreyStone profile while preserving the authored control for other profiles.
+- [x] Preserve shared shaders, geometry, triangulation, scenes, prefabs, recipes, layers, tags, and the completed 5N-H3 diagnostic matrix.
+- [x] Visual validation supplied on 2026-08-07: the new HLSL material still exhibits wrong source-face and bevel brightness ordering relative to surface orientation, while the legacy material exhibits coherent orientation-driven lighting.
+- [x] Reject F0/specular parity, whole-rock darkness, and the 5O generated-normal bypass as sufficient explanations or closure criteria for the active defect.
+- [ ] Roll back or supersede the 5O behavioral trial only in a separately approved production patch; 5P changes documentation/comments only.
+- [ ] Continue by tracing **per-fragment orientation-to-light response and parent–bevel–parent ordering**, not by tuning global brightness.
+
+## GM-SURFACE.5P — Surface-orientation defect-definition freeze
+
+- [x] Freeze the canonical problem as per-surface/per-bevel orientation-driven lighting response incoherence.
+- [x] State explicitly that whole-object darkness and specular magnitude are not the defect definition.
+- [x] Mark 5O visually insufficient as a root-cause correction.
+- [x] Add matching comments at production normal publication, normal perturbation, forward-lighting, shader entry, bevel provenance, parent-envelope analysis, and report interpretation boundaries.
+- [x] Preserve all executable rendering math, serialized values, diagnostic thresholds, geometry, scenes, prefabs, profiles, layers, and tags.
+- [ ] Next production diagnosis/fix must directly validate surface orientation versus observed face/bevel response ordering under the same light.
+
