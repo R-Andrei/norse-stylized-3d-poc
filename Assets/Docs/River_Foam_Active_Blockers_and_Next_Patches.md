@@ -4263,3 +4263,1091 @@ The hard localization gates are intentionally stage-specific:
 The delayed-tick case remains a robustness case rather than a normal reveal-speed case. The report-access controls remain `Copy Shore TXT + CSV` and `Open Shore Reports Folder`.
 
 No production source scheduler, source geometry, lifecycle, transport, shader, scene, prefab, material, or serialized River value is changed by D8.12. The first D8.12 report is expected to localize the sparse live ribbon result to birth, lifecycle, transport, combined simulation, or a later visual-shape/final-render stage.
+
+## RIVER-FOAM-SPAWN-D8.13 — Shore Ribbon Progressive Body Authority
+
+Status: **rejected by live Play Mode evidence on 2026-07-30; superseded by D8.14; do not restore.** The cumulative source body produced broad overlapping Shore birth packs in Automatic Birth Sources instead of one moving 1×1 birth head. A contemporaneous Editor freeze is correlated with D8.13 but remains unverified without a crash log or GPU capture.
+
+### Objective
+
+Make a finite Shore Ribbon event authoritatively maintain its complete progressively revealed body while the event is forming. Coverage and Activity continue to schedule finite events; resolved Length defines the final along-shore body length; Reveal Speed defines reveal duration; Body Width and Head Width remain direct cell controls. After the final complete deposition, the event despawns and the resulting material returns to ordinary persistent Foam transport and lifecycle ownership.
+
+### Approved files
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+
+No scene, prefab, material, serialized River value, scheduler, source-event ABI, event packing, lifecycle implementation, transport implementation, or Inspector authoring-control change is approved.
+
+### Reviewed evidence
+
+- `CS_RiverFoam.compute::FoamEvaluateShoreRibbonSource` currently evaluates only `[revealedEnd - HeadLength, revealedEnd]`; the persistent body is expected to arise solely from historical births.
+- `StylizedRiverFoamRuntime.Injection.cs::SimulateFullField` transports and ages persistent Foam before the next automatic birth merge. Historical source cells therefore move and age independently while the source head continues along the authored path.
+- `CS_RiverFoam.Simulation.hlsl::FoamMergeBornMaterial` adds only missing Coverage. Re-evaluating an already occupied revealed body does not reset Presence, Remaining Life, or Pattern; it returns the existing material when no Coverage is added.
+- D8.12 reconstructed stationary accumulated birth at every checkpoint and applied only one isolated downstream step. It did not carry simulation output into the next tick and therefore could not validate recurrent production behavior.
+- `StylizedRiverFoamRuntime.SourceUnits.cs::TryResolveAutomaticSourceDispatchRange` already covers the complete finite Shore Ribbon path and its lateral envelope. No dispatch-range expansion is required.
+
+### Accepted design
+
+1. Preserve the existing moving-head evaluator for isolated head diagnostics.
+2. Add a Shore Ribbon cumulative revealed-shape evaluator whose union is:
+   - completed body `[0, headStart]` at Body Width;
+   - current head `[headStart, revealedEnd]` at Head Width.
+3. Production Shore Ribbon raster permission evaluates the complete current revealed shape every tick. Other source recipes retain current-minus-previous permission.
+4. Existing packet-independent material merge fills only Coverage missing from the active revealed shape; occupied material is not refreshed.
+5. Component mode `4` is reserved for `Shore Ribbon Moving Head Only` in the cell-exact audit so its `Head=1x1 on 5x3 Body` contract remains isolated.
+6. Replace D8.12 checkpoint reconstruction with four recurrent audit-owned timelines: Birth Only, Lifecycle Only, Transport Only, and Combined Production. Each lane commits its previous output as the next tick's input, and simulation precedes cumulative birth exactly as in production.
+7. Use the active material update rate rather than a hard-coded 8 Hz assumption. The delayed case advances source progress by 3.5 cells in one audit tick while retaining one ordinary material simulation step; it is source-stall robustness, not a production delta-time claim.
+
+### Invariants and non-goals
+
+- Shore Ribbon remains a finite event and despawns on the existing completion boundary.
+- Coverage, Activity, Length Min/Max, Reveal Speed, body width, head length, head width, and bank offset retain their current meanings and serialization.
+- No permanent source, walker population, separate production field, source velocity compensation, lifetime retuning, or shore-wide transport suppression is introduced.
+- Inward Wash, Object Foam, and Free-Water recipes retain their existing evaluators and deposition permission.
+- The production event record and GPU ABI remain unchanged.
+- The visible persistent Foam field is never read from or written by the dedicated audit.
+- Diagnostics remain incremental, cancellable, asynchronous, progress-visible, and partial-report preserving.
+
+### File-by-file implementation sequence
+
+1. `CS_RiverFoam.compute`
+   - add the cumulative Shore Ribbon revealed-shape evaluator;
+   - route production Shore Ribbon evaluation to it;
+   - retain moving-head-only evaluation under debug component mode `4`;
+   - bypass current-minus-previous permission only for cumulative Shore Ribbon production/development mode.
+2. `StylizedRiverFoamRuntime.P7Diagnostics.cs`
+   - assign component mode `4` to Shore Ribbon head-only cases in Smoke, replay, and Exhaustive construction;
+   - label the mode explicitly in reports.
+3. `StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+   - replace snapshot branches with recurrent lane state and ping-pong textures;
+   - simulate each lane before birth using production transport substeps and lane-owned Bulk-Phase state;
+   - deposit the same cumulative event into all recurrent lanes;
+   - capture only selected checkpoints through asynchronous GPU readback;
+   - report continuous-run length, metric spans, and recurrent stage results.
+4. This document
+   - record final diff, static checks, Unity validation state, and any deviation.
+
+### Acceptance criteria
+
+- Generic Cell-Exact Smoke remains `84/84 PASS`; the Shore Ribbon `Head=1x1 on 5x3 Body` row still measures the isolated 1×1 moving head.
+- At normal 1 and 2 cells/s cases on both banks, every recurrent lane contains a continuous occupied run covering the progressively revealed authored path within one-cell raster tolerance.
+- At event completion, the Birth Only and Combined Production lanes contain a continuous run covering the resolved 8- or 20-cell length within one-cell tolerance.
+- The delayed 3.5-cell source-progress case contains no missing internal source-path segment.
+- Event elapsed time reaches the existing duration exactly once; no extra source tick occurs after completion.
+- Non-Shore source evaluators and deposition permission remain unchanged.
+- No diagnostic resource aliases the visible persistent state.
+
+### Performance budget
+
+Production adds no dispatch, buffer, texture, CPU event iteration, or persistent allocation. The existing Shore Ribbon event envelope is already dispatched each material tick. More cells inside that envelope can reach `FoamMergeBornMaterial`, but already satisfied Coverage exits through the existing no-added-Coverage branch. The expected cost scales with active Shore Ribbon revealed area and is small relative to full-field transport. Unity GPU profiling remains pending.
+
+The recurrent audit uses three simulation ping-pong lane pairs plus one Birth Only state and reads back only checkpoints. It removes D8.12's per-checkpoint branch reconstruction and advances every timeline once per material tick.
+
+### Implementation result
+
+- `CS_RiverFoam.compute` now evaluates Shore Ribbon production births as the union of the completed revealed body and current moving head. Debug component mode `4` retains the previous moving-head-only evaluator.
+- Cumulative Shore Ribbon birth permission bypasses current-minus-previous only for Shore Ribbon production/development mode. `Inward Wash`, Object, and Free-Water evaluators and permission remain unchanged.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs` assigns `Moving Head Only` mode to the Shore 1×1 head case in Smoke, replay, and Exhaustive construction. Static review caught and corrected an initial replay-mode omission before packaging.
+- `StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs` now advances four audit-owned histories recurrently. Lifecycle, transport, and combined lanes commit their output before the next cumulative birth, using the active material cadence, production transport-substep count, and lane-owned Bulk-Phase state.
+- D8.12 snapshot reconstruction and `Graphics.CopyTexture` stage branching were removed. Readback remains asynchronous and occurs only at selected checkpoints.
+- The dedicated fixture still uses deterministic synthetic Shore geometry with the live runtime topology/motion resources. It validates recurrent production contracts without mutating visible Foam, but it is not a captured replay of one naturally scheduled live event.
+
+### Final source scope
+
+Modified exactly:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+
+No scene, prefab, material, serialized River value, scheduler, source-event ABI, event packing, lifecycle implementation, transport implementation, or Inspector authoring-control file changed.
+
+### Validation and compliance status
+
+- Gate 1 review: complete for the Shore evaluator, raster permission, packet-independent merge, event packing/progression, dispatch range, production simulation order, shared simulation bindings, generic footprint audit, dedicated Shore suite, and canonical handoff evidence.
+- Gate 2 plan: recorded here before code or shader modification.
+- C#/shader implementation: complete in source.
+- Static changed-file reconciliation: passed; exactly the four approved paths differ.
+- Static delimiter/symbol/contract checks: passed.
+- Static cumulative-interval model: passed at 8/12/16 Hz for 8-cell and 20-cell ribbons at 1 and 2 cells/s, including the 3.5-cell delayed-progress case; no internal longitudinal interval gap was produced.
+- Generic suite construction audit: passed; Smoke remains 84 cases and Exhaustive remains 672 cases; Shore head replay preserves component mode `4`.
+- Shared-shader impact audit: passed statically; cumulative authority is gated to source type `ShoreRibbon`, and every other recipe remains on the previous permission path.
+- Unity 6000.5.0f1 C#/shader compilation: pending in the user project because Unity and its shader compiler are unavailable in the archive environment.
+- Cell-Exact Smoke Suite: pending.
+- Recurrent Shore Ribbon Behavior Suite: pending.
+- Live Play Mode visual validation: pending.
+- GPU profiling of the larger maintained Shore birth area: pending.
+
+## RIVER-FOAM-SPAWN-D8.14 — Discrete 1×1 Shore Ribbon Head Traversal
+
+Status: source implementation complete; static scope/contract audit passed; Unity 6000.5.0f1 compilation, shader import, and Play Mode validation pending. The existing `StylizedRiverEditor.Actions.cs` help text remains stale because that ninth file was explicitly outside the approved scope.
+
+### Objective
+
+Remove D8.13 progressive-body authority and restore Shore Ribbon birth as a finite sequence of discrete source cells. Each newly entered path cell is born exactly once from one selected longitudinal grid column and one selected lateral grid row. A normal material tick enters zero or one new path cell at the authored 1–2 cells/s speeds; a delayed tick may enter several cells, but each remains an independent 1×1 birth cell. No Shore Ribbon body is rewritten, and no transport, lifecycle, or final-render behavior is modified.
+
+### Approved files
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+
+Explicitly outside scope:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RuntimeUpdates.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`
+- every scene, prefab, material, `.asset`, `.meta`, layer, tag, and serialized scene value.
+
+`StylizedRiverEditor.Actions.cs` contains D8.13-era suite help text describing lifecycle/transport/combined branches. It is outside the approved file set and will not be modified. Final compliance must mark that Inspector copy as pending rather than silently expanding scope.
+
+### Reviewed evidence
+
+- Repository instructions: `Assets/AGENTS.md`, read completely before review and implementation.
+- Continuation evidence: `/mnt/data/River_Foam_Shore_Ribbon_Spawning_Continuation_Handoff(1).md`, especially the finite-event contract, cell-exact requirement, diagnostic responsiveness requirement, and prohibition on scene modification.
+- D8.13 source state: `Assets-Code-Archive(44).zip` plus `RIVER-FOAM-SPAWN-D8.13_Shore_Ribbon_Progressive_Body_Authority.zip`; D8.13 changed-file package SHA-256 `e4e5c9a59401b8424c9f0d669b9c38d81119b6f9ad1f34160c850ebb0e1a19ab`.
+- `CS_RiverFoam.compute::FoamEvaluateShoreRibbonRevealedSource` emits `[event start, current head]` and `EvaluateFoamAutomaticSourceRasterSample` bypasses current-minus-previous permission for that entire region. This is the direct source of D8.13 wide, overlapping birth packs.
+- `StylizedRiverFoamRuntime.Injection.cs::DispatchAutomaticFoamSourceEvents` currently dispatches every active Shore Ribbon whenever floating progress advances, even when no new integer path cell is entered.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticShoreSourceEvent` resolves fractional Shore length/width/head controls and clamps each endpoint independently, so the final path can be fractional and shorter than the authored cell count near a domain edge.
+- `CS_RiverFoam.compute::FoamEvaluateShoreRibbonSource` uses interval overlap for both axes. A nominal one-cell interval can cover two texels when positioned between grid centres; it does not enforce a single birth texel.
+- `StylizedRiverFoamRuntime.SourceUnits.cs::TryResolveAutomaticSourceDispatchRange` already covers the complete Shore path and lateral envelope, so no dispatch-range change is required.
+- `StylizedRiverFoamRuntime.State.cs::FoamSourceEventGpuData` already carries current and previous progress plus D8 cell counts in the existing fixed ABI. No ABI expansion is required.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs` and `StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs` already provide asynchronous audit-owned readback and resource-lifetime infrastructure. The dedicated suite can be reduced to current-tick birth and accumulated birth without synchronous GPU access.
+
+### Mathematical contract
+
+For integer path length `N`, speed `v` cells/s, and event time `t`:
+
+```text
+d(t) = min(N, v t)
+R(t) = 0                                      when d(t) <= 0
+R(t) = clamp(ceil(d(t) - 1e-5), 0, N)        otherwise
+```
+
+For one update from `t0` to `t1`, birth exactly the integer path-cell indices:
+
+```text
+k in [R(t0), R(t1))
+```
+
+At the intended minimum cadence and maximum normal reveal speed:
+
+```text
+v <= 2 cells/s
+f >= 8 Hz
+Delta d = v/f <= 0.25 cell/tick
+```
+
+Therefore each normal tick enters at most one new cell. A delayed jump remains legal because the shader evaluates every integer `k` in the newly entered half-open interval without converting the interval into one long body rectangle.
+
+### Accepted implementation
+
+1. `StylizedRiver.cs`
+   - remove the serialized D8 Shore Ribbon width-min, width-max, head-length, and head-width fields and their accessors/sanitization;
+   - keep Shore length, bank offset, reveal speed, Initial Presence, and Initial Life;
+   - leave legacy metre-era fields untouched because they are outside the current authoritative cell-control surface and are not required by D8.14.
+2. `StylizedRiverEditor.Foam.cs`
+   - remove Width, Head Length, and Head Width controls from Shore Ribbon Pattern;
+   - show one read-only `Birth Head: Fixed 1 × 1 cell` row;
+   - keep Segment Length, Bank Offset, Reveal Speed, Initial Presence, and Initial Life.
+3. `StylizedRiverFoamRuntime.BirthEvents.cs`
+   - resolve Shore length to an integer cell count;
+   - shift the whole segment inside the domain instead of independently clipping its endpoints;
+   - fix Shore body width, head length, and head width to one cell in event state;
+   - preserve Inward Wash construction unchanged.
+4. `StylizedRiverFoamRuntime.Injection.cs`
+   - add one CPU integer revealed-count helper matching the shader equation;
+   - dispatch Shore Ribbon only when the revealed integer count increases;
+   - retain all non-Shore dispatch gating unchanged.
+5. `CS_RiverFoam.compute`
+   - remove `FoamEvaluateShoreRibbonRevealedSource` and D8.13 cumulative permission;
+   - add a discrete Shore Ribbon birth evaluator;
+   - derive the authoritative path-cell spacing from event start/end and integer cell count;
+   - for each newly entered path-cell centre, choose exactly one nearest longitudinal column and exactly one nearest lateral row with deterministic tie-breaking;
+   - return binary `1` only for those winning texels;
+   - preserve Inward Wash, Object, and Free-Water evaluation and permission byte-for-byte outside the Shore branch.
+6. `StylizedRiverFoamRuntime.P7Diagnostics.cs`
+   - update Shore scenarios and reporting to the fixed 1×1 discrete-head contract;
+   - keep Smoke and Exhaustive suite counts unchanged;
+   - retain audit-owned asynchronous GPU readback.
+7. `StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+   - remove lifecycle, transport, and combined simulation lanes;
+   - maintain `CURRENT_TICK_SOURCE` and `ACCUMULATED_BIRTH` audit-owned textures only;
+   - clear current-tick source, rasterize one production Shore event, and merge the same birth into accumulated state;
+   - report new integer cell count, current-tick occupied cells, maximum occupied rows per source column, accumulated occupied columns, internal gaps, completion count, and post-completion dispatch count;
+   - dispatch no transport or lifecycle kernel.
+8. This document
+   - record actual diff, static checks, deviations, Unity validation state, and pending Inspector-copy correction.
+
+### Invariants and non-goals
+
+- Shore Ribbon source birth is fixed at one longitudinal cell by one lateral cell per path-cell identity.
+- A Shore Ribbon event emits each integer path-cell identity once and only once.
+- Delayed progress emits multiple independent 1×1 cells in one dispatch; it never emits a body rectangle.
+- Coverage, Activity, Length Min/Max, Bank Offset, Reveal Speed, Initial Presence, and Initial Life retain authority.
+- Inward Wash, Object, and Free-Water source construction, packing, dispatch gating, shader evaluation, and diagnostics remain unchanged unless a shared test label must distinguish the fixed Shore contract.
+- No production transport, lifecycle, support, merge, presentation, final visibility, or rendering code changes.
+- No scene or serialized asset edit.
+- No synchronous GPU readback, blocking wait, or automatic diagnostic run.
+
+### Acceptance criteria
+
+- D8.13 cumulative revealed-body evaluator and production permission branch are absent.
+- A normal Shore birth dispatch contains zero or one occupied texel per event.
+- Every occupied Shore birth column contains at most one occupied row.
+- A delayed 3.5-cell jump emits the exact integer count `R(t1)-R(t0)` with no internal path-cell gap and at most one occupied row per emitted column.
+- At event completion, accumulated birth contains exactly `N` occupied path columns, zero internal gaps, and no additional source dispatch after completion.
+- Shore width/head authoring fields are absent from source and Inspector; the Inspector states `Fixed 1 × 1 cell`.
+- Inward Wash, Object, and Free-Water source branches remain unchanged in the final shared-shader diff.
+- Cell-Exact Smoke still constructs 84 cases and Exhaustive still constructs 672 cases.
+- Diagnostics remain incremental, cancellable, asynchronous, progress-visible, and partial-report preserving.
+
+### Performance budget
+
+For a length-`N` event, D8.13 repeatedly evaluated/wrote an average revealed length near `N/2` over approximately `N f / v` material ticks:
+
+```text
+W_D8.13 approximately N^2 f / (2v)
+```
+
+D8.14 emits each path cell once:
+
+```text
+W_D8.14 = N
+```
+
+For `N=20`, `f=8 Hz`, `v=1 cell/s`:
+
+```text
+W_D8.13 approximately 1600 source-cell writes
+W_D8.14 = 20 source-cell writes
+reduction = 80x
+```
+
+D8.14 also skips Shore dispatches on ticks where the integer revealed count does not advance. No new production texture, buffer, dispatch type, persistent allocation, per-frame full-field pass, or GPU ABI lane is introduced.
+
+### Validation plan
+
+1. Static scope/diff audit against the exact D8.13 source state.
+2. C# and HLSL delimiter, symbol, removed-field-reference, and shared-branch checks.
+3. Mathematical revealed-count tests at 8/12/16 Hz, 1/2 cells/s, 8/20/47 cells, both directions, domain-edge placement, and a delayed 3.5-cell jump.
+4. Generic suite construction count and Shore fixed-head scenario audit.
+5. Unity 6000.5.0f1 compilation and shader import in the user project.
+6. Cell-Exact Smoke Suite, dedicated Shore Ribbon birth suite, and Shore-only Play Mode visual validation.
+
+### Implementation result
+
+- `StylizedRiver.cs` removes the authoritative Shore Ribbon Width Min/Max, Head Length, and Head Width serialized controls and accessors. Length, Bank Offset, Reveal Speed, Initial Presence, and Initial Life remain authoritative.
+- `StylizedRiverEditor.Foam.cs` replaces those removed controls with `Birth Head: Fixed 1 × 1 cell`.
+- `StylizedRiverFoamRuntime.BirthEvents.cs` resolves Shore length to an integer cell count, shifts the complete segment inside the domain without shortening it, and fixes Shore body/head width and head length to one cell. Inward Wash follows its pre-D8.14 construction path.
+- `StylizedRiverFoamRuntime.Injection.cs` dispatches a Shore event only when `R(current)-R(previous) > 0`; all other recipe gates retain their previous phase/progress logic.
+- `CS_RiverFoam.compute` removes D8.13 cumulative-body authority. Shore birth now selects exactly one nearest longitudinal column and one nearest lateral row for each newly entered integer path-cell centre. The current dispatch may contain several independent cells after a delayed progress jump, but no body rectangle is evaluated.
+- `StylizedRiverFoamRuntime.P7Diagnostics.cs` retains `84` Smoke and `672` Exhaustive cases while treating every Shore scenario as fixed one-cell lateral birth. D8.13 debug component mode `4` is removed.
+- `StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs` is birth-only. It owns `CURRENT_TICK_SOURCE` and `ACCUMULATED_BIRTH`, dispatches no lifecycle or transport kernel, uses asynchronous readback, and validates occupied cell count, occupied columns, maximum rows per column, internal gaps, completion, and zero post-completion birth.
+
+### Final changed-file reconciliation
+
+Modified exactly the eight approved files:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+
+No scene, prefab, material, `.asset`, `.meta`, layer, tag, transport source, lifecycle source, final-render source, or GPU ABI definition changed.
+
+### Validation and compliance status
+
+- Gate 1 review: complete for repository instructions, canonical River Foam plan, serialized controls, Inspector mapping, Shore event construction, event packing/progression, dispatch gating/range, shared GPU event ABI, shared source raster, generic footprint audit, dedicated suite, lifecycle caller, and Inspector action caller.
+- Gate 2 canonical plan: recorded before code or shader modification.
+- Gate 3 implementation: complete within the approved eight-file scope.
+- Gate 4 final source/diff audit: passed for scope, delimiter balance, removed-symbol references, D8.13 symbol removal, birth-only diagnostic ownership, suite cardinality, and shared-shader Shore-only routing.
+- Static revealed-count model: passed at `8/12/16 Hz`, `1/2 cells/s`, lengths `8/20/47`, both flow directions, and a delayed `3.5-cell` jump. Normal ticks enter at most one cell; the delayed case emits `[1,4,1,1,1]` cells across its birth dispatches and totals exactly eight.
+- Static domain placement model: passed for both flow directions and domain lengths `1/8/20/47/64` cells; segment endpoints remain inside the domain and retain exactly the integer resolved length.
+- Static fixed-lattice ownership model: passed for integer, half-cell, and fractional source offsets; every path-cell centre has one deterministic winning grid column.
+- Generic suite construction: passed statically; Smoke remains `84` and Exhaustive remains `672`.
+- Unity 6000.5.0f1 C# compilation and compute-shader import: pending because Unity is unavailable in the archive environment.
+- Cell-Exact Smoke Suite, Shore Ribbon discrete birth suite, live Automatic Birth Sources validation, and freeze regression check: pending in the user project.
+- Inspector consistency limitation: `StylizedRiverEditor.Actions.cs` still describes D8.13 lifecycle/transport/combined branches. Correcting that text requires explicit approval to modify the currently excluded ninth file; runtime behavior and report contents do not depend on the stale text.
+
+### Current gate status
+
+- Gate 1 review: complete.
+- Gate 2 canonical plan: complete.
+- Gate 3 implementation: complete in source.
+- Gate 4 static audit: complete; Unity validation and the explicitly excluded Inspector-copy correction remain pending.
+
+## RIVER-FOAM-SPAWN-D8.15 — Persistent Shore-Following Heads and Length-Scaled Shore Scheduling
+
+Status: **implementation authorized; Gate 1 review complete; Gate 2 plan recorded before code modification; implementation in progress.**
+
+### Objective
+
+Replace D8.14's global fixed-rate Shore scheduler and intermittent source-head dispatch with a scalable per-bank-bucket scheduler and persistent Shore Ribbon head semantics. Every Ribbon event selects one start cell against the current visible shore, resolves one whole-cell effective length from the existing user-facing Min/Max cell controls, keeps one logical 1x1 head alive for the complete event, advances that head in flow order along the existing `_FoamCurrentShoreEdgesRead` contour, births each newly traversed cell once, and terminates after the final path cell has occupied its complete cell-duration. Multiple buckets may own events concurrently; event population scales with valid shoreline length and active chunks.
+
+This patch removes Shore Coverage for the entire Shore source family. Activity and Minimum Packet Gap become the complete Shore population controls. No user-facing `Resolved Length` control is added: resolved/effective length is event-local runtime state selected inclusively from the existing Min/Max controls.
+
+### Approved files
+
+Canonical documents:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Rendering_Roadmap.md`
+
+Runtime and authoring:
+
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Sweep.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+Explicitly outside scope:
+
+- every transport kernel and transport control;
+- lifecycle mathematics and material-state merge semantics;
+- final Foam rendering and visibility;
+- scenes, prefabs, materials, `.asset`, `.meta`, layers, and tags;
+- river geometry/domain generation;
+- `_FoamCurrentShoreEdgesRead` allocation or `BuildCurrentShoreEdges`;
+- boundary, metric, topology, obstacle-routing, and motion-lane generation;
+- Object and Free-Water scheduling or source geometry;
+- Inward Wash shape evaluation beyond shared Shore scheduling, whole-cell along-length selection, and fixed shore-touching start offset;
+- GPU event ABI expansion;
+- new path buffers, path textures, shoreline readback, or shoreline-build kernels;
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Actions.cs`.
+
+### Gate 1 reviewed evidence
+
+- Repository rules: `Assets/AGENTS.md`, read completely from the reconstructed D8.14 source before review.
+- Source base: `Assets-Code-Archive(44).zip` plus accepted D8.13 and D8.14 changed-file packages. Baseline hashes are recorded in `/mnt/data/d815out/baseline_hashes.txt`.
+- `StylizedRiver.cs`: Shore Coverage is serialized as `foamShoreFoamCoverage`; Ribbon and Inward Wash expose cell-authoritative offset controls; Ribbon and Inward Wash retain user-facing Min/Max cell lengths.
+- `StylizedRiverEditor.Foam.cs::DrawFoamAutomaticSourcePopulationSection`: the Inspector currently presents Coverage and Shore start-offset controls and describes the superseded permanent-slot model.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::AutomaticShoreSourceProfile`: Coverage and a global `5 * Activity` events-per-second rate are scheduler authorities.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::AdvanceAutomaticShoreBirthSources`: one global accumulator gives equal attempt rates to short and long rivers.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryStartAutomaticShoreSourceEvent`: the existing 3.5 m per-bank lattice and deterministic cursor already provide bounded scalable scheduling buckets, but Coverage permanently masks buckets and per-bucket rearm stores only one float timestamp.
+- `StylizedRiverFoamRuntime.BirthEvents.cs::TryBeginAutomaticShoreSourceEvent`: D8.14 samples fractional Min/Max values with `Lerp`; Ribbon treats the selected candidate as the whole-segment centre; Ribbon and Inward Wash use authored shore offsets.
+- `StylizedRiverFoamRuntime.Injection.cs::DispatchAutomaticFoamSourceEvents`: D8.14 dispatches Ribbon only when the integer revealed count changes, producing one-tick source-debug flashes at 1–2 cells/s under the live 12 Hz material cadence.
+- `CS_RiverFoam.compute::FoamEvaluateDiscreteShoreRibbonBirth`: the existing evaluator already reads `_FoamCurrentShoreEdgesRead` independently at every selected longitudinal column and selects exactly one nearest inward lateral row. The current shore-edge texture is therefore the complete implicit Ribbon path; no path calculation or resource is missing.
+- `StylizedRiverFoamRuntime.SourceUnits.cs::TryResolveAutomaticSourceDispatchRange`: D8.14 still dispatches the complete event envelope even when only one head/catch-up column is needed.
+- `StylizedRiverFoamRuntime.State.cs::AutomaticFoamSourceEvent` and `FoamSourceEventGpuData`: CPU event state may add bucket ownership without changing the fixed eight-`float4` GPU ABI.
+- `StylizedRiverFoamRuntime.Members.cs` and `Resources.cs`: the event pool and GPU buffer are fixed at 32 entries; a 100 m river owns 58 Shore buckets before Object/Free-Water allowance, so fixed capacity silently breaks length scaling.
+- `ShoreRibbonBehaviorSuite(2).txt`: live preflight observed 13 concurrent Ribbon events, proving the global fixed-rate scheduler populated many independent heads. The suite's synthetic birth path itself remained one cell per column, proving geometry and scheduler/lifetime were separate defects.
+- `CellExactSpawnerSmokeSuite(11).txt`: the broad suite returned 83/84, with a Shore diagonal replay failure; it is not accepted as current completion evidence.
+
+### Accepted scheduling contract
+
+For valid river length `L` and fixed internal bucket spacing `S = 3.5 m`:
+
+```text
+B = max(1, ceil(L / S))             // buckets per bank
+M = 2B                              // both banks
+```
+
+All `M` buckets are always eligible. Coverage is absent. Bucket `i` owns the interval:
+
+```text
+bucketStart = domainMinimum + i * S
+bucketEnd   = min(bucketStart + S, domainMinimum + validFieldLength)
+```
+
+Each bucket keeps:
+
+```text
+Initialized
+CycleIndex
+NextStartTime
+ActiveEventId
+```
+
+The bucket's cycle seed chooses its recipe, whole-cell effective dimensions, and a deterministic jittered start inside the geometrically valid portion of its interval. Distinct buckets may own events concurrently. One bucket may not own overlapping events.
+
+For actual event duration `D`, Activity `A`, and distance-derived packet-clearance time `G`:
+
+```text
+ActivityIdle(D,A) = +infinity                 when A <= 0
+ActivityIdle(D,A) = D * (1-A) / A             when 0 < A < 1
+ActivityIdle(D,A) = 0                         when A >= 1
+NextStartTime     = startTime + D + max(ActivityIdle, G)
+```
+
+Activity therefore controls each bucket's target active-time fraction; Minimum Packet Gap remains the hard physical clearance authority. Startup uses deterministic per-bucket phase staggering across one representative activity/clearance cycle. Scan work remains bounded to 32 buckets and 3 successful starts per material update.
+
+### Effective-length contract
+
+No user-facing `Resolved Length` field exists. Ribbon keeps `Length Min/Max (cells)`; Inward Wash keeps `Along-Bank Length Min/Max (cells)`. Event creation resolves an inclusive whole-cell count:
+
+```text
+minimum = max(1, round(authoredMinimum))
+maximum = max(minimum, round(authoredMaximum))
+resolved = minimum + floor(hash01 * (maximum-minimum+1))
+```
+
+The selected value is clamped only to the largest whole-cell path that fits the selected candidate without moving the candidate or shortening below authored Min. If Min cannot fit at that candidate, the cycle advances to another deterministic candidate.
+
+### Ribbon event/path contract
+
+The selected candidate is the centre of path cell zero. For flow sign `q`, longitudinal cell size `dx`, and effective length `N`:
+
+```text
+startBoundary = candidateCentre - q * 0.5 * dx
+endBoundary   = startBoundary + q * N * dx
+```
+
+Head index at elapsed time `t`, reveal speed `v` cells/s, and event duration `N/v`:
+
+```text
+head(t) = clamp(floor(v*t + 1e-5), 0, N-1)
+```
+
+Equivalently from normalized progress `p`:
+
+```text
+head(p) = clamp(floor(p*N + 1e-5), 0, N-1)
+```
+
+For each head index `k`, the longitudinal column is the deterministic nearest grid column to the centre of cell `k`. At that column, the existing `_FoamCurrentShoreEdgesRead` provides the selected bank's current visible edge, and the head row is the nearest valid fluid row half one lateral cell inward. The implicit path is therefore:
+
+```text
+P[k] = (nearestColumn(k), nearestInwardRow(currentShoreEdge[nearestColumn(k)]))
+```
+
+The path follows river curvature through the existing river-distance coordinate and follows local bank waviness laterally through the existing shore-edge texture. No path is generated or stored.
+
+### Birth/debug contract
+
+The same event remains active through all `N` head cells. Material birth and source visualization are separate:
+
+```text
+debugCoverage = current head cell every material tick
+birthCoverage = every newly entered path cell exactly once
+```
+
+Normal same-cell tick:
+
+```text
+previousHead == currentHead
+birth: none
+debug: current head remains visible
+```
+
+Delayed tick:
+
+```text
+previousHead < currentHead
+birth: each P[previousHead+1 ... currentHead]
+debug: P[currentHead]
+```
+
+Normal gameplay dispatches Ribbon only when a new path cell is entered. `Automatic Birth Sources` debug mode dispatches every material tick so the active head remains continuously visible. The dispatch range is reduced to the current head and any catch-up columns, with the full lateral row range; the GPU's existing shore-edge lookup selects the single row.
+
+### Capacity contract
+
+The former fixed 32-event pool becomes descriptor-derived at resource initialization:
+
+```text
+shoreBucketCount   = 2 * max(1, ceil(validFieldLength / 3.5))
+eventCapacity      = 32 + shoreBucketCount
+reservationCapacity = 2 * eventCapacity
+```
+
+The existing 32-entry allowance remains for non-Shore sources. CPU arrays and the existing structured GPU buffer are allocated once per resource build. No per-frame or per-event allocation is permitted.
+
+For `L = 100 m`:
+
+```text
+shoreBucketCount = 58
+eventCapacity = 90
+GPU event data = 90 * 128 B = 11,520 B
+```
+
+### File-by-file implementation sequence
+
+1. Update this canonical plan first.
+2. Remove Shore Coverage and Ribbon/Inward shore-start offset serialized properties and Inspector controls; retain Min/Max length controls.
+3. Replace fixed capacity constants and static arrays with descriptor-derived capacities allocated during resource initialization.
+4. Add per-bucket schedule state and CPU-only bucket ownership on Shore events.
+5. Replace the global accumulator scheduler with bounded all-bucket renewal scheduling, deterministic startup staggering, inclusive whole-cell length resolution, and geometrically valid candidate intervals.
+6. Make Ribbon candidate position path-cell zero rather than the segment centre; force zero shore offset for both Shore recipes.
+7. Split Ribbon birth/debug coverage in the compute shader and keep the current head continuously visible only when source debug is active.
+8. Restrict Ribbon dispatch to current/catch-up columns and keep all non-Shore dispatch paths unchanged.
+9. Remove obsolete accumulator resets, update the Shore report's control-authority text, and update canonical architecture documents.
+10. Perform final full-surface diff, shared-shader, scope, allocation, formula, and symbol audits; record Unity-only validation as pending.
+
+### Acceptance criteria
+
+- Shore Coverage and both Shore recipe start-offset controls are absent from runtime authority and Inspector UI.
+- Ribbon and Inward Min/Max cell lengths remain user-facing; event-local effective lengths are inclusive whole integers.
+- Number of Shore scheduling buckets scales as `2 * ceil(validFieldLength / 3.5 m)` and every bucket remains eligible.
+- Activity controls per-bucket renewal duty cycle; Minimum Packet Gap remains a hard clearance lower bound.
+- Multiple buckets may own events concurrently; one bucket never owns overlapping events.
+- A Ribbon candidate is the first head-cell centre, not the segment centre.
+- Each Ribbon event retains one identity from start through completion and its current 1x1 head remains continuously visible in Automatic Birth Sources.
+- Each newly traversed Ribbon path cell is born once; no cumulative body is emitted.
+- Every head cell samples the existing current visible shore edge at its own longitudinal column and selects one nearest inward row.
+- No path resource, path solve, shoreline readback, transport, lifecycle, final-render, scene, prefab, material, or GPU ABI change occurs.
+- Event/buffer capacity scales with valid river length and is allocated only during resource build.
+- Object, Free-Water, and Inward Wash shape-evaluator behavior remains unchanged.
+
+### Performance budget
+
+Normal Ribbon birth work remains approximately `v` tiny dispatches per active event per second, where `v` is the authored 1–2 cells/s. Source-debug mode adds one tiny current-head dispatch per active Ribbon per material tick only while that explicit debug view is selected. The Ribbon dispatch range contains only current/catch-up columns by the full existing lateral row count. New normal-runtime shoreline work, textures, buffers, kernels, passes, and readbacks: zero. Scheduler work is bounded CPU dictionary lookup/hash/arithmetic over at most 32 scanned buckets and 3 successful starts per material tick.
+
+### Validation plan
+
+Offline/static:
+
+1. Exact changed-file reconciliation against the approved list and D8.14 baseline hashes.
+2. C# and HLSL delimiter/preprocessor/symbol checks.
+3. Removal-reference checks for Shore Coverage, Ribbon offset, Inward offset, global Shore accumulator, and fixed Shore event-rate constant.
+4. Mathematical scheduler simulations across 5/32/100 m lengths, Activity 0/0.25/0.5/1, both flow directions, Min/Max length ranges, startup staggering, and bounded scan/start budgets.
+5. Head progression and catch-up simulations at 8/12/16 Hz, 1/2 cells/s, lengths 8/20/47, including delayed updates and final-cell dwell.
+6. Capacity calculations and buffer/array size consistency.
+7. Shared compute-shader audit proving non-Shore birth paths are unchanged.
+
+Unity pending:
+
+- Unity 6000.5.0f1 compilation and compute-shader import.
+- Live Shore-only Play Mode observation before any further broad diagnostic suite.
+- Automatic Birth Sources evidence: multiple length-scaled heads may coexist, but each head remains stable, moves cell by cell along its local visible bank, and terminates once.
+- Final Foam evidence that the resulting births form Shore strokes; transport/lifecycle interpretation remains explicitly outside this patch.
+
+### D8.15 implementation and Gate 4 audit status
+
+Status: source implementation complete; offline/static audit complete; Unity compilation, compute import, live Shore-only production observation, and profiler evidence pending.
+
+Actual changed files reconcile exactly with the approved list:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Sweep.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+```
+
+Implemented differences from D8.14:
+
+- removed Shore Coverage and Ribbon/Inward shore-start offset runtime and Inspector authority;
+- replaced the global fixed-rate Shore accumulator with all-bucket per-slot renewal state, deterministic phase staggering, bounded scan/start work, and completion-relative Activity/Gap rearm;
+- retained active bucket ownership while Shore starts are temporarily disabled, preventing re-enable overlap with a still-running event;
+- made event-local Ribbon/Inward along-length resolution inclusive and whole-cell, bounded to the authored range and the largest length that fits the selected candidate;
+- made the Ribbon candidate the centre of path cell zero;
+- retained one Ribbon event identity and logical `1 x 1` head through the complete event;
+- separated one-time birth Coverage from current-head source-debug Coverage;
+- reused `_FoamCurrentShoreEdgesRead` as the only lateral path authority and added no path resource or solve;
+- narrowed Ribbon dispatch to current/catch-up columns;
+- derived event and reservation capacities from valid river length once during resource initialization;
+- preserved Inward Wash, Object, and Free-Water shape evaluators byte-for-byte.
+
+Offline evidence:
+
+```text
+D8.15 static/mathematical audit: 131/131 PASS
+Changed-file reconciliation: exactly 17 approved files
+Serialized scene/prefab/material changes: 0
+New shoreline resources/kernels/passes/readbacks: 0
+5 m / 32 m / 100 m Shore bucket counts: 4 / 20 / 58
+100 m event/reservation capacities: 90 / 180
+100 m GPU event buffer: 11,520 bytes
+Head progression: exact N births at 8/12/16 Hz, 1/2 cells/s, N=8/20/47
+Randomized geometry bounds: 20,000 cases per recipe/flow direction
+Non-Shore shader evaluator comparison: byte-identical
+```
+
+Offline evidence file:
+
+```text
+/mnt/data/d815out/d815_static_audit.txt
+```
+
+Unity-only blockers remain explicit. No broad diagnostic suite is requested before the live production result is observed. The first Unity gate is compilation followed by direct Automatic Birth Sources observation of stable, concurrent, shore-following heads.
+
+---
+
+## RIVER-FOAM-SPAWN-D8.16 — Continuous Shore Emitters, Activity-Resolved Population, and Phase-Correct Source/Trail View
+
+### Status
+
+**Authorized and in implementation on 2026-07-30. Unity validation pending.**
+
+This section supersedes the D8.15 Shore population, intermittent Ribbon birth, and Automatic Birth Sources presentation contracts. D8.15 remains historical evidence for whole-cell length selection, current-shore-edge path authority, and finite event identity only.
+
+### Objective
+
+Implement the accepted Shore spawning behavior without touching transport, lifecycle mathematics, material merge semantics, or Final Foam rendering:
+
+1. `Activity` directly resolves a river-length-scaled target active-head population.
+2. The Inspector displays the predicted active-head range from current Activity and represented river length, and Play Mode displays runtime population status.
+3. Multiple finite Shore events may coexist, but the scheduler starts at most one replacement per material tick and never fills every 3.5 m candidate bucket merely because Activity is one.
+4. One Shore Ribbon event owns one persistent 1×1 head from start through completion.
+5. The current head attempts birth every material tick; `FoamMergeBornMaterial` remains the authority that fills only missing Coverage and does not refresh already full material.
+6. A delayed material tick emits each skipped path cell separately plus the current head cell; no cumulative body or stretched rectangle is emitted.
+7. The existing `_FoamCurrentShoreEdgesRead` texture remains the only shoreline path authority. No path texture, path buffer, CPU path cache, new kernel, readback, spline solve, or extra shoreline pass is added.
+8. Automatic Birth Sources displays phase-correct active heads over phase-correct committed persistent Foam, so the view shows both the emitter and the deposited trail.
+
+### Accepted Activity contract
+
+Let:
+
+```text
+L = represented valid river length in metres
+B = 2L = represented bank length across both banks
+A = clamp01(Activity)
+S = 17.5 m full-Activity head spacing across bank length
+```
+
+The mean target is:
+
+```text
+meanHeads = A * B / S
+```
+
+The predicted Inspector range is:
+
+```text
+minimumHeads = floor(meanHeads)
+maximumHeads = ceil(meanHeads)
+```
+
+The runtime target uses deterministic fractional duty:
+
+```text
+targetHeads = minimumHeads +
+    (stablePopulationPhase < frac(meanHeads) ? 1 : 0)
+```
+
+The fractional decision changes only at a stable population boundary derived from the current authored Shore event-duration range; it never changes every frame. If the target decreases, existing heads finish normally. The scheduler stops replacements until active heads are at or below the target. Minimum Packet Gap and packet reservations may temporarily prevent the target from being reached.
+
+At `Activity = 1`:
+
+```text
+5 m river   -> mean 0.57 heads across both banks
+32 m river  -> mean 3.66 heads across both banks
+100 m river -> mean 11.43 heads across both banks
+```
+
+### Reviewed evidence
+
+Repository instructions re-read before work:
+
+```text
+Assets/AGENTS.md
+```
+
+Canonical/current documents reviewed:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Rendering_Roadmap.md
+```
+
+Complete implementation surface and direct contracts reviewed:
+
+```text
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthDiagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.PublicSurface.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Coordinates.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Observed D8.15 evidence reviewed:
+
+- The current river displays substantially more than the intended 3–5 heads.
+- Heads intermittently attempt material birth instead of emitting continuously.
+- Automatic Birth Sources shows head markers only and does not show committed deposited material.
+- Head markers can visibly drift backward and jump forward under Bulk-Phase transport.
+
+Source-localized causes:
+
+1. `AdvanceAutomaticShoreBirthSources` applies Activity as an independent active/idle duty cycle to every 3.5 m bucket, making the active population approach the full bucket count at Activity one.
+2. `DispatchAutomaticFoamSourceEvents` dispatches a Ribbon for material birth only when `currentHeadCell > previousHeadCell`; debug mode alone dispatches same-cell ticks.
+3. `FoamEvaluatePersistentShoreRibbonHead` sets `birthShape` only for newly entered cells, excluding the current same-cell head on ordinary ticks.
+4. `FoamAutomaticSourceGlobalDistanceAtColumn` applies Bulk Phase to source storage coordinates, but Automatic Birth Sources renders `_FoamBirthDebug` at raw unshifted `foam.fieldUV`.
+5. `_FoamCurrentShoreEdgesRead` is built in unshifted world-column coordinates, while the D8.15 source evaluator indexes it with the phase-shifted storage coordinate.
+6. The debug texture is intentionally cleared each material tick and currently stores only active source markers. The committed trail already exists in `_FoamCurrent` and can be rendered without another GPU resource.
+
+### Approved files
+
+Modify exactly:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+```
+
+### Invariants and non-goals
+
+- Do not modify transport kernels, transport controls, lifecycle mathematics, `FoamMergeBornMaterial`, Final Foam evaluation, scenes, prefabs, materials, river geometry, boundary/topology generation, or current-shore-edge generation.
+- Do not add a new serialized population control. `Activity` remains normalized `0..1`.
+- Do not add a path resource, compute pass, kernel, readback, CPU path list, or per-frame allocation.
+- Do not change Object or Free-Water scheduling or geometry.
+- Do not change Inward Wash geometry. Inward Wash shares only the new Shore-family population budget and existing packet-clearance scheduler.
+- Preserve user-facing Ribbon Length Min/Max in cells and deterministic inclusive whole-cell effective-length selection.
+- Preserve finite event completion and packet reservation authority.
+
+### File-by-file implementation sequence
+
+1. **This document** — record the exact D8.16 contract, review surface, approved scope, risks, and validation gates before code edits.
+2. `StylizedRiver.cs` — define the invariant 17.5 m full-Activity head-spacing constant and update Activity tooltip semantics; no serialized-field addition.
+3. `StylizedRiverFoamRuntime.Constants.cs` — reduce Shore starts to one per material tick.
+4. `StylizedRiverFoamRuntime.Members.cs` — add bounded Shore population target/status state and separate active Shore count.
+5. `StylizedRiverFoamRuntime.BirthEvents.cs` — replace per-bucket duty scheduling with global length-scaled target scheduling, retain buckets as candidate/clearance state, update stable fractional target at bounded population boundaries, and maintain active Shore count.
+6. `StylizedRiverFoamRuntime.Injection.cs` — dispatch every active Ribbon each material tick and preserve finite completion; continue catch-up range support.
+7. `CS_RiverFoam.compute` — include the current head in birth every tick, resolve current-shore lookup through the corresponding unshifted world column, and retain exact 1×1 row/column ownership.
+8. `SH_CleanStylizedRiver.shader` — phase-correct `_FoamBirthDebug` sampling and composite active source colours over committed Coverage trail.
+9. `StylizedRiverEditor.Foam.cs` — show predicted head range, represented bank length, and Play Mode runtime population status below Activity.
+10. `StylizedRiverEditor.DebugViews.cs` — update Automatic Birth Sources description and legend/status wording.
+11. `River_Foam_Stage6_Architecture.md` — freeze the accepted population, continuous-emitter, and source/trail debug contracts and mark conflicting historical statements superseded.
+
+### Performance contract
+
+Normal production:
+
+- No new persistent GPU resource.
+- No new compute kernel or pass.
+- No new GPU readback.
+- One bounded O(event-capacity) CPU count is avoided by maintaining `activeAutomaticShoreSourceEventCount` directly.
+- Active Ribbon dispatch frequency increases to material cadence, but each dispatch remains restricted to the current head column plus delayed catch-up columns and the existing field-height row search. The requested behavior requires this source attempt; full cells return immediately through existing merge semantics.
+- Population is reduced from near one event per 3.5 m bucket to the Activity-resolved target, substantially reducing the number of concurrent Ribbon events.
+
+Debug view:
+
+- No additional texture or pass. The fragment shader already has `_FoamCurrent`, `_FoamBirthDebug`, phase values, and packed-state decode helpers.
+- One extra committed-state sample is performed only while Automatic Birth Sources is selected.
+
+### Risks
+
+1. **Population oscillation:** prevented by changing the fractional head decision only at a stable population boundary and never killing existing heads on target reduction.
+2. **Target starvation:** packet reservations may block starts; runtime status must report waiting for clearance rather than pretending target achievement.
+3. **Coordinate drift:** source storage coordinate, world shore coordinate, and render debug coordinate must use explicit separate mappings.
+4. **Shared shader regression:** only Foam debug view `2` may change; all other Foam and final-render branches must remain byte-equivalent apart from line movement required by the scoped edit.
+5. **Continuous source cost:** active population reduction and one-column dispatch bounds must be verified structurally; Unity profiling remains pending.
+
+### Acceptance criteria
+
+1. Activity one on the current approximately 32 m represented river predicts 3–4 active Shore heads, not approximately twenty.
+2. Inspector shows predicted range and represented bank length in Edit Mode; Play Mode status shows active count, resolved current target, predicted range, and clearance waiting where applicable.
+3. Each Ribbon head stays continuously visible, progresses monotonically in flow direction, follows the current visible shore laterally, and terminates after its effective Min/Max-selected whole-cell length.
+4. Every active Ribbon attempts birth from its current 1×1 head every material tick; delayed ticks also cover skipped shoreline cells.
+5. Automatic Birth Sources shows committed persistent Foam in neutral grey plus active source heads in category colours; same-update source overlap remains white.
+6. Bulk Phase does not cause visible head backtracking or forward snapping in the debug view.
+7. No cumulative Ribbon source body, wide Shore birth footprint, new shoreline path resource, or transport/lifecycle change exists.
+
+### Validation and compliance status
+
+- Gate 1 review: **complete**.
+- Gate 2 canonical plan: **complete**.
+- Implementation: **in progress**.
+- Final scope/diff audit: pending.
+- Static C#/HLSL checks: pending.
+- Unity 6000.5.0f1 C# compilation and shader import: pending in user project.
+- Direct Play Mode behavior and runtime profiling: pending in user project.
+
+### D8.16 implementation and Gate 4 audit record
+
+Source implementation status: **implemented within the approved scope; Unity compilation, shader import, GPU execution, live behavior, and profiling remain pending.** This is not a validated or release-ready patch until those Unity gates pass.
+
+Implemented differences from D8.15:
+
+1. `Activity` now resolves `meanHeads = Activity * (2 * validFieldLength) / 17.5 m`, with floor/ceiling prediction and deterministic fractional selection at event-completion or bounded duration-derived population boundaries.
+2. `activeAutomaticShoreSourceEventCount` is maintained directly. A falling target never kills a live event; replacements stop until the population is at or below target.
+3. The scheduler starts at most one Shore event per material tick. Existing 3.5 m buckets remain candidate and packet-clearance ownership only. On completion, a bucket rearms after packet clearance; no per-bucket Activity idle calculation remains.
+4. Every active Shore Ribbon dispatches at material cadence. The shader emits the current 1x1 head on every tick and additionally emits each skipped intermediate cell after a delayed tick. The existing `FoamMergeBornMaterial` contract remains unchanged and rejects repeated attempts into already full cells.
+5. Shore metric and current-shore-edge lookup resolve from the unshifted world column corresponding to the phase-shifted storage cell. No path resource, path solve, kernel, pass, or readback was added.
+6. Automatic Birth Sources subtracts current Bulk Phase when sampling `_FoamBirthDebug` and composites category-coloured active emitters over phase-correct committed Coverage shown in dark grey.
+7. The Shore Inspector displays predicted active-head range, mean, represented bank length, estimated 32 m Foam chunk count, and Play Mode runtime population status. The debug panel displays the same runtime population status.
+8. `AutomaticShoreSourceMaximumStartsPerUpdate` changed from `3` to `1`. No serialized default changed.
+
+Intentional unchanged behavior confirmed:
+
+- Shore Ribbon event length remains an inclusive whole-cell effective selection between the existing user-facing Min/Max values.
+- Finite event duration and completion remain authoritative.
+- Inward Wash geometry/evaluator remains byte-equivalent; it shares only the Shore population budget and corrected world-column Shore metric lookup.
+- Object and Free-Water evaluators and schedulers remain unchanged.
+- `CS_RiverFoam.Simulation.hlsl`, lifecycle mathematics, SourceUnits dispatch-range logic, packet-independent merge semantics, final Foam rendering, scenes, prefabs, materials, current-shore-edge generation, topology, and boundary generation remain unchanged.
+
+Offline Gate 4 evidence:
+
+```text
+Changed files: exactly the 11 approved paths
+Serialized Unity assets changed: 0
+Static audit: 61/61 PASS
+Population calculations at Activity 1:
+  5 m   -> mean 0.571429, predicted 0-1
+  32 m  -> mean 3.657143, predicted 3-4
+  100 m -> mean 11.428571, predicted 11-12
+New compute kernels: 0
+New GPU resources: 0
+New readbacks: 0
+New shoreline/path passes: 0
+Maximum Shore starts per material tick: 1
+```
+
+Static audit covered changed-file scope, serialized-asset exclusion, C#/HLSL delimiter balance, removal of the old per-bucket Activity resolver, direct Shore active-count lifecycle, clearance-only bucket rearm, continuous Ribbon CPU dispatch, current-head/catch-up birth semantics, unshifted world Shore lookup, phase-correct source sampling, committed-trail composite, Inspector/debug population reporting, forbidden-file hash equality, and byte equality of all non-Ribbon source evaluator functions.
+
+Unavailable validation and concrete next action:
+
+- Unity 6000.5.0f1 C# compilation and compute/water-shader import: apply the changed files in the user project and provide the complete Console output if any error appears.
+- Live production behavior: in Play Mode inspect the normal Shore authoring section and Automatic Birth Sources directly; do not run the broad diagnostic suites.
+- Runtime performance: profile only after compilation and direct behavior pass; verify active-head count and material-cadence one-column Ribbon dispatch cost.
+
+### D8.16 status update
+
+- Gate 1 review: **complete**.
+- Gate 2 canonical plan: **complete**.
+- Gate 3 scoped implementation: **complete in source**.
+- Gate 4 final scope, consistency, and static audit: **complete offline; 61/61 PASS**.
+- Unity compilation, shader import, live visual validation, and profiling: **pending in user project**.
+
+## RIVER-FOAM-VELOCITY-B1 — Independent Shore Component Suppression
+
+### Status
+
+**Implemented in source on 2026-07-31. Gate 4 offline audit passed; Unity compilation, shader import, Play Mode validation, and profiling remain pending.**
+
+### Objective
+
+Add two independent Layer B Canonical Velocity controls that reuse the existing current Shore Support field:
+
+```text
+Shore Lateral Movement Suppression:    0..1
+Shore Downstream Movement Suppression: 0..1
+```
+
+At full Shore Support:
+
+```text
+0 = preserve the existing component;
+1 = set that velocity component to exactly zero.
+```
+
+The existing Foam Motion Field and Foam Motion Field + Cell Grid debug views must resolve velocity through the same shared contract so changes are directly visible.
+
+### Approved files
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+```
+
+### Reviewed evidence
+
+1. `StylizedRiver.cs` owns current Layer B velocity authoring, including Downstream Speed Ratio, Maximum Lateral Speed Ratio, Object Contact slowdown, public accessors, migration, reset, and `OnValidate` clamping.
+2. `StylizedRiverEditor.Foam.cs::DrawFoamLayerB()` is the exact Inspector hierarchy for Canonical Velocity controls.
+3. `StylizedRiverFoamRuntime.Compute.cs::ConfigureSharedComputeParameters()` binds the canonical velocity inputs used by `SimulateFoam`.
+4. `StylizedRiverFoamRuntime.Binding.cs` binds the same inputs to the water material for Motion Field debug rendering and defines hold/disabled fallbacks.
+5. `CS_RiverFoam.Motion.hlsl::FoamResolveVelocity()` is the only compute caller of the shared velocity contract.
+6. `SH_CleanStylizedRiver.shader` Foam debug modes 5 and 6 are the only render caller of the shared velocity contract.
+7. `_FoamTopologySourcesRead.b` / `_FoamTopologySources.b` is the existing current Shore Support field. It is already generated, bound, aligned with Foam-grid coordinates, and available to compute and the water shader.
+8. `CS_RiverFoam.Simulation.hlsl::FoamResolveGridVelocity()` passes the physical motion coordinate, including Bulk Phase, into `FoamResolveVelocity()`. The Shore Support sample must use that same coordinate.
+9. `RiverWaterFoamVelocity.hlsl` owns the pure shared resolver. Any signature change requires both compute and shader callers to remain consistent.
+
+### Mathematical contract
+
+Let:
+
+```text
+S  = saturate(Shore Support)
+CL = saturate(Shore Lateral Movement Suppression)
+CD = saturate(Shore Downstream Movement Suppression)
+```
+
+Component-retention factors:
+
+```text
+lateralFactor    = 1 - S * CL
+downstreamFactor = 1 - S * CD
+```
+
+After existing lane/obstacle routing and object-contact slowdown:
+
+```text
+vDownstream' = vDownstream * downstreamFactor
+vLateral'    = vLateral * lateralFactor
+```
+
+At full Shore Support:
+
+```text
+CL=1 -> vLateral'=0
+CD=1 -> vDownstream'=0
+```
+
+The existing Object Contact slowdown remains independent and multiplicative. The Motion Field debug brightness must use the total resolved downstream factor, and its red/blue lateral hue must use the total resolved lateral velocity.
+
+### Invariants
+
+- Defaults are `0`, preserving current velocity until explicitly changed.
+- No new texture, buffer, kernel, pass, dispatch, readback, shoreline calculation, topology field, or per-frame CPU work.
+- Reuse existing Shore Support exactly; do not alter its generation, width, fade, obstacle exclusion, or lifecycle meaning.
+- The controls are spatial Layer B controls. They affect any persistent Foam currently inside Shore Support, regardless of source provenance.
+- Preserve upstream prohibition: downstream suppression may reduce world downstream speed to zero but may not produce upstream world motion.
+- Preserve all spawning, transport scheme mathematics, lifecycle, merge, final-render, scene, prefab, material, Object slowdown, Object/Free-Water source, and Shore source behavior.
+- Foam Motion Field debug modes 5 and 6 must visibly reflect the same velocity used by transport.
+
+### Non-goals
+
+- Do not diagnose or fix Foam birth width in this patch.
+- Do not add source provenance to persistent Foam state.
+- Do not change Shore Support reach or add a separate Shore velocity mask.
+- Do not add a new debug view or legend colour.
+- Do not change Object Contact slowdown semantics.
+
+### File-by-file implementation sequence
+
+1. **This document** — record the accepted plan before code edits.
+2. `StylizedRiver.cs` — add bounded serialized controls, defaults, tooltips, public accessors, reset, and validation clamps.
+3. `StylizedRiverEditor.Foam.cs` — expose both controls inside Layer B — Canonical Velocity immediately before Object Contact slowdown.
+4. `StylizedRiverFoamRuntime.Constants.cs` — add material property IDs.
+5. `StylizedRiverFoamRuntime.Compute.cs` — bind both values to the shared simulation compute configuration.
+6. `StylizedRiverFoamRuntime.Binding.cs` — bind both values to live material debug rendering and safe zero fallbacks.
+7. `CS_RiverFoam.Resources.hlsl` — declare compute uniforms.
+8. `RiverWaterFoamVelocity.hlsl` — extend the pure contract with Shore Support and independent component suppression.
+9. `CS_RiverFoam.Motion.hlsl` — load existing Shore Support at the same physical motion coordinate and pass it to the shared contract.
+10. `SH_CleanStylizedRiver.shader` — declare properties/uniforms, sample existing Shore Support in debug modes 5/6, and pass it to the same resolver.
+11. `River_Foam_Stage6_Architecture.md` — freeze the accepted Layer B contract and debug semantics.
+
+### Risks and mitigation
+
+1. **Bulk residual transport:** world downstream suppression to zero must still pass through the existing bulk-residual subtraction. The pure resolver returns zero absolute downstream speed; the residual transport path then cancels bulk movement as designed.
+2. **Coordinate mismatch:** compute Shore Support must use `motionSampleCoordinate`, not raw storage coordinates. Shader debug must sample Shore Support with the same field-space UV used for route and obstacle fields.
+3. **Shared include regression:** all callers of `RiverWaterResolveFoamVelocityContract()` must be updated together and audited.
+4. **Hold/disabled stale uniforms:** Binding fallbacks must explicitly set both suppression values to zero.
+5. **Debug mismatch:** Motion Field hue and brightness must derive from final suppressed velocity/factors, not pre-suppression route intent.
+
+### Validation and compliance plan
+
+Offline:
+
+- exact changed-file scope audit;
+- C# and HLSL delimiter/symbol checks;
+- verify both shared resolver callers use the new signature;
+- verify no new resource/kernel/pass/readback;
+- verify forbidden spawning, simulation, lifecycle, merge, and final-render files remain unchanged;
+- mathematical endpoint checks for Shore Support/control combinations 0 and 1.
+
+Unity 6000.5.0f1:
+
+1. Compile C# and import compute/water shaders.
+2. In `River_Strip -> Stylized River -> Foam -> Layer B — Canonical Velocity`, set both controls independently and inspect Foam Motion Field.
+3. At both controls `1`, full Shore Support cells must display zero lateral hue and near-black downstream brightness; interior water remains unchanged.
+4. At lateral `1`, downstream `0`, shore cells retain brightness but lose red/blue lateral colour.
+5. At lateral `0`, downstream `1`, shore cells retain lateral hue but become near-black.
+
+### Status checklist
+
+- Gate 1 review: **complete**.
+- Gate 2 canonical plan: **complete**.
+- Gate 3 implementation: **complete in source**.
+- Gate 4 final scope, consistency, and static audit: **complete offline; 49/49 PASS**.
+- Unity compilation, shader import, Play Mode visual validation, and profiling: **pending in user project**.
+
+
+### RIVER-FOAM-VELOCITY-B1 implementation and Gate 4 audit record
+
+Implemented differences from D8.16:
+
+1. Added two zero-default serialized Layer B controls and public accessors: Shore Lateral Movement Suppression and Shore Downstream Movement Suppression.
+2. Bound both controls to `SimulateFoam` and to the water material used by Motion Field debug modes. Hold and disabled bindings explicitly reset both values to zero.
+3. Extended the shared pure velocity resolver with the existing Shore Support value and independent downstream/lateral component-retention factors.
+4. Compute transport samples `_FoamTopologySourcesRead.b` at the same physical motion coordinate used by lane and obstacle routing.
+5. Motion Field debug modes 5 and 6 sample `_FoamTopologySources.b` and call the same shared resolver, so hue and brightness visualize the final suppressed velocity.
+6. No source, transport scheme, lifecycle, merge, final-render, scene, prefab, material, topology-generation, or Object slowdown behavior changed.
+
+Offline Gate 4 evidence:
+
+```text
+Changed files: exactly the 11 approved paths
+Serialized Unity assets changed: 0
+Static audit: 49/49 PASS
+New compute kernels: 0
+New RenderTexture allocations: 0
+New GraphicsBuffer allocations: 0
+New AsyncGPUReadback references: 0
+Forbidden spawning/simulation/lifecycle files: byte-identical
+Shared velocity-contract occurrences: one definition + two updated callers
+Endpoint mathematics:
+  Shore=1, lateral=1, downstream=0 -> lateral factor 0, downstream factor 1
+  Shore=1, lateral=0, downstream=1 -> lateral factor 1, downstream factor 0
+  Shore=1, lateral=1, downstream=1 -> both factors 0
+  Shore=0 -> both factors 1 regardless of controls
+```
+
+Unavailable validation and concrete next action:
+
+- Unity 6000.5.0f1 C# compilation and compute/water-shader import: apply the changed files and provide complete Console output if any error appears.
+- Play Mode velocity validation: use Foam Motion Field and Foam Motion Field + Cell Grid with the exact control combinations in the validation section.
+- Runtime profiling: after visual acceptance, compare `SimulateFoam` GPU time at both controls zero versus one. The implementation adds one existing-texture Shore Support load per canonical velocity resolution and no additional pass or allocation.

@@ -1,256 +1,292 @@
-# Weather Inspector Cleanup Plan
+# Weather LightRay and Cloud Inspector Cleanup Plan
 
 ## Status
 
-**Patch:** `WEATHER-INSPECTOR-CLEANUP-V1.0`
+**Patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A`
 
-**Current state:** source implementation complete; local consistency and scope audits passed; Unity compilation and Inspector validation pending.
+**Current state:** source implementation and static closure audit completed against the supplied Archive 48 source. Unity compilation, runtime validation, and the later serialized mandatory-preset migration remain pending.
 
 ## Objective
 
-Replace the four inconsistent Weather custom Inspectors with one coherent authoring scheme:
+Clean the current Weather LightRay and cloud authoring surfaces without changing the frozen cloud-cookie producer or the indexed vegetation-accent sidecar.
 
-- every editable control lives under a clearly named foldout;
-- every foldout starts collapsed for each newly created Editor instance;
-- every visible editable control has a specific tooltip;
-- vague labels are replaced in the Inspector without renaming serialized fields;
-- duplicate cloud-debug buttons are removed and the serialized debug dropdown becomes authoritative;
-- stale refresh/report-preview controls are removed;
-- derived values and architecture explanations are shown as read-only information;
-- the LightRay Inspector states explicitly that V1.0 creates and renders no rays.
+The patch will:
 
-This patch changes Editor presentation only. It must not change Weather runtime calculations, serialized values, scenes, shaders, materials, render assets, hierarchy, layers, tags, or gameplay behavior.
+1. make LightRays source-agnostic at the core architecture level;
+2. remove the unused preset catalog and disconnected preset-selection infrastructure;
+3. remove obsolete non-shader LightRay diagnostics and Editor smoke tests;
+4. separate automatic-population dependency suspension from cloud-transition spawn pausing;
+5. preserve existing automatic rays through cloud-pattern transitions;
+6. remove obsolete or derived automatic-population controls;
+7. make the camera-ground footprint the only automatic-population region shape;
+8. make the LightRay and Cloud Inspectors production authoring surfaces with one telemetry root each;
+9. replace stale Weather documentation with the current agreed architecture;
+10. preserve `_TEST.asset` as an intentional high-strength testing preset that future production orchestration must ignore.
 
 ## Approved files
 
-### Create
-
-- `Assets/Docs/Weather_Inspector_Cleanup_Plan.md`
-- `Assets/Game/Procedural/Weather/Editor/WeatherInspectorGui.cs`
-
 ### Modify
 
+- `Assets/Docs/Weather_Inspector_Cleanup_Plan.md`
+- `Assets/Docs/Weather_Cloud_Shadow_Handoff.md`
+- `Assets/Docs/Weather_Light_Ray_Architecture.md`
 - `Assets/Docs/Weather_System_Architecture_Provisional.md`
-- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs`
-- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs`
-- `Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowControllerEditor.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayController.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayPopulationRuntime.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayPreset.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayTypes.cs`
 - `Assets/Game/Procedural/Weather/Editor/WeatherLightRayControllerEditor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowControllerEditor.cs`
 
-No other file is approved.
+### Delete
+
+- `Assets/Game/Procedural/Weather/WeatherLightRayPresetCatalog.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRaySelectionProfile.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRaySelectionRuntime.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayPopulationProfile.cs`
+- `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRayPresetCatalog.asset`
+- `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRaySelection_DefaultCycle.asset`
+- `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRayPopulation_Daylight.asset`
+- `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRayPopulation_IndependentNight.asset`
+
+No scene, prefab, material, renderer asset, shader, HLSL include, layer, tag, package, or project-setting change is approved.
 
 ## Reviewed evidence
 
-### Repository rules
+The complete current source and relevant consumers/producers were reviewed before implementation:
 
-- `Assets/AGENTS.md` — complete current file reviewed. It requires a persistent plan before implementation, exact scope control, a post-change consistency audit, and explicit pending Unity validation. Git interaction is discouraged unless requested.
+- LightRay controller storage, source resolution, lifecycle, cloud response, population integration, reports, diagnostics, and vegetation publication;
+- automatic population settings, camera-footprint resolution, candidate lifecycle, cloud sampling, spawn/update, retirement, reporting, and debug records;
+- LightRay Controller Inspector authoring, telemetry, Scene diagnostics, smoke tests, and reports;
+- authored Anchor and preset descriptor contracts;
+- shared LightRay types and renderer source-kind consumers;
+- Cloud Controller query, evolution-stability, debug, report, and benchmark contracts;
+- Cloud Controller Inspector authoring, telemetry, preview, actions, and benchmark UI;
+- renderer and vegetation sidecar boundaries;
+- current Weather architecture, LightRay architecture, cloud handoff, and prior Inspector plan;
+- catalog, selection profile/runtime, and selection-only population profile code and assets;
+- repository-wide consumers of selection-only shared types.
 
-### Wind Domain Inspector
+## Settled ownership
 
-- `Assets/Game/Procedural/Weather/Editor/WeatherWindDomainEditor.cs` — complete file reviewed.
-- `OnInspectorGUI` delegates all authored controls to `DrawDefaultInspector`, then renders always-expanded actions and status.
-- Scene diagnostics depend on `WeatherWindDomain.DebugView`, `DebugSampleStepCells`, `DebugHeightOffset`, `DebugArrowScale`, `GetFieldWorldRectXZ`, `GetDebugAnchorPosition`, `SampleTargetWindXZ`, and editor-only response-texture readback.
-- Runtime source fields and public read-only data were reviewed in `WeatherWindDomain.cs`, including domain placement, resolution/update budget, prevailing wind, broad variation, gusts, elastic response, mapping, debug controls, resource state, memory estimate, field origin, ring offset, and dispatch counters.
+### Core LightRay system
 
-### Wind Trail Inspector
+The core LightRay system is generic. It owns rendering, storage, lifecycle, appearance application, beam evolution, source-policy evaluation, cloud-policy evaluation, authored registration, and procedural request execution.
 
-- `Assets/Game/Procedural/Weather/Editor/WeatherWindTrailRendererEditor.cs` — complete file reviewed.
-- `showVisualCalibration`, `showPlacement`, `showSceneDiagnostics`, and `showReport` currently initialize to `true`.
-- The Inspector embeds a large selectable full report and separately exposes copy behavior.
-- The existing baseline migration and default-shader assignment execute before normal drawing and must be retained.
-- Scene diagnostics are Editor-instance state and use `TryGetLastCandidate`, `TryGetTrailPoint`, and `GetTrailPointCount`; they must remain nonserialized and default off.
-- All serialized authoring fields from `WeatherWindTrailRenderer.cs` were reviewed: rendering, capacity/cadence, strong-wind placement, camera-entry placement, candidate selection, streamline construction, lifecycle, shape, altitude, wobble, and opacity.
-- Runtime status APIs reviewed: domain/camera/shader resolution, resource state, active count, candidate counts, mesh capacities, resolved lifecycle ranges, reset action, report generation, and baseline upgrade.
+It does not own daylight, the Sun, Weather eligibility, quest eligibility, storytelling eligibility, or automatic preset selection.
 
-### Cloud Shadow Inspector
+### Preset
 
-- `Assets/Game/Procedural/Weather/Editor/WeatherCloudShadowControllerEditor.cs` — complete file reviewed.
-- `DrawSerializedProperties` iterates every visible serialized property without foldout organization.
-- The serialized `debugVisualization` enum is duplicated by `Show Cloud Areas`, `Show Cloud / Opening Map`, and `Hide Cloud Debug Overlay` buttons.
-- `Refresh Debug Focus` duplicates normal controller refresh behavior; `RefreshNow` and edit-preview ticking already resolve current state.
-- The generated cookie preview, benchmark interface, actions, and status are always expanded.
-- Benchmark public APIs in `WeatherCloudShadowBenchmark.cs` were reviewed; start, cancel/restore, progress, retained report, and report path behavior must remain unchanged.
-- All serialized cloud fields and public status APIs in `WeatherCloudShadowController.cs` were reviewed: activation, cookie pattern, evolution, movement, debug focus, sun gate, debug visualization, cookie/evolution metrics, source resolution, error reporting, actions, and benchmark state support.
+A preset owns appearance and shared presentation only. It must not determine source ownership, automatic eligibility, or Weather dependencies.
 
-### LightRay Inspector
+The legacy serialized preset `SourceKind` remains in this patch only because deleting serialized preset data belongs to the later mandatory-preset migration patch. Production automatic population must not read it.
 
-- `Assets/Game/Procedural/Weather/Editor/WeatherLightRayControllerEditor.cs` — complete file reviewed.
-- It currently uses `DrawDefaultInspector`, exposes future V1 controls that have no V1.0 visual consumer, contains a redundant refresh button, and gives an ambiguous instruction referring to a cloud control on another component.
-- `WeatherLightRayController.cs` source and public APIs were reviewed. V1.0 owns fixed storage and cloud-projection diagnostics but has no registration surface and no renderer; active count `0` is expected.
-- `lightRaysEnabled` and `cloudEvolutionResumeThreshold` remain serialized for future V1 work but are hidden in this V1.0 cleanup because they do not currently control a visible ray lifecycle.
+### Runtime request
 
-### Canonical architecture
+A ray request may carry a source kind, explicit direction, source-gate policy, cloud policy, movement policy, lifecycle, and placement. Those values describe that request; they do not redefine global LightRay ownership.
 
-- `Assets/Docs/Weather_System_Architecture_Provisional.md` reviewed for active Weather ownership, cloud diagnostics, benchmark ownership, and LightRay V1.0 status.
-- `Assets/Docs/Weather_Wind_Architecture.md` reviewed for Wind Domain and Wind Trail diagnostic/report requirements.
-- `Assets/Docs/Weather_Cloud_Shadow_Handoff.md` reviewed for the cloud debug-focus contract, generated-cookie preview, benchmark actions, report behavior, and frozen runtime architecture.
-- `Assets/Docs/Weather_Light_Ray_Architecture.md` reviewed for V1.0 nonvisual status and mandatory later hybrid rendering.
+### Weather orchestration
 
-## Invariants and non-goals
+A future Weather orchestration layer will decide which atmospheric population is active, which preset is eligible, which environmental dependencies matter, and which directional source is supplied at runtime. This cleanup does not implement that orchestrator and must not hardcode its future decisions into the core system.
 
-1. Preserve every serialized field name and every serialized value.
-2. Do not add `FormerlySerializedAs`; no runtime field is renamed.
-3. Do not call runtime reset/rebuild actions merely because a foldout opens or closes.
-4. Preserve Wind Trail baseline migration and default-shader assignment behavior.
-5. Preserve the cloud benchmark implementation and all start/cancel/copy operations.
-6. Preserve all existing Scene-view diagnostic geometry and classification logic.
-7. Do not add a Weather manager component or merge the four existing components.
-8. Do not implement LightRay registration, spawning, rendering, gameplay influence, or cloud-clearance selection.
-9. Do not modify runtime C#, shaders, HLSL, scenes, prefabs, materials, renderer assets, or project settings.
-10. Foldout state is Editor-instance state only and is not serialized.
+### Current automatic population
 
-## Inspector-wide presentation contract
+The current automatic producer is a cloud-opening atmospheric population. It may continue receiving the currently resolved daylight directional source for cloud projection and visual direction, but its contracts, labels, preset checks, stable identity, and documentation must not define all automatic LightRays as Sun-owned.
 
-- The disabled Script reference remains first.
-- Critical errors and multiple-publisher warnings may remain visible outside foldouts.
-- Every ordinary section uses `WeatherInspectorGui.Foldout` and initializes closed.
-- Every editable property uses an explicit `GUIContent` label and tooltip.
-- Units are included where relevant: `(m)`, `(s)`, `(Hz)`, `(°)`, `(XZ)`.
-- Derived information uses disabled read-only rows or help boxes.
-- Actions and reports live under one collapsed `Actions & Reports` section per component.
-- Status lives under one collapsed `Live Status` section per component.
+### Cloud producer
 
-## File-by-file implementation sequence
+The cloud-shadow subsystem remains the frozen producer of the globally tiled directional cookie and present/future CPU transmission queries. Cookie generation, projection, movement, receiver shading, benchmark implementation, and debug overlay behavior are non-goals.
 
-### 1. Shared helper — `WeatherInspectorGui.cs`
+## Required behavior changes
 
-**Status:** complete at source level; Unity compilation pending.
+### Cloud transition policy
 
-Implement editor-only helpers for:
+During cloud-pattern evolution below `Cloud Transition Spawn Resume`:
 
-- disabled Script reference;
-- consistent collapsed foldouts;
-- serialized-property lookup and drawing with explicit label/tooltip;
-- read-only text/int/float rows;
-- consistent min/max field groups;
-- missing-property error reporting;
-- compact spacing and explanatory help boxes.
+- existing automatic rays continue their assigned lifetimes and normal fades;
+- authored and caller-created rays continue normally;
+- beam evolution continues;
+- automatic active-ray lifecycle, camera-region retirement, budget retirement, cooldown, and reporting continue;
+- pending and new automatic candidate evaluation pauses;
+- no full automatic-population retirement occurs merely because the cloud pattern is unstable;
+- cloud transmission marked `EvolutionUnstable` remains usable for existing `RespectClouds` rays.
 
-The helper contains no runtime state and no reflection over Weather components.
+Runtime state must distinguish `Disabled`, `Suspended`, `SpawningPaused`, and `Running`.
 
-### 2. Wind Domain Inspector
+### Automatic population region
 
-**Status:** complete at source level; Unity compilation and visual Inspector validation pending.
+- obtain one representative Ground Mask hit to establish a horizontal reference-plane height;
+- project the viewport centre and all eight perimeter rays mathematically onto that plane;
+- do not require every viewport sample to hit a finite Ground collider;
+- expand the resulting polygon by Camera Margin;
+- when a focus override is assigned, translate the resolved footprint in XZ so its centre follows the override;
+- preserve the ground-reference height for candidate raycast origins;
+- raycast each actual candidate downward against the configured Ground Mask before spawning;
+- never restore a circular fallback;
+- suspend only when no usable ground reference or valid camera-plane footprint can be resolved.
 
-Replace `DrawDefaultInspector` with collapsed sections:
+### Derived controls
 
-- Domain Placement;
-- Resolution & Update Budget;
-- Base Wind;
-- Broad Variation;
-- Gust Regions;
-- Elastic Visual Response;
-- Debug & Diagnostics;
-- Actions & Reports;
-- Live Status.
+Delete serialized authoring for:
 
-Preserve simulation-hash comparison, rebuild requests, readback invalidation, Scene-view drawing, reset action, report copy, error warnings, and multiple-domain warning.
+- Fallback Active Radius;
+- Qualification Duration;
+- Candidate Checks Per Tick;
+- Ground Search Distance.
 
-### 3. Wind Trail Inspector
+Derive:
 
-**Status:** complete at source level; Unity compilation and visual Inspector validation pending.
+```text
+candidate checks per update = clamp(Ray Budget × 2, 4, 64)
+ground raycast distance = max(100 m, resolved camera far clipping distance)
+```
 
-Retain baseline migration and default shader assignment. Replace current groupings with collapsed sections:
+The first valid six-sample evaluation may spawn a new candidate during the same population update. No hidden second evaluation remains.
 
-- Appearance;
-- Shape & Altitude;
-- Lifecycle & Travel;
-- Wobble & Local Shape;
-- Population & Separation;
-- Camera Entry Placement;
-- Advanced Candidate Selection;
-- Advanced Path Construction;
-- Debug & Diagnostics;
-- Actions & Reports;
-- Live Status.
+### Inspector contract
 
-Remove the embedded full report preview. Keep one copy-report action. Make Scene diagnostics default off and retain its exact existing draw logic.
+The LightRay Controller Inspector roots are:
 
-### 4. Cloud Shadow Inspector
+1. Core Setup
+2. Source & Rendering
+3. Automatic Population
+4. Advanced System
+5. Diagnostics
+6. Runtime Status
+7. Report
 
-**Status:** complete at source level; Unity compilation and visual Inspector validation pending.
+Only Runtime Status contains live or resolved telemetry. Diagnostics contains editable debug toggles only. Report contains one copy action.
 
-Replace flat iteration with collapsed sections:
+The Cloud Controller Inspector retains its production controls, preview, actions, receiver audit entry point, and benchmark, but all ordinary live telemetry moves to its sole Runtime Status root.
 
-- Activation & Sun Source;
-- Cloud Pattern;
-- Cloud Motion;
-- Pattern Evolution;
-- Sun Availability Gate;
-- Debug Visualization;
-- Generated Cookie Preview;
-- Actions & Reports;
-- Performance Benchmark;
-- Live Status.
+## Deleted infrastructure
 
-Remove duplicate cloud-debug buttons and the redundant debug-focus refresh button. Keep only the serialized `debugVisualization` dropdown for normal overlay selection. Keep the conditional runtime-focus-clear action. Preserve edit-preview ticking, all cloud actions, benchmark behavior, preview drawing, and all error/warning states.
+Delete:
 
-### 5. LightRay Inspector
+- unused preset catalog code and asset;
+- disconnected selection profile/runtime;
+- selector-only population profiles and assets;
+- Controller selection-dependency resolver;
+- selection-only shared enums and structures with no remaining consumer;
+- LightRay-owned CPU cloud projection probe;
+- Procedural Test Pair Editor scaffolding;
+- Cloud-Aware Test Ray Editor scaffolding;
+- separate Beam Evolution Runtime Audit;
+- Controller vegetation diagnostic suite state and Inspector actions only where removal does not touch shared shader/HLSL code.
 
-**Status:** complete at source level; Unity compilation and visual Inspector validation pending.
+The legacy vegetation diagnostic shader globals and false-colour branches remain for the separately approved shader cleanup patch. This patch must not alter the indexed sidecar layout or shared vegetation files.
 
-Show an always-visible V1.0 foundation notice, then collapsed sections:
+## Preserved behavior and invariants
 
-- Source Binding;
-- Foundation Storage;
-- Cloud Projection Diagnostic;
-- Actions & Reports;
-- Live Status.
+- `_TEST.asset` remains unchanged and present.
+- All curated LightRay preset assets remain.
+- manual Active Preset selection remains authoritative for now.
+- runtime preset switching API remains.
+- authored and procedural multi-ray rendering remains.
+- beam evolution remains active throughout each slot lifecycle.
+- current surface Spot Light behavior remains.
+- indexed vegetation accent sidecar publication remains byte-compatible.
+- cloud cookie generation, query, movement, debug overlay, receiver audit, and benchmark remain.
+- automatic population remains disabled by default and still requires an explicit Ground Mask.
+- no automatic time-of-day, Sun, Moon, quest, or gameplay orchestration is introduced.
+- no mandatory-preset Anchor migration or serialized appearance-field deletion occurs in this patch.
 
-Hide `lightRaysEnabled` and `cloudEvolutionResumeThreshold` until their runtime consumers exist. Remove the refresh button. Replace ambiguous cross-component instructions with the exact path:
+## File-by-file sequence
 
-`Weather Cloud Shadow Controller -> Debug Visualization -> Debug View -> Cloud + Sun Openings`.
+1. Rewrite this canonical plan and lock scope.
+2. Delete disconnected catalog/selection code and assets.
+3. Remove selection-only shared contracts and Controller consumers.
+4. Refactor automatic population state, transition policy, footprint resolution, derived work budgets, and immediate candidate spawning.
+5. Remove obsolete Controller non-shader diagnostic state and update reporting.
+6. Rebuild the LightRay Controller Inspector.
+7. Consolidate Cloud Inspector telemetry without changing cloud runtime behavior.
+8. Rewrite the LightRay and provisional Weather architecture documents.
+9. Run repository-wide dead-reference, source-ownership, serialized-field, and scope audits.
+10. Run available static syntax checks and prepare exact Unity validation.
 
-Preserve Scene-view probe rendering and colour classification unchanged.
+## Risks and safeguards
 
-### 6. Architecture status update
+### Serialized migration
 
-**Status:** complete.
+Legacy Controller and Anchor appearance fields and preset `SourceKind` remain until the later serialized migration audit. This patch does not claim mandatory preset authority is complete.
 
-Add `WEATHER-INSPECTOR-CLEANUP-V1.0` to the active Weather architecture status and record that this patch changes Editor presentation only.
+### Source coupling
 
-## Risks and mitigations
+The current controller still resolves a daylight directional source through legacy serialized fields. The automatic producer may consume that runtime value, but no preset eligibility check, automatic-population label, identity hash, or system-level statement may treat it as inherent ownership.
 
-| Risk | Evidence | Mitigation |
-|---|---|---|
-| Missing a serialized field hides authored functionality | Current Cloud and Wind Domain Inspectors expose all visible fields automatically | Enumerate every serialized authored field from the runtime sources and perform an exact field-coverage audit after implementation. Future-only hidden LightRay fields are the only approved exceptions. |
-| Inspector edits trigger unintended rebuilds | Wind Domain compares a simulation configuration hash; Cloud and LightRay call `RefreshNow` after changes | Preserve the same change-detection flow and action calls. Foldout state is not serialized and cannot trigger change handling. |
-| Wind Trail scene tuning migrates unexpectedly | Existing editor runs baseline migration and default-shader assignment before drawing | Preserve both methods and their ordering unchanged. |
-| Cloud benchmark controls regress | Benchmark uses EditorPrefs plus static runner APIs | Preserve setting keys, clamping, save/load, start, cancel/restore, progress, retained report, and path display. |
-| Scene diagnostics disappear | Diagnostics are implemented in editor callbacks, not runtime fields | Preserve all callback registration and existing draw routines. |
-| A custom label changes serialized data | Labels are presentation only | Use `SerializedProperty` with explicit `GUIContent`; do not rename fields. |
-| Shared helper creates cross-component coupling | Helper is new | Keep it stateless and editor-only; each Inspector owns its section state and runtime decisions. |
+### Transition regression
+
+Spawn pausing must not bypass normal lifecycle and retirement work. The runtime status enum and report must expose the distinction.
+
+### Footprint regression
+
+A focus override translates the complete camera footprint. It must not create a circle or use the override Transform height as terrain height.
+
+### Shared shader boundary
+
+No shader or HLSL modification is allowed. Diagnostic CPU publication that is still referenced by the unchanged shader path may remain temporarily, but no obsolete Inspector action or report may expose it as a supported production diagnostic.
 
 ## Acceptance criteria
 
-- [ ] Selecting the Weather GameObject shows compact Weather components whose internal foldouts all begin collapsed. **Unity validation pending.**
-- [x] Every source-exposed editable field has an explicit tooltip in the custom Inspectors. **Unity presentation validation pending.**
-- [x] Cloud Debug View is the only ordinary control for showing or hiding the cloud overlay.
-- [ ] No new serialized scene value changes occur merely from opening foldouts or viewing the Inspectors. The retained pre-existing Wind Trail baseline migration and missing-shader recovery remain the explicit exceptions. **Unity validation pending.**
-- [x] Every existing action remains available under a clear actions or benchmark foldout, except the approved redundant refresh controls.
-- [x] Wind Trail baseline migration and default shader assignment remain active in the same pre-draw order.
-- [x] No runtime, shader, scene, material, renderer, or project-setting file changed; live behavior validation remains pending in Unity.
-- [x] LightRay clearly states that V1.0 creates and renders no rays.
-- [ ] The project compiles with zero errors. **Unity validation pending.**
-- [ ] Scene diagnostics, report copying, benchmark controls, reset actions, and cloud preview continue to work. **Unity validation pending.**
-- [x] Final scope contains exactly the seven approved files.
+- no catalog, selector, selector profile, or selector-only population profile reference remains;
+- `_TEST.asset` is present and unmodified;
+- production automatic population does not read preset `SourceKind`;
+- automatic-population labels and reports contain no Sun-owned claim;
+- cloud evolution below threshold produces `SpawningPaused`, not full suspension;
+- existing automatic rays are not retired by the transition pause;
+- existing cloud-response rays do not receive zero openness solely because data is evolution-unstable;
+- the focus override translates a complete camera footprint;
+- no circular population fallback remains;
+- candidate and ground-raycast budgets are derived exactly as specified;
+- a new valid candidate can spawn on its first six-sample evaluation;
+- the LightRay Inspector has exactly the seven approved roots and only one telemetry root;
+- the Cloud Inspector has one telemetry root;
+- obsolete LightRay projection/test/audit actions are absent;
+- the comprehensive report remains available;
+- the frozen cloud producer, renderer path, surface Spots, and vegetation sidecar are unchanged;
+- all modified C# files pass available lexical, brace, and dead-reference checks;
+- Unity compilation and runtime validation are explicitly reported as pending until run in Unity 6000.5.0f1.
 
-## Validation and compliance ledger
+## Patch status
 
-| Check | Status | Evidence / next action |
-|---|---|---|
-| Read-only source and architecture review | Passed | Evidence recorded above from the supplied archive plus the LightRay V1.0 files and compile fix already produced in this thread. |
-| Persistent implementation plan created before code edits | Passed | This document is the first source change in the working copy. |
-| Exact serialized-field coverage audit | Passed | Wind Domain 27/27; Wind Trail 50/50 authored fields plus one intentionally hidden migration field; Cloud 35/35; LightRay 11/11 visible V1.0 fields plus the two approved future-only hidden fields. |
-| Static C# structure and reference scan | Passed with Unity limitation | Balanced delimiters, strings, comments, and preprocessor structure; every referenced Weather public API and serialized property was confirmed in the supplied source. Unity assemblies are unavailable, so this is not a Unity compile result. |
-| Final diff scope audit | Passed | The diff contains exactly the seven approved files. |
-| Runtime/non-Editor byte-identity audit | Passed | All files outside the two approved documents and five Editor files are byte-identical to the authoritative current input. |
-| Unity compilation | Pending | User must compile in Unity 6000.5.0f1. |
-| Inspector visual validation | Pending | User must verify collapsed defaults, tooltips, actions, and diagnostics in Unity. |
+- [x] Review surface completed.
+- [x] Scope and ownership decisions recorded.
+- [x] Catalog/selection deletion completed.
+- [x] Population runtime refactor completed.
+- [x] Controller cleanup completed.
+- [x] LightRay Inspector cleanup completed.
+- [x] Cloud Inspector telemetry cleanup completed.
+- [x] Canonical architecture documents updated.
+- [x] Final diff and consistency audit completed.
+- [x] Available static validation completed.
+- [ ] Unity compilation and runtime validation completed.
 
-## Next work items
+## Static closure evidence
 
-1. Compile the patch in Unity 6000.5.0f1.
-2. Verify all Weather foldouts start collapsed and every exposed control shows its tooltip.
-3. Verify Cloud Debug View is the sole normal overlay control and the overlay still follows its selected mode.
-4. Verify Wind and Wind Trail Scene diagnostics, reset actions, copied reports, cookie preview, and benchmark controls still work.
-5. Confirm opening and closing foldouts does not dirty the scene or change serialized values.
+The Archive 48 source was audited after implementation with the following results:
+
+- all six modified C# files passed lexical string/comment and delimiter-balance checks;
+- all serialized property names drawn by the rebuilt Inspectors resolve to current Controller fields;
+- all Controller properties and methods used by both custom Inspectors resolve to current source members;
+- all Controller calls into `WeatherLightRayPopulationRuntime` resolve to current runtime members;
+- no live source reference remains to the deleted catalog, selector, selector-only population profiles, or selection-only shared types;
+- no source reference remains to the removed LightRay projection probe, test-pair, cloud-aware test-ray, separate evolution audit, or vegetation diagnostic Inspector suite;
+- no production automatic-population read of preset `SourceKind` remains;
+- no circular population fallback or obsolete serialized population control remains;
+- the cloud Controller, cloud generator, LightRay renderer feature, LightRay Anchor, shared vegetation HLSL, vegetation shader, and Anchor Inspector are byte-identical to Archive 48;
+- `_TEST.asset` is byte-identical to Archive 48 with SHA-256 `e25c225dd700dc3db10cb32fab5ce8b3d97d5c93da70e3a9a892a867b1c6842d`;
+- the eight approved deleted files are absent from the implementation tree.
+
+Unity Editor compilation and runtime behavior cannot be executed in this environment and remain mandatory acceptance gates.
+
+## V1.3A2 turnover-randomization closure
+
+The automatic population follow-up is intentionally stateless:
+
+- each completed cell sweep resolves a new deterministic permutation from Population Seed and turnover epoch;
+- stable cell identity remains responsible for occupancy, cooldown, and duplicate prevention;
+- a separate activation identity varies exact within-cell position, lifetime, beam seed, and external opening identity;
+- active rays remain static;
+- no recent-cell history, queue, cache, or additional Inspector control is introduced.
+
+Acceptance requires varied replacement locations during a mostly clear-sky multi-minute test, while the same Population Seed remains reproducible for the same runtime sequence.

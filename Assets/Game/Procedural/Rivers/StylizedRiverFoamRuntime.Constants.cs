@@ -20,14 +20,15 @@ namespace ProgrammaticStylized3D.Rivers
         private const int HighStructuralResolution = 128;
         private const float ResourceReleaseDelaySeconds = 2f;
         private const float TopologyMetricsUpdateRate = 8f;
-        // Patch 4.11C.5.14E separates final automatic source
-        // rasterization from the manual/debug injection primitive path. Keep
-        // this bounded: source events are authored vocabulary, not particles.
-        private const int AutomaticFoamSourceEventCapacity = 32;
+        // D8.15 preserves the historical 32-event non-Shore allowance and
+        // adds one possible entry per length-derived Shore scheduling bucket
+        // when resources are built. Source events remain authored vocabulary,
+        // not particles.
+        private const int AutomaticFoamSourceBaseEventCapacity = 32;
         // D7 reserves the prepared geometric envelope of active and recently
         // released automatic packets. This is a bounded CPU-side start filter,
         // not a particle system and not per-cell simulation work.
-        private const int AutomaticFoamPacketReservationCapacity = 64;
+        private const int AutomaticFoamPacketReservationCapacityMultiplier = 2;
         private const float AutomaticFoamPacketEnvelopeMinimumPaddingMetres = 0.10f;
         private const int AutomaticBirthDebugCounterCount = 1;
         private const float ProgressiveRibbonMinimumDuration = 0.5f;
@@ -182,9 +183,8 @@ namespace ProgrammaticStylized3D.Rivers
         private const float AutomaticFreeWaterBirthSourceFillSeedSalt = 941.633f;
         private const float AutomaticFreeWaterBirthShapeSeedSalt = 1171.509f;
         private const float AutomaticShoreSourceSlotSpacingMetres = 3.5f;
-        private const float AutomaticShoreSourceMaximumEventsPerSecond = 5.0f;
         private const float AutomaticPacketClearanceMinimumSpeedMetresPerSecond = 0.05f;
-        private const int AutomaticShoreSourceMaximumStartsPerUpdate = 3;
+        private const int AutomaticShoreSourceMaximumStartsPerUpdate = 1;
         private const int AutomaticShoreSourceMaximumScansPerUpdate = 32;
         private const float AutomaticShoreSourceMinimumHeadTrailMetres = 0.12f;
         private const float AutomaticShoreSourceMaximumHeadTrailMetres = 0.65f;
@@ -553,6 +553,10 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamBaseDownstreamSpeed");
         private static readonly int FoamMaximumLateralSpeedRatioId =
             Shader.PropertyToID("_FoamMaximumLateralSpeedRatio");
+        private static readonly int FoamShoreLateralMovementSuppressionId =
+            Shader.PropertyToID("_FoamShoreLateralMovementSuppression");
+        private static readonly int FoamShoreDownstreamMovementSuppressionId =
+            Shader.PropertyToID("_FoamShoreDownstreamMovementSuppression");
         private static readonly int FoamObstacleSlowdownStrengthId =
             Shader.PropertyToID("_FoamObstacleSlowdownStrength");
         private static readonly int FoamObstacleMinimumDownstreamFactorId =

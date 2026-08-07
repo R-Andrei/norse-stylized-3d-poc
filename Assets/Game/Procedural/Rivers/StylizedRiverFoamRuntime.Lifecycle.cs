@@ -713,7 +713,6 @@ namespace ProgrammaticStylized3D.Rivers
             lastConfiguredAbsoluteLifeProbeActive = false;
             birthCommandsThisFrame = 0;
             lastBirthCommandAt = -1.0;
-            automaticShoreBirthAccumulator = 0f;
             automaticShoreBirthSubmittedLastUpdate = 0;
             automaticShoreBirthRejectedLastUpdate = 0;
             automaticShoreBirthStatus = river != null && river.FoamAutomaticBirthEnabled

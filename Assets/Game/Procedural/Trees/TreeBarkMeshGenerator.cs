@@ -107,6 +107,24 @@ namespace ProgrammaticStylized3D.Trees
         public float MeasuredAxialTwistDegrees { get; internal set; }
         public float AxialTwistErrorDegrees { get; internal set; }
         public float AxialTwistTurns { get; internal set; }
+        public float FirstAuthoredAxialTwistNormalizedDistance
+            { get; internal set; }
+        public float AxialTwistAtGroundPlateauEndDegrees
+            { get; internal set; }
+        public float AxialTwistAtRootCollapseEndDegrees
+            { get; internal set; }
+        public float AxialTwistAtEarliestRootTransitionDegrees
+            { get; internal set; }
+        public float AxialTwistAtEffectiveRootTransitionDegrees
+            { get; internal set; }
+        public float MaximumAuthoredAxialTwistStepDegrees
+            { get; internal set; }
+        public float MaximumAllowedAxialTwistStepDegrees
+            { get; internal set; }
+        public float MaximumAuthoredAxialTwistStepStartNormalizedDistance
+            { get; internal set; }
+        public float MaximumAuthoredAxialTwistStepEndNormalizedDistance
+            { get; internal set; }
         public float RootTrunkBoundaryMaximumMismatch { get; internal set; }
         public bool RootTrunkBoundaryMismatchEvaluated { get; internal set; }
         public bool RootTrunkBoundaryCandidateActivated { get; internal set; }
@@ -181,7 +199,7 @@ namespace ProgrammaticStylized3D.Trees
 
     public static class TreeBarkMeshGenerator
     {
-        public const int BarkAlgorithmVersion = 24;
+        public const int BarkAlgorithmVersion = 26;
         private const float TwoPi = Mathf.PI * 2f;
         private const float Epsilon = 0.000001f;
         private const float TriangleAreaSquaredEpsilon = 0.0000000001f;
@@ -342,6 +360,19 @@ namespace ProgrammaticStylized3D.Trees
             internal float CumulativeDistance;
         }
 
+        private struct AxialTwistTelemetry
+        {
+            internal float FirstNonZeroNormalizedDistance;
+            internal float GroundPlateauEndDegrees;
+            internal float RootCollapseEndDegrees;
+            internal float EarliestRootTransitionDegrees;
+            internal float EffectiveRootTransitionDegrees;
+            internal float MaximumStepDegrees;
+            internal float MaximumAllowedStepDegrees;
+            internal float MaximumStepStartNormalizedDistance;
+            internal float MaximumStepEndNormalizedDistance;
+        }
+
         private struct TrunkTipClosure
         {
             internal bool Applied;
@@ -457,6 +488,8 @@ namespace ProgrammaticStylized3D.Trees
             float axialTwistErrorDegrees = 0f;
             float axialTwistTurns = 0f;
             TreeResolvedParameters resolved = definition.ResolvedParameters;
+            AxialTwistTelemetry axialTwistTelemetry =
+                CreateAxialTwistTelemetry(resolved, settings);
             IReadOnlyList<TreeBranchDefinition> branches = definition.Branches;
             for (int branchIndex = 0; branchIndex < branches.Count; branchIndex++)
             {
@@ -564,6 +597,7 @@ namespace ProgrammaticStylized3D.Trees
             result.RootSupportWidthClampedByCount =
                 emittedRootSupportAngularWidthDegrees + 0.0001f <
                 requestedRootSupportAngularWidthDegrees;
+            CopyAxialTwistTelemetry(result, axialTwistTelemetry);
 
             for (int branchIndex = 0;
                  branchIndex < branches.Count;
@@ -635,6 +669,7 @@ namespace ProgrammaticStylized3D.Trees
                         ref measuredAxialTwistDegrees,
                         ref axialTwistErrorDegrees,
                         ref axialTwistTurns,
+                        ref axialTwistTelemetry,
                         out string failure))
                 {
                     if (captureAuditTelemetry)
@@ -646,6 +681,7 @@ namespace ProgrammaticStylized3D.Trees
                             totalBuildStopwatch.Elapsed.TotalMilliseconds;
                     }
                     CopyBoundaryTelemetry(result);
+                    CopyAxialTwistTelemetry(result, axialTwistTelemetry);
                     result.Failure = failure;
                     targetMesh.Clear();
                     return result;
@@ -692,6 +728,7 @@ namespace ProgrammaticStylized3D.Trees
                 result.VertexCount = vertices.Count;
                 result.TriangleCount = triangles.Count / 3;
                 CopyBoundaryTelemetry(result);
+                CopyAxialTwistTelemetry(result, axialTwistTelemetry);
                 result.Failure =
                     "Bark topology audit failed.\n" +
                     result.TopologyAudit.Report;
@@ -825,6 +862,7 @@ namespace ProgrammaticStylized3D.Trees
             result.MeasuredAxialTwistDegrees = measuredAxialTwistDegrees;
             result.AxialTwistErrorDegrees = axialTwistErrorDegrees;
             result.AxialTwistTurns = axialTwistTurns;
+            CopyAxialTwistTelemetry(result, axialTwistTelemetry);
             CopyBoundaryTelemetry(result);
             result.LocalBounds = targetMesh.bounds;
             result.InputFingerprint = CalculateInputFingerprint(
@@ -1105,6 +1143,7 @@ namespace ProgrammaticStylized3D.Trees
             ref float measuredAxialTwistDegrees,
             ref float axialTwistErrorDegrees,
             ref float axialTwistTurns,
+            ref AxialTwistTelemetry axialTwistTelemetry,
             out string failure)
         {
             failure = string.Empty;
@@ -1227,6 +1266,34 @@ namespace ProgrammaticStylized3D.Trees
                     "Branch " + branch.StableBranchId +
                     " produced fewer than two render samples.";
                 return false;
+            }
+
+            if (branch.BranchOrder == 0)
+            {
+                CalculateAuthoredAxialTwistDistribution(
+                    definition.ResolvedParameters,
+                    samples,
+                    ref axialTwistTelemetry);
+                if (axialTwistTelemetry.MaximumStepDegrees >
+                    axialTwistTelemetry.MaximumAllowedStepDegrees + 0.001f)
+                {
+                    failure =
+                        "Generated trunk axial-roll sampling exceeded the " +
+                        "active-policy step limit. measured=" +
+                        axialTwistTelemetry.MaximumStepDegrees.ToString("F3") +
+                        " allowed=" +
+                        axialTwistTelemetry.MaximumAllowedStepDegrees
+                            .ToString("F3") +
+                        " interval=" +
+                        axialTwistTelemetry
+                            .MaximumStepStartNormalizedDistance
+                            .ToString("F6") +
+                        "->" +
+                        axialTwistTelemetry
+                            .MaximumStepEndNormalizedDistance
+                            .ToString("F6") + ".";
+                    return false;
+                }
             }
 
             int minimumRadialSegments;
@@ -1363,10 +1430,15 @@ namespace ProgrammaticStylized3D.Trees
                     // roll as completed at that zero-radius point rather than
                     // falsely reporting a twist deficit caused by removing
                     // invalid finite-radius rings.
+                    float collapsedStart = Mathf.Clamp01(
+                        1f - trunkTipClosure.CollapsedNormalizedSpan);
                     measuredAxialTwistDegrees +=
-                        definition.ResolvedParameters
-                            .TrunkSurfaceTorsionDegrees *
-                        trunkTipClosure.CollapsedNormalizedSpan;
+                        ResolveAuthoredTrunkSurfaceRollDegrees(
+                            definition.ResolvedParameters,
+                            1f) -
+                        ResolveAuthoredTrunkSurfaceRollDegrees(
+                            definition.ResolvedParameters,
+                            collapsedStart);
                 }
                 axialTwistErrorDegrees = Mathf.Abs(
                     measuredAxialTwistDegrees -
@@ -2398,8 +2470,12 @@ namespace ProgrammaticStylized3D.Trees
                 0f,
                 b.NormalizedDistance - a.NormalizedDistance);
             float twistSpan = Mathf.Abs(
-                parameters.TrunkSurfaceTorsionDegrees) *
-                normalizedSpan;
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    b.NormalizedDistance) -
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    a.NormalizedDistance));
             int twistSubdivisions = Mathf.Max(
                 1,
                 Mathf.CeilToInt(
@@ -3448,12 +3524,24 @@ namespace ProgrammaticStylized3D.Trees
                 parameters, current.NormalizedDistance);
             float nextFrameEnvelope = EvaluateRootFrameEnvelope(
                 parameters, next.NormalizedDistance);
-            float effectiveTransition =
-                CalculateEffectiveRootTransitionHeight(parameters);
-            float currentRollProgress = Mathf.InverseLerp(
-                effectiveTransition, 1f, current.NormalizedDistance);
-            float nextRollProgress = Mathf.InverseLerp(
-                effectiveTransition, 1f, next.NormalizedDistance);
+            float currentRollDegrees =
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    current.NormalizedDistance);
+            float nextRollDegrees =
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    next.NormalizedDistance);
+            float requestedRollDegrees =
+                parameters.TrunkSurfaceTorsionDegrees;
+            float currentRollProgress =
+                Mathf.Abs(requestedRollDegrees) > Epsilon
+                    ? currentRollDegrees / requestedRollDegrees
+                    : 0f;
+            float nextRollProgress =
+                Mathf.Abs(requestedRollDegrees) > Epsilon
+                    ? nextRollDegrees / requestedRollDegrees
+                    : 0f;
             float worstAngleDegrees = worstSide >= 0
                 ? worstSide * 360f / radialSegments
                 : 0f;
@@ -3508,13 +3596,14 @@ namespace ProgrammaticStylized3D.Trees
                 .Append(currentFrameEnvelope.ToString("F6"))
                 .Append(" -> ")
                 .AppendLine(nextFrameEnvelope.ToString("F6"));
-            report.Append("bark-roll progress current -> next / authored degrees: ")
+            report.Append("bark-roll progress current -> next / degrees: ")
                 .Append(currentRollProgress.ToString("F6"))
                 .Append(" -> ")
                 .Append(nextRollProgress.ToString("F6"))
                 .Append(" / ")
-                .AppendLine(parameters.TrunkSurfaceTorsionDegrees
-                    .ToString("F3"));
+                .Append(currentRollDegrees.ToString("F3"))
+                .Append(" -> ")
+                .AppendLine(nextRollDegrees.ToString("F3"));
             report.Append("root phase / worst angle degrees / root count: ")
                 .Append((ResolveRootPhase(branch.Phase) * Mathf.Rad2Deg)
                     .ToString("F3")).Append(" / ")
@@ -3910,19 +3999,77 @@ namespace ProgrammaticStylized3D.Trees
                 surfaceBinormalAxis * sine,
                 surfaceNormalAxis);
 
-            crossSectionMultiplier =
-                EvaluateTrunkCrossSectionMultiplier(
-                    parameters,
-                    branch.Phase,
-                    sample.NormalizedDistance,
-                    angle);
-            return sample.Position +
-                radial *
+            EvaluateTrunkRootContributions(
+                parameters,
+                branch.Phase,
+                sample.NormalizedDistance,
+                angle,
+                out float bodyContribution,
+                out float footContribution,
+                out float footEnvelope);
+            if (!parameters.RecipeOnlyControlSource)
+            {
+                crossSectionMultiplier = Mathf.Max(
+                    0.35f,
+                    1f + bodyContribution + footContribution);
+                return sample.Position +
+                    radial *
+                    sample.Radius *
+                    crossSectionMultiplier;
+            }
+
+            Vector3 bodyOffset = radial *
                 sample.Radius *
-                crossSectionMultiplier;
+                (1f + bodyContribution);
+            Vector3 footRadial = ResolveGroundAnchoredRootFootRadial(
+                parameters,
+                sample.NormalizedDistance,
+                angle,
+                footEnvelope);
+            Vector3 offset = bodyOffset +
+                footRadial * sample.Radius * footContribution;
+            crossSectionMultiplier = offset.magnitude /
+                Mathf.Max(Epsilon, sample.Radius);
+            return sample.Position + offset;
         }
 
         private static void ResolveTrunkSurfaceFrame(
+            TreeResolvedParameters parameters,
+            RenderSample sample,
+            out Vector3 tangent,
+            out Vector3 normal,
+            out Vector3 binormal)
+        {
+            ResolveTrunkBaseSurfaceFrame(
+                parameters,
+                sample,
+                out tangent,
+                out normal,
+                out binormal);
+
+            if (parameters.RecipeOnlyControlSource &&
+                Mathf.Abs(parameters.TrunkSurfaceTorsionDegrees) > Epsilon)
+            {
+                float rollDegrees =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        sample.NormalizedDistance);
+                normal = Quaternion.AngleAxis(
+                    rollDegrees,
+                    tangent) * normal;
+                normal = SafeNormalize(
+                    Vector3.ProjectOnPlane(normal, tangent),
+                    ChooseInitialNormal(tangent));
+                binormal = SafeNormalize(
+                    Vector3.Cross(tangent, normal),
+                    binormal);
+                normal = SafeNormalize(
+                    Vector3.Cross(binormal, tangent),
+                    normal);
+            }
+        }
+
+        private static void ResolveTrunkBaseSurfaceFrame(
             TreeResolvedParameters parameters,
             RenderSample sample,
             out Vector3 tangent,
@@ -3965,7 +4112,10 @@ namespace ProgrammaticStylized3D.Trees
                     Vector3.ProjectOnPlane(Vector3.right, tangent),
                     ChooseInitialNormal(tangent));
                 normal = SafeNormalize(
-                    Vector3.Slerp(fixedRootNormal, transportedNormal, adoption),
+                    Vector3.Slerp(
+                        fixedRootNormal,
+                        transportedNormal,
+                        adoption),
                     fixedRootNormal);
             }
             else
@@ -3973,30 +4123,20 @@ namespace ProgrammaticStylized3D.Trees
                 normal = transportedNormal;
             }
 
-            if (parameters.RecipeOnlyControlSource &&
-                Mathf.Abs(parameters.TrunkSurfaceTorsionDegrees) > Epsilon)
-            {
-                float rootHeight =
-                    CalculateEarliestRootTransitionHeight(parameters);
-                float rollProgress = Mathf.InverseLerp(
-                    rootHeight,
-                    1f,
-                    sample.NormalizedDistance);
-                float rollDegrees =
-                    parameters.TrunkSurfaceTorsionDegrees * rollProgress;
-                normal = Quaternion.AngleAxis(
-                    rollDegrees,
-                    tangent) * normal;
-                normal = SafeNormalize(
-                    Vector3.ProjectOnPlane(normal, tangent),
-                    ChooseInitialNormal(tangent));
-            }
             binormal = SafeNormalize(
                 Vector3.Cross(tangent, normal),
                 sample.Binormal);
             normal = SafeNormalize(
                 Vector3.Cross(binormal, tangent),
                 normal);
+        }
+
+        private static float ResolveAuthoredTrunkSurfaceRollDegrees(
+            TreeResolvedParameters parameters,
+            float normalizedDistance)
+        {
+            return parameters.TrunkSurfaceTorsionDegrees *
+                Mathf.Clamp01(normalizedDistance);
         }
 
         private static float CalculateRootGroundPlateauEnd(
@@ -4187,23 +4327,42 @@ namespace ProgrammaticStylized3D.Trees
             float normalizedDistance,
             float angle)
         {
+            EvaluateTrunkRootContributions(
+                parameters,
+                branchPhase,
+                normalizedDistance,
+                angle,
+                out float bodyContribution,
+                out float footContribution,
+                out _);
+            return Mathf.Max(
+                0.35f,
+                1f + bodyContribution + footContribution);
+        }
+
+        private static void EvaluateTrunkRootContributions(
+            TreeResolvedParameters parameters,
+            float branchPhase,
+            float normalizedDistance,
+            float angle,
+            out float bodyContribution,
+            out float footContribution,
+            out float footEnvelope)
+        {
             int buttressCount = Mathf.Clamp(
                 parameters.RootButtressCount,
                 3,
                 8);
-            float rootPhase = ResolveRootPhase(branchPhase);
-            TreeRootCollapseTournamentProfile tournamentProfile =
-                GetActiveRootCollapseProfile();
             EvaluateRootEnvelopes(
                 parameters,
                 normalizedDistance,
                 out float bodyEnvelope,
-                out float footEnvelope);
+                out footEnvelope);
             float shoulderWidth =
                 EvaluateButtressAngularWidthScale(bodyEnvelope);
             EvaluateButtressMasks(
                 angle,
-                rootPhase,
+                ResolveRootPhase(branchPhase),
                 buttressCount,
                 shoulderWidth,
                 parameters.RootThickness,
@@ -4211,8 +4370,6 @@ namespace ProgrammaticStylized3D.Trees
                 out float bodyMask,
                 out float footMask);
 
-            float bodyContribution;
-            float footContribution;
             if (parameters.RecipeOnlyControlSource)
             {
                 float reach = Mathf.Max(0f, parameters.RootReach);
@@ -4220,28 +4377,48 @@ namespace ProgrammaticStylized3D.Trees
                     reach * 0.28f * bodyEnvelope * bodyMask;
                 footContribution =
                     reach * 0.72f * footEnvelope * footMask;
-            }
-            else
-            {
-                bodyContribution =
-                    0.25f *
-                    Mathf.Max(0f, parameters.RootButtressStrength) *
-                    bodyEnvelope *
-                    bodyMask;
-                float footAmplitude =
-                    0.40f *
-                    Mathf.Max(0f, parameters.RootButtressStrength) +
-                    0.75f *
-                    (Mathf.Max(1f, parameters.RootFlareScale) - 1f);
-                footContribution =
-                    footAmplitude * footEnvelope * footMask;
+                return;
             }
 
-            return Mathf.Max(
-                0.35f,
-                1f +
-                bodyContribution +
-                footContribution);
+            bodyContribution =
+                0.25f *
+                Mathf.Max(0f, parameters.RootButtressStrength) *
+                bodyEnvelope *
+                bodyMask;
+            float footAmplitude =
+                0.40f *
+                Mathf.Max(0f, parameters.RootButtressStrength) +
+                0.75f *
+                (Mathf.Max(1f, parameters.RootFlareScale) - 1f);
+            footContribution =
+                footAmplitude * footEnvelope * footMask;
+        }
+
+        private static Vector3 ResolveGroundAnchoredRootFootRadial(
+            TreeResolvedParameters parameters,
+            float normalizedDistance,
+            float angle,
+            float footEnvelope)
+        {
+            Vector3 anchoredNormal = Vector3.right;
+            Vector3 anchoredBinormal = Vector3.Cross(
+                Vector3.up,
+                anchoredNormal).normalized;
+            Vector3 anchoredRadial = SafeNormalize(
+                anchoredNormal * Mathf.Cos(angle) +
+                anchoredBinormal * Mathf.Sin(angle),
+                anchoredNormal);
+            float anchorWeight = Mathf.Clamp01(footEnvelope);
+            float releasedRollDegrees =
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    normalizedDistance) *
+                (1f - anchorWeight);
+            return SafeNormalize(
+                Quaternion.AngleAxis(
+                    releasedRollDegrees,
+                    Vector3.up) * anchoredRadial,
+                anchoredRadial);
         }
 
         private static float ResolveRootPhase(float branchPhase)
@@ -4285,8 +4462,8 @@ namespace ProgrammaticStylized3D.Trees
             // Recipe-only root-width contract. Thickness 0.5 reproduces
             // the accepted H4 six-root support exactly: one 60-degree support
             // sector with the original q^4 profile. Lower values reduce the
-            // requested support. Higher values broaden both support and crest
-            // through a steeper profile, while the emitted support is clamped
+            // requested support. Higher values broaden support while tapering
+            // toward a rounder crest; the emitted support remains clamped
             // to one root sector so neighbouring lobes still meet at a true
             // zero valley. Root Count therefore changes width only when the
             // requested absolute support would physically overlap.
@@ -4315,7 +4492,7 @@ namespace ProgrammaticStylized3D.Trees
                 0.50f,
                 1f,
                 Mathf.Clamp(rootThickness, 0.50f, 1f));
-            float profilePower = Mathf.Lerp(4f, 12f, highThickness);
+            float profilePower = Mathf.Lerp(4f, 2f, highThickness);
             float basis = Mathf.Max(
                 0f,
                 1f - Mathf.Pow(q, profilePower));
@@ -4526,7 +4703,7 @@ namespace ProgrammaticStylized3D.Trees
                 0.50f,
                 1f,
                 Mathf.Clamp(parameters.RootThickness, 0.50f, 1f));
-            float profilePower = Mathf.Lerp(4f, 12f, highThickness);
+            float profilePower = Mathf.Lerp(4f, 2f, highThickness);
             float crestContribution = Mathf.Max(0f, parameters.RootReach);
             if (crestContribution <= Epsilon)
             {
@@ -4744,6 +4921,57 @@ namespace ProgrammaticStylized3D.Trees
                 return 0f;
             }
 
+            if (!parameters.RecipeOnlyControlSource)
+            {
+                return MeasureLegacyGeneratedTrunkAxialTwist(
+                    parameters,
+                    samples,
+                    vertices,
+                    ringVertexStarts);
+            }
+
+            float previousWrappedAngle = 0f;
+            float accumulatedAngle = 0f;
+            for (int ring = 0; ring < samples.Count; ring++)
+            {
+                RenderSample sample = samples[ring];
+                ResolveTrunkBaseSurfaceFrame(
+                    parameters,
+                    sample,
+                    out Vector3 surfaceTangent,
+                    out Vector3 zeroRollNormal,
+                    out _);
+
+                int vertexIndex = ringVertexStarts[ring];
+                Vector3 emittedRadial = Vector3.ProjectOnPlane(
+                    vertices[vertexIndex] - sample.Position,
+                    surfaceTangent);
+                emittedRadial = SafeNormalize(
+                    emittedRadial,
+                    zeroRollNormal);
+                float wrappedAngle = Vector3.SignedAngle(
+                    zeroRollNormal,
+                    emittedRadial,
+                    surfaceTangent);
+                if (ring > 0)
+                {
+                    accumulatedAngle += Mathf.DeltaAngle(
+                        previousWrappedAngle,
+                        wrappedAngle);
+                }
+
+                previousWrappedAngle = wrappedAngle;
+            }
+
+            return accumulatedAngle;
+        }
+
+        private static float MeasureLegacyGeneratedTrunkAxialTwist(
+            TreeResolvedParameters parameters,
+            IReadOnlyList<RenderSample> samples,
+            IReadOnlyList<Vector3> vertices,
+            IReadOnlyList<int> ringVertexStarts)
+        {
             Vector3 previousStructuralTangent = SafeNormalize(
                 samples[0].Tangent,
                 Vector3.up);
@@ -4811,6 +5039,122 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             return accumulatedAngle;
+        }
+
+        private static AxialTwistTelemetry CreateAxialTwistTelemetry(
+            TreeResolvedParameters parameters,
+            TreeBarkMeshSettings settings)
+        {
+            float groundPlateauEnd = CalculateRootGroundPlateauEnd(
+                parameters);
+            float rootCollapseEnd = CalculateEffectiveRootCollapseHeight(
+                parameters);
+            float earliestTransition =
+                CalculateEarliestRootTransitionHeight(parameters);
+            float effectiveTransition =
+                CalculateEffectiveRootTransitionHeight(parameters);
+            return new AxialTwistTelemetry
+            {
+                FirstNonZeroNormalizedDistance = -1f,
+                GroundPlateauEndDegrees =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        groundPlateauEnd),
+                RootCollapseEndDegrees =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        rootCollapseEnd),
+                EarliestRootTransitionDegrees =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        earliestTransition),
+                EffectiveRootTransitionDegrees =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        effectiveTransition),
+                MaximumAllowedStepDegrees =
+                    settings.ResolveMaximumTrunkTwistStepDegrees()
+            };
+        }
+
+        private static void CalculateAuthoredAxialTwistDistribution(
+            TreeResolvedParameters parameters,
+            IReadOnlyList<RenderSample> samples,
+            ref AxialTwistTelemetry telemetry)
+        {
+            telemetry.FirstNonZeroNormalizedDistance = -1f;
+            telemetry.MaximumStepDegrees = 0f;
+            telemetry.MaximumStepStartNormalizedDistance = 0f;
+            telemetry.MaximumStepEndNormalizedDistance = 0f;
+            if (samples == null || samples.Count == 0 ||
+                Mathf.Abs(parameters.TrunkSurfaceTorsionDegrees) <= Epsilon)
+            {
+                return;
+            }
+
+            float previousRoll = ResolveAuthoredTrunkSurfaceRollDegrees(
+                parameters,
+                samples[0].NormalizedDistance);
+            bool foundFirst = Mathf.Abs(previousRoll) > Epsilon;
+            if (foundFirst)
+            {
+                telemetry.FirstNonZeroNormalizedDistance =
+                    samples[0].NormalizedDistance;
+            }
+
+            for (int index = 1; index < samples.Count; index++)
+            {
+                float currentRoll =
+                    ResolveAuthoredTrunkSurfaceRollDegrees(
+                        parameters,
+                        samples[index].NormalizedDistance);
+                if (!foundFirst && Mathf.Abs(currentRoll) > Epsilon)
+                {
+                    telemetry.FirstNonZeroNormalizedDistance =
+                        samples[index].NormalizedDistance;
+                    foundFirst = true;
+                }
+
+                float step = Mathf.Abs(currentRoll - previousRoll);
+                if (step > telemetry.MaximumStepDegrees)
+                {
+                    telemetry.MaximumStepDegrees = step;
+                    telemetry.MaximumStepStartNormalizedDistance =
+                        samples[index - 1].NormalizedDistance;
+                    telemetry.MaximumStepEndNormalizedDistance =
+                        samples[index].NormalizedDistance;
+                }
+                previousRoll = currentRoll;
+            }
+        }
+
+        private static void CopyAxialTwistTelemetry(
+            TreeBarkMeshBuildResult result,
+            AxialTwistTelemetry telemetry)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            result.FirstAuthoredAxialTwistNormalizedDistance =
+                telemetry.FirstNonZeroNormalizedDistance;
+            result.AxialTwistAtGroundPlateauEndDegrees =
+                telemetry.GroundPlateauEndDegrees;
+            result.AxialTwistAtRootCollapseEndDegrees =
+                telemetry.RootCollapseEndDegrees;
+            result.AxialTwistAtEarliestRootTransitionDegrees =
+                telemetry.EarliestRootTransitionDegrees;
+            result.AxialTwistAtEffectiveRootTransitionDegrees =
+                telemetry.EffectiveRootTransitionDegrees;
+            result.MaximumAuthoredAxialTwistStepDegrees =
+                telemetry.MaximumStepDegrees;
+            result.MaximumAllowedAxialTwistStepDegrees =
+                telemetry.MaximumAllowedStepDegrees;
+            result.MaximumAuthoredAxialTwistStepStartNormalizedDistance =
+                telemetry.MaximumStepStartNormalizedDistance;
+            result.MaximumAuthoredAxialTwistStepEndNormalizedDistance =
+                telemetry.MaximumStepEndNormalizedDistance;
         }
 
         private static void CalculateRootDimensions(

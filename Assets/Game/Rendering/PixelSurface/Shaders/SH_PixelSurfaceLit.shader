@@ -55,6 +55,8 @@ Shader "PS3D/Pixel Surface Lit"
 
         [Enum(ProgrammaticStylized3D.Rendering.PixelSurfaceMaskDebugMode)]
         _MaskDebugMode("Mask Debug Mode", Float) = 0
+        [HideInInspector] _SurfaceCausalityMode("Surface Causality Mode", Float) = 0
+        [HideInInspector] _SurfaceCausalityLightScale("Surface Causality Light Scale", Float) = 1
         [Enum(GeneratedMass,0,Ground,1)]
         _SurfaceContract("Surface Contract", Float) = 0
         _GroundSnowResponse("Ground Snow Response", Range(0, 2)) = 1
@@ -151,6 +153,7 @@ Shader "PS3D/Pixel Surface Lit"
             #pragma target 3.5
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma shader_feature_local_fragment _SURFACE_CAUSALITY_AUDIT
             #pragma multi_compile_fog
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS
@@ -205,6 +208,8 @@ Shader "PS3D/Pixel Surface Lit"
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
                 float _MaskDebugMode;
+                float _SurfaceCausalityMode;
+                float _SurfaceCausalityLightScale;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
                 float _GroundDampResponse;
@@ -331,6 +336,8 @@ Shader "PS3D/Pixel Surface Lit"
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
                 float _MaskDebugMode;
+                float _SurfaceCausalityMode;
+                float _SurfaceCausalityLightScale;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
                 float _GroundDampResponse;
@@ -501,6 +508,8 @@ Shader "PS3D/Pixel Surface Lit"
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
                 float _MaskDebugMode;
+                float _SurfaceCausalityMode;
+                float _SurfaceCausalityLightScale;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
                 float _GroundDampResponse;
@@ -665,6 +674,8 @@ Shader "PS3D/Pixel Surface Lit"
                 float _StoneCreaseResponse;
                 half4 _StoneCreaseTint;
                 float _MaskDebugMode;
+                float _SurfaceCausalityMode;
+                float _SurfaceCausalityLightScale;
                 float _SurfaceContract;
                 float _GroundSnowResponse;
                 float _GroundDampResponse;

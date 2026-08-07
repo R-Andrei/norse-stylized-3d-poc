@@ -395,6 +395,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             {
                 using (new EditorGUI.DisabledScope(
                     TreeGeometryEfficiencyAudit.IsRunning ||
+                    TreeRootQualityEvaluation.IsRunning ||
                     TreeRootCollapseTournament.IsRunning))
                 {
                     if (GUILayout.Button("Run 41-Control Response Suite"))
@@ -452,6 +453,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             {
                 using (new EditorGUI.DisabledScope(
                     TreeControlResponseSuite.IsRunning ||
+                    TreeRootQualityEvaluation.IsRunning ||
                     TreeRootCollapseTournament.IsRunning))
                 {
                     if (GUILayout.Button("Run Geometry Efficiency Audit"))
@@ -473,6 +475,68 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 if (GUILayout.Button("Open Geometry Audit Folder"))
                 {
                     TreeGeometryEfficiencyAudit.OpenOutputFolder();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Root Quality Evaluation",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Builds a temporary 8-case Wych Elm board for the grounded root-foot model: authored roots, the operator's 400-degree / 1.2 Reach / 0.9 Thickness profile, isolated Reach and Thickness stress, opposite twist handedness, and Persistence 0 / 1. Each case receives a neutral close-root capture and an exact game-camera context capture. The evaluation changes no recipes, exact controls, scene objects or gallery meshes; it advances incrementally, checkpoints partial output and remains cancellable.",
+                MessageType.None);
+            if (TreeRootQualityEvaluation.IsRunning)
+            {
+                Rect rootQualityProgressRect = GUILayoutUtility.GetRect(
+                    10f,
+                    18f,
+                    GUILayout.ExpandWidth(true));
+                EditorGUI.ProgressBar(
+                    rootQualityProgressRect,
+                    TreeRootQualityEvaluation.CurrentProgress,
+                    TreeRootQualityEvaluation.ProgressLabel);
+                EditorGUILayout.LabelField(
+                    "Current",
+                    TreeRootQualityEvaluation.CurrentDetail);
+                EditorGUILayout.LabelField(
+                    "Timing",
+                    TreeRootQualityEvaluation.CurrentEta);
+                if (GUILayout.Button("Cancel Grounded Root-Foot Evaluation"))
+                {
+                    TreeRootQualityEvaluation.RequestCancel();
+                }
+            }
+            else
+            {
+                using (new EditorGUI.DisabledScope(
+                    TreeControlResponseSuite.IsRunning ||
+                    TreeGeometryEfficiencyAudit.IsRunning ||
+                    TreeRootCollapseTournament.IsRunning))
+                {
+                    if (GUILayout.Button("Run Grounded Root-Foot Board"))
+                    {
+                        TreeRootQualityEvaluation.Start(instance);
+                    }
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                string.IsNullOrEmpty(
+                    TreeRootQualityEvaluation.LastReportPath)))
+            {
+                if (GUILayout.Button("Open Grounded Root-Foot Board"))
+                {
+                    TreeRootQualityEvaluation.OpenBoard();
+                }
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy Grounded Root-Foot Report"))
+                {
+                    TreeRootQualityEvaluation.CopyLastReport();
+                }
+                if (GUILayout.Button("Open Grounded Root-Foot Folder"))
+                {
+                    TreeRootQualityEvaluation.OpenOutputFolder();
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -509,7 +573,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
             {
                 using (new EditorGUI.DisabledScope(
                     TreeControlResponseSuite.IsRunning ||
-                    TreeGeometryEfficiencyAudit.IsRunning))
+                    TreeGeometryEfficiencyAudit.IsRunning ||
+                    TreeRootQualityEvaluation.IsRunning))
                 {
                     if (GUILayout.Button("Run Root-Frame Tournament"))
                     {

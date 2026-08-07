@@ -1,10 +1,52 @@
 #ifndef PS3D_PIXELSURFACEFORWARDPASS_HLSL
 #define PS3D_PIXELSURFACEFORWARDPASS_HLSL
 
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+            int ResolveSurfaceCausalityMode()
+            {
+                return (int)round(_SurfaceCausalityMode);
+            }
+
+            half3 ResolveSurfaceCausalityMainDirect(
+                half3 albedo,
+                Varyings input,
+                half3 normalWS)
+            {
+                Light mainLight = GetMainLight(
+                    TransformWorldToShadowCoord(input.positionWS));
+                half ndotl = saturate(dot(normalWS, mainLight.direction));
+                half attenuation =
+                    mainLight.distanceAttenuation *
+                    mainLight.shadowAttenuation;
+                return
+                    albedo *
+                    mainLight.color *
+                    ndotl *
+                    attenuation *
+                    (half)max(0.0, _SurfaceCausalityLightScale);
+            }
+
+            half3 ResolveSurfaceCausalityAmbient(
+                half3 albedo,
+                half3 normalWS)
+            {
+                return
+                    albedo *
+                    SampleSH(normalWS) *
+                    (half)max(0.0, _SurfaceCausalityLightScale);
+            }
+#endif
+
             half3 ResolvePixelSurfaceColor(Varyings input)
             {
                 half4 baseSample =
                     SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 20)
+                {
+                    return baseSample.rgb * _BaseColor.rgb;
+                }
+#endif
 
                 float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
                 float3 broadCoordinate =
@@ -52,6 +94,12 @@
                     pixelProfileContrast;
                 half tonalScale =
                     (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 21)
+                {
+                    return baseSample.rgb * _BaseColor.rgb * tonalScale;
+                }
+#endif
 
                 float isGroundSurface = ResolveSurfaceContractIsGround();
                 float exposureMask =
@@ -146,6 +194,12 @@
                     _BaseColor.rgb *
                     tonalScale *
                     (half)max(0.0, semanticScale);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 22)
+                {
+                    return albedo;
+                }
+#endif
 
                 half3 groundAlbedo = albedo;
                 groundAlbedo = lerp(
@@ -178,6 +232,12 @@
                     wetness,
                     frostStrength,
                     monolithicFlatten);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 23)
+                {
+                    return albedo;
+                }
+#endif
 
                 half3 exposureTintTarget =
                     PS3D_ApplyValuePreservingTint(
@@ -309,7 +369,12 @@
                     albedo,
                     wetDampTarget,
                     (half)saturate(wetDampStrength));
-
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 24)
+                {
+                    return albedo;
+                }
+#endif
 
                 float frostNoise =
                     PS3D_ValueNoise31(broadCoordinate * 1.7 + 71.31);
@@ -473,6 +538,10 @@
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
+#if !defined(_SURFACE_CAUSALITY_AUDIT)
+                // Production variant: intentionally identical to the validated
+                // pre-audit forward path. Diagnostic derivatives, branches, and
+                // isolation modes are compiled out of ordinary materials.
                 half3 geometricNormalWS = normalize(input.normalWS);
                 half3 normalWS = geometricNormalWS;
                 float generatedMassSurface =
@@ -554,5 +623,162 @@
 
                 finalRgb = MixFog(finalRgb, inputData.fogCoord);
                 return half4(finalRgb, pbrColor.a);
+#else
+                int causalityMode = ResolveSurfaceCausalityMode();
+                half3 storedNormalWS = normalize(input.normalWS);
+                half3 viewDirectionWS =
+                    SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
+                half3 triangleNormalWS = normalize(
+                    cross(
+                        ddy(input.positionWS),
+                        ddx(input.positionWS)));
+                triangleNormalWS = faceforward(
+                    triangleNormalWS,
+                    -viewDirectionWS,
+                    triangleNormalWS);
+
+                bool triangleNormalMode =
+                    causalityMode == 5 ||
+                    (causalityMode >= 15 && causalityMode <= 19);
+                bool storedNormalMode =
+                    causalityMode >= 11 && causalityMode <= 14;
+                bool noGeneratedSurfaceNormalMode = causalityMode == 7;
+
+                half3 normalWS = storedNormalWS;
+                float generatedMassSurface =
+                    1.0 - ResolveSurfaceContractIsGround();
+                if (triangleNormalMode)
+                {
+                    normalWS = triangleNormalWS;
+                }
+                else if (!storedNormalMode)
+                {
+                    if (generatedMassSurface > 0.5 &&
+                        !noGeneratedSurfaceNormalMode)
+                    {
+                        normalWS = (half3)ResolveGeneratedMassWholeSurfaceNormalWS(
+                            input,
+                            normalWS);
+                    }
+                    half flatNormalStrength =
+                        saturate((half)_FlatNormalStrength);
+                    if (flatNormalStrength > 0.001h)
+                    {
+                        normalWS = normalize(
+                            lerp(
+                                normalWS,
+                                triangleNormalWS,
+                                flatNormalStrength));
+                    }
+                }
+
+                half3 debugColor = ResolveMaskDebugColor(input);
+                if (debugColor.r >= 0.0h)
+                {
+                    return half4(debugColor, 1.0h);
+                }
+
+                half3 albedo = ResolvePixelSurfaceColor(input);
+                if (causalityMode >= 20 && causalityMode <= 24)
+                {
+                    return half4(albedo, 1.0h);
+                }
+                if (generatedMassSurface <= 0.5)
+                {
+                    albedo = ApplyStylizedValueShaping(albedo, input, normalWS);
+                }
+                albedo = PS3D_ApplyValuePreservingTint(
+                    albedo,
+                    _GeneratedMassOverallRockTint.rgb,
+                    _GeneratedMassOverallRockTintStrength);
+
+                if (causalityMode == 1)
+                {
+                    return half4(albedo, 1.0h);
+                }
+                if (causalityMode == 5)
+                {
+                    return half4(triangleNormalWS * 0.5h + 0.5h, 1.0h);
+                }
+                if (causalityMode == 6)
+                {
+                    return half4(normalWS * 0.5h + 0.5h, 1.0h);
+                }
+                if (causalityMode == 14)
+                {
+                    return half4(storedNormalWS * 0.5h + 0.5h, 1.0h);
+                }
+
+                bool constantAlbedoMode =
+                    (causalityMode >= 2 && causalityMode <= 4) ||
+                    (causalityMode >= 11 && causalityMode <= 13) ||
+                    (causalityMode >= 15 && causalityMode <= 17);
+                if (constantAlbedoMode)
+                {
+                    albedo = half3(0.5h, 0.5h, 0.5h);
+                }
+
+                bool directOnlyMode =
+                    causalityMode == 3 ||
+                    causalityMode == 9 ||
+                    causalityMode == 12 ||
+                    causalityMode == 16 ||
+                    causalityMode == 18;
+                if (directOnlyMode)
+                {
+                    return half4(
+                        ResolveSurfaceCausalityMainDirect(
+                            albedo,
+                            input,
+                            normalWS),
+                        1.0h);
+                }
+
+                bool ambientOnlyMode =
+                    causalityMode == 4 ||
+                    causalityMode == 10 ||
+                    causalityMode == 13 ||
+                    causalityMode == 17 ||
+                    causalityMode == 19;
+                if (ambientOnlyMode)
+                {
+                    return half4(
+                        ResolveSurfaceCausalityAmbient(albedo, normalWS),
+                        1.0h);
+                }
+
+                InputData inputData = BuildInputData(input, normalWS);
+                SurfaceData surfaceData = BuildSurfaceData(albedo);
+                half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
+
+                half3 finalRgb;
+                if (generatedMassSurface > 0.5)
+                {
+                    finalRgb = pbrColor.rgb;
+                }
+                else
+                {
+                    half3 safeAlbedo = max(albedo, half3(0.001h, 0.001h, 0.001h));
+                    half3 pbrLightingRatio = pbrColor.rgb / safeAlbedo;
+                    half lightingLuma =
+                        dot(
+                            pbrLightingRatio,
+                            half3(0.2126h, 0.7152h, 0.0722h));
+                    half3 neutralLitColor =
+                        albedo * max(0.0h, lightingLuma);
+                    half lightingTintInfluence =
+                        saturate((half)_GeneratedMassLightingTintInfluence);
+                    finalRgb = lerp(
+                        neutralLitColor,
+                        pbrColor.rgb,
+                        lightingTintInfluence);
+                }
+
+                if (causalityMode != 8)
+                {
+                    finalRgb = MixFog(finalRgb, inputData.fogCoord);
+                }
+                return half4(finalRgb, pbrColor.a);
+#endif
             }
 #endif // PS3D_PIXELSURFACEFORWARDPASS_HLSL

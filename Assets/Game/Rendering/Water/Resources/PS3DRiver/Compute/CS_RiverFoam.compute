@@ -1160,48 +1160,164 @@ float FoamEvaluateBoundedRibbonCoverage4x4(
     return coverage / 16.0;
 }
 
-float FoamEvaluateShoreRibbonSource(
+int FoamResolveShoreRibbonHeadCellIndex(
+    float progress,
+    int totalCellCount)
+{
+    return clamp(
+        (int)floor(
+            saturate(progress) * (float)totalCellCount + 0.00001),
+        0,
+        totalCellCount - 1);
+}
+
+float FoamAutomaticSourceGlobalDistanceAtColumn(int x)
+{
+    int safeX = clamp(x, 0, max(0, _FoamDimensions.x - 1));
+    return _FoamGlobalStart +
+        FoamGridLocalDistanceAtTexel(safeX) +
+        _FoamBulkTransportPhaseCells *
+            FoamTransportLongitudinalSpacing(safeX);
+}
+
+int FoamResolveAutomaticSourceWorldColumn(float globalDistance)
+{
+    float localDistance = globalDistance - _FoamGlobalStart;
+    if (FoamGridUsesFixedMetricLattice())
+    {
+        float spacing = max(0.0001, _FoamGridDescriptorSpacing.z);
+        return clamp(
+            (int)floor(
+                (localDistance - _FoamGridDescriptorLongitudinal.x) /
+                spacing),
+            0,
+            max(0, _FoamDimensions.x - 1));
+    }
+
+    return FoamUVToContainingTexel(
+        localDistance / max(0.001, _FoamFieldLength),
+        _FoamDimensions.x);
+}
+
+bool FoamIsNearestShoreRibbonColumn(
+    int x,
+    float targetGlobalDistance)
+{
+    float currentError = abs(
+        FoamAutomaticSourceGlobalDistanceAtColumn(x) -
+        targetGlobalDistance);
+    float lowerError = x > 0
+        ? abs(
+            FoamAutomaticSourceGlobalDistanceAtColumn(x - 1) -
+            targetGlobalDistance)
+        : 1e20;
+    float upperError = x + 1 < _FoamDimensions.x
+        ? abs(
+            FoamAutomaticSourceGlobalDistanceAtColumn(x + 1) -
+            targetGlobalDistance)
+        : 1e20;
+
+    // Exact ties select the greater grid index. Exactly one column therefore
+    // owns each discrete Shore Ribbon path-cell centre.
+    return currentError <= lowerError && currentError < upperError;
+}
+
+bool FoamIsNearestShoreRibbonRow(
+    int y,
+    FoamMetricRow metric,
+    float targetLateralMetres)
+{
+    float currentError = abs(
+        FoamLateralMetresAtTexel(y, metric) -
+        targetLateralMetres);
+    float lowerError = y > 0
+        ? abs(
+            FoamLateralMetresAtTexel(y - 1, metric) -
+            targetLateralMetres)
+        : 1e20;
+    float upperError = y + 1 < _FoamDimensions.y
+        ? abs(
+            FoamLateralMetresAtTexel(y + 1, metric) -
+            targetLateralMetres)
+        : 1e20;
+
+    // Exact ties select the greater grid index. Exactly one row therefore
+    // owns the one-cell-wide Shore Ribbon head in this column.
+    return currentError <= lowerError && currentError < upperError;
+}
+
+void FoamEvaluatePersistentShoreRibbonHead(
     FoamSourceEventData sourceEvent,
-    float globalDistance,
-    float lateralMetres,
+    int2 coordinate,
+    FoamMetricRow metric,
     float shoreMetres,
     float2 physicalCellSpacing,
-    out float coverageMultiplier)
+    out float birthShape,
+    out float headShape)
 {
-    float dx = max(0.005, physicalCellSpacing.x);
-    float dy = max(0.005, physicalCellSpacing.y);
-    float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
+    birthShape = 0.0;
+    headShape = 0.0;
+
+    int totalCellCount = max(
+        1,
+        (int)floor(max(1.0, sourceEvent.kinematics.z) + 0.5));
+    int currentHeadCell = FoamResolveShoreRibbonHeadCellIndex(
+        sourceEvent.header.z,
+        totalCellCount);
+    int previousHeadCell = sourceEvent.deposit.z > 0.5
+        ? FoamResolveShoreRibbonHeadCellIndex(
+            sourceEvent.deposit.y,
+            totalCellCount)
+        : -1;
+
+    float pathLengthMetres = abs(
+        sourceEvent.distance.y - sourceEvent.distance.x);
+    float longitudinalCellSpacing = max(
+        0.005,
+        pathLengthMetres / (float)totalCellCount);
+    float flowDirection = sourceEvent.distance.w >= 0.0
+        ? 1.0
+        : -1.0;
+    float globalDistance =
+        FoamAutomaticSourceGlobalDistanceAtColumn(coordinate.x);
     float alongCells = flowDirection *
-        (globalDistance - sourceEvent.distance.x) / dx;
-    float totalLengthCells = max(1.0,
-        abs(sourceEvent.distance.y - sourceEvent.distance.x) / dx);
-    float progress = saturate(sourceEvent.header.z);
-    float headLengthCells = max(1.0, sourceEvent.kinematics.y);
-    float revealedEnd = totalLengthCells * progress;
-    float revealedStart = max(0.0, revealedEnd - headLengthCells);
-    float longitudinalCoverage = FoamCellIntervalOverlap(
-        alongCells, revealedStart, revealedEnd);
+        (globalDistance - sourceEvent.distance.x) /
+        longitudinalCellSpacing;
+    int candidateCell = (int)floor(alongCells);
+    if (candidateCell < 0 || candidateCell >= totalCellCount)
+    {
+        return;
+    }
 
-    float inwardMetres = sourceEvent.header.y < 0.0
-        ? lateralMetres - shoreMetres
-        : shoreMetres - lateralMetres;
-    float lateralCells = inwardMetres / dy;
-    float insetCells = max(0.0, sourceEvent.shore.x);
-    float widthCells = max(1.0, sourceEvent.shore.y);
-    float headWidthCells = max(1.0, sourceEvent.shore.w);
-    bool movingHeadInterval = headLengthCells < totalLengthCells - 0.0001;
-    float activeWidth = movingHeadInterval ? headWidthCells : widthCells;
+    float targetGlobalDistance = sourceEvent.distance.x +
+        flowDirection *
+        ((float)candidateCell + 0.5) *
+        longitudinalCellSpacing;
+    if (!FoamIsNearestShoreRibbonColumn(
+            coordinate.x,
+            targetGlobalDistance))
+    {
+        return;
+    }
 
-    // Width is an inward occupancy count, not a radius centred on the bank.
-    // Centring the interval on the shoreline places half of every source outside
-    // valid fluid and makes a requested N-cell strip integrate to roughly N/2.
-    float lateralCoverage = FoamCellIntervalOverlap(
-        lateralCells,
-        insetCells,
-        insetCells + activeWidth);
+    float lateralCellSpacing = max(0.005, physicalCellSpacing.y);
+    float targetInwardMetres = 0.5 * lateralCellSpacing;
+    float targetLateralMetres = sourceEvent.header.y < 0.0
+        ? shoreMetres + targetInwardMetres
+        : shoreMetres - targetInwardMetres;
+    if (!FoamIsNearestShoreRibbonRow(
+            coordinate.y,
+            metric,
+            targetLateralMetres))
+    {
+        return;
+    }
 
-    coverageMultiplier = 1.0;
-    return saturate(longitudinalCoverage * lateralCoverage);
+    bool currentHead = candidateCell == currentHeadCell;
+    bool skippedCatchUp = candidateCell > previousHeadCell &&
+        candidateCell < currentHeadCell;
+    headShape = currentHead ? 1.0 : 0.0;
+    birthShape = currentHead || skippedCatchUp ? 1.0 : 0.0;
 }
 
 float FoamEvaluateInwardWashSource(
@@ -2029,6 +2145,7 @@ struct FoamAutomaticSourceRasterSample
 {
     float4 packedState;
     float injectedCoverage;
+    float debugCoverage;
     float sourceType;
     float clearState;
 };
@@ -2039,6 +2156,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     FoamAutomaticSourceRasterSample result;
     result.packedState = 0.0.xxxx;
     result.injectedCoverage = 0.0;
+    result.debugCoverage = 0.0;
     result.sourceType = 0.0;
     result.clearState = 0.0;
 
@@ -2069,24 +2187,28 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         return result;
     }
 
-    FoamMetricRow metric = _FoamMetricRows[x];
-    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
     float globalDistance = _FoamGlobalStart +
         FoamGridLocalDistanceAtTexel(x) +
         _FoamBulkTransportPhaseCells *
         FoamTransportLongitudinalSpacing(x);
+    bool shoreSource = sourceType < 2.5;
+    int worldMetricX = shoreSource
+        ? FoamResolveAutomaticSourceWorldColumn(globalDistance)
+        : x;
+    FoamMetricRow metric = _FoamMetricRows[worldMetricX];
+    float lateralMetres = FoamLateralMetresAtTexel(y, metric);
     float2 physicalPosition = float2(globalDistance, lateralMetres);
     float2 physicalCellSpacing = float2(
         max(0.01, metric.widthsAndSpacing.z),
         max(0.01, metric.widthsAndSpacing.w));
-    float2 shoreEdges = _FoamCurrentShoreEdgesRead.Load(int3(x, 0, 0));
+    float2 shoreEdges = _FoamCurrentShoreEdgesRead.Load(
+        int3(worldMetricX, 0, 0));
     float shoreMetres = sourceEvent.header.y < 0.0
         ? shoreEdges.x
         : shoreEdges.y;
     float inwardMetres = sourceEvent.header.y < 0.0
         ? lateralMetres - shoreMetres
         : shoreMetres - lateralMetres;
-    bool shoreSource = sourceType < 2.5;
     if (shoreSource &&
         inwardMetres < -max(sourceEvent.shore.w, physicalCellSpacing.y))
     {
@@ -2097,13 +2219,16 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     float currentShape = 0.0;
     if (sourceType < 1.5)
     {
-        currentShape = FoamEvaluateShoreRibbonSource(
+        float headShape = 0.0;
+        FoamEvaluatePersistentShoreRibbonHead(
             sourceEvent,
-            globalDistance,
-            lateralMetres,
+            coordinate,
+            metric,
             shoreMetres,
             physicalCellSpacing,
-            currentCoverageMultiplier);
+            currentShape,
+            headShape);
+        result.debugCoverage = saturate(headShape * validFluid);
     }
     else if (sourceType < 2.5)
     {
@@ -2176,6 +2301,18 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     float currentContribution = saturate(currentShape) *
         max(0.0, currentCoverageMultiplier);
     float birthContribution = currentContribution;
+    if (sourceType < 1.5)
+    {
+        // Shore Ribbon birth attempts from the current one-cell head every
+        // material tick and covers delayed catch-up cells independently. The
+        // source never becomes a cumulative revealed body; existing full cells
+        // reject the repeated attempt through FoamMergeBornMaterial.
+        if (currentContribution <= FoamMaterialStateEpsilon)
+        {
+            return result;
+        }
+    }
+    else
     {
         FoamSourceEventData previousSourceEvent = sourceEvent;
         previousSourceEvent.header.y = sourceEvent.deposit.x;
@@ -2187,17 +2324,7 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         {
             float previousCoverageMultiplier = 1.0;
             float previousShape = 0.0;
-            if (sourceType < 1.5)
-            {
-                previousShape = FoamEvaluateShoreRibbonSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    shoreMetres,
-                    physicalCellSpacing,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 2.5)
+            if (sourceType < 2.5)
             {
                 previousShape = FoamEvaluateInwardWashSource(
                     previousSourceEvent,
@@ -2279,16 +2406,9 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
 
         // Current-minus-previous is permission only. Once the moving reveal
         // interval reaches a cell, write the complete current geometric target
-        // rather than a cadence-dependent derivative amount. This preserves
-        // authored Coverage while still preventing writes behind the head.
+        // rather than a cadence-dependent derivative amount.
         birthContribution = currentContribution;
     }
-
-    // Every automatic source deposits only the newly revealed interval. Object
-    // Arc/Semi-Arc stroke zero establishes the complete obstacle-contact ring and
-    // then emits its finite wake arm geometry once. Later Arc strokes use the
-    // complete Arc contact profile; later Semi-Arc strokes use the selected half.
-    // Phase changes reset one-shot permission and no later stroke emits a wake arm.
 
     // P13A makes Initial Presence and Initial Life authoritative material
     // properties. Source shape, family/subcell shaping, reveal progression and
@@ -2316,6 +2436,10 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
         physicalCellSpacing);
     result.packedState = FoamEncodeMaterialState(sourceState);
     result.injectedCoverage = injectedCoverage;
+    if (sourceType >= 1.5)
+    {
+        result.debugCoverage = injectedCoverage;
+    }
     return result;
 }
 
@@ -2343,7 +2467,7 @@ void WriteFoamAutomaticSourceDebug(
     int2 coordinate,
     FoamAutomaticSourceRasterSample sample)
 {
-    if (sample.injectedCoverage <= FoamMaterialStateEpsilon)
+    if (sample.debugCoverage <= FoamMaterialStateEpsilon)
     {
         return;
     }
@@ -2365,7 +2489,7 @@ void WriteFoamAutomaticSourceDebug(
 
     debugState.rgb = max(
         debugState.rgb,
-        categoryMask * sample.injectedCoverage);
+        categoryMask * sample.debugCoverage);
     debugState.a = max(
         debugState.a,
         alreadyOccupied ? 1.0 : 0.0);

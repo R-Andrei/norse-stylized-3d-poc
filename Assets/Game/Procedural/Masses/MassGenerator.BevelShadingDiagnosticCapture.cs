@@ -72,6 +72,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         public sealed class FinalTriangleRecord
         {
             public int TriangleIndex;
+            public int IndexA;
+            public int IndexB;
+            public int IndexC;
             public int LogicalBevelId = -1;
             public int ProvenanceKind;
             public string ProvenanceKindName = string.Empty;
@@ -82,6 +85,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             public Vector3 B;
             public Vector3 C;
             public Vector3 GeometricNormal;
+            public FinalTriangleCondition TriangleCondition;
+            public bool TriangleStructurallyInvalid;
+            public bool TriangleNumericallyUnderResolved;
+            public bool TriangleExtremeSliver;
+            public double TriangleDoubleArea;
+            public double TriangleNormalizedDoubleArea;
+            public double TriangleAspectRatio;
+            public double TriangleMinimumAngleDegrees;
             public Vector3 RenderNormal;
             public Vector3 AuthoredNormal;
             public Vector4 MaskA;
@@ -435,10 +446,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 int ia = meshData.Triangles[offset];
                 int ib = meshData.Triangles[offset + 1];
                 int ic = meshData.Triangles[offset + 2];
-                Vector3 cross = Vector3.Cross(
-                    meshData.Vertices[ib] - meshData.Vertices[ia],
-                    meshData.Vertices[ic] - meshData.Vertices[ia]);
-                if (cross.sqrMagnitude > 0.000000000001f) continue;
+                FinalTriangleQuality quality = EvaluateFinalTriangleQuality(
+                    meshData.Vertices,
+                    ia,
+                    ib,
+                    ic);
+                if (!quality.IsStructurallyInvalid) continue;
                 count++;
                 unchecked
                 {
@@ -619,13 +632,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         private static void CaptureFinalTriangle(
             int triangleIndex,
+            int indexA,
+            int indexB,
+            int indexC,
             PolygonFaceProvenanceKind provenanceKind,
             int provenanceIndex,
             int surfaceGroup,
             Vector3 a,
             Vector3 b,
             Vector3 c,
-            Vector3 geometricNormal,
+            FinalTriangleQuality triangleQuality,
             Vector3 renderNormal,
             Vector3 authoredNormal,
             Vector4 maskA,
@@ -644,6 +660,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             activeBevelShadingBuild.FinalTriangles.Add(new FinalTriangleRecord
             {
                 TriangleIndex = triangleIndex,
+                IndexA = indexA,
+                IndexB = indexB,
+                IndexC = indexC,
                 LogicalBevelId = logicalBevelId,
                 ProvenanceKind = (int)provenanceKind,
                 ProvenanceKindName = provenanceKind.ToString(),
@@ -651,7 +670,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 IsOrdinaryBevel = ordinaryBevel,
                 SurfaceGroup = surfaceGroup,
                 A = a, B = b, C = c,
-                GeometricNormal = geometricNormal,
+                GeometricNormal = triangleQuality.GeometricNormal,
+                TriangleCondition = triangleQuality.PrimaryCondition,
+                TriangleStructurallyInvalid = triangleQuality.IsStructurallyInvalid,
+                TriangleNumericallyUnderResolved = triangleQuality.IsNumericallyUnderResolved,
+                TriangleExtremeSliver = triangleQuality.IsExtremeSliver,
+                TriangleDoubleArea = triangleQuality.DoubleArea,
+                TriangleNormalizedDoubleArea = triangleQuality.NormalizedDoubleArea,
+                TriangleAspectRatio = triangleQuality.AspectRatio,
+                TriangleMinimumAngleDegrees = triangleQuality.MinimumAngleDegrees,
                 RenderNormal = renderNormal,
                 AuthoredNormal = authoredNormal,
                 MaskA = maskA, MaskB = maskB, MaskC = maskC,

@@ -2531,3 +2531,17 @@ Impact classification:
 
 P13G modifies only the five canonical River Foam documents. Unity validation is not required for this documentation update. Compilation and focused spawning regression become mandatory after the external Weather shader integration is supplied.
 
+
+## D8.15 Shore scheduling and fixed-metric dependency override
+
+This section is the authoritative replacement for earlier entries stating that Shore Coverage selects a stable slot share or that Shore Activity maps to a fixed global attempt rate.
+
+- Removed dependency: Shore Coverage. No Shore Ribbon or Inward Wash location is permanently masked.
+- Existing dependency retained: fixed internal scheduling spacing `3.5 m` per bank. The slot population is length-derived with `2 * ceil(validFieldLength / 3.5 m)` entries and all entries remain eligible.
+- Activity dependency: per-slot duty cycle, not global events/second. Minimum Packet Gap remains the physical clearance lower bound.
+- Length dependency: Ribbon Length Min/Max and Inward Along-Bank Length Min/Max remain authored in cells. Runtime values are inclusive whole integers selected per event.
+- Shore-contact dependency: `_FoamCurrentShoreEdgesRead` remains the sole current visible-edge authority. Ribbon and Inward start offset is fixed to the nearest inward cell centre; no authored Shore offset remains.
+- Ribbon path dependency: existing longitudinal Foam-grid metric plus one current-shore-edge sample at each path column. New path textures, buffers, CPU paths, GPU path-build passes, and readbacks are forbidden for this contract.
+- Capacity dependency: source-event capacity is `32 + shoreBucketCount`; reservation capacity is twice that value and is allocated only when the grid descriptor is applied.
+
+No transport, lifecycle, topology, boundary, obstacle-routing, or final-render dependency changes.

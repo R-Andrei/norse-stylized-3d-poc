@@ -50,6 +50,21 @@ float FoamSampleMotionLaneSmooth(float2 coordinate)
     return lerp(a, b, blend);
 }
 
+float FoamLoadShoreVelocityInfluence(float2 coordinate)
+{
+    int2 texel = int2(floor(coordinate));
+    if (texel.x < 0 || texel.x >= _FoamDimensions.x ||
+        texel.y < 0 || texel.y >= _FoamDimensions.y)
+    {
+        return 0.0;
+    }
+
+    // B = existing current Shore Support. Reuse the Layer A/B support
+    // product directly; no separate velocity mask or shoreline solve exists.
+    return saturate(
+        _FoamTopologySourcesRead.Load(int3(texel, 0)).b);
+}
+
 float2 FoamLoadObstacleRoutingCell(float2 coordinate)
 {
     int2 texel = int2(floor(coordinate));
@@ -72,12 +87,17 @@ RiverWaterFoamResolvedVelocity FoamResolveVelocity(
 {
     float laneIntent = FoamSampleMotionLaneSmooth(motionSampleCoordinate);
     float2 obstacle = FoamLoadObstacleRoutingCell(motionSampleCoordinate);
+    float shoreInfluence =
+        FoamLoadShoreVelocityInfluence(motionSampleCoordinate);
     return RiverWaterResolveFoamVelocityContract(
         laneIntent,
         obstacle.x,
         obstacle.y,
+        shoreInfluence,
         _FoamBaseDownstreamSpeed,
         _FoamMaximumLateralSpeedRatio,
+        _FoamShoreLateralMovementSuppression,
+        _FoamShoreDownstreamMovementSuppression,
         _FoamObstacleSlowdownStrength,
         _FoamObstacleMinimumDownstreamFactor,
         validFluid);

@@ -8,7 +8,7 @@ namespace ProgrammaticStylized3D.Trees
 {
     public static class TreeGenerator
     {
-        public const int CurrentGeneratorVersion = 6;
+        public const int CurrentGeneratorVersion = 7;
         // Geometry/constraint algorithm versions may advance without rerolling
         // accepted seed streams or stable branch IDs. Change this only when a
         // deterministic structural reroll is explicitly approved.
@@ -1210,7 +1210,7 @@ namespace ProgrammaticStylized3D.Trees
             TreeResolvedParameters p = context.Parameters;
             int seed = context.Seeds.GetSeed(TreeSeedStream.TrunkShape);
             int pointCount = Mathf.Max(3, p.TrunkControlPointCount);
-            var points = new List<Vector3>(pointCount);
+            var nonSpiralAnchors = new List<Vector3>(pointCount);
             Vector2 leanDirection = DirectionFromDegrees(p.TrunkLeanDirectionDegrees);
             Vector2 primaryCurveDirection = TreeDeterministicUtility.DirectionXZ(seed, "trunk-primary-curve");
             Vector2 secondaryCurveDirection = new Vector2(-primaryCurveDirection.y, primaryCurveDirection.x);
@@ -1244,23 +1244,29 @@ namespace ProgrammaticStylized3D.Trees
                     p.TrunkIrregularity * p.Height * 0.035f * bendEnvelope;
                 Vector2 lean = leanDirection *
                     p.TrunkLeanStrength * p.Height * Mathf.Pow(t, 1.35f);
-                float spiralEnvelope = Mathf.SmoothStep(0f, 1f, t) *
-                    Mathf.Lerp(0.7f, 1f, t);
-                float spiralAngle = spiralPhase +
-                    p.TrunkSpiralDirection * TwoPi * p.TrunkSpiralTurns * t;
-                float spiralRadius = p.TrunkSpiralStrength * p.Height *
-                    (p.RecipeOnlyControlSource ? 1f : 0.35f) *
-                    spiralEnvelope;
-                Vector2 spiral = new Vector2(
-                    Mathf.Cos(spiralAngle),
-                    Mathf.Sin(spiralAngle)) * spiralRadius;
-                points.Add(new Vector3(
-                    curve.x + drift.x + irregularity.x + lean.x + spiral.x,
+                nonSpiralAnchors.Add(new Vector3(
+                    curve.x + drift.x + irregularity.x + lean.x,
                     y,
-                    curve.y + drift.y + irregularity.y + lean.y + spiral.y));
+                    curve.y + drift.y + irregularity.y + lean.y));
             }
 
-            ConstrainTrunkControlPoints(context, points);
+            bool useHeightPreservingPathSpiral =
+                IsActiveRecipeOnlyPathSpiral(context, p);
+            List<Vector3> points = useHeightPreservingPathSpiral
+                ? BuildHeightPreservingRecipePathSpiralControlPoints(
+                    nonSpiralAnchors,
+                    p,
+                    spiralPhase,
+                    context.Policy)
+                : AddPathSpiralToAnchors(
+                    nonSpiralAnchors,
+                    p,
+                    spiralPhase);
+
+            ConstrainTrunkControlPoints(
+                context,
+                points,
+                useHeightPreservingPathSpiral);
 
             float endRadius = context.RecipeOnly
                 ? ResolveRecipeOnlyTrunkEndRadius(
@@ -1277,9 +1283,13 @@ namespace ProgrammaticStylized3D.Trees
                 endRadius,
                 context.RecipeOnly ? 0f : p.TrunkSurfaceTorsionDegrees,
                 context.Policy.MaximumSamplesPerBranch,
-                0f,
+                useHeightPreservingPathSpiral
+                    ? context.Policy.MaximumTrunkSegmentTurnDegrees * 0.75f
+                    : 0f,
                 context.Warnings,
-                "Trunk");
+                "Trunk",
+                useHeightPreservingPathSpiral,
+                useHeightPreservingPathSpiral ? context : null);
             var trunk = new TreeBranchDefinition();
             trunk.Initialize(
                 StableBranchId(context, -1, 0, 0),
@@ -1297,6 +1307,117 @@ namespace ProgrammaticStylized3D.Trees
                 points,
                 samples);
             context.Branches.Add(trunk);
+        }
+
+        private static bool IsActiveRecipeOnlyPathSpiral(
+            GenerationContext context,
+            TreeResolvedParameters parameters)
+        {
+            return context != null &&
+                context.RecipeOnly &&
+                parameters != null &&
+                parameters.RecipeOnlyControlSource &&
+                parameters.TrunkSpiralStrength > Epsilon;
+        }
+
+        private static List<Vector3> AddPathSpiralToAnchors(
+            List<Vector3> nonSpiralAnchors,
+            TreeResolvedParameters parameters,
+            float spiralPhase)
+        {
+            int count = nonSpiralAnchors != null
+                ? nonSpiralAnchors.Count
+                : 0;
+            var points = new List<Vector3>(count);
+            for (int index = 0; index < count; index++)
+            {
+                float t = count <= 1
+                    ? 0f
+                    : index / (float)(count - 1);
+                Vector2 spiral = EvaluatePathSpiralOffset(
+                    parameters,
+                    spiralPhase,
+                    t);
+                Vector3 anchor = nonSpiralAnchors[index];
+                points.Add(new Vector3(
+                    anchor.x + spiral.x,
+                    anchor.y,
+                    anchor.z + spiral.y));
+            }
+
+            return points;
+        }
+
+        private static List<Vector3>
+            BuildHeightPreservingRecipePathSpiralControlPoints(
+                List<Vector3> nonSpiralAnchors,
+                TreeResolvedParameters parameters,
+                float spiralPhase,
+                TreeGenerationRuntimePolicy policy)
+        {
+            int anchorCount = nonSpiralAnchors != null
+                ? nonSpiralAnchors.Count
+                : 0;
+            if (anchorCount < 2)
+            {
+                return AddPathSpiralToAnchors(
+                    nonSpiralAnchors,
+                    parameters,
+                    spiralPhase);
+            }
+
+            float targetPhaseStepDegrees = Mathf.Max(
+                1f,
+                policy.MaximumTrunkSegmentTurnDegrees * 0.5f);
+            int requiredSegments = Mathf.CeilToInt(
+                Mathf.Abs(parameters.TrunkSpiralTurns) *
+                360f /
+                targetPhaseStepDegrees);
+            int pointCount = Mathf.Clamp(
+                Mathf.Max(anchorCount, requiredSegments + 1),
+                anchorCount,
+                policy.MaximumSamplesPerBranch);
+            var points = new List<Vector3>(pointCount);
+            for (int index = 0; index < pointCount; index++)
+            {
+                float t = index / (float)(pointCount - 1);
+                Vector3 basePoint = EvaluateCatmullRom(
+                    nonSpiralAnchors,
+                    t);
+                Vector2 spiral = EvaluatePathSpiralOffset(
+                    parameters,
+                    spiralPhase,
+                    t);
+                points.Add(new Vector3(
+                    basePoint.x + spiral.x,
+                    parameters.Height * t,
+                    basePoint.z + spiral.y));
+            }
+
+            return points;
+        }
+
+        private static Vector2 EvaluatePathSpiralOffset(
+            TreeResolvedParameters parameters,
+            float spiralPhase,
+            float normalizedDistance)
+        {
+            float t = Mathf.Clamp01(normalizedDistance);
+            float spiralEnvelope = Mathf.SmoothStep(0f, 1f, t) *
+                Mathf.Lerp(0.7f, 1f, t);
+            float spiralAngle = spiralPhase +
+                parameters.TrunkSpiralDirection *
+                TwoPi *
+                parameters.TrunkSpiralTurns *
+                t;
+            float spiralRadius =
+                parameters.TrunkSpiralStrength *
+                parameters.Height *
+                (parameters.RecipeOnlyControlSource ? 1f : 0.35f) *
+                spiralEnvelope;
+            return new Vector2(
+                Mathf.Cos(spiralAngle),
+                Mathf.Sin(spiralAngle)) * spiralRadius;
         }
 
         private static float ResolveRecipeOnlyTrunkEndRadius(
@@ -1840,7 +1961,8 @@ namespace ProgrammaticStylized3D.Trees
 
         private static void ConstrainTrunkControlPoints(
             GenerationContext context,
-            List<Vector3> points)
+            List<Vector3> points,
+            bool preserveAuthoredVerticalProfile)
         {
             if (points == null || points.Count < 2)
             {
@@ -1852,6 +1974,16 @@ namespace ProgrammaticStylized3D.Trees
             float maximumHorizontal =
                 context.Parameters.Height *
                 constraints.MaximumTrunkHorizontalDisplacementRatio;
+
+            if (preserveAuthoredVerticalProfile)
+            {
+                ScaleHeightPreservingTrunkToHorizontalEnvelope(
+                    context,
+                    points,
+                    maximumHorizontal);
+                return;
+            }
+
             for (int index = 1; index < points.Count; index++)
             {
                 Vector2 horizontal = new Vector2(
@@ -1884,6 +2016,71 @@ namespace ProgrammaticStylized3D.Trees
                 0f,
                 context.Parameters.Height);
             ClampControlPointsToReferenceEnvelope(context, points);
+        }
+
+        private static void ScaleHeightPreservingTrunkToHorizontalEnvelope(
+            GenerationContext context,
+            List<Vector3> points,
+            float maximumHorizontal)
+        {
+            float horizontalScale = 1f;
+            TreeReferenceCalibrationPreset calibration =
+                context.Calibration;
+            bool hasReferenceEnvelope =
+                calibration != null &&
+                calibration.TargetVisibleWidth > 0f &&
+                calibration.TargetVisibleDepth > 0f;
+            float radiusX = hasReferenceEnvelope
+                ? Mathf.Max(
+                    0.1f,
+                    calibration.TargetVisibleWidth * 0.5f *
+                    (1f - context.Policy.CrownEnvelopeOvershoot * 0.35f))
+                : 1f;
+            float radiusZ = hasReferenceEnvelope
+                ? Mathf.Max(
+                    0.1f,
+                    calibration.TargetVisibleDepth * 0.5f *
+                    (1f - context.Policy.CrownEnvelopeOvershoot * 0.35f))
+                : 1f;
+
+            for (int index = 0; index < points.Count; index++)
+            {
+                Vector3 point = points[index];
+                float horizontalMagnitude = new Vector2(
+                    point.x,
+                    point.z).magnitude;
+                if (maximumHorizontal > Epsilon &&
+                    horizontalMagnitude > maximumHorizontal)
+                {
+                    horizontalScale = Mathf.Min(
+                        horizontalScale,
+                        maximumHorizontal / horizontalMagnitude);
+                }
+
+                if (hasReferenceEnvelope)
+                {
+                    float normalized =
+                        (point.x * point.x) / (radiusX * radiusX) +
+                        (point.z * point.z) / (radiusZ * radiusZ);
+                    if (normalized > 1f)
+                    {
+                        horizontalScale = Mathf.Min(
+                            horizontalScale,
+                            1f / Mathf.Sqrt(normalized));
+                    }
+                }
+            }
+
+            float height = context.Parameters.Height;
+            for (int index = 0; index < points.Count; index++)
+            {
+                float normalized = index / (float)(points.Count - 1);
+                Vector3 point = points[index];
+                points[index] = new Vector3(
+                    point.x * horizontalScale,
+                    height * normalized,
+                    point.z * horizontalScale);
+            }
         }
 
         private static void ConstrainBranchControlPoints(
@@ -2518,7 +2715,9 @@ namespace ProgrammaticStylized3D.Trees
             int maximumSamples,
             float maximumSampleTurnDegrees,
             List<string> warnings,
-            string label)
+            string label,
+            bool preserveNormalizedVerticalProfile = false,
+            GenerationContext heightPreservingContext = null)
         {
             int sampleCount = Mathf.Clamp(
                 Mathf.Max(6, controlPoints.Count * 4),
@@ -2528,10 +2727,39 @@ namespace ProgrammaticStylized3D.Trees
             for (int index = 0; index < sampleCount; index++)
             {
                 float t = index / (float)(sampleCount - 1);
-                positions.Add(EvaluateCatmullRom(controlPoints, t));
+                Vector3 position = EvaluateCatmullRom(controlPoints, t);
+                if (preserveNormalizedVerticalProfile)
+                {
+                    position.y = Mathf.Lerp(
+                        controlPoints[0].y,
+                        controlPoints[controlPoints.Count - 1].y,
+                        t);
+                }
+                positions.Add(position);
             }
 
-            if (maximumSampleTurnDegrees > 0f)
+            if (preserveNormalizedVerticalProfile)
+            {
+                if (maximumSampleTurnDegrees > 0f)
+                {
+                    ConstrainHeightPreservingSampledCurveTurns(
+                        positions,
+                        maximumSampleTurnDegrees);
+                }
+
+                if (heightPreservingContext != null)
+                {
+                    float maximumHorizontal =
+                        heightPreservingContext.Parameters.Height *
+                        heightPreservingContext.Policy
+                            .MaximumTrunkHorizontalDisplacementRatio;
+                    ScaleHeightPreservingTrunkToHorizontalEnvelope(
+                        heightPreservingContext,
+                        positions,
+                        maximumHorizontal);
+                }
+            }
+            else if (maximumSampleTurnDegrees > 0f)
             {
                 ConstrainSampledCurveTurns(
                     positions,
@@ -2599,6 +2827,63 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             return samples;
+        }
+
+        private static void ConstrainHeightPreservingSampledCurveTurns(
+            List<Vector3> positions,
+            float maximumTurnDegrees)
+        {
+            if (positions == null || positions.Count < 2)
+            {
+                return;
+            }
+
+            float startY = positions[0].y;
+            float endY = positions[positions.Count - 1].y;
+            Vector3 firstSegment = positions[1] - positions[0];
+            Vector3 previousDirection = firstSegment.sqrMagnitude > Epsilon
+                ? firstSegment.normalized
+                : Vector3.up;
+            float maximumTurnRadians =
+                Mathf.Max(0f, maximumTurnDegrees) * Mathf.Deg2Rad;
+
+            for (int index = 1; index < positions.Count; index++)
+            {
+                float normalized = index / (float)(positions.Count - 1);
+                float targetY = Mathf.Lerp(startY, endY, normalized);
+                Vector3 target = positions[index];
+                target.y = targetY;
+                Vector3 rawSegment = target - positions[index - 1];
+                Vector3 desiredDirection = rawSegment.sqrMagnitude > Epsilon
+                    ? rawSegment.normalized
+                    : previousDirection;
+                Vector3 constrainedDirection = index == 1
+                    ? desiredDirection
+                    : Vector3.RotateTowards(
+                        previousDirection,
+                        desiredDirection,
+                        maximumTurnRadians,
+                        0f).normalized;
+
+                if (constrainedDirection.y <= Epsilon)
+                {
+                    constrainedDirection = Vector3.up;
+                }
+
+                float verticalStep = targetY - positions[index - 1].y;
+                float segmentLength = verticalStep / constrainedDirection.y;
+                Vector3 constrained =
+                    positions[index - 1] +
+                    constrainedDirection * segmentLength;
+                constrained.y = targetY;
+                positions[index] = constrained;
+
+                Vector3 emittedSegment =
+                    positions[index] - positions[index - 1];
+                previousDirection = emittedSegment.sqrMagnitude > Epsilon
+                    ? emittedSegment.normalized
+                    : previousDirection;
+            }
         }
 
         private static void ConstrainSampledCurveTurns(
@@ -3123,6 +3408,16 @@ namespace ProgrammaticStylized3D.Trees
                 return;
             }
 
+            if (IsActiveRecipeOnlyPathSpiral(
+                    context,
+                    context.Parameters))
+            {
+                ValidateHeightPreservingRecipePathSpiral(
+                    context,
+                    context.Branches[0],
+                    failures);
+            }
+
             var ids = new HashSet<int>();
             for (int index = 0; index < context.Branches.Count; index++)
             {
@@ -3198,6 +3493,109 @@ namespace ProgrammaticStylized3D.Trees
                         "Branch " + branch.StableBranchId +
                         " length is below the profile minimum.");
                 }
+            }
+        }
+
+        private static void ValidateHeightPreservingRecipePathSpiral(
+            GenerationContext context,
+            TreeBranchDefinition trunk,
+            List<string> failures)
+        {
+            if (trunk == null)
+            {
+                failures.Add(
+                    "Height-preserving path spiral validation found no trunk.");
+                return;
+            }
+
+            float height = context.Parameters.Height;
+            float verticalTolerance = Mathf.Max(
+                0.0005f,
+                Mathf.Abs(height) * 0.00005f);
+            IReadOnlyList<Vector3> controlPoints = trunk.ControlPoints;
+            if (controlPoints == null || controlPoints.Count < 2)
+            {
+                failures.Add(
+                    "Height-preserving path spiral emitted fewer than two trunk control points.");
+            }
+            else
+            {
+                if (Mathf.Abs(controlPoints[0].y) > verticalTolerance ||
+                    Mathf.Abs(
+                        controlPoints[controlPoints.Count - 1].y - height) >
+                        verticalTolerance)
+                {
+                    failures.Add(
+                        "Height-preserving path spiral changed the authored trunk control-point endpoints.");
+                }
+
+                if (controlPoints.Count >
+                    context.Policy.MaximumSamplesPerBranch)
+                {
+                    failures.Add(
+                        "Height-preserving path spiral exceeded the recipe-only trunk point budget.");
+                }
+            }
+
+            IReadOnlyList<TreeCurveSample> samples = trunk.Samples;
+            if (samples == null || samples.Count < 2)
+            {
+                failures.Add(
+                    "Height-preserving path spiral emitted fewer than two trunk samples.");
+                return;
+            }
+
+            float previousY = float.NegativeInfinity;
+            float maximumTurn = 0f;
+            for (int index = 0; index < samples.Count; index++)
+            {
+                TreeCurveSample sample = samples[index];
+                float expectedY = height *
+                    Mathf.Clamp01(sample.NormalizedDistance);
+                if (Mathf.Abs(sample.Position.y - expectedY) >
+                    verticalTolerance)
+                {
+                    failures.Add(
+                        "Height-preserving path spiral changed normalized vertical progression at trunk sample " +
+                        index + ".");
+                    break;
+                }
+
+                if (sample.Position.y + verticalTolerance < previousY)
+                {
+                    failures.Add(
+                        "Height-preserving path spiral emitted a descending trunk sample at index " +
+                        index + ".");
+                    break;
+                }
+                previousY = sample.Position.y;
+
+                if (index > 0)
+                {
+                    maximumTurn = Mathf.Max(
+                        maximumTurn,
+                        Vector3.Angle(
+                            samples[index - 1].Tangent,
+                            sample.Tangent));
+                }
+            }
+
+            if (Mathf.Abs(samples[0].Position.y) > verticalTolerance ||
+                Mathf.Abs(samples[samples.Count - 1].Position.y - height) >
+                    verticalTolerance)
+            {
+                failures.Add(
+                    "Height-preserving path spiral changed the authored trunk sample endpoints.");
+            }
+
+            if (maximumTurn >
+                context.Policy.MaximumTrunkSegmentTurnDegrees + 0.05f)
+            {
+                failures.Add(
+                    "Height-preserving path spiral exceeded the recipe-only trunk turn limit: " +
+                    maximumTurn.ToString("F3") + " degrees > " +
+                    context.Policy.MaximumTrunkSegmentTurnDegrees.ToString("F3") +
+                    " degrees.");
             }
         }
 

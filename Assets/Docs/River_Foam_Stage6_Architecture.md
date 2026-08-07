@@ -5050,3 +5050,87 @@ D7 does not edit `VisualFrameworkDemo.unity`, any prefab, material, asset metada
 - Shared envelope work: bounded CPU comparisons only when an automatic start is attempted; no per-frame allocation and no per-cell work.
 
 D7 must be rejected or revised if profiling demonstrates a measurable one-percent river-cost regression, but its structural work is outside the material transport/render hot path.
+
+## D8.15 historical Shore spawning architecture — superseded by D8.16
+
+This section is retained as historical evidence only. D8.16 supersedes its per-bucket Activity and transition-only Ribbon birth contracts. D8.15 superseded every earlier Stage 6 statement that Shore Coverage permanently selects a subset of shoreline slots or that Shore Activity drives one global fixed events-per-second accumulator.
+
+- Shore Coverage is removed for the complete Shore family. Every valid left/right shoreline scheduling bucket remains eligible.
+- The existing `3.5 m` per-bank lattice is internal scheduling/deconfliction only. Bucket count is `2 * max(1, ceil(validFieldLength / 3.5 m))`, so concurrent opportunity scales with river and active-chunk length.
+- Each bucket owns an independent deterministic renewal state: cycle index, next-start time, and active event ID. Different buckets may own events simultaneously; one bucket may not overlap itself.
+- Activity is the target active-time fraction of each bucket. For event duration `D`, Activity `A`, and packet-clearance time `G`, the next cycle starts after `D + max(D * (1-A) / A, G)` for `0 < A < 1`; zero disables new starts and one leaves only packet clearance.
+- Ribbon and Inward Wash retain user-facing Min/Max cell lengths. Event creation chooses one inclusive whole-cell effective length; no user-facing resolved-length control exists.
+- Both Shore recipes begin in the nearest valid Foam cell touching the current visible shore. Ribbon has one fixed `1 x 1` birth head.
+- Ribbon path authority is the already-built `_FoamCurrentShoreEdgesRead` texture. Each longitudinal path-cell column independently selects the nearest inward row from that current edge, so the head follows the visible bank without a new path buffer, build kernel, readback, or spline solve.
+- Ribbon material birth contains only newly traversed cells. Automatic Birth Sources debug separately shows the current persistent head every material tick. No cumulative source body is emitted.
+- The source event pool is descriptor-derived as `32 + shoreBucketCount`; packet reservations remain twice event capacity. Allocation occurs only during resource build.
+
+Transport, lifecycle, final Foam rendering, topology, boundary construction, and current-shore-edge construction are unchanged by D8.15.
+
+
+## D8.16 accepted Shore population and emitter contract
+
+Status: implemented in source; Unity compilation and live validation pending.
+
+- Shore Activity controls a river-length-scaled target active-head population rather than per-bucket duty cycle. The mean target is `Activity * represented bank length / 17.5 m`, where represented bank length is both banks across the active Foam domain. Fractional means resolve deterministically to a stable floor/ceiling target at event-completion or bounded population-cycle boundaries.
+- The Inspector reports the predicted floor/ceiling head range, mean, represented shoreline length, chunk estimate, and live runtime population status in Play Mode.
+- The scheduler starts at most one Shore event per material tick, never kills an existing event when the target drops, and uses the existing 3.5 m buckets only for candidate distribution and packet-clearance ownership.
+- Each active Shore Ribbon performs a one-cell current-head birth attempt every material tick. Existing packet-independent merge semantics fill only missing Coverage; delayed updates additionally emit every skipped path cell.
+- The existing `_FoamCurrentShoreEdgesRead` texture remains the only shoreline-path authority. Shore metric/edge lookup uses the unshifted world column while material writes use phase-shifted storage coordinates. No path buffer, path kernel, readback, or extra shoreline solve exists.
+- Automatic Birth Sources samples source storage with the current Bulk Phase and composites current source colours over committed persistent Foam shown in dark grey.
+- Transport, lifecycle mathematics, merge semantics, final Foam rendering, scenes, prefabs, materials, Object scheduling, Free-Water scheduling, and Inward Wash geometry remain unchanged.
+
+## RIVER-FOAM-VELOCITY-B1 addendum — independent Shore component suppression
+
+Layer B Canonical Velocity now supports two independent spatial Shore controls:
+
+```text
+Shore Lateral Movement Suppression:    0..1
+Shore Downstream Movement Suppression: 0..1
+```
+
+They reuse the existing current Shore Support value in `_FoamTopologySources.b`. No separate Shore velocity mask, texture, buffer, kernel, pass, readback, shoreline evaluation, or source-provenance state exists.
+
+Let:
+
+```text
+S  = saturate(Shore Support)
+CL = saturate(Shore Lateral Movement Suppression)
+CD = saturate(Shore Downstream Movement Suppression)
+```
+
+The resolved component-retention factors are:
+
+```text
+shoreLateralFactor    = 1 - S * CL
+shoreDownstreamFactor = 1 - S * CD
+```
+
+After lane/obstacle routing and the existing object-contact full-vector slowdown:
+
+```text
+vDownstream' = vDownstream * shoreDownstreamFactor
+vLateral'    = vLateral * shoreLateralFactor
+```
+
+At full Shore Support, control value one removes the selected component exactly. The Shore Support fade provides the spatial transition toward unaffected interior water. Defaults are zero, preserving pre-B1 behavior.
+
+The controls are spatial Layer B controls. They apply to every persistent Foam packet currently inside Shore Support, regardless of whether the material originated from Shore, Object, or Free-Water birth. Source-specific suppression would require persistent provenance and is outside this architecture.
+
+Compute transport and Motion Field debug modes 5/6 call the same pure resolver in:
+
+```text
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoamVelocity.hlsl
+```
+
+Compute samples Shore Support at the same physical motion coordinate used for lane and obstacle fields. Motion Field diagnostics sample the same bound `_FoamTopologySources` field and therefore show the final suppressed velocity directly:
+
+```text
+lateral suppression -> red/blue hue collapses toward neutral grey;
+downstream suppression -> field brightness approaches near-black;
+both at one -> full-Shore-Support cells resolve to zero velocity.
+```
+
+The upstream invariant remains authoritative: the pure resolver returns nonnegative absolute downstream speed. In Bulk-Phase transport, a resolved absolute speed of zero becomes the existing negative residual that cancels bulk movement, producing zero world downstream travel rather than upstream travel.
+
+Object Contact slowdown remains independent and multiplicative. Its routing and slowdown field generation, authored controls, and minimum speed factor are unchanged.

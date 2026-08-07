@@ -41,6 +41,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
             internal float PrimaryAttachmentMinimum;
             internal float PrimaryAttachmentMaximum;
             internal int PrimaryAttachmentCount;
+            internal int EmittedTrunkControlPointCount;
+            internal int TrunkSampleCount;
+            internal float TrunkTipHeight;
+            internal float MaximumTrunkSampleTurnDegrees;
         }
 
         private sealed class ControlSummary
@@ -132,7 +136,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
             writer.WriteLine(
                 "Representative,ControlId,Control,Sample,AuthoredValue,CaseStatus," +
                 "ExactFingerprint,StructuralFingerprint,TrunkFingerprint,BranchFingerprint," +
-                "PaletteFingerprint,BarkFingerprint,Height,TrunkControlPoints,Branches," +
+                "PaletteFingerprint,BarkFingerprint,Height,TrunkControlPoints," +
+                "EmittedTrunkControlPoints,TrunkSamples,TrunkTipY,MaximumTrunkTurnDegrees,Branches," +
                 "Primary,Secondary,Tertiary,Dead,Broken,BoundsX,BoundsY,BoundsZ," +
                 "PrimaryAttachmentMin,PrimaryAttachmentMax,RootCrest,RootHalfWidthDegrees," +
                 "RootHalfChord,RequestedRootSupportDegrees,EmittedRootSupportDegrees," +
@@ -360,6 +365,12 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 out sample.PrimaryAttachmentMinimum,
                 out sample.PrimaryAttachmentMaximum,
                 out sample.PrimaryAttachmentCount);
+            MeasureTrunkCenterline(
+                sample.Definition,
+                out sample.EmittedTrunkControlPointCount,
+                out sample.TrunkSampleCount,
+                out sample.TrunkTipHeight,
+                out sample.MaximumTrunkSampleTurnDegrees);
 
             if (RequiresBarkResponse(descriptor.PropertyName))
             {
@@ -514,6 +525,35 @@ namespace ProgrammaticStylized3D.Trees.Editor
                                 .TrunkControlPointCount))
                     {
                         failure = "Bend Frequency changed trunk control-point count.";
+                        return false;
+                    }
+                    break;
+
+                case "pathSpiralRadius":
+                case "signedPathSpiralTurns":
+                    if (!ValidatePathSpiralHeightContract(
+                            baseline,
+                            out failure))
+                    {
+                        return false;
+                    }
+                    for (int index = 0; index < samples.Count; index++)
+                    {
+                        if (!ValidatePathSpiralHeightContract(
+                                samples[index],
+                                out failure))
+                        {
+                            return false;
+                        }
+                    }
+                    if (propertyName == "signedPathSpiralTurns" &&
+                        (minimum.EmittedTrunkControlPointCount !=
+                            maximum.EmittedTrunkControlPointCount ||
+                         minimum.TrunkSampleCount !=
+                            maximum.TrunkSampleCount))
+                    {
+                        failure =
+                            "Opposite Signed Path Spiral handedness values emitted different centreline resolutions.";
                         return false;
                     }
                     break;
@@ -1103,10 +1143,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     SetFloat(controls, "leanAmount", 0.25f);
                     break;
                 case "pathSpiralRadius":
-                    SetFloat(controls, "signedPathSpiralTurns", 1f);
+                    SetFloat(controls, "signedPathSpiralTurns", 3f);
                     break;
                 case "signedPathSpiralTurns":
-                    SetFloat(controls, "pathSpiralRadius", 0.12f);
+                    SetFloat(controls, "pathSpiralRadius", 0.50f);
                     break;
                 case "rootCount":
                 case "rootReach":
@@ -1399,6 +1439,102 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
         }
 
+        private static void MeasureTrunkCenterline(
+            TreeDefinition definition,
+            out int controlPointCount,
+            out int sampleCount,
+            out float tipHeight,
+            out float maximumTurnDegrees)
+        {
+            controlPointCount = 0;
+            sampleCount = 0;
+            tipHeight = 0f;
+            maximumTurnDegrees = 0f;
+            if (definition == null ||
+                definition.Branches == null ||
+                definition.TrunkBranchIndex < 0 ||
+                definition.TrunkBranchIndex >= definition.Branches.Count)
+            {
+                return;
+            }
+
+            TreeBranchDefinition trunk =
+                definition.Branches[definition.TrunkBranchIndex];
+            if (trunk == null)
+            {
+                return;
+            }
+
+            controlPointCount = trunk.ControlPoints != null
+                ? trunk.ControlPoints.Count
+                : 0;
+            sampleCount = trunk.Samples != null
+                ? trunk.Samples.Count
+                : 0;
+            if (sampleCount == 0)
+            {
+                return;
+            }
+
+            tipHeight = trunk.Samples[sampleCount - 1].Position.y;
+            for (int index = 1; index < sampleCount; index++)
+            {
+                maximumTurnDegrees = Mathf.Max(
+                    maximumTurnDegrees,
+                    Vector3.Angle(
+                        trunk.Samples[index - 1].Tangent,
+                        trunk.Samples[index].Tangent));
+            }
+        }
+
+        private static bool ValidatePathSpiralHeightContract(
+            SampleResult sample,
+            out string failure)
+        {
+            failure = string.Empty;
+            if (sample == null || sample.Definition == null ||
+                sample.Definition.ResolvedParameters == null)
+            {
+                failure =
+                    "Path Spiral validation received no generated definition.";
+                return false;
+            }
+
+            TreeResolvedParameters parameters =
+                sample.Definition.ResolvedParameters;
+            bool active = parameters.RecipeOnlyControlSource &&
+                parameters.TrunkSpiralStrength > 0.00001f;
+            if (!active)
+            {
+                return true;
+            }
+
+            float tolerance = Mathf.Max(
+                0.0005f,
+                Mathf.Abs(parameters.Height) * 0.00005f);
+            if (Mathf.Abs(sample.TrunkTipHeight - parameters.Height) >
+                tolerance)
+            {
+                failure =
+                    "Path Spiral changed authored trunk tip height: requested=" +
+                    parameters.Height.ToString("F4", CultureInfo.InvariantCulture) +
+                    ", emitted=" +
+                    sample.TrunkTipHeight.ToString("F4", CultureInfo.InvariantCulture) +
+                    ".";
+                return false;
+            }
+
+            if (sample.EmittedTrunkControlPointCount < 2 ||
+                sample.TrunkSampleCount < 2)
+            {
+                failure =
+                    "Path Spiral emitted an incomplete trunk centreline.";
+                return false;
+            }
+
+            return true;
+        }
+
         private static float CalculateNormalizedTrunkDifference(
             TreeDefinition first,
             TreeDefinition second)
@@ -1533,6 +1669,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 sample.Bark != null ? sample.Bark.GeometryFingerprint : string.Empty,
                 parameters != null ? F(parameters.Height) : string.Empty,
                 parameters != null ? parameters.TrunkControlPointCount.ToString() : string.Empty,
+                sample.EmittedTrunkControlPointCount.ToString(),
+                sample.TrunkSampleCount.ToString(),
+                F(sample.TrunkTipHeight),
+                F(sample.MaximumTrunkSampleTurnDegrees),
                 metrics != null ? metrics.BranchCount.ToString() : string.Empty,
                 metrics != null ? metrics.PrimaryBranchCount.ToString() : string.Empty,
                 metrics != null ? metrics.SecondaryBranchCount.ToString() : string.Empty,

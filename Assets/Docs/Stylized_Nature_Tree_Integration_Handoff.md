@@ -3935,3 +3935,417 @@ Contour-owned radial resolution is accepted as the production bark representatio
 2. Repair deterministic structural regeneration before reducing serialized `TreeDefinition` retention.
 3. Implement spatial streaming, culling, and unloading for world-scale tree populations.
 4. Do not introduce traditional distance-based tree LOD meshes.
+
+## TREE-ROOTS.1 — Root Control and Shape Evaluation
+
+### Objective
+
+Establish direct visual evidence for the production root-control contracts before changing the root generator or tuning curated recipe values against imported references. This stage is diagnostic-only: it creates temporary validation definitions, temporary bark meshes, and isolated captures without modifying recipes, exact-control snapshots, gallery meshes, scenes, prefabs, materials, or serialized tree structures.
+
+### Representative set
+
+The evaluation resolves four current curated gallery representatives by exact recipe identity and stable slot:
+
+1. Alder Standard — Common.
+2. Norway Spruce Standard — Pine.
+3. Wych Elm Leaning — Twisted.
+4. Dead Alder — Dead.
+
+Each representative uses its current serialized exact-control snapshot, master seed, family, transform rotation, and scale. Validation regeneration is deterministic and unsaved.
+
+### Case matrix
+
+Each representative receives nine cases:
+
+1. Baseline.
+2. Root Thickness `0.10`.
+3. Root Thickness `1.00`.
+4. Root Reach `0.00`.
+5. Root Reach `2.00`.
+6. Root Height `0.01`.
+7. Root Height `0.40`.
+8. Buttress Persistence `0.00`.
+9. Buttress Persistence `1.00`.
+
+Wych Elm additionally receives:
+
+- Root Thickness `1.00` + Root Reach `2.00`.
+- Root Thickness `1.00` + Buttress Persistence `1.00`.
+- Root Reach `2.00` + Root Height `0.01`.
+
+Total: `39` cases and `78` captures.
+
+### Capture contract
+
+- Every successful case receives a neutral lit close-root three-quarter capture over a ground plane.
+- Every successful case also receives an isolated full-tree capture using the enabled Main Camera's exact rotation and projection at the selected tree's current reference distance.
+- Captures use isolated preview Scenes, `Camera.Render`, and polled `AsyncGPUReadback`; no synchronous GPU readback or blocking wait is permitted.
+- The workflow advances incrementally across Editor updates, displays progress and ETA, supports cancellation, and checkpoints Markdown, CSV, HTML, and completed PNGs after each case.
+
+### Superseded historical Inspector path
+
+The following temporary diagnostic path is retained only as implementation history and is no longer present in the current Inspector:
+
+`Procedural Tree Instance Inspector → Root Quality Evaluation → Run 39-Case Root Quality Board`
+
+Output:
+
+- `Library/PS3D/Trees/RootQualityEvaluation/TreeRootQualityEvaluationBoard.html`
+- `Library/PS3D/Trees/RootQualityEvaluation/TreeRootQualityEvaluationReport.md`
+- `Library/PS3D/Trees/RootQualityEvaluation/TreeRootQualityEvaluation.csv`
+- `Library/PS3D/Trees/RootQualityEvaluation/Captures`
+
+### Evaluation questions
+
+- Root Thickness must visibly alter each buttress lobe's mass without uniformly inflating the circular trunk core or acting as Root Reach.
+- Root Reach must alter horizontal footprint without materially changing angular thickness, Root Height, or persistence.
+- Root Height must alter the vertical ground-root envelope without changing ground reach or thickness.
+- Buttress Persistence must control how far the lobed contour survives up the trunk while preserving the ground footprint and authored Root Height.
+- Root tips must remain rounded rather than flat, needle-like, or triangular.
+- Buttress shoulders must blend into the trunk without a hard ninety-degree ledge or a wide melted pedestal.
+- Common, Pine, Twisted, and Dead roots must remain family-appropriate while sharing the same dependable control semantics.
+
+### Closure rule
+
+Do not tune curated recipe root ranges against imported trees until the operator reviews the board and the generator-level root defects are corrected. Recipe tuning must not compensate for weak, coupled, or misleading root controls.
+
+## TREE-ROOTS.2 — Continuous Root-to-Trunk Twist
+
+### Status
+
+**Accepted for production on 2026-07-30. Implementation, Unity execution, focused visual review, and twenty-tree topology/performance validation are complete. Persistent curated-gallery/library regeneration is the immediate next operation; broad control-bound safety testing follows only after that regeneration.**
+
+### Objective
+
+Replace the recipe-only delayed bark-roll distribution with one authoritative continuous base-to-tip roll field so root bodies, buttress crests, persistence-owned lobes, and the upper trunk share one uninterrupted axial phase. Keep the ground ring anchored at zero roll, preserve the existing root-frame stabilization and structural branch placement, and make generation, axial refinement, diagnostics, and validation consume the same phase equation.
+
+### Acceptance criteria
+
+1. Recipe-only axial twist begins continuously above normalized trunk distance `0.000`, with the exact ground ring remaining at zero roll.
+2. No phase reset or angular handoff occurs at the ground plateau, root-lobe collapse, earliest root transition, persistence transition, circular release, or trunk tip.
+3. Twist `0` preserves current geometry behavior.
+4. Positive and negative axial twist produce coherent opposite-handed root-to-tip spirals.
+5. Persistence `0.000`, `0.500`, and `1.000` remain topology-safe; Persistence `1.000` stays lobe-owned wherever the authored contour remains visible.
+6. The maximum authored adjacent-ring roll is measured directly and remains within the active production twist-step threshold.
+7. Requested versus measured total axial twist remains within the existing two-degree build gate.
+8. The ordinary twenty-tree geometry audit remains topology-complete with no material vertex or triangle inflation.
+9. No scene, prefab, recipe, material, exact-control snapshot, generated gallery mesh, layer, tag, or runtime component is modified by the focused evaluation workflow.
+10. Active-gameplay CPU, GPU, draw-call, vertex-format, and persistent-memory costs remain unchanged.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeGeometryEfficiencyAudit.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeGalleryGenerationCoordinator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeRootQualityEvaluation.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+
+No file creation, deletion, move, scene edit, prefab edit, recipe edit, material edit, layer edit, or tag edit is approved.
+
+### Reviewed evidence
+
+- Current production versions are bark algorithm `24`, bark settings `10`, and structural generator `6`.
+- Recipe-only structural generation passes zero torsion into structural curve sampling and applies authored `TrunkSurfaceTorsionDegrees` later in bark-frame resolution; legacy generation embeds torsion in transported structural samples.
+- Current recipe-only bark-frame resolution maps axial roll from `CalculateEarliestRootTransitionHeight(...)` to `1.000`, producing zero authored bark roll throughout the lower root domain and compressing the full requested twist into the remaining upper trunk.
+- Root-lobe phase is stable per branch and does not vary with height; world-space helical progression is therefore owned by the per-ring surface frame and must not be duplicated in the root-mask phase.
+- The current adaptive twist-refinement equation already assumes a linear `0.000 → 1.000` roll distribution, while current geometry delays that roll. Refinement and geometry therefore disagree.
+- The root-ring correspondence diagnostic uses `CalculateEffectiveRootTransitionHeight(...)` for roll reporting while production geometry uses the earliest transition, so the diagnostic does not describe the emitted roll field.
+- Existing total-twist validation can pass despite the distribution defect because it checks only final accumulated twist.
+- Existing gallery validation divides total requested twist by total trunk intervals; this is an average, not the actual maximum local roll step.
+- Historical root-transition work intentionally delayed roll to avoid unsafe strips. Continuous roll must therefore retain topology auditing and direct local-step telemetry rather than relying on visual evidence alone.
+
+### Invariants and non-goals
+
+- Preserve the stabilized recipe-only root tangent/normal frame and apply authored roll after that no-roll frame is resolved.
+- Preserve fixed local root-lobe identity; do not add height-varying roll to `ResolveRootPhase(...)` or `EvaluateButtressMasks(...)`.
+- Preserve structural branch attachment azimuths and all `TreeGenerator` output.
+- Preserve accepted axial/radial sampling thresholds, contour-owned radial tiers, mixed-resolution stitching, UV side ordering, topology rules, and root-control meanings.
+- Do not add a Root Twist control or a second root-foot phase envelope.
+- Do not switch twist semantics from normalized curve distance to normalized arc length in this update.
+- Do not perform recipe tuning, root-shape tuning, additional geometry reduction, foliage work, normals redesign, streaming work, or distance-based LOD work.
+
+### File-by-file sequence
+
+1. **Canonical plan — complete.** The approved contract, reviewed evidence, risks, and validation gates were recorded before code edits.
+2. **Bark generator — implemented and accepted.** One authoritative normalized-distance roll function now drives recipe-only surface-frame rotation, adaptive twist subdivision, correspondence diagnostics, phase telemetry, and terminal-tip roll completion. The stabilized no-roll root frame remains separate and root-mask phase remains unchanged. Total-twist measurement references the exact no-roll surface frame for recipe-only trees while preserving the prior legacy measurement path. Bark algorithm version is `25`; bark settings remain `10`; structural generator remains `6`.
+3. **Geometry audit — implemented and passed.** The completed audit reported `60 / 60` policy cases and `20 / 20` Production Current topology passes. Production Current measured `131252` vertices and `206391` triangles, a `651`-vertex (`0.50%`) and `1162`-triangle (`0.57%`) increase over the immediately preceding accepted aggregate; this is accepted as non-material. All requested/measured production twist errors rounded to `0.000`, and the maximum adjacent-ring authored roll was `8.982°` against the `10.000°` limit.
+4. **Gallery coordinator — implemented and audit-validated.** The invalid total-twist/ring-count average gate was replaced by the build result’s actual maximum authored adjacent-ring roll and active-policy limit.
+5. **Focused evaluation — complete; behavior accepted.** The evaluator completed all eight Wych Elm cases. Twist `0`, authored twist, `+460°`, `-460°`, and `+460°` with Persistence `0.000`, `0.500`, and `1.000` all passed and produced the required captures. The operator accepted the continuous base-to-tip behavior as visually compelling and production-worthy. The deliberate Cartesian-extreme stress case (`Twist 460°`, Root Thickness `1.000`, Root Reach `2.000`, Root Height `0.010`, Persistence `1.000`) exposed nine non-terminal unsafe strips; this is recorded as future control-bound evidence, not a rejection of the accepted production behavior or a precondition for library regeneration.
+6. **Inspector — implemented and exercised.** The existing Root Quality Evaluation section exposes `Run Continuous Twist Board`, with matching cancel/open/copy/folder controls.
+7. **Static and consistency audit — complete.** The final review surface was reread; the worktree differs from the supplied archive in exactly the six approved files; all five modified C# files passed lexical structure checks; CSV header/value parity is `35 / 35` for the focused board and `94 / 94` for the geometry aggregate; `48 / 48` static compliance checks passed; no delayed root-height roll equation or deprecated sorted object search remains; no scene, prefab, recipe, material, layer, tag, or generated-asset write was added.
+8. **Unity validation — complete for behavior acceptance.** The focused board and ordinary twenty-tree geometry audit completed. Continuous twist is accepted for production. Full persistent curated-gallery/library regeneration is now required before any broad control-bound audit or recipe/root-shape tuning continues.
+
+### Affected modules
+
+- Recipe-only bark surface-frame orientation.
+- Trunk adaptive axial refinement.
+- Axial-twist build telemetry and total-twist measurement.
+- Root-ring correspondence diagnostics.
+- Geometry-efficiency aggregate reporting.
+- Gallery validation gates.
+- Temporary root visual-evaluation workflow and Inspector UI.
+
+### Risks and mitigations
+
+- **Root-strip inversion:** historical delayed-roll policy avoided unsafe root strips. Mitigation: preserve dense root sampling, use the existing twist-step threshold, report the actual adjacent-ring authored phase delta, and require complete topology audits.
+- **Double twist:** adding roll to both the surface frame and root-mask phase would apply the same rotation twice. Mitigation: leave root-mask phase unchanged.
+- **Root-foot orbiting:** a separate foot phase could detach ground contact. Mitigation: keep the ground ring at exact zero roll and add no foot-specific attenuation unless later evidence proves it necessary.
+- **Measurement contamination:** transported-frame or root-frame adoption can be mistaken for axial roll. Mitigation: measure emitted radial orientation against the exact no-roll surface frame.
+- **Diagnostic drift:** independent roll formulas can diverge again. Mitigation: centralize the expected roll calculation and consume it in geometry, refinement, correspondence reporting, and telemetry.
+- **Geometry inflation:** topology repair could insert or preserve more rings. Mitigation: compare twenty-tree ring, vertex, triangle, and build-time results against the accepted production baseline.
+
+### Validation and compliance status
+
+- Repository instructions: reviewed.
+- Current source and direct bark-generation consumers: reviewed.
+- Historical root-transition and geometry-optimization records: reviewed.
+- Implementation: complete and accepted.
+- Static/API audit: `48 / 48` passed.
+- Unity execution: completed by the operator; no compile blocker was reported.
+- Focused visual board: complete; seven production-relevant cases passed and were visually accepted. One deliberate all-extremes stress case failed topology and is deferred to the later systematic bounds program.
+- Twenty-tree topology/performance audit: complete; Production Current `20 / 20`, all policies `60 / 60`, maximum adjacent-ring roll `8.982° / 10.000°`.
+- Persistent curated-gallery/library regeneration: pending and required immediately after applying the accepted bark algorithm.
+- Broad control-bound safety testing: explicitly deferred until the persistent library regeneration completes.
+
+### Implementation result
+
+- Recipe-only authored roll is now `TrunkSurfaceTorsionDegrees × Clamp01(normalizedDistance)`. The exact ground ring remains at zero phase and every elevated ring participates continuously.
+- Root-frame stabilization still resolves the tangent and no-roll normal first. Authored roll is applied afterward. Structural branch azimuths, generated tree definitions, and legacy/non-recipe structural twist remain unchanged.
+- `ResolveRootPhase(...)` and buttress-mask phase were not modified, preventing double application of the same axial rotation.
+- Adaptive subdivision now measures the difference between the shared roll function at each span endpoint rather than using an independent approximation.
+- The root-ring correspondence diagnostic now reports the same roll field emitted by production geometry instead of an unrelated persistence-derived transition.
+- Build telemetry records first nonzero emitted roll distance, phase at the ground plateau, root-collapse end, earliest transition, and effective transition, plus the maximum adjacent-ring authored phase step and its interval.
+- Bark generation fails before mesh emission if the actual emitted-ring sampling exceeds the active policy’s authored twist-step threshold.
+- The gallery gate consumes the direct adjacent-ring metric rather than dividing total twist by ring count.
+- The focused board reports the same distribution telemetry and retains topology auditing before either capture is attempted.
+- No settings schema, structural generator version, author-facing control, runtime component, vertex channel, draw call, persistent buffer, recipe, scene, prefab, material, layer, or tag was changed.
+
+### Actual changed-file reconciliation
+
+- Modified: exactly the six approved files.
+- Created: none.
+- Deleted: none.
+- Moved or renamed: none.
+- Unapproved or unrelated differences versus the supplied archive: none.
+
+### Static audit evidence
+
+- Complete final review surface reread: passed.
+- Approved scope comparison: passed.
+- C# lexical delimiter/string/comment checks: `5 / 5` passed.
+- Focused-board CSV header/value parity: `35 / 35`.
+- Geometry aggregate CSV header/value parity: `94 / 94`.
+- Static policy, version, API, symbol, UI-label, prohibited-write, and centralized-roll checks: `48 / 48` passed.
+- Bark settings version: `10`, unchanged.
+- Structural generator version: `6`, unchanged.
+- Bark algorithm version: `25`.
+- Unity compilation: unavailable in the archive-only environment and not represented as passed.
+
+### Current verified Inspector path
+
+`Procedural Tree Instance Inspector → Root Quality Evaluation → Run Continuous Twist Board`
+
+### Acceptance evidence
+
+1. The focused evaluator completed `8 / 8` scheduled cases. Seven production-relevant cases passed topology and produced both close-root and exact game-camera captures.
+2. The operator accepted the continuous root-to-trunk visual behavior and explicitly approved production promotion before further bounds work.
+3. Twist `0`, authored twist, `+460°`, and `-460°` preserved identical `12404 / 18978` geometry counts in the focused representative; handedness reversed correctly and requested/measured twist matched.
+4. Persistence `0.000`, `0.500`, and `1.000` passed the focused topology and capture workflow.
+5. The ordinary geometry audit completed `60 / 60` cases with Production Current topology `20 / 20`, generated-mesh parity `20 / 20`, and maximum production adjacent-ring roll `8.982° / 10.000°`.
+6. The all-extremes stress failure is retained as a bounds-audit seed. It does not override behavior acceptance because safe Cartesian bounds have not yet been established for all tree families and all controls.
+
+### Immediate production regeneration
+
+After applying bark algorithm `25`, run the existing incremental curated-gallery rebuild. Its checkpoint compatibility gate requires the current bark algorithm version, so persistent bark checkpoints generated with algorithm `24` are rejected and rebuilt. The operation regenerates all twenty stable curated slots, re-samples their exact controls, re-validates deterministic structure, rebuilds persistent bark mesh subassets, saves each completed checkpoint, and produces a resumable report.
+
+Do not begin systematic control-bound sweeps, change advertised limits, add dynamic clamping, or tune recipes against the new shape until the complete persistent regeneration reports `20 / 20` successful slots.
+
+## TREE-SPIRAL.1 — Height-Preserving Signed Path Spiral
+
+### Status
+
+**IMPLEMENTED / UNITY VALIDATION PENDING**
+
+### Objective
+
+Correct recipe-only Signed Path Spiral so increasing signed revolutions changes the horizontal trunk centreline without increasing, reducing, or otherwise remapping the authored vertical height. The full public `-3.0 ... +3.0` revolution interval must remain deterministic and structurally finite at the full `0.0 ... 0.5 × Height` Path Spiral Radius interval.
+
+### Approved files
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeGenerator.cs`
+- `Assets/Game/Procedural/Trees/TreeControlDescriptorRegistry.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeControlResponseSuite.cs`
+
+### Reviewed evidence
+
+- Recipe-only trunk construction emits twelve stable normalized non-spiral shape anchors, then currently adds the path spiral directly to those sparse anchors.
+- The shared polyline turn constraint reconstructs constrained points from the raw three-dimensional segment length. When a high-radius spiral is constrained toward the prior direction, horizontal arc length is converted into forward/vertical displacement and the trunk exceeds the authored height.
+- The recipe-only control contract advertises Signed Path Spiral Turns from `-3` to `+3` and Path Spiral Radius from `0` to `0.5 × Height`.
+- The recipe-only runtime policy allows at most `64` trunk samples and a `38°` maximum adjacent trunk-segment turn.
+- Static stress reconstruction showed that dense analytic points plus uniform horizontal scaling are not sufficient when high Bend Frequency, Drift, Roughness, Lean, Path Spiral Radius, and Signed Path Spiral Turns interact: the unconstrained sampled curve can still exceed the `38°` local-turn contract. The active path therefore requires a fixed-height sampled-turn limiter rather than the legacy three-dimensional length-preserving limiter.
+- Persistent curated-gallery checkpoint reuse requires the stored structural generator version to equal the current generator version. This structural correction therefore requires a generator version increment so existing persistent definitions cannot be reused silently.
+
+### Acceptance criteria
+
+1. The recipe-only trunk centreline begins at `y = 0` and ends at `y = authored Height` for every active path-spiral value.
+2. Every emitted recipe-only path-spiral sample follows `y = authored Height × normalizedDistance` within floating-point tolerance; Signed Path Spiral cannot change vertical progression.
+3. The full signed-turn and radius control intervals generate finite, monotonically rising trunk samples.
+4. Adjacent emitted trunk tangent turn remains at or below the active `38°` recipe-only policy limit.
+5. Positive and negative turns remain deterministic opposite-handed structural responses.
+6. Zero Path Spiral Radius preserves the existing non-spiral generation path. Zero Signed Path Spiral Turns with nonzero radius remains a valid non-revolving radial centreline sweep and must still preserve authored height.
+7. Branch attachment, root, foliage, and bark systems continue to consume the corrected trunk samples without new runtime work, per-frame state, or author-facing controls.
+8. Current structural generator version increments from `6` to `7`; seed compatibility remains `3`; bark algorithm remains `25`; bark settings remain `10`.
+9. Persistent gallery regeneration is mandatory because all version-6 structural checkpoints become incompatible.
+
+### Invariants and non-goals
+
+- Preserve the original twelve deterministic non-spiral shape anchors and their random keys.
+- Densify only the recipe-only centreline representation required to resolve the authored spiral; do not resample random shape noise.
+- Preserve exact authored vertical progression after interpolation.
+- Do not alter legacy/profile-driven generation.
+- Do not alter Axial Twist, continuous root-to-trunk bark roll, root geometry, branch algorithms, recipe assets, scenes, prefabs, materials, layers, or tags.
+- Do not clamp the public signed-turn range to hide the defect.
+- Do not add a permanent diagnostic action or parallel validation suite.
+
+### Implementation sequence
+
+1. Split recipe-only trunk anchor construction into stable non-spiral anchors plus an analytically evaluated path-spiral offset.
+2. Determine a deterministic turn-aware centreline point count from authored revolutions, the existing trunk turn limit, and the existing per-branch sample budget.
+3. Evaluate the non-spiral anchor curve at that point count, add the analytic spiral at each normalized position, and force exact authored `y` at every point.
+4. Bypass the three-dimensional polyline reconstruction only for active recipe-only path spirals; preserve each authored vertical coordinate and enforce horizontal safety with one deterministic uniform horizontal scale across the complete centreline rather than pointwise projection that can create clamp-boundary kinks.
+5. Force exact linear vertical sampling in the active recipe-only path-spiral `BuildCurveSamples` call, then constrain sampled segment direction with exact fixed `y` increments at `0.75 ×` the public local-turn limit so central-difference sample tangents retain safety margin. Reapply one uniform horizontal envelope scale after that constraint.
+6. Add generation-time structural validation for endpoint height, normalized vertical progression, monotonicity, finiteness, and maximum adjacent tangent turn.
+7. Extend the existing exhaustive control suite so Path Spiral Radius and Signed Path Spiral Turns exercise their combined maximum interaction and report trunk tip height, sample count, and maximum trunk turn.
+8. Update the control description and canonical status.
+9. Perform final scope, version, deterministic-key, API, CSV-schema, lexical, and source-diff audits. Unity compilation, full control-suite execution, gallery regeneration, and visual review remain operator validation gates.
+
+### Risks and mitigations
+
+- **Sparse-turn aliasing:** twelve anchors cannot represent three complete revolutions cleanly. Mitigation: preserve the twelve non-spiral random anchors, then add the analytic spiral on a deterministic turn-aware dense centreline.
+- **Clamp-boundary tangent spikes:** pointwise radial or elliptical projection can preserve height but create abrupt local direction changes where only some points touch the safety envelope. Mitigation: resolve one uniform horizontal scale from all active-path points and all applicable horizontal envelopes, then apply that scale to the complete centreline before sampling.
+- **Combined-shape local turns:** high non-spiral bend, drift, roughness, and lean can add local curvature on top of the analytic spiral even after turn-aware densification. Mitigation: constrain the final sampled path sequentially with fixed authored `y` increments and a `0.75 ×` internal segment-turn target, then validate the resulting central-difference tangents against the full public `38°` limit.
+- **Structural reroll:** changing trunk samples changes branch attachment frames and fingerprints. Mitigation: increment the structural generator version while preserving seed compatibility and stable random keys.
+- **Sample-budget exhaustion:** the public extreme must fit the existing sample budget. Mitigation: derive density from half the active turn limit and cap it at the existing `64`-sample budget; generation validation rejects any unresolved over-limit result rather than silently deforming it.
+- **Legacy regression:** the shared turn constraint also serves branches and legacy trees. Mitigation: leave that shared function unchanged and select the height-preserving path only for active recipe-only path spirals.
+- **Diagnostic drift:** a visual response alone would not prove height preservation. Mitigation: enforce the contract in production structure validation and expose direct centreline metrics in the existing control suite.
+
+### Implementation result
+
+- `TreeGenerator.CurrentGeneratorVersion` is `7`; seed compatibility remains `3`.
+- Active recipe-only Path Spiral preserves exact authored vertical control-point and sample progression from `0` to `Height`.
+- The original twelve deterministic non-spiral shape anchors and their random keys remain authoritative; an analytic spiral is evaluated on a deterministic turn-aware dense centreline.
+- Active-path horizontal safety uses one uniform scale across all points and both the runtime displacement envelope and any active reference-calibration ellipse.
+- Final active-path samples use a fixed-height local-turn limiter at `0.75 ×` the production segment-turn policy, then reapply the uniform horizontal envelope before frames and branch attachments are derived.
+- The legacy/profile trunk path, shared branch turn constraint, Axial Twist, bark algorithm `25`, bark settings `10`, recipe assets, scenes, prefabs, materials, layers, and tags are unchanged.
+- The existing control-response suite now reports emitted trunk controls, sample count, tip height, and maximum adjacent sample-tangent turn; Path Spiral controls exercise the full `0.50 × Height` / `±3` interaction.
+
+### Validation status
+
+- Review gate: complete.
+- Canonical plan: complete.
+- Implementation: complete.
+- Static/source audit: `34 / 34` passed.
+- Mathematical reconstruction: authored height remained exact at the tested signed-turn values; the old sparse three-dimensional constraint reproduced height growth at high turns.
+- Deterministic static stress reconstruction: `5,000` all-trunk-control-maximum seeds produced a maximum reconstructed adjacent sample-tangent turn of `35.478°`, below the public `38°` gate. This is supporting static evidence, not Unity execution.
+- Unity compilation: pending.
+- Exhaustive control response suite: pending.
+- Persistent curated-gallery regeneration: pending until source validation passes.
+- Visual confirmation at signed turns `1.5`, `3.0`, `-1.5`, and `-3.0`: pending.
+
+
+## TREE-ROOTS.3 — Twisted Buttress Body and Ground-Anchored Root Foot
+
+### Status
+
+**Source implementation and static audit complete. Unity compilation, focused visual review, and production topology validation are pending.**
+
+### Objective
+
+Preserve the accepted continuous base-to-tip axial bark roll for the proximal buttress body while preventing the distal root foot from orbiting around the trunk. Recipe-only roots must retain a stable ground-space outward direction through the foot-collapse domain so large Root Reach and Root Thickness values produce a continuous outward-to-ground silhouette rather than an airborne hook that curls back toward the trunk.
+
+### Acceptance criteria
+
+1. The exact ground ring remains unchanged in reach and phase: Root Reach continues to resolve as the full ground-level crest extension.
+2. The proximal buttress body continues to follow the accepted continuous axial twist field.
+3. The distal foot retains the base root sector's ground-space direction and releases continuously into the twisted body as the foot envelope collapses.
+4. Positive and negative axial twist retain opposite handedness without reversing or orbiting the distal foot.
+5. Root Thickness broadens the root support while retaining a rounded/tapered crest; the high-thickness profile must not become a flat sector-wide block.
+6. Root Count, Root Reach, Root Thickness, Root Height, and Buttress Persistence remain the only author-facing root controls; no hidden clamp, terrain query, runtime dependency, or new control is introduced.
+7. Legacy/profile-driven root generation remains unchanged.
+8. Existing contour-owned radial resolution, mixed-resolution stitching, UV side ordering, normals/tangents derived from final geometry, topology gates, and production geometry budgets remain active.
+9. The focused evaluation uses temporary unsaved structures and meshes, advances incrementally, remains cancellable, and does not alter recipes, exact controls, gallery meshes, scenes, prefabs, materials, layers, or tags.
+10. Active-gameplay CPU, GPU, draw-call, vertex-format, and persistent-state costs remain unchanged.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeRootQualityEvaluation.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+
+No file creation, deletion, move, scene edit, prefab edit, recipe edit, material edit, layer edit, tag edit, settings-schema change, or structural-generator change is approved.
+
+### Reviewed evidence
+
+- Pre-edit recipe-only root geometry was emitted as one rotated radial surface: `sample centre + twisted radial × sample radius × (1 + body contribution + foot contribution)`.
+- Pre-edit body and foot amplitudes were separate scalars, but both used the same continuously twisting radial direction. The distal foot therefore orbited with the trunk and could retract toward the body instead of preserving its base-sector ground direction.
+- The exact ground ring already has zero authored roll and a stabilized world-up/right root frame. It is therefore a deterministic anchor for every root sector and preserves the current ground footprint without a new control.
+- The recipe-only foot envelope is already strongest at the ground and collapses before the body/persistence envelope. It can drive a continuous anchored-foot-to-twisted-body release without changing Root Height or Buttress Persistence semantics.
+- Pre-edit high Root Thickness increased the root-mask profile power from `4` toward `12`, which created a broad flat crest. Width broadening already came from the requested angular support, so increasing the profile power was unnecessary and caused the observed blockiness.
+- Final trunk normals and tangents are derived from neighbouring final surface positions. A spatial foot correction in the shared surface evaluator therefore remains authoritative for positions, normals, tangents, topology preflight, caps, captures, and production mesh output.
+
+### Invariants and non-goals
+
+- Preserve `TREE-ROOTS.2` continuous axial roll and do not add a second height-varying root phase.
+- Preserve Root Reach as exact ground-level radial projection and Root Thickness as angular breadth.
+- Preserve the fixed local root-lobe identity and the existing root body/foot amplitude split.
+- Anchor only the recipe-only distal foot; do not change legacy roots.
+- Use the tree-local base plane and deterministic base root frame; do not query terrain.
+- Do not add separate root meshes, bones, per-root runtime objects, per-frame deformation, or author-facing grounding controls.
+- Do not alter Signed Path Spiral, structural branches, foliage, recipes, shaders, materials, scenes, prefabs, layers, tags, or geometry-efficiency policy thresholds.
+- Do not perform broad control-bound closure in this patch. The focused board validates representative production and high-root profiles; full cross-family bounds work remains later.
+
+### File-by-file implementation sequence
+
+1. **Canonical plan — complete.** Record the approved architecture, evidence, invariants, risks, and validation contract before code changes.
+2. **Bark surface model — source complete; Unity validation pending.** Recipe-only body/base displacement remains in the fully twisted surface frame. The foot contribution uses the deterministic base-plane root direction and receives only the authored roll released by `1 - footEnvelope`; it is fully anchored at the ground/plateau and exactly rejoins the twisted body as the foot contribution reaches zero.
+3. **Rounded thickness profile — source complete; Unity validation pending.** Thickness `0.5` remains the exact `q^4` profile. The high-thickness exponent now interpolates from `4` toward `2`, and the width diagnostic uses the same profile, so width broadening remains support-owned rather than becoming a flat crest.
+4. **Version and deterministic rebuild — complete.** Bark algorithm `25` became `26`. Bark settings remain `10`; structural generator remains `7`.
+5. **Focused evaluation — source complete; execution pending.** The temporary eight-case board now covers the authored profile, the operator's `400° / 1.2 Reach / 0.9 Thickness / 0.2874 Height / 0.5 Persistence` profile at both zero and authored twist, isolated Reach and Thickness stress, combined positive/negative twist stress, and Persistence `0`/`1`. The former low-Height bounds case is intentionally excluded because cross-family bounds work is deferred.
+6. **Inspector — source complete; execution pending.** The existing Root Quality Evaluation section now exposes the grounded-foot run/cancel/report/board/folder actions without adding another diagnostic section.
+7. **Audit — static phase complete; Unity phase pending.** The final diff is confined to the four approved files. Static scope, version, lexical, API, CSV-schema, neutral-profile, endpoint-identity, and representative vector-cancellation checks pass. Unity compilation, the focused board, and the normal production geometry/topology audit remain operator gates.
+
+### Implemented source delta
+
+- Recipe-only final root displacement is now the vector sum of a fully twisted body/base offset and a separately directed foot extension. The foot direction is defined in the exact deterministic base root frame and releases continuously into the authored twist as the existing foot envelope collapses.
+- Ground identity is preserved algebraically: at normalized distance `0`, authored roll is `0` and the body and foot directions are identical, so the complete ground footprint and Root Reach magnitude remain unchanged.
+- Foot-collapse identity is preserved algebraically: when the foot contribution reaches `0`, the emitted position exactly reduces to the accepted continuously twisted body surface.
+- Twist-`0` recipe trees remain position-equivalent throughout the foot domain because the stabilized root frame and anchored foot frame coincide there.
+- Legacy/profile-driven roots retain the prior scalar cross-section path and do not enter the grounded-foot branch.
+- The root-mask profile and its half-extension diagnostic now share the same high-thickness exponent interpolation from `4` toward `2`; thickness `0.5` remains exact.
+- The evaluator output and UI are retargeted rather than duplicated. It still uses temporary hidden preview objects, asynchronous capture readback, incremental progress, cancellation, and checkpointed output.
+
+### Static audit evidence
+
+- Approved-file scope: `4 / 4`, with no creation, deletion, move, or serialized-asset edit.
+- Source and mathematical reconstruction checks: `33 / 33` passed.
+- Focused CSV schema: `35 / 35` columns aligned.
+- Representative approved profiles (`400° / Reach 1.2 / Thickness 0.9` and `±460° / Reach 2 / Thickness 1`) never reduced the combined offset below `1.000 ×` the local trunk radius during the tested root domain; no body/foot vector cancellation below the base surface was found.
+- Maximum body-to-foot angular separation in those profiles was `26.400°`; the direction release remains bounded before the foot contribution vanishes.
+- Twenty-one straight-trunk contour reconstructions covering all focused non-authored profiles at `30`, `36`, and `60` radial samples produced no ring self-intersection; every reconstructed longitudinal quad retained a non-zero triangulation, with minimum best-diagonal triangle area `0.00131951` in normalized-radius units.
+- Unity compilation and live generated topology are unavailable in this environment and remain explicitly pending.
+
+### Risks and mitigations
+
+- **Foot/body kink:** independently directed displacement can create a discontinuity. Mitigation: keep the ground ring identical and multiply the anchoring influence by the existing smooth foot envelope so it reaches zero before the foot contribution disappears.
+- **Contour inversion:** strong twist plus large Reach can cross adjacent strips. Mitigation: all topology preflight and final topology audit paths consume the same final surface evaluator; no topology threshold is weakened.
+- **Ground-foot shrinkage:** vector addition can reduce upper-foot radial magnitude under twist. Mitigation: Root Reach remains exact at the ground ring; only elevated foot sections trade orbiting for anchored continuity.
+- **Thickness regression:** changing the high-thickness profile could alter the neutral accepted root. Mitigation: keep the exact thickness-`0.5` exponent and change only the high-thickness interpolation.
+- **Diagnostic drift:** an evaluator that only checks topology would miss the silhouette defect. Mitigation: use close-root captures from both twist handednesses and the exact operator profile in addition to the ordinary topology result.
+- **Performance regression:** an extra per-vertex frame calculation could increase dirty-generation cost. Mitigation: use constant-time vector arithmetic in the existing build-only surface evaluator, add no rings solely for grounding, and retain the normal production geometry audit afterward.

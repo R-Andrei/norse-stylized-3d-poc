@@ -203,6 +203,8 @@ float _FoamIntegratedAreaFixedPointScale;
 float _FoamDisturbanceEnabled;
 float _FoamBaseDownstreamSpeed;
 float _FoamMaximumLateralSpeedRatio;
+float _FoamShoreLateralMovementSuppression;
+float _FoamShoreDownstreamMovementSuppression;
 float _FoamObstacleSlowdownStrength;
 float _FoamObstacleMinimumDownstreamFactor;
 float _FoamMotionLaneScrollCells;

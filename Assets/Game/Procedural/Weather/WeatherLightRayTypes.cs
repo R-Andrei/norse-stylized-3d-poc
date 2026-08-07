@@ -10,53 +10,6 @@ namespace ProgrammaticStylized3D.Weather
         Independent = 2
     }
 
-    public enum WeatherLightRayPresetControlMode
-    {
-        Manual = 0,
-        SelectionProfile = 1
-    }
-
-    public enum WeatherLightRayCycleSourceMode
-    {
-        TimeOfDay = 0,
-        ManualNormalizedValue = 1,
-        ExternalRuntimeOverride = 2
-    }
-
-    public enum WeatherLightRayDirectionMode
-    {
-        ControllerDirectionalSource = 0,
-        Vertical = 1,
-        FixedWorldDirection = 2
-    }
-
-    public enum WeatherLightRaySourceAvailabilityPolicy
-    {
-        Ignore = 0,
-        Require = 1,
-        MultiplyActivation = 2
-    }
-
-    public enum WeatherLightRayCloudProjectionMode
-    {
-        None = 0,
-        CloudControllerDirectionalSource = 1
-    }
-
-    public enum WeatherLightRayCloudDataRequirement
-    {
-        Ignored = 0,
-        Optional = 1,
-        Required = 2
-    }
-
-    public enum WeatherLightRaySpatialCloudPolicy
-    {
-        AnyPosition = 0,
-        ClearFootprint = 1,
-        DistinctCloudOpening = 2
-    }
-
     public enum WeatherLightRayOriginKind
     {
         Procedural = 0,

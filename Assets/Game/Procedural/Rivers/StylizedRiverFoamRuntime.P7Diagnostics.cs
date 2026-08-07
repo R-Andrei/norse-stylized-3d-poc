@@ -273,7 +273,11 @@ namespace ProgrammaticStylized3D.Rivers
                 {
                     CellSpawnerAuditCase original = cellSpawnerAuditCases[i];
                     cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(
-                        original.Recipe, original.Scenario, original.Seed, i + 1));
+                        original.Recipe,
+                        original.Scenario,
+                        original.Seed,
+                        i + 1,
+                        original.ComponentMode));
                 }
 
                 // Record profile and wake body components before evaluating their
@@ -311,7 +315,8 @@ namespace ProgrammaticStylized3D.Rivers
             for (int scenario = 0; scenario < 7; scenario++)
             for (int seed = 0; seed < 12; seed++)
             {
-                cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(recipe, scenario, seed));
+                cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(
+                    recipe, scenario, seed));
             }
         }
 
@@ -323,7 +328,8 @@ namespace ProgrammaticStylized3D.Rivers
             cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(recipe, 2, 0));
             cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(recipe, 3, 0));
             cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(recipe, 4, 0));
-            cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(recipe, 6, 0));
+            cellSpawnerAuditCases.Add(new CellSpawnerAuditCase(
+                recipe, 6, 0));
         }
 
         private static int ResolveCellSpawnerComponentAreaKey(
@@ -526,6 +532,27 @@ namespace ProgrammaticStylized3D.Rivers
                 out bool headOnlyMeasurement, out float expectedLength,
                 out float expectedWidth, out float offsetX, out float offsetY,
                 out float angleDegrees);
+            if (testCase.Recipe == 0)
+            {
+                // Shore Ribbon production has one structural birth shape: one
+                // longitudinal grid cell by one lateral grid cell. Legacy body
+                // width and head-size scenarios remain as fixed-contract rows so
+                // Smoke/Exhaustive suite cardinality and replay numbering stay
+                // stable without pretending those removed controls still apply.
+                requestedWidth = 1f;
+                headLength = 1f;
+                headWidth = 1f;
+                headOnlyMeasurement = false;
+                expectedLength = requestedLength;
+                expectedWidth = 1f;
+                scenarioName = testCase.Scenario switch
+                {
+                    3 => "5-Cell Path · Discrete 1x1 Birth Cells",
+                    4 => "Legacy Width Scenario · Fixed 1-Cell Birth",
+                    6 => "5-Cell Path · Fixed 1x1 Birth Cells",
+                    _ => scenarioName + " · Fixed 1x1 Birth"
+                };
+            }
             if (testCase.ComponentMode > 0)
             {
                 scenarioName += testCase.ComponentMode switch
@@ -768,9 +795,15 @@ namespace ProgrammaticStylized3D.Rivers
             e.SourceAmount = 1f;
             e.RemainingLife = 1f;
             e.BodyLengthCells = lengthCells;
-            e.BodyWidthCells = widthCells;
-            e.HeadLengthCells = headLengthCells;
-            e.HeadWidthCells = headWidthCells;
+            e.BodyWidthCells = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : widthCells;
+            e.HeadLengthCells = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : headLengthCells;
+            e.HeadWidthCells = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : headWidthCells;
             e.BendAmplitudeCells = 0f;
             e.ContactSpanCells = lengthCells;
             e.ContactWidthCells = widthCells;
@@ -779,13 +812,21 @@ namespace ProgrammaticStylized3D.Rivers
             e.ShoreInsetMetres = 0f;
             // The D8 Shore/Inward packing path retains legacy metre-named
             // fields, but consumes these values as authoritative Foam cells.
-            e.WidthMetres = widthCells;
+            e.WidthMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : widthCells;
             // Length and Inward Reach are independent authored controls. Body
             // dimension cases isolate the path length under test.
             e.InwardReachMetres = testCase.Recipe == 1 ? 0f : lengthCells * dy;
-            e.FeatherMetres = headWidthCells;
-            e.RevealPathDistanceMetres = Mathf.Max(dx, lengthCells * dx);
-            e.HeadTrailMetres = headLengthCells * dx;
+            e.FeatherMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : headWidthCells;
+            e.RevealPathDistanceMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? Mathf.Max(1f, lengthCells)
+                : Mathf.Max(dx, lengthCells * dx);
+            e.HeadTrailMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
+                ? 1f
+                : headLengthCells * dx;
             e.FormationSpeedMetresPerSecond = Mathf.Max(dx, lengthCells * dx);
             e.ObjectSourceLateralCellSpacingMetres = dy;
             e.ObjectWakeArmLengthMetres = lengthCells * dx;

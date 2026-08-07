@@ -222,6 +222,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "PrimaryVertices,PrimaryTriangles,SecondaryVertices,SecondaryTriangles,TertiaryVertices,TertiaryTriangles," +
                 "CapVertices,CapTriangles,SeamDuplicateVertices,SourceSamples,RenderRings,InsertedRings,RootRefinementInsertedRings,TwistRefinementInsertedRings,AdaptiveShapeRefinementInsertedRings,RemovedRings,EfficiencyPolicyRemovedRings,TopologyRepairRemovedRings," +
                 "PhaseAlignedRings,CurvatureRadiusClamps,CircularTopologyRemovedRings,TrunkTipRemovedRings,AlternateQuadDiagonals," +
+                "RequestedAxialTwistDegrees,MeasuredAxialTwistDegrees,AxialTwistErrorDegrees,FirstAuthoredAxialTwistDistance,AxialTwistAtGroundPlateauEndDegrees,AxialTwistAtRootCollapseEndDegrees,AxialTwistAtEarliestRootTransitionDegrees,AxialTwistAtEffectiveRootTransitionDegrees,MaximumAuthoredAxialTwistStepDegrees,MaximumAllowedAxialTwistStepDegrees,MaximumAuthoredAxialTwistStepStartDistance,MaximumAuthoredAxialTwistStepEndDistance," +
                 "AverageSegmentLength,MaximumSegmentLength,AverageTurnDegrees,MaximumTurnDegrees," +
                 "RendererCount,DrawCallEstimate,ShadowCasterRendererCount,ShadowCasterDrawCallEstimate,ShadowCasterTriangleEstimate,ExistingMeshVertices,ExistingMeshTriangles,ExistingBaselineMeshMatched," +
                 "SilhouetteMeasured,SilhouetteDeviation,CapturePath,CaptureFailure,TopologySummary");
@@ -830,7 +831,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
 
             var report = new StringBuilder(65536);
-            report.AppendLine("# TREE-GEOMETRY.3B — Procedural Tree Geometry Efficiency Audit");
+            report.AppendLine("# TREE-GEOMETRY.3B / TREE-ROOTS.2 — Procedural Tree Geometry Efficiency Audit");
             report.AppendLine();
             report.Append("- Generated UTC: ")
                 .AppendLine(DateTime.UtcNow.ToString("O"));
@@ -852,7 +853,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 .AppendLine(FormatDuration(
                     (DateTime.UtcNow - job.StartedUtc).TotalSeconds));
             report.AppendLine("- Traditional distance LOD: excluded.");
-            report.AppendLine("- Production Current is the accepted Patch 1 axial plus contour-owned radial policy; Radial Aggressive remains diagnostic-only.");
+            report.AppendLine("- Production Current is the accepted Patch 1 axial plus contour-owned radial policy with TREE-ROOTS.2 continuous base-to-tip recipe bark roll; Radial Aggressive remains diagnostic-only.");
             report.AppendLine("- Capture pipeline: isolated preview Scene plus polled AsyncGPUReadback; no synchronous GPU readback or wait.");
             if (!string.IsNullOrEmpty(fatalFailure))
             {
@@ -866,6 +867,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
             AppendPolicyDefinitions(report);
             AppendAggregateSummary(report, job);
+            AppendAxialTwistSummary(report, job);
             AppendStructureAndStorageSummary(report, job);
             AppendPerTreeSummary(report, job);
             AppendRecommendations(report, job, outcome);
@@ -1072,6 +1074,77 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     .Append("× vertices / ")
                     .Append((productionTriangles / (double)KnownRecentHeadTriangles).ToString("F2", CultureInfo.InvariantCulture))
                     .AppendLine("× triangles**.");
+            }
+        }
+
+        private static void AppendAxialTwistSummary(
+            StringBuilder report,
+            Job job)
+        {
+            report.AppendLine();
+            report.AppendLine("## Production axial-twist distribution");
+            report.AppendLine();
+            report.AppendLine("| Tree | Requested / measured / error | First roll t | Roll at ground / collapse / earliest / effective | Maximum adjacent-ring step / limit | Step interval |");
+            report.AppendLine("|---|---:|---:|---:|---:|---:|");
+            for (int resultIndex = 0;
+                resultIndex < job.Results.Count;
+                resultIndex++)
+            {
+                CaseResult result = job.Results[resultIndex];
+                if (result.Policy != TreeBarkMeshEfficiencyPolicy.Current ||
+                    result.Bark == null)
+                {
+                    continue;
+                }
+
+                TreeBarkMeshBuildResult bark = result.Bark;
+                report.Append("| ").Append(result.Target.Name)
+                    .Append(" | ")
+                    .Append(bark.RequestedAxialTwistDegrees.ToString(
+                        "F2",
+                        CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.MeasuredAxialTwistDegrees.ToString(
+                        "F2",
+                        CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.AxialTwistErrorDegrees.ToString(
+                        "F3",
+                        CultureInfo.InvariantCulture))
+                    .Append(" | ")
+                    .Append(bark.FirstAuthoredAxialTwistNormalizedDistance
+                        .ToString("F4", CultureInfo.InvariantCulture))
+                    .Append(" | ")
+                    .Append(bark.AxialTwistAtGroundPlateauEndDegrees.ToString(
+                        "F2",
+                        CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.AxialTwistAtRootCollapseEndDegrees.ToString(
+                        "F2",
+                        CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.AxialTwistAtEarliestRootTransitionDegrees
+                        .ToString("F2", CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.AxialTwistAtEffectiveRootTransitionDegrees
+                        .ToString("F2", CultureInfo.InvariantCulture))
+                    .Append(" | ")
+                    .Append(bark.MaximumAuthoredAxialTwistStepDegrees.ToString(
+                        "F3",
+                        CultureInfo.InvariantCulture))
+                    .Append(" / ")
+                    .Append(bark.MaximumAllowedAxialTwistStepDegrees.ToString(
+                        "F3",
+                        CultureInfo.InvariantCulture))
+                    .Append(" | ")
+                    .Append(bark
+                        .MaximumAuthoredAxialTwistStepStartNormalizedDistance
+                        .ToString("F4", CultureInfo.InvariantCulture))
+                    .Append("→")
+                    .Append(bark
+                        .MaximumAuthoredAxialTwistStepEndNormalizedDistance
+                        .ToString("F4", CultureInfo.InvariantCulture))
+                    .AppendLine(" |");
             }
         }
 
@@ -1458,6 +1531,18 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 I(result.Bark?.CircularBranchRingRemovalCount),
                 I(result.Bark?.TrunkTipRemovedRingCount),
                 I(result.Bark?.AlternateQuadDiagonalCount),
+                D(result.Bark?.RequestedAxialTwistDegrees),
+                D(result.Bark?.MeasuredAxialTwistDegrees),
+                D(result.Bark?.AxialTwistErrorDegrees),
+                D(result.Bark?.FirstAuthoredAxialTwistNormalizedDistance),
+                D(result.Bark?.AxialTwistAtGroundPlateauEndDegrees),
+                D(result.Bark?.AxialTwistAtRootCollapseEndDegrees),
+                D(result.Bark?.AxialTwistAtEarliestRootTransitionDegrees),
+                D(result.Bark?.AxialTwistAtEffectiveRootTransitionDegrees),
+                D(result.Bark?.MaximumAuthoredAxialTwistStepDegrees),
+                D(result.Bark?.MaximumAllowedAxialTwistStepDegrees),
+                D(result.Bark?.MaximumAuthoredAxialTwistStepStartNormalizedDistance),
+                D(result.Bark?.MaximumAuthoredAxialTwistStepEndNormalizedDistance),
                 F(totals.AverageSegmentLength),
                 F(totals.MaximumSegmentLength),
                 F(totals.AverageTurn),

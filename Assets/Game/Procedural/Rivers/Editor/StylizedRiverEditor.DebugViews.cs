@@ -434,6 +434,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 : "Not in Play Mode";
 
             DrawReadOnlyRow(
+                new GUIContent("Shore Head Population"),
+                runtime != null
+                    ? runtime.AutomaticShoreBirthStatus
+                    : unavailable);
+            DrawReadOnlyRow(
                 new GUIContent("Live Source Texels"),
                 runtime != null
                     ? runtime.AutomaticBirthDebugReadbackAvailable
@@ -1497,7 +1502,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.AutomaticBirthSources:
                     return
-                        "Exact automatic Layer C geometric birth Coverage from the latest material update before transport and aging. Yellow is Shore Ribbon and Inward Wash, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update overlap between multiple source events or categories, and black means no source Coverage was written this update. This view does not encode intrinsic Presence or Remaining Life.";
+                        "Phase-correct automatic source and deposited-trail view. Dark grey is committed persistent Foam already deposited, yellow is the current Shore Ribbon or Inward Wash emitter, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update source overlap, and black means neither committed Foam nor a current source. Source colours do not encode intrinsic Presence or Remaining Life.";
 
                 case StylizedRiverFoamDebugView.MaterialCoverage:
                     return

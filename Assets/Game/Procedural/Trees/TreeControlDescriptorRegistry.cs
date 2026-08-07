@@ -103,7 +103,7 @@ namespace ProgrammaticStylized3D.Trees
                 TreeControlSection.TrunkSpiralAndTwist,
                 "trunk-spiral-twist",
                 "Trunk Spiral and Twist",
-                "Path Spiral moves the trunk centreline. Axial Twist rotates only the bark/cross-section frame around that centreline and does not rotate structural branch attachments. Signed Path Spiral Turns uses sign for handedness and magnitude for revolutions.",
+                "Path Spiral moves the trunk centreline while preserving authored vertical height. Axial Twist rotates only the bark/cross-section frame around that centreline and does not rotate structural branch attachments. Signed Path Spiral Turns uses sign for handedness and magnitude for revolutions.",
                 false),
             new TreeControlSectionDescriptor(
                 TreeControlSection.Roots,
@@ -178,7 +178,7 @@ namespace ProgrammaticStylized3D.Trees
             Angle(TreeControlSection.TrunkShape, "tree.trunk.lean-direction", "leanDirection", "Lean Direction", "Horizontal lean direction in degrees. This interval may wrap through zero.", 0f, 360f),
 
             Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.path-spiral-radius", "pathSpiralRadius", "Path Spiral Radius", "Radius of the actual centreline spiral as a fraction of tree height.", 0f, 0.50f),
-            Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.path-spiral-turns", "signedPathSpiralTurns", "Signed Path Spiral Turns", "Number of centreline revolutions. Positive and negative values select opposite handedness.", -3f, 3f),
+            Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.path-spiral-turns", "signedPathSpiralTurns", "Signed Path Spiral Turns", "Number of height-preserving centreline revolutions. Positive and negative values select opposite handedness without changing authored tree height.", -3f, 3f),
             Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.axial-twist", "axialTwist", "Axial Twist", "Total bark/cross-section roll around the trunk centreline, in degrees. It does not move the centreline or rotate structural branch attachment azimuths.", -1080f, 1080f),
 
             Integer(TreeControlSection.Roots, "tree.root.count", "rootCount", "Root Count", "Number of buttresses around the trunk. Count does not redefine requested angular width; emitted width is clamped and reported only when the requested support would overlap adjacent roots.", 3, 8),

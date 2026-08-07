@@ -13558,15 +13558,42 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "Mesh Diagnostics",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Audits the currently generated MeshFilter.sharedMesh " +
-                "without regeneration or repair. Proof clones are " +
-                "temporary, non-serialized, and replace only suspect " +
-                "tangents or the material for causal comparison.",
+                "Audit Render Mesh inspects one existing mesh without " +
+                "regeneration. Surface Causality Suite freezes the active " +
+                "mass, automatically compares the current material with " +
+                "Assets/Game/Demo/Materials/Stone/M_PixelStone.mat on the " +
+                "same mesh, and optionally accepts one selected reference " +
+                "mass. Before regeneration it snapshots every source shared " +
+                "material slot plus global/per-slot property blocks, restores " +
+                "them immediately and again at finalization, and fails the " +
+                "report if restoration differs. Proof renderers, cameras, " +
+                "materials, meshes, and render targets are temporary; no " +
+                "diagnostic material is assigned to the source renderer. " +
+                "Outside this suite, changing a debug field invokes OnValidate; " +
+                "a named Stone Surface Profile can therefore reassert its HLSL " +
+                "material. Use Stone Surface Profile = Renderer Material when " +
+                "manually retaining M_PixelStone.",
                 MessageType.None);
 
             GeneratedMass mass = target as GeneratedMass;
             bool editingMultiple =
                 serializedObject.isEditingMultipleObjects;
+            GeneratedMass activeSelectedMass =
+                Selection.activeGameObject == null
+                    ? null
+                    : Selection.activeGameObject.GetComponent<GeneratedMass>();
+            GeneratedMass causalitySuspect =
+                activeSelectedMass != null &&
+                targets.Contains(activeSelectedMass)
+                    ? activeSelectedMass
+                    : mass;
+            GeneratedMass causalityReference = targets
+                .OfType<GeneratedMass>()
+                .FirstOrDefault(x => x != causalitySuspect);
+            bool causalitySelectionValid =
+                targets.Length >= 1 &&
+                targets.Length <= 2 &&
+                targets.All(x => x is GeneratedMass);
             bool currentAudit = IsCurrentRenderMeshAudit(mass);
 
             if (renderMeshProofTarget != null &&
@@ -13588,10 +13615,22 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     RunRenderMeshAudit(mass);
                 }
+            }
 
-                if (GUILayout.Button("Run Bevel-Shading Evidence Suite"))
+            using (new EditorGUI.DisabledScope(
+                Application.isPlaying ||
+                !causalitySelectionValid ||
+                causalitySuspect == null ||
+                GeneratedMassBevelShadingDiagnosticSuite.IsRunning))
+            {
+                string causalityLabel = causalityReference == null
+                    ? "Run Surface Causality Suite (Same Mesh + Legacy)"
+                    : "Run Surface Causality Suite (Legacy + Reference)";
+                if (GUILayout.Button(causalityLabel))
                 {
-                    GeneratedMassBevelShadingDiagnosticSuite.Start(mass);
+                    GeneratedMassBevelShadingDiagnosticSuite.Start(
+                        causalitySuspect,
+                        causalityReference);
                 }
             }
 
@@ -13601,7 +13640,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     GeneratedMassBevelShadingDiagnosticSuite.ProgressText +
                     ". The report checkpoints after every batch.",
                     MessageType.Info);
-                if (GUILayout.Button("Cancel Bevel-Shading Evidence Suite"))
+                if (GUILayout.Button("Cancel Surface Causality Suite"))
                 {
                     GeneratedMassBevelShadingDiagnosticSuite.Cancel();
                 }
@@ -13611,7 +13650,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUILayout.HelpBox(
                     GeneratedMassBevelShadingDiagnosticSuite.LastSummary,
                     MessageType.Info);
-                if (GUILayout.Button("Copy Last Bevel-Shading Report"))
+                if (GUILayout.Button("Copy Last Surface Causality Report"))
                 {
                     GeneratedMassBevelShadingDiagnosticSuite.CopyLastReport();
                 }
@@ -13620,7 +13659,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             if (editingMultiple)
             {
                 EditorGUILayout.HelpBox(
-                    "Render-mesh diagnostics require one selected mass.",
+                    "Audit Render Mesh requires one selected mass. Surface " +
+                    "Causality Suite supports exactly two selected masses " +
+                    "for suspect/reference parity.",
                     MessageType.None);
                 return;
             }

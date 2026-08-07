@@ -138,6 +138,12 @@ namespace ProgrammaticStylized3D.Rivers
                 "_FoamMaximumLateralSpeedRatio",
                 ResolveEffectiveFoamMaximumLateralSpeedRatio());
             computeShader.SetFloat(
+                "_FoamShoreLateralMovementSuppression",
+                river.FoamShoreLateralMovementSuppression);
+            computeShader.SetFloat(
+                "_FoamShoreDownstreamMovementSuppression",
+                river.FoamShoreDownstreamMovementSuppression);
+            computeShader.SetFloat(
                 "_FoamObstacleSlowdownStrength",
                 river.FoamObstacleSlowdownStrength);
             computeShader.SetFloat(

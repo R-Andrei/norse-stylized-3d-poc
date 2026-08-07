@@ -477,6 +477,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Low Lateral Motion Coverage",
                     "Approximate fraction of the route field compressed toward very low lateral intent."));
             EditorGUILayout.PropertyField(
+                Find("foamShoreLateralMovementSuppression"),
+                new GUIContent(
+                    "Shore Lateral Movement Suppression",
+                    "Suppresses lateral/cross-river canonical Foam velocity inside the existing Shore Support field. Zero preserves current lateral movement; one removes it completely at full Shore Support."));
+            EditorGUILayout.PropertyField(
+                Find("foamShoreDownstreamMovementSuppression"),
+                new GUIContent(
+                    "Shore Downstream Movement Suppression",
+                    "Suppresses downstream canonical Foam velocity inside the existing Shore Support field. Zero preserves current downstream movement; one removes it completely at full Shore Support."));
+            EditorGUILayout.PropertyField(
                 Find("foamObstacleSlowdownStrength"),
                 new GUIContent(
                     "Object Contact Slowdown Falloff",
@@ -1106,6 +1116,58 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             EditorGUI.showMixedValue = false;
         }
 
+        private void DrawAutomaticShorePopulationPrediction()
+        {
+            StylizedRiver selectedRiver = target as StylizedRiver;
+            if (selectedRiver == null || targets.Length != 1)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Predicted Active Heads"),
+                    "Select one river");
+                return;
+            }
+
+            float representedRiverLength = selectedRiver.Domain.IsValid
+                ? Mathf.Max(0f, selectedRiver.Domain.LocalLength)
+                : 0f;
+            float representedBankLength = representedRiverLength * 2f;
+            float meanHeadCount = Mathf.Clamp01(
+                    selectedRiver.FoamShoreFoamActivity) *
+                representedBankLength /
+                Mathf.Max(
+                    0.01f,
+                    StylizedRiver.AutomaticShoreFullActivityHeadSpacingMetres);
+            int minimumHeadCount = Mathf.FloorToInt(meanHeadCount);
+            int maximumHeadCount = Mathf.CeilToInt(meanHeadCount);
+            string predicted = minimumHeadCount == maximumHeadCount
+                ? $"{minimumHeadCount} (mean {meanHeadCount:0.##})"
+                : $"{minimumHeadCount}-{maximumHeadCount} " +
+                  $"(mean {meanHeadCount:0.##})";
+            DrawReadOnlyRow(
+                new GUIContent(
+                    "Predicted Active Heads",
+                    "Long-term target range resolved from Activity and the represented shoreline length. Packet clearance or invalid geometry may temporarily keep the live count below this target."),
+                predicted);
+
+            int chunkCount = representedRiverLength > 0f
+                ? Mathf.Max(1, Mathf.CeilToInt(representedRiverLength / 32f))
+                : 0;
+            DrawReadOnlyRow(
+                new GUIContent("Represented Shoreline"),
+                $"{representedBankLength:0.#} m across 2 banks | " +
+                $"{chunkCount} Foam chunk(s)");
+
+            StylizedRiverFoamRuntime runtime = Application.isPlaying
+                ? selectedRiver.GetComponent<StylizedRiverFoamRuntime>()
+                : null;
+            if (runtime != null)
+            {
+                DrawReadOnlyRow(
+                    new GUIContent("Runtime Shore Population"),
+                    runtime.AutomaticShoreBirthStatus);
+            }
+        }
+
         private void DrawNormalizedPatternWeight(
             SerializedProperty primary,
             SerializedProperty secondary,
@@ -1220,7 +1282,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
         private void DrawFoamAutomaticSourcePopulationSection()
         {
             EditorGUILayout.HelpBox(
-                "Automatic birth creates finite Layer C material packets. Coverage selects a stable share of deterministic source slots, Activity controls how promptly a cleared slot fires, and Minimum Packet Gap extends a bounded shared packet-envelope reservation so neighbouring Shore, Object, and Free-Water events do not start as one welded pack.",
+                "Automatic birth creates finite Layer C material packets. Shore Activity controls a river-length-scaled target active-head population across the complete shoreline, while Minimum Packet Gap enforces physical packet clearance. Object and Free-Water categories retain their own population controls.",
                 MessageType.None);
 
             EditorGUILayout.PropertyField(
@@ -1246,23 +1308,19 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Enabled",
                         "Enables deterministic shore/contact Layer C material birth when Automatic Foam Birth is on and Spawn Preset is not Off."));
                 EditorGUILayout.PropertyField(
-                    Find("foamShoreFoamCoverage"),
-                    new GUIContent(
-                        "Coverage",
-                        "How much eligible shoreline can participate in deterministic source events over time. This does not change event opacity or patch size."));
-                EditorGUILayout.PropertyField(
                     Find("foamShoreFoamActivity"),
                     new GUIContent(
                         "Activity",
-                        "How promptly an eligible Shore slot starts a finite packet. Zero disables starts; one fires immediately after clearance. Activity cannot bypass the packet gap."));
+                        "Controls the target active Shore-head population from the represented shoreline length. Zero requests no heads; one requests approximately one head per 17.5 metres across both banks. Minimum Packet Gap remains the final placement authority."));
+                DrawAutomaticShorePopulationPrediction();
                 EditorGUILayout.PropertyField(
                     Find("foamShoreMinimumPacketGapMetres"),
                     new GUIContent(
                         "Minimum Packet Gap (m)",
                         "Minimum downstream clearance reserved after a Shore packet completes. It rearms the same slot and extends shared cross-source packet separation."));
                 EditorGUILayout.HelpBox(
-                    "D8.2 stages cell-authored source geometry. These Cell Geometry values are serialized now but remain non-authoritative until each recipe is converted to the shared D8.3 rasterizer. Existing births intentionally retain their D7C metric geometry in this patch.",
-                    MessageType.Info);
+                    "All shoreline scheduling buckets remain eligible. Activity resolves a river-length-scaled active-head target, Minimum Packet Gap enforces physical separation, and each selected pattern starts in the nearest Foam cell touching the current visible shore.",
+                    MessageType.None);
                 EditorGUILayout.PropertyField(
                     Find("foamShoreFoamPattern"),
                     new GUIContent(
@@ -1296,16 +1354,16 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Segment Length",
                         Find("foamShoreRibbonLengthMinCells"),
                         Find("foamShoreRibbonLengthMaxCells"));
-                    DrawMinMaxCellControls(
-                        "Width",
-                        Find("foamShoreRibbonWidthMinCells"),
-                        Find("foamShoreRibbonWidthMaxCells"));
-                    EditorGUILayout.PropertyField(Find("foamShoreRibbonHeadLengthCells"), new GUIContent("Head Length Cells"));
-                    EditorGUILayout.PropertyField(Find("foamShoreRibbonHeadWidthCells"), new GUIContent("Head Width Cells"));
-                    DrawMinMaxCellControls(
-                        "Bank Offset",
-                        Find("foamShoreRibbonOffsetMinCells"),
-                        Find("foamShoreRibbonOffsetMaxCells"));
+                    DrawReadOnlyRow(
+                        new GUIContent(
+                            "Birth Head",
+                            "Shore Ribbon birth is structurally fixed to one longitudinal cell by one lateral cell. Width and head-size controls cannot expand it."),
+                        "Fixed 1 × 1 cell");
+                    DrawReadOnlyRow(
+                        new GUIContent(
+                            "Shore Placement",
+                            "Every Ribbon head uses the nearest valid Foam cell touching the current visible shore."),
+                        "Nearest shore cell");
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonRevealSpeedCellsPerSecond"),
                         new GUIContent("Reveal Speed (Cells/s)"));
@@ -1341,10 +1399,11 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamInwardWashReachMaxCells"));
                     EditorGUILayout.PropertyField(Find("foamInwardWashHeadLengthCells"), new GUIContent("Head Length Cells"));
                     EditorGUILayout.PropertyField(Find("foamInwardWashHeadWidthCells"), new GUIContent("Head Width Cells"));
-                    DrawMinMaxCellControls(
-                        "Shore Start Offset",
-                        Find("foamInwardWashOffsetMinCells"),
-                        Find("foamInwardWashOffsetMaxCells"));
+                    DrawReadOnlyRow(
+                        new GUIContent(
+                            "Shore Placement",
+                            "Every Inward Wash starts in the nearest valid Foam cell touching the current visible shore."),
+                        "Nearest shore cell");
                     DrawMinMaxCellControls(
                         "Bend Amplitude",
                         Find("foamInwardWashBendAmplitudeMinCells"),

@@ -323,6 +323,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     .Append(barkResult.MeasuredAxialTwistDegrees.ToString("F2"))
                     .Append("/")
                     .Append(barkResult.AxialTwistErrorDegrees.ToString("F3"))
+                    .Append(" | twistFirst/MaxStep/Limit=")
+                    .Append(barkResult.FirstAuthoredAxialTwistNormalizedDistance.ToString("F4"))
+                    .Append("/")
+                    .Append(barkResult.MaximumAuthoredAxialTwistStepDegrees.ToString("F3"))
+                    .Append("/")
+                    .Append(barkResult.MaximumAllowedAxialTwistStepDegrees.ToString("F3"))
+                    .Append("@")
+                    .Append(barkResult.MaximumAuthoredAxialTwistStepStartNormalizedDistance.ToString("F4"))
+                    .Append("→")
+                    .Append(barkResult.MaximumAuthoredAxialTwistStepEndNormalizedDistance.ToString("F4"))
                     .Append(" | branchTurn=")
                     .Append(CalculateMaximumNonTrunkSegmentTurn(
                         representative.GeneratedDefinition).ToString("F2"))
@@ -559,18 +569,27 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     }
                 }
 
-                float maximumAverageTwistStep =
-                    barkResult.EffectiveTrunkRingCount > 1
-                        ? Mathf.Abs(barkResult.RequestedAxialTwistDegrees) /
-                          (barkResult.EffectiveTrunkRingCount - 1)
-                        : float.PositiveInfinity;
-                if (maximumAverageTwistStep > 12.001f)
+                float maximumAuthoredTwistStep =
+                    barkResult.MaximumAuthoredAxialTwistStepDegrees;
+                float maximumAllowedTwistStep =
+                    barkResult.MaximumAllowedAxialTwistStepDegrees;
+                if (maximumAuthoredTwistStep >
+                    maximumAllowedTwistStep + 0.001f)
                 {
                     aggregateFailures.Add(
                         representative.Family +
-                        " 1 averages " +
-                        maximumAverageTwistStep.ToString("F2") +
-                        " degrees of twist per trunk ring; maximum is 12.00.");
+                        " 1 has an authored adjacent-ring twist step of " +
+                        maximumAuthoredTwistStep.ToString("F3") +
+                        " degrees at normalized distance " +
+                        barkResult
+                            .MaximumAuthoredAxialTwistStepStartNormalizedDistance
+                            .ToString("F4") +
+                        "→" +
+                        barkResult
+                            .MaximumAuthoredAxialTwistStepEndNormalizedDistance
+                            .ToString("F4") +
+                        "; maximum is " +
+                        maximumAllowedTwistStep.ToString("F3") + ".");
                 }
 
                 if (representative.Family == TreeFamily.Twisted &&

@@ -8,10 +8,10 @@ namespace ProgrammaticStylized3D.Weather
     /// This asset owns beam, surface, vegetation, geometry, and evolution
     /// presentation. It must never decide when it is active, which runtime
     /// source is required, whether clouds are required, or how automatic rays
-    /// are populated. Those contracts belong to Selection and Population
-    /// profiles. The legacy SourceKind field is retained only for serialized
-    /// compatibility until curated asset migration and must not be read by
-    /// production selection or population code.
+    /// are populated. Those policies belong to the runtime request owner and,
+    /// eventually, the Weather orchestration layer. The legacy SourceKind field
+    /// is retained only for serialized compatibility until curated asset
+    /// migration and must not be read by production request or population code.
     /// </summary>
     [CreateAssetMenu(
         fileName = "WeatherLightRayPreset",
@@ -22,8 +22,8 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField] private string displayName = "LightRay Preset";
         [SerializeField]
         [Tooltip(
-            "Legacy catalog metadata only. V1.2E production selection and " +
-            "population must use explicit Selection Profile dependencies.")]
+            "Legacy serialized metadata only. Runtime request owners and " +
+            "Weather orchestration must supply source dependencies explicitly.")]
         private WeatherLightRaySourceKind sourceKind =
             WeatherLightRaySourceKind.Sun;
 

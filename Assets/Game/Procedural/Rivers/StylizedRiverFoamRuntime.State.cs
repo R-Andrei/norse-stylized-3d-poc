@@ -18,6 +18,14 @@ namespace ProgrammaticStylized3D.Rivers
             FreeWaterCrossLaceConnector = 8
         }
 
+        private struct AutomaticShoreSlotScheduleState
+        {
+            public bool Initialized;
+            public int CycleIndex;
+            public int ActiveEventId;
+            public float NextStartTime;
+        }
+
         private struct AutomaticObjectSourceState
         {
             public int CycleIndex;
@@ -61,6 +69,7 @@ namespace ProgrammaticStylized3D.Rivers
             public AutomaticFoamSourceEventType Type;
             public EntityId ObjectSourceId;
             public float SideSign;
+            public int ShoreScheduleSlotId;
             public float StartGlobalDistance;
             public float EndGlobalDistance;
             public float ObjectCentreGlobalDistance;
@@ -137,7 +146,7 @@ namespace ProgrammaticStylized3D.Rivers
             // contact point 0; z = centre storage global; w = flow direction
             // except Object Arc/Semi-Arc contact point 1.x.
             public Vector4 Distance;
-            // x = shore offset cells for D8 Shore/Inward except Object Arc/Semi-Arc contact point 1.y;
+            // x = fixed zero shore-start offset for D8 Shore/Inward except Object Arc/Semi-Arc contact point 1.y;
             // y = width cells for D8 Shore/Inward and Object
             // Arc/Semi-Arc straight wake-arm length metres; z = inward reach cells for D8 Inward Wash or
             // Arc/Semi-Arc normalized material-step duration; w = head width cells for D8 Shore/Inward

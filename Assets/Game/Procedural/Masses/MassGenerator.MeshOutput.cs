@@ -1358,27 +1358,78 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     out int provenanceIndex);
                 soup.TryResolveAuthoredSurfaceGroup(soupIndex, out int surfaceGroup);
                 soup.TryResolveAuthoredSurfaceNormal(soupIndex, out Vector3 authoredNormal);
-                Vector3 a = meshData.Vertices[ia];
-                Vector3 b = meshData.Vertices[ib];
-                Vector3 c = meshData.Vertices[ic];
-                Vector3 geometricNormal = Vector3.Cross(b - a, c - a).normalized;
-                Vector3 renderNormal = (meshData.Normals[ia] + meshData.Normals[ib] + meshData.Normals[ic]).normalized;
+                FinalTriangleQuality triangleQuality =
+                    EvaluateFinalTriangleQuality(
+                        meshData.Vertices,
+                        ia,
+                        ib,
+                        ic,
+                        authoredNormal);
+                Vector3 a = triangleQuality.HasValidIndexRange
+                    ? meshData.Vertices[ia]
+                    : Vector3.zero;
+                Vector3 b = triangleQuality.HasValidIndexRange
+                    ? meshData.Vertices[ib]
+                    : Vector3.zero;
+                Vector3 c = triangleQuality.HasValidIndexRange
+                    ? meshData.Vertices[ic]
+                    : Vector3.zero;
+                Vector3 renderNormal =
+                    triangleQuality.HasValidIndexRange &&
+                    ia < meshData.Normals.Count &&
+                    ib < meshData.Normals.Count &&
+                    ic < meshData.Normals.Count
+                        ? (meshData.Normals[ia] +
+                           meshData.Normals[ib] +
+                           meshData.Normals[ic]).normalized
+                        : Vector3.zero;
                 CaptureFinalTriangle(
                     triangleIndex,
+                    ia,
+                    ib,
+                    ic,
                     provenanceKind,
                     provenanceIndex,
                     surfaceGroup,
                     a, b, c,
-                    geometricNormal,
+                    triangleQuality,
                     renderNormal,
                     authoredNormal,
-                    new Vector4(meshData.Colors[ia].r, meshData.Colors[ia].g, meshData.Colors[ia].b, meshData.UV2[ia].y),
-                    new Vector4(meshData.Colors[ib].r, meshData.Colors[ib].g, meshData.Colors[ib].b, meshData.UV2[ib].y),
-                    new Vector4(meshData.Colors[ic].r, meshData.Colors[ic].g, meshData.Colors[ic].b, meshData.UV2[ic].y),
-                    meshData.SurfaceFeatures[ia],
-                    meshData.SurfaceFeatures[ib],
-                    meshData.SurfaceFeatures[ic]);
+                    ReadDiagnosticMask(meshData, ia),
+                    ReadDiagnosticMask(meshData, ib),
+                    ReadDiagnosticMask(meshData, ic),
+                    ReadDiagnosticStructural(meshData, ia),
+                    ReadDiagnosticStructural(meshData, ib),
+                    ReadDiagnosticStructural(meshData, ic));
             }
+        }
+
+        private static Vector4 ReadDiagnosticMask(MeshData meshData, int index)
+        {
+            if (meshData == null ||
+                index < 0 ||
+                index >= meshData.Colors.Count ||
+                index >= meshData.UV2.Count)
+            {
+                return Vector4.zero;
+            }
+            Color color = meshData.Colors[index];
+            return new Vector4(
+                color.r,
+                color.g,
+                color.b,
+                meshData.UV2[index].y);
+        }
+
+        private static Vector4 ReadDiagnosticStructural(
+            MeshData meshData,
+            int index)
+        {
+            return meshData != null &&
+                   index >= 0 &&
+                   index < meshData.SurfaceFeatures.Count
+                ? meshData.SurfaceFeatures[index]
+                : Vector4.zero;
         }
 
 

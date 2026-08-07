@@ -131,6 +131,8 @@ namespace ProgrammaticStylized3D.Rivers
                 boundaryTexture != null &&
                 metricBuffer != null &&
                 automaticFoamSourceEventBuffer != null &&
+                automaticFoamSourceEventBuffer.count ==
+                    automaticFoamSourceEventCapacity &&
                 topologyMetricsBuffer != null &&
                 transportMetricsBuffer != null &&
                 domainVersion == river.Domain.Version &&
@@ -369,7 +371,7 @@ namespace ProgrammaticStylized3D.Rivers
                             sizeof(uint),
                             ComputeBufferType.Raw);
                         automaticFoamSourceEventBuffer = new ComputeBuffer(
-                            AutomaticFoamSourceEventCapacity,
+                            automaticFoamSourceEventCapacity,
                             Marshal.SizeOf<FoamSourceEventGpuData>(),
                             ComputeBufferType.Structured);
                     }
@@ -822,6 +824,42 @@ namespace ProgrammaticStylized3D.Rivers
             structuralHeight = descriptor.RowCount;
             fieldLength = descriptor.AllocatedLengthMetres;
             validFieldLength = descriptor.ValidLengthMetres;
+            ConfigureAutomaticFoamSourceCapacities();
+        }
+
+        private void ConfigureAutomaticFoamSourceCapacities()
+        {
+            int shoreBucketCount = ResolveAutomaticShoreTotalSlotCount(
+                validFieldLength);
+            int resolvedEventCapacity =
+                AutomaticFoamSourceBaseEventCapacity + shoreBucketCount;
+            int resolvedReservationCapacity = Mathf.Max(
+                resolvedEventCapacity,
+                resolvedEventCapacity *
+                    AutomaticFoamPacketReservationCapacityMultiplier);
+
+            if (automaticFoamSourceEvents.Length == resolvedEventCapacity &&
+                automaticFoamSourceEventGpuData.Length == resolvedEventCapacity &&
+                automaticFoamPacketReservations.Length ==
+                    resolvedReservationCapacity)
+            {
+                automaticFoamSourceEventCapacity = resolvedEventCapacity;
+                automaticFoamPacketReservationCapacity =
+                    resolvedReservationCapacity;
+                return;
+            }
+
+            ClearAutomaticFoamSourceEvents();
+            automaticFoamSourceEventCapacity = resolvedEventCapacity;
+            automaticFoamPacketReservationCapacity =
+                resolvedReservationCapacity;
+            automaticFoamSourceEvents = new AutomaticFoamSourceEvent[
+                automaticFoamSourceEventCapacity];
+            automaticFoamSourceEventGpuData = new FoamSourceEventGpuData[
+                automaticFoamSourceEventCapacity];
+            automaticFoamPacketReservations =
+                new AutomaticFoamPacketReservation[
+                    automaticFoamPacketReservationCapacity];
         }
 
         private float ResolveInitializationMotionTime()

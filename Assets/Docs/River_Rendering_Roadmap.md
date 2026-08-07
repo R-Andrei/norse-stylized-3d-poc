@@ -1531,3 +1531,15 @@ P13G itself remains documentation-only and adds no runtime work, resource, alloc
 ### Shore-wave motion freeze after P13G
 
 S3.1E and S3.1E.1 are rejected incomplete decoupling attempts. S3.1E.2 is rejected because one signed cycle made Length contribute a hidden negative-half gap. S3.1E.3 is user-validated and accepted: one positive zero-slope lobe owns the complete Length, Gap is the only calm interval, and Gap `0` permits adjacent packets to meet. The shared result remains authoritative for displacement, normals/detail, refraction, analytical shoreline clipping, Shoreline Accent, edge coverage, and Foam shoreline support.
+
+## RIVER-FOAM-SPAWN-D8.15 — current Shore source contract
+
+D8.15 supersedes all earlier roadmap descriptions of Shore Coverage and the fixed `5 * Activity` global start rate.
+
+- Shore Coverage is removed for Shore Ribbon and Inward Wash. The complete valid shoreline remains available.
+- Internal `3.5 m` per-bank scheduling buckets scale with valid river length and active chunks. Each bucket has its own deterministic active event and renewal clock, allowing multiple simultaneous strokes without a global one-head cap.
+- Activity controls the active-time fraction of each bucket; Minimum Packet Gap is the independent hard packet-clearance constraint.
+- User controls retain Min/Max length in cells. The runtime selects one event-local inclusive whole-cell length; no Resolved Length control is exposed.
+- Ribbon starts at the selected cell-zero centre, keeps one logical `1 x 1` head for the entire event, follows the existing current visible-shore edge column by column, births each traversed cell once, and terminates after the final cell duration.
+- Automatic Birth Sources shows the current head continuously, independently from one-time material birth.
+- The implementation adds no shoreline calculation, path resource, transport work, lifecycle work, or rendering pass. Source capacity scales once at resource initialization.

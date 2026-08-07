@@ -6,7 +6,9 @@
 // G. This keeps the one-sided collision route separate from the narrow all-side
 // contact retention halo without adding a resource or sample. The resolved
 // slowdown factor scales the complete routed velocity vector so full contact
-// influence reduces downstream, lateral, and total speed consistently.
+// influence reduces downstream, lateral, and total speed consistently. Existing
+// Shore Support then applies independent downstream and lateral component
+// retention without adding another field or source-provenance contract.
 struct RiverWaterFoamResolvedVelocity
 {
     // x = nonnegative downstream speed magnitude in metres/second.
@@ -23,8 +25,11 @@ RiverWaterFoamResolvedVelocity RiverWaterResolveFoamVelocityContract(
     float laneIntent,
     float obstacleIntent,
     float obstacleInfluence,
+    float shoreInfluence,
     float baseDownstreamSpeed,
     float maximumLateralSpeedRatio,
+    float shoreLateralMovementSuppression,
+    float shoreDownstreamMovementSuppression,
     float obstacleSlowdownStrength,
     float obstacleMinimumDownstreamFactor,
     float validFluid)
@@ -63,16 +68,25 @@ RiverWaterFoamResolvedVelocity RiverWaterResolveFoamVelocityContract(
         : 0.0;
     float minimumFactor = saturate(obstacleMinimumDownstreamFactor);
     float contactSpeedFactor = lerp(1.0, minimumFactor, slowdown);
+    float shore = saturate(shoreInfluence);
+    float shoreLateralFactor = 1.0 -
+        shore * saturate(shoreLateralMovementSuppression);
+    float shoreDownstreamFactor = 1.0 -
+        shore * saturate(shoreDownstreamMovementSuppression);
     float speedActive = speed > 0.0001 ? 1.0 : 0.0;
     float2 routedVelocity = float2(
         speed,
         lateral * speed * lateralRatio);
+    float2 shoreComponentFactor = float2(
+        shoreDownstreamFactor,
+        shoreLateralFactor);
 
     resolved.velocityMetresPerSecond =
-        routedVelocity * contactSpeedFactor * validity;
-    resolved.lateralIntent = lateral * validity;
+        routedVelocity * contactSpeedFactor * shoreComponentFactor * validity;
+    resolved.lateralIntent = lateral * shoreLateralFactor * validity;
     resolved.downstreamSpeedFactor =
-        contactSpeedFactor * speedActive * validity;
+        contactSpeedFactor * shoreDownstreamFactor *
+        speedActive * validity;
     resolved.obstacleInfluence = slowdownField * validity;
     resolved.laneIntent = lane * validity;
     resolved.obstacleIntent = signedRoutingInfluence * validity;

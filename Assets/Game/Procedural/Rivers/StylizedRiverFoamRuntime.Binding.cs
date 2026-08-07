@@ -77,6 +77,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
             propertyBlock.SetFloat(FoamBaseDownstreamSpeedId, 0f);
             propertyBlock.SetFloat(FoamMaximumLateralSpeedRatioId, 0f);
+            propertyBlock.SetFloat(
+                FoamShoreLateralMovementSuppressionId,
+                0f);
+            propertyBlock.SetFloat(
+                FoamShoreDownstreamMovementSuppressionId,
+                0f);
             propertyBlock.SetFloat(FoamObstacleSlowdownStrengthId, 0f);
             propertyBlock.SetFloat(
                 FoamObstacleMinimumDownstreamFactorId,
@@ -258,6 +264,12 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamMaximumLateralSpeedRatioId,
                 ResolveEffectiveFoamMaximumLateralSpeedRatio());
             propertyBlock.SetFloat(
+                FoamShoreLateralMovementSuppressionId,
+                river.FoamShoreLateralMovementSuppression);
+            propertyBlock.SetFloat(
+                FoamShoreDownstreamMovementSuppressionId,
+                river.FoamShoreDownstreamMovementSuppression);
+            propertyBlock.SetFloat(
                 FoamObstacleSlowdownStrengthId,
                 river.FoamObstacleSlowdownStrength);
             propertyBlock.SetFloat(
@@ -410,6 +422,12 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamMotionLaneScrollCellsId, 0f);
             propertyBlock.SetFloat(FoamBaseDownstreamSpeedId, 0f);
             propertyBlock.SetFloat(FoamMaximumLateralSpeedRatioId, 0f);
+            propertyBlock.SetFloat(
+                FoamShoreLateralMovementSuppressionId,
+                0f);
+            propertyBlock.SetFloat(
+                FoamShoreDownstreamMovementSuppressionId,
+                0f);
             propertyBlock.SetFloat(FoamObstacleSlowdownStrengthId, 0f);
             propertyBlock.SetFloat(
                 FoamObstacleMinimumDownstreamFactorId,

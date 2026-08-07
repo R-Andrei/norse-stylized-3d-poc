@@ -12,6 +12,14 @@ namespace ProgrammaticStylized3D.Weather
         Cooldown = 3
     }
 
+    public enum WeatherLightRayPopulationRuntimeState
+    {
+        Disabled = 0,
+        Suspended = 1,
+        SpawningPaused = 2,
+        Running = 3
+    }
+
     public readonly struct WeatherLightRayPopulationDebugRecord
     {
         public readonly long StableIdentity;
@@ -35,31 +43,13 @@ namespace ProgrammaticStylized3D.Weather
         }
     }
 
-    /// <summary>
-    /// Bounded deterministic automatic-population runtime for one resolved
-    /// population rule. It owns candidate state only. Source, preset, cloud,
-    /// and budget authority are resolved by the Controller before Tick. Never
-    /// inspect WeatherLightRayPreset.SourceKind here, never evict authored or
-    /// gameplay rays, and never add a per-frame cookie scan or GPU readback.
-    /// </summary>
     internal sealed class WeatherLightRayPopulationRuntime
     {
-        /// <summary>
-        /// WEATHER LIGHTRAY POPULATION SETTINGS CONTRACT.
-        ///
-        /// Settings are fully resolved by the Controller/Selection layer.
-        /// This runtime must not inspect visual-preset SourceKind metadata or
-        /// invent source/cloud policy. Rules that ignore clouds execute zero
-        /// cloud queries. Optional clouds treat only an absent or disabled
-        /// producer as clear sky; an enabled but invalid producer suspends.
-        /// </summary>
         internal readonly struct Settings
         {
-            internal readonly string Label;
             internal readonly bool Enabled;
             internal readonly bool GlobalLightRaysEnabled;
             internal readonly int Seed;
-            internal readonly ulong IdentitySalt;
             internal readonly Transform FocusOverride;
             internal readonly Camera RenderCamera;
             internal readonly LayerMask GroundMask;
@@ -67,37 +57,26 @@ namespace ProgrammaticStylized3D.Weather
             internal readonly int MaximumCount;
             internal readonly float MinimumSpacingMetres;
             internal readonly float OffscreenMarginMetres;
-            internal readonly float FallbackActiveRadiusMetres;
             internal readonly float EvaluationRateHz;
-            internal readonly int CandidateChecksPerTick;
             internal readonly float MinimumClearance;
-            internal readonly float MinimumDistinctOpeningContrast;
-            internal readonly float SurroundingSampleRadiusMetres;
-            internal readonly float QualificationDurationSeconds;
             internal readonly float InvalidGraceDurationSeconds;
-            internal readonly float MinimumViableOpeningDurationSeconds;
+            internal readonly float SpawnFadeDurationSeconds;
+            internal readonly float DespawnFadeDurationSeconds;
+            internal readonly float MinimumRayLifetimeSeconds;
+            internal readonly float MaximumRayLifetimeSeconds;
+            internal readonly float ReplacementDelaySeconds;
             internal readonly float MaximumGroundSlopeDegrees;
-            internal readonly float GroundSearchDistanceMetres;
             internal readonly float CloudEvolutionResumeThreshold;
             internal readonly WeatherLightRayPreset ActivePreset;
-            internal readonly WeatherLightRaySourceKind SourceKind;
-            internal readonly Vector3 RayDirectionWorld;
-            internal readonly WeatherLightRaySourceGatePolicy SourceGatePolicy;
-            internal readonly bool DependencyAvailable;
-            internal readonly string DependencyFailureReason;
-            internal readonly Light CloudProjectionLight;
-            internal readonly WeatherLightRayCloudDataRequirement
-                CloudDataRequirement;
-            internal readonly WeatherLightRaySpatialCloudPolicy
-                SpatialCloudPolicy;
+            internal readonly WeatherLightRaySourceState DirectionalSource;
             internal readonly WeatherCloudShadowController CloudController;
+            internal readonly int CandidateChecksPerUpdate;
+            internal readonly float GroundRaycastDistanceMetres;
 
             internal Settings(
-                string label,
                 bool enabled,
                 bool globalLightRaysEnabled,
                 int seed,
-                ulong identitySalt,
                 Transform focusOverride,
                 Camera renderCamera,
                 LayerMask groundMask,
@@ -105,36 +84,23 @@ namespace ProgrammaticStylized3D.Weather
                 int maximumCount,
                 float minimumSpacingMetres,
                 float offscreenMarginMetres,
-                float fallbackActiveRadiusMetres,
                 float evaluationRateHz,
-                int candidateChecksPerTick,
                 float minimumClearance,
-                float minimumDistinctOpeningContrast,
-                float surroundingSampleRadiusMetres,
-                float qualificationDurationSeconds,
                 float invalidGraceDurationSeconds,
-                float minimumViableOpeningDurationSeconds,
+                float spawnFadeDurationSeconds,
+                float despawnFadeDurationSeconds,
+                float minimumRayLifetimeSeconds,
+                float maximumRayLifetimeSeconds,
+                float replacementDelaySeconds,
                 float maximumGroundSlopeDegrees,
-                float groundSearchDistanceMetres,
                 float cloudEvolutionResumeThreshold,
                 WeatherLightRayPreset activePreset,
-                WeatherLightRaySourceKind sourceKind,
-                Vector3 rayDirectionWorld,
-                WeatherLightRaySourceGatePolicy sourceGatePolicy,
-                bool dependencyAvailable,
-                string dependencyFailureReason,
-                Light cloudProjectionLight,
-                WeatherLightRayCloudDataRequirement cloudDataRequirement,
-                WeatherLightRaySpatialCloudPolicy spatialCloudPolicy,
+                in WeatherLightRaySourceState directionalSource,
                 WeatherCloudShadowController cloudController)
             {
-                Label = string.IsNullOrWhiteSpace(label)
-                    ? "Automatic Population"
-                    : label;
                 Enabled = enabled;
                 GlobalLightRaysEnabled = globalLightRaysEnabled;
                 Seed = seed;
-                IdentitySalt = identitySalt;
                 FocusOverride = focusOverride;
                 RenderCamera = renderCamera;
                 GroundMask = groundMask;
@@ -142,31 +108,28 @@ namespace ProgrammaticStylized3D.Weather
                 MaximumCount = maximumCount;
                 MinimumSpacingMetres = minimumSpacingMetres;
                 OffscreenMarginMetres = offscreenMarginMetres;
-                FallbackActiveRadiusMetres = fallbackActiveRadiusMetres;
                 EvaluationRateHz = evaluationRateHz;
-                CandidateChecksPerTick = candidateChecksPerTick;
                 MinimumClearance = minimumClearance;
-                MinimumDistinctOpeningContrast =
-                    minimumDistinctOpeningContrast;
-                SurroundingSampleRadiusMetres = surroundingSampleRadiusMetres;
-                QualificationDurationSeconds = qualificationDurationSeconds;
                 InvalidGraceDurationSeconds = invalidGraceDurationSeconds;
-                MinimumViableOpeningDurationSeconds =
-                    minimumViableOpeningDurationSeconds;
+                SpawnFadeDurationSeconds = spawnFadeDurationSeconds;
+                DespawnFadeDurationSeconds = despawnFadeDurationSeconds;
+                MinimumRayLifetimeSeconds = minimumRayLifetimeSeconds;
+                MaximumRayLifetimeSeconds = maximumRayLifetimeSeconds;
+                ReplacementDelaySeconds = replacementDelaySeconds;
                 MaximumGroundSlopeDegrees = maximumGroundSlopeDegrees;
-                GroundSearchDistanceMetres = groundSearchDistanceMetres;
                 CloudEvolutionResumeThreshold = cloudEvolutionResumeThreshold;
                 ActivePreset = activePreset;
-                SourceKind = sourceKind;
-                RayDirectionWorld = rayDirectionWorld.sqrMagnitude > 0.000001f
-                    ? rayDirectionWorld.normalized
-                    : Vector3.down;
-                SourceGatePolicy = sourceGatePolicy;
-                DependencyAvailable = dependencyAvailable;
-                DependencyFailureReason = dependencyFailureReason ?? string.Empty;
-                CloudProjectionLight = cloudProjectionLight;
-                CloudDataRequirement = cloudDataRequirement;
-                SpatialCloudPolicy = spatialCloudPolicy;
+                DirectionalSource = directionalSource;
+                CandidateChecksPerUpdate = Mathf.Clamp(
+                    MaximumCount * 2,
+                    4,
+                    64);
+                float farClip = RenderCamera != null &&
+                    !float.IsNaN(RenderCamera.farClipPlane) &&
+                    !float.IsInfinity(RenderCamera.farClipPlane)
+                        ? RenderCamera.farClipPlane
+                        : 100f;
+                GroundRaycastDistanceMetres = Mathf.Max(100f, farClip);
                 CloudController = cloudController;
             }
         }
@@ -182,60 +145,89 @@ namespace ProgrammaticStylized3D.Weather
             GroundTooSteep = 6,
             CloudEvolutionUnstable = 7,
             CloudUnavailable = 8,
-            InsufficientClearance = 9,
-            QualificationPending = 10,
-            CooldownActive = 11,
-            SourceUnavailable = 12,
-            CandidateStorageFull = 13,
-            SpawnOrUpdateFailed = 14,
-            Count = 15
+            InsufficientPresentCentre = 9,
+            InsufficientPresentSurrounding = 10,
+            InsufficientPredictedCentre = 11,
+            CooldownActive = 12,
+            SourceUnavailable = 13,
+            CandidateStorageFull = 14,
+            SpawnOrUpdateFailed = 15,
+            Count = 16
         }
 
         private struct Candidate
         {
             internal bool Occupied;
             internal long Identity;
+            internal long ActivationIdentity;
             internal int CellX;
             internal int CellZ;
             internal Vector3 GroundPosition;
             internal WeatherLightRayPopulationCandidateState State;
             internal WeatherLightRayHandle Handle;
             internal float Clearance;
-            internal double ValidSince;
             internal double InvalidSince;
             internal double CooldownUntil;
-            internal int ConsecutiveValidEvaluations;
+            internal double SpawnedAt;
+            internal float AssignedLifetimeSeconds;
+            internal float PresentCentreOpenness;
+            internal int PresentSurroundingPassCount;
+            internal float PredictedCentreOpenness;
+            internal float PredictionHorizonSeconds;
+            internal string RetirementReason;
             internal uint CloudDataVersion;
         }
 
         private const int MinimumCandidateCapacity = 64;
         private const int CandidateCapacityMultiplier = 8;
-        private const int MinimumQualificationEvaluations = 2;
-        private const float AutomaticFadeInSeconds = 0.75f;
-        private const float AutomaticFadeOutSeconds = 0.75f;
+        private const int RequiredPresentSurroundingPassCount = 2;
+        private const float PredictionStableWindowFraction = 0.70f;
         private const float ReleaseIntensityThreshold = 0.001f;
-        private const float CandidateCooldownSeconds = 1f;
         private const float RegionChangeEpsilonSquared = 0.25f;
-        private const int FootprintSampleCount = 13;
-        private const int ForecastSampleCount = 4;
+        private const int CameraFootprintPointCount = 8;
+        private static readonly Vector2[] CameraViewportSamples =
+        {
+            new Vector2(0f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(1f, 0f),
+            new Vector2(1f, 0.5f),
+            new Vector2(1f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, 1f),
+            new Vector2(0f, 0.5f)
+        };
 
         private Candidate[] candidates;
         private int[] rejectionCounts;
         private long[] totalRejectionCounts;
-        private int pendingCursor;
-        private int cellCursorX;
-        private int cellCursorZ;
+        private int traversalCursor;
+        private int traversalOffset;
+        private int traversalStep = 1;
+        private int traversalCellCount;
+        private int traversalSeed;
+        private ulong turnoverEpoch;
         private int minimumCellX;
         private int maximumCellX;
         private int minimumCellZ;
         private int maximumCellZ;
-        private bool cellCursorInitialized;
+        private bool traversalInitialized;
         private double nextEvaluationTime;
         private Vector3 focusWorld;
         private float activeRadiusMetres;
+        private readonly Vector2[] activeFootprint =
+            new Vector2[CameraFootprintPointCount];
+        private int activeFootprintCount;
+        private bool useFootprintRegion;
+        private float activeMinimumX;
+        private float activeMaximumX;
+        private float activeMinimumZ;
+        private float activeMaximumZ;
+        private float replacementDelaySeconds = 1.5f;
         private Vector3 previousFocusWorld;
         private float previousActiveRadiusMetres;
-        private string suspensionReason = "Automatic population is disabled.";
+        private WeatherLightRayPopulationRuntimeState runtimeState =
+            WeatherLightRayPopulationRuntimeState.Disabled;
+        private string statusReason = "Automatic population is disabled.";
         private int activeCount;
         private int pendingCount;
         private int retiringCount;
@@ -249,9 +241,12 @@ namespace ProgrammaticStylized3D.Weather
         private float evolutionProgress;
         private long totalEvaluationTicks;
 
-        internal bool IsEnabledAndRunning =>
-            string.IsNullOrEmpty(suspensionReason);
-        internal string SuspensionReason => suspensionReason;
+        internal WeatherLightRayPopulationRuntimeState RuntimeState =>
+            runtimeState;
+        internal bool IsOperating =>
+            runtimeState == WeatherLightRayPopulationRuntimeState.Running ||
+            runtimeState == WeatherLightRayPopulationRuntimeState.SpawningPaused;
+        internal string StatusReason => statusReason;
         internal Vector3 FocusWorld => focusWorld;
         internal float ActiveRadiusMetres => activeRadiusMetres;
         internal int ActiveCount => activeCount;
@@ -267,19 +262,15 @@ namespace ProgrammaticStylized3D.Weather
         internal float EvolutionProgress => evolutionProgress;
         internal long TotalEvaluationTicks => totalEvaluationTicks;
 
-        /// <summary>
-        /// Executes one bounded population-rule evaluation. All policy in the
-        /// Settings value is already resolved by the Controller. This function
-        /// may qualify, update, retire, or release only candidates owned by this
-        /// runtime; it must not inspect selection assets, visual-preset source
-        /// metadata, or evict authored/gameplay rays.
-        /// </summary>
         internal void Tick(
             WeatherLightRayController controller,
             in Settings settings,
             double now)
         {
             EnsureStorage(settings.MaximumCount);
+            replacementDelaySeconds = Mathf.Max(
+                0f,
+                settings.ReplacementDelaySeconds);
 
             double interval = 1.0 / Math.Max(1.0, settings.EvaluationRateHz);
             if (now < nextEvaluationTime)
@@ -304,10 +295,17 @@ namespace ProgrammaticStylized3D.Weather
                 ? settings.CloudController.EvolutionProgress
                 : 0f;
 
-            suspensionReason = ResolveSuspensionReason(settings);
-            if (!string.IsNullOrEmpty(suspensionReason))
+            string dependencyFailure = ResolveSuspensionReason(settings);
+            if (!string.IsNullOrEmpty(dependencyFailure))
             {
-                RetireAllAutomaticCandidates(controller, now);
+                runtimeState = settings.Enabled
+                    ? WeatherLightRayPopulationRuntimeState.Suspended
+                    : WeatherLightRayPopulationRuntimeState.Disabled;
+                statusReason = dependencyFailure;
+                RetireAllAutomaticCandidates(
+                    controller,
+                    now,
+                    dependencyFailure);
                 ProcessRetiringAndCooldown(controller, now);
                 UpdateCounts(controller, now);
                 return;
@@ -315,34 +313,42 @@ namespace ProgrammaticStylized3D.Weather
 
             if (!TryResolveFocus(settings, out focusWorld, out activeRadiusMetres))
             {
-                suspensionReason =
-                    "No valid population focus could be projected onto the configured Ground Mask.";
-                RetireAllAutomaticCandidates(controller, now);
+                runtimeState = WeatherLightRayPopulationRuntimeState.Suspended;
+                statusReason =
+                    "No usable ground reference or camera-plane footprint could be resolved for automatic population.";
+                RetireAllAutomaticCandidates(
+                    controller,
+                    now,
+                    statusReason);
                 ProcessRetiringAndCooldown(controller, now);
                 UpdateCounts(controller, now);
                 return;
             }
 
-            UpdateCellBounds(settings.MinimumSpacingMetres);
+            UpdateCellBounds(
+                settings.MinimumSpacingMetres,
+                settings.Seed);
             ProcessRetiringAndCooldown(controller, now);
             RetireOutsideBudget(controller, settings, now);
             RevalidateActiveCandidates(controller, settings, now);
 
-            int remainingChecks = settings.CandidateChecksPerTick;
-            remainingChecks -= EvaluatePendingCandidates(
+            if (ShouldPauseSpawning(settings))
+            {
+                runtimeState =
+                    WeatherLightRayPopulationRuntimeState.SpawningPaused;
+                statusReason =
+                    "New atmospheric-ray spawning is paused for the active cloud-pattern transition.";
+                UpdateCounts(controller, now);
+                return;
+            }
+
+            runtimeState = WeatherLightRayPopulationRuntimeState.Running;
+            statusReason = string.Empty;
+            EvaluateNewCandidates(
                 controller,
                 settings,
                 now,
-                remainingChecks);
-            if (remainingChecks > 0)
-            {
-                EvaluateNewCandidates(
-                    controller,
-                    settings,
-                    now,
-                    remainingChecks);
-            }
-
+                settings.CandidateChecksPerUpdate);
             UpdateCounts(controller, now);
         }
 
@@ -355,7 +361,6 @@ namespace ProgrammaticStylized3D.Weather
                 return;
             }
 
-            double now = Time.realtimeSinceStartupAsDouble;
             for (int index = 0; index < candidates.Length; index++)
             {
                 Candidate candidate = candidates[index];
@@ -364,51 +369,42 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                if (releaseImmediately)
+                if (candidate.Handle.IsValid &&
+                    controller.IsValid(candidate.Handle))
                 {
-                    if (candidate.Handle.IsValid &&
-                        controller.IsValid(candidate.Handle))
+                    if (releaseImmediately)
                     {
                         controller.TryReleaseProceduralRay(
                             candidate.Handle,
                             out _);
                     }
-                    candidate = default;
-                }
-                else if (candidate.State ==
-                    WeatherLightRayPopulationCandidateState.Active)
-                {
-                    BeginRetirement(controller, ref candidate, now);
-                }
-                else if (candidate.State ==
-                    WeatherLightRayPopulationCandidateState.Pending)
-                {
-                    EnterCooldown(ref candidate, now);
+                    else
+                    {
+                        controller.TrySetProceduralRayVisible(
+                            candidate.Handle,
+                            false,
+                            out _);
+                    }
                 }
 
+                candidate = default;
                 candidates[index] = candidate;
             }
 
-            if (releaseImmediately)
-            {
-                activeCount = 0;
-                pendingCount = 0;
-                retiringCount = 0;
-                cooldownCount = 0;
-                cellCursorInitialized = false;
-                pendingCursor = 0;
-            }
-            else
-            {
-                UpdateCounts(controller, now);
-            }
-
-            suspensionReason = "Automatic population is disabled.";
+            activeCount = 0;
+            pendingCount = 0;
+            retiringCount = 0;
+            cooldownCount = 0;
+            runtimeState = WeatherLightRayPopulationRuntimeState.Disabled;
+            statusReason = "Automatic population is disabled.";
+            turnoverEpoch++;
+            traversalCursor = 0;
+            traversalCellCount = 0;
+            traversalInitialized = false;
         }
 
         internal int CopyDebugRecords(
-            WeatherLightRayPopulationDebugRecord[] destination,
-            int destinationOffset = 0)
+            WeatherLightRayPopulationDebugRecord[] destination)
         {
             int count = 0;
             if (candidates == null)
@@ -424,14 +420,11 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                int destinationIndex = destinationOffset + count;
-                if (destination != null &&
-                    destinationIndex >= 0 &&
-                    destinationIndex < destination.Length)
+                if (destination != null && count < destination.Length)
                 {
-                    destination[destinationIndex] =
+                    destination[count] =
                         new WeatherLightRayPopulationDebugRecord(
-                            candidate.Identity,
+                            candidate.ActivationIdentity,
                             candidate.GroundPosition,
                             candidate.State,
                             candidate.Clearance,
@@ -444,27 +437,67 @@ namespace ProgrammaticStylized3D.Weather
             return count;
         }
 
+        internal int CopyActiveFootprint(Vector3[] destination)
+        {
+            if (!useFootprintRegion || activeFootprintCount < 3)
+            {
+                return 0;
+            }
+
+            if (destination != null)
+            {
+                int count = Mathf.Min(destination.Length, activeFootprintCount);
+                for (int index = 0; index < count; index++)
+                {
+                    Vector2 point = activeFootprint[index];
+                    destination[index] = new Vector3(
+                        point.x,
+                        focusWorld.y + 0.05f,
+                        point.y);
+                }
+            }
+
+            return activeFootprintCount;
+        }
+
         internal void AppendReport(
             StringBuilder builder,
             in Settings settings,
             int freeSlotCount)
         {
-            builder.Append('[')
-                .Append(settings.Label)
-                .AppendLine("]");
-            builder.Append("Enabled / running: ")
+            builder.AppendLine("[Automatic Atmospheric Population]");
+            builder.Append("Enabled / runtime state: ")
                 .Append(settings.Enabled ? "Yes" : "No")
                 .Append(" / ")
-                .AppendLine(IsEnabledAndRunning ? "Yes" : "No");
-            builder.Append("Suspension reason: ")
-                .AppendLine(string.IsNullOrEmpty(suspensionReason)
+                .AppendLine(runtimeState.ToString());
+            builder.Append("Status reason: ")
+                .AppendLine(string.IsNullOrEmpty(statusReason)
                     ? "None"
-                    : suspensionReason);
-            builder.Append("Focus / active radius: ")
+                    : statusReason);
+            builder.Append("Focus / region / enclosing radius: ")
                 .Append(focusWorld.ToString("F3"))
+                .Append(" / ")
+                .Append("Camera footprint")
                 .Append(" / ")
                 .Append(activeRadiusMetres.ToString("0.###"))
                 .AppendLine(" m");
+            builder.Append("Lifetime min / max / replacement delay: ")
+                .Append(settings.MinimumRayLifetimeSeconds.ToString("0.###"))
+                .Append(" / ")
+                .Append(settings.MaximumRayLifetimeSeconds.ToString("0.###"))
+                .Append(" / ")
+                .Append(settings.ReplacementDelaySeconds.ToString("0.###"))
+                .AppendLine(" s");
+            builder.Append("Spawn / despawn fade: ")
+                .Append(settings.SpawnFadeDurationSeconds.ToString("0.###"))
+                .Append(" / ")
+                .Append(settings.DespawnFadeDurationSeconds.ToString("0.###"))
+                .AppendLine(" s");
+            builder.Append("Minimum openness / present surrounding rule: ")
+                .Append(settings.MinimumClearance.ToString("0.###"))
+                .Append(" / ")
+                .Append(RequiredPresentSurroundingPassCount)
+                .AppendLine(" of 4");
             builder.Append("Seed / desired / maximum / free slots: ")
                 .Append(settings.Seed)
                 .Append(" / ")
@@ -490,9 +523,19 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Evaluation Hz / candidate budget / cells: ")
                 .Append(settings.EvaluationRateHz.ToString("0.###"))
                 .Append(" / ")
-                .Append(settings.CandidateChecksPerTick)
+                .Append(settings.CandidateChecksPerUpdate)
                 .Append(" / ")
                 .AppendLine(cellsInActiveRegion.ToString());
+            builder.Append("Turnover epoch / traversal progress / permutation offset-step: ")
+                .Append(turnoverEpoch)
+                .Append(" / ")
+                .Append(traversalCursor)
+                .Append(" of ")
+                .Append(traversalCellCount)
+                .Append(" / ")
+                .Append(traversalOffset)
+                .Append('-')
+                .AppendLine(traversalStep.ToString());
             builder.Append("Last tick candidate checks / ground raycasts / cloud samples: ")
                 .Append(candidateChecksLastTick)
                 .Append(" / ")
@@ -516,8 +559,10 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                builder.Append("Candidate ")
+                builder.Append("Candidate cell / activation ")
                     .Append(candidate.Identity)
+                    .Append(" / ")
+                    .Append(candidate.ActivationIdentity)
                     .Append(" | cell ")
                     .Append(candidate.CellX)
                     .Append(',')
@@ -526,8 +571,36 @@ namespace ProgrammaticStylized3D.Weather
                     .Append(candidate.State)
                     .Append(" | ")
                     .Append(candidate.Handle)
-                    .Append(" | clearance ")
+                    .Append(" | openness centre / surrounding / predicted: ")
+                    .Append(candidate.PresentCentreOpenness.ToString("0.###"))
+                    .Append(" / ")
+                    .Append(candidate.PresentSurroundingPassCount)
+                    .Append(" of 4 / ")
+                    .Append(candidate.PredictedCentreOpenness.ToString("0.###"))
+                    .Append(" | prediction ")
+                    .Append(candidate.PredictionHorizonSeconds.ToString("0.###"))
+                    .Append(" s | placement strength ")
                     .Append(candidate.Clearance.ToString("0.###"))
+                    .Append(" | age / lifetime ")
+                    .Append(candidate.SpawnedAt > 0.0
+                        ? Math.Max(0.0, Time.realtimeSinceStartupAsDouble - candidate.SpawnedAt).ToString("0.###")
+                        : "-")
+                    .Append(" / ")
+                    .Append(candidate.AssignedLifetimeSeconds > 0f
+                        ? candidate.AssignedLifetimeSeconds.ToString("0.###")
+                        : "-")
+                    .Append(" s | remaining ")
+                    .Append(candidate.SpawnedAt > 0.0 &&
+                        candidate.AssignedLifetimeSeconds > 0f
+                        ? Math.Max(
+                            0.0,
+                            candidate.AssignedLifetimeSeconds -
+                                (Time.realtimeSinceStartupAsDouble - candidate.SpawnedAt)).ToString("0.###")
+                        : "-")
+                    .Append(" s | retirement ")
+                    .Append(string.IsNullOrEmpty(candidate.RetirementReason)
+                        ? "None"
+                        : candidate.RetirementReason)
                     .Append(" | WS ")
                     .AppendLine(candidate.GroundPosition.ToString("F3"));
             }
@@ -547,7 +620,6 @@ namespace ProgrammaticStylized3D.Weather
                 }
 
                 candidates = replacement;
-                pendingCursor = 0;
             }
 
             if (rejectionCounts == null ||
@@ -577,14 +649,13 @@ namespace ProgrammaticStylized3D.Weather
 
             if (settings.ActivePreset == null)
             {
-                return "Automatic population requires a resolved visual preset.";
+                return "Automatic population requires an Active Preset.";
             }
 
-            if (!settings.DependencyAvailable)
+            if (!settings.DirectionalSource.Available ||
+                settings.DirectionalSource.SourceLight == null)
             {
-                return string.IsNullOrEmpty(settings.DependencyFailureReason)
-                    ? "The selected LightRay dependencies are unavailable."
-                    : settings.DependencyFailureReason;
+                return "The atmospheric population directional source is unavailable.";
             }
 
             if (settings.GroundMask.value == 0)
@@ -592,53 +663,31 @@ namespace ProgrammaticStylized3D.Weather
                 return "Automatic population requires a non-empty Ground Mask.";
             }
 
-            if (settings.FocusOverride == null &&
-                settings.RenderCamera == null)
+            if (settings.CloudController == null ||
+                !settings.CloudController.IsPublished)
             {
-                return "No population focus override or resolved render camera is available.";
+                return "No published Weather Cloud Shadow Controller is available.";
             }
 
-            if (settings.CloudDataRequirement ==
-                    WeatherLightRayCloudDataRequirement.Ignored)
+            if (!settings.CloudController.CookieReady)
             {
-                return settings.SpatialCloudPolicy ==
-                        WeatherLightRaySpatialCloudPolicy.AnyPosition
-                    ? string.Empty
-                    : "A cloud-ignored rule may use only Any Position.";
+                return "The published cloud transmission cookie is not ready.";
             }
 
-            WeatherCloudShadowController cloud = settings.CloudController;
-            bool producerAbsentOrDisabled = cloud == null ||
-                !cloud.IsPublished ||
-                !cloud.CloudShadowsEnabled;
-            if (producerAbsentOrDisabled)
+            if (settings.RenderCamera == null)
             {
-                return settings.CloudDataRequirement ==
-                        WeatherLightRayCloudDataRequirement.Optional
-                    ? string.Empty
-                    : "The population rule requires an enabled published cloud field.";
-            }
-
-            if (!cloud.CookieReady)
-            {
-                return "The enabled published cloud field is not ready.";
-            }
-
-            if (settings.SpatialCloudPolicy !=
-                    WeatherLightRaySpatialCloudPolicy.AnyPosition &&
-                settings.CloudProjectionLight == null)
-            {
-                return "The spatially cloud-qualified population rule has no valid projection source.";
-            }
-
-            if (cloud.EvolutionInProgress &&
-                cloud.EvolutionProgress <
-                    settings.CloudEvolutionResumeThreshold)
-            {
-                return "Cloud seed evolution is below the LightRay resume threshold.";
+                return "No resolved render camera is available for the automatic-population footprint.";
             }
 
             return string.Empty;
+        }
+
+        private static bool ShouldPauseSpawning(in Settings settings)
+        {
+            return settings.CloudController != null &&
+                settings.CloudController.EvolutionInProgress &&
+                settings.CloudController.EvolutionProgress <
+                    settings.CloudEvolutionResumeThreshold;
         }
 
         private bool TryResolveFocus(
@@ -646,100 +695,181 @@ namespace ProgrammaticStylized3D.Weather
             out Vector3 resolvedFocus,
             out float resolvedRadius)
         {
-            if (settings.FocusOverride != null)
-            {
-                resolvedFocus = settings.FocusOverride.position;
-                resolvedRadius = settings.FallbackActiveRadiusMetres +
-                    settings.OffscreenMarginMetres;
-                return true;
-            }
+            activeFootprintCount = 0;
+            useFootprintRegion = false;
 
             Camera camera = settings.RenderCamera;
-            if (camera == null)
+            if (camera == null ||
+                !TryResolveGroundReference(
+                    camera,
+                    settings,
+                    out Vector3 groundReference))
             {
                 resolvedFocus = Vector3.zero;
                 resolvedRadius = 0f;
                 return false;
             }
 
-            if (!TryRaycastViewportGround(
+            Plane groundPlane = new Plane(Vector3.up, groundReference);
+            if (!TryProjectViewportToPlane(
+                    camera,
+                    0.5f,
+                    0.5f,
+                    groundPlane,
+                    settings.GroundRaycastDistanceMetres,
+                    out Vector3 projectedFocus))
+            {
+                resolvedFocus = Vector3.zero;
+                resolvedRadius = 0f;
+                return false;
+            }
+
+            float maximumDistance = 0f;
+            for (int index = 0; index < CameraViewportSamples.Length; index++)
+            {
+                Vector2 viewport = CameraViewportSamples[index];
+                if (!TryProjectViewportToPlane(
+                        camera,
+                        viewport.x,
+                        viewport.y,
+                        groundPlane,
+                        settings.GroundRaycastDistanceMetres,
+                        out Vector3 projectedPoint))
+                {
+                    activeFootprintCount = 0;
+                    resolvedFocus = Vector3.zero;
+                    resolvedRadius = 0f;
+                    return false;
+                }
+
+                Vector2 point = new Vector2(
+                    projectedPoint.x,
+                    projectedPoint.z);
+                Vector2 focus = new Vector2(
+                    projectedFocus.x,
+                    projectedFocus.z);
+                Vector2 outward = point - focus;
+                if (outward.sqrMagnitude > 0.000001f)
+                {
+                    point += outward.normalized *
+                        settings.OffscreenMarginMetres;
+                }
+
+                activeFootprint[activeFootprintCount++] = point;
+            }
+
+            Vector2 translation = Vector2.zero;
+            if (settings.FocusOverride != null)
+            {
+                translation = new Vector2(
+                    settings.FocusOverride.position.x - projectedFocus.x,
+                    settings.FocusOverride.position.z - projectedFocus.z);
+            }
+
+            resolvedFocus = new Vector3(
+                projectedFocus.x + translation.x,
+                groundReference.y,
+                projectedFocus.z + translation.y);
+            Vector2 resolvedFocusXZ = new Vector2(
+                resolvedFocus.x,
+                resolvedFocus.z);
+            for (int index = 0; index < activeFootprintCount; index++)
+            {
+                activeFootprint[index] += translation;
+                maximumDistance = Mathf.Max(
+                    maximumDistance,
+                    Vector2.Distance(
+                        activeFootprint[index],
+                        resolvedFocusXZ));
+            }
+
+            useFootprintRegion = true;
+            resolvedRadius = maximumDistance;
+            UpdateFootprintBounds();
+            return true;
+        }
+
+        private bool TryResolveGroundReference(
+            Camera camera,
+            in Settings settings,
+            out Vector3 groundReference)
+        {
+            if (TryRaycastViewportGround(
                     camera,
                     0.5f,
                     0.5f,
                     settings,
                     out RaycastHit centreHit))
             {
-                resolvedFocus = Vector3.zero;
-                resolvedRadius = 0f;
-                return false;
+                groundReference = centreHit.point;
+                return true;
             }
 
-            resolvedFocus = centreHit.point;
-            float maximumDistance = 0f;
-            int cornerHitCount = 0;
-            maximumDistance = ResolveCornerDistance(
-                camera,
-                0f,
-                0f,
-                settings,
-                resolvedFocus,
-                maximumDistance,
-                ref cornerHitCount);
-            maximumDistance = ResolveCornerDistance(
-                camera,
-                1f,
-                0f,
-                settings,
-                resolvedFocus,
-                maximumDistance,
-                ref cornerHitCount);
-            maximumDistance = ResolveCornerDistance(
-                camera,
-                0f,
-                1f,
-                settings,
-                resolvedFocus,
-                maximumDistance,
-                ref cornerHitCount);
-            maximumDistance = ResolveCornerDistance(
-                camera,
-                1f,
-                1f,
-                settings,
-                resolvedFocus,
-                maximumDistance,
-                ref cornerHitCount);
-            resolvedRadius = cornerHitCount > 0
-                ? maximumDistance + settings.OffscreenMarginMetres
-                : settings.FallbackActiveRadiusMetres +
-                    settings.OffscreenMarginMetres;
-            return true;
+            for (int index = 0; index < CameraViewportSamples.Length; index++)
+            {
+                Vector2 viewport = CameraViewportSamples[index];
+                if (TryRaycastViewportGround(
+                        camera,
+                        viewport.x,
+                        viewport.y,
+                        settings,
+                        out RaycastHit sampleHit))
+                {
+                    groundReference = sampleHit.point;
+                    return true;
+                }
+            }
+
+            groundReference = Vector3.zero;
+            return false;
         }
 
-        private float ResolveCornerDistance(
+        private static bool TryProjectViewportToPlane(
             Camera camera,
             float viewportX,
             float viewportY,
-            in Settings settings,
-            Vector3 resolvedFocus,
-            float currentMaximum,
-            ref int hitCount)
+            in Plane plane,
+            float maximumDistance,
+            out Vector3 projectedPoint)
         {
-            if (!TryRaycastViewportGround(
-                    camera,
-                    viewportX,
-                    viewportY,
-                    settings,
-                    out RaycastHit hit))
+            Ray ray = camera.ViewportPointToRay(
+                new Vector3(viewportX, viewportY, 0f));
+            if (!plane.Raycast(ray, out float distance) ||
+                distance < 0f ||
+                distance > maximumDistance)
             {
-                return currentMaximum;
+                projectedPoint = Vector3.zero;
+                return false;
             }
 
-            hitCount++;
-            Vector2 delta = new Vector2(
-                hit.point.x - resolvedFocus.x,
-                hit.point.z - resolvedFocus.z);
-            return Mathf.Max(currentMaximum, delta.magnitude);
+            projectedPoint = ray.GetPoint(distance);
+            return IsFinite(projectedPoint);
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) &&
+                !float.IsInfinity(value.x) &&
+                !float.IsNaN(value.y) &&
+                !float.IsInfinity(value.y) &&
+                !float.IsNaN(value.z) &&
+                !float.IsInfinity(value.z);
+        }
+
+        private void UpdateFootprintBounds()
+        {
+            activeMinimumX = float.PositiveInfinity;
+            activeMaximumX = float.NegativeInfinity;
+            activeMinimumZ = float.PositiveInfinity;
+            activeMaximumZ = float.NegativeInfinity;
+            for (int index = 0; index < activeFootprintCount; index++)
+            {
+                Vector2 point = activeFootprint[index];
+                activeMinimumX = Mathf.Min(activeMinimumX, point.x);
+                activeMaximumX = Mathf.Max(activeMaximumX, point.x);
+                activeMinimumZ = Mathf.Min(activeMinimumZ, point.y);
+                activeMaximumZ = Mathf.Max(activeMaximumZ, point.y);
+            }
         }
 
         private bool TryRaycastViewportGround(
@@ -755,28 +885,31 @@ namespace ProgrammaticStylized3D.Weather
             return Physics.Raycast(
                 ray,
                 out hit,
-                settings.GroundSearchDistanceMetres,
+                settings.GroundRaycastDistanceMetres,
                 settings.GroundMask,
                 QueryTriggerInteraction.Ignore);
         }
 
-        private void UpdateCellBounds(float minimumSpacingMetres)
+        private void UpdateCellBounds(
+            float minimumSpacingMetres,
+            int populationSeed)
         {
             float cellSize = Mathf.Max(0.5f, minimumSpacingMetres);
             int newMinimumX = Mathf.FloorToInt(
-                (focusWorld.x - activeRadiusMetres) / cellSize);
+                activeMinimumX / cellSize);
             int newMaximumX = Mathf.FloorToInt(
-                (focusWorld.x + activeRadiusMetres) / cellSize);
+                activeMaximumX / cellSize);
             int newMinimumZ = Mathf.FloorToInt(
-                (focusWorld.z - activeRadiusMetres) / cellSize);
+                activeMinimumZ / cellSize);
             int newMaximumZ = Mathf.FloorToInt(
-                (focusWorld.z + activeRadiusMetres) / cellSize);
+                activeMaximumZ / cellSize);
             cellsInActiveRegion = Mathf.Max(
                 0,
                 newMaximumX - newMinimumX + 1) *
                 Mathf.Max(0, newMaximumZ - newMinimumZ + 1);
 
-            bool regionChanged = !cellCursorInitialized ||
+            bool regionChanged = !traversalInitialized ||
+                populationSeed != traversalSeed ||
                 (focusWorld - previousFocusWorld).sqrMagnitude >
                     RegionChangeEpsilonSquared ||
                 Mathf.Abs(activeRadiusMetres - previousActiveRadiusMetres) >
@@ -797,17 +930,40 @@ namespace ProgrammaticStylized3D.Weather
                 return;
             }
 
-            if (!cellCursorInitialized ||
-                cellCursorX < minimumCellX ||
-                cellCursorX > maximumCellX ||
-                cellCursorZ < minimumCellZ ||
-                cellCursorZ > maximumCellZ)
+            BeginCellTraversal(
+                populationSeed,
+                traversalInitialized);
+        }
+
+        private void BeginCellTraversal(
+            int populationSeed,
+            bool advanceEpoch)
+        {
+            if (advanceEpoch)
             {
-                cellCursorX = minimumCellX;
-                cellCursorZ = minimumCellZ;
+                turnoverEpoch++;
             }
 
-            cellCursorInitialized = true;
+            traversalSeed = populationSeed;
+            traversalCursor = 0;
+            traversalCellCount = cellsInActiveRegion;
+            if (traversalCellCount <= 0)
+            {
+                traversalOffset = 0;
+                traversalStep = 1;
+                traversalInitialized = false;
+                return;
+            }
+
+            ulong epochHash = MixHash(
+                unchecked((ulong)(uint)populationSeed) ^
+                MixHash(turnoverEpoch + 0x9E3779B97F4A7C15UL));
+            traversalOffset = (int)(epochHash %
+                unchecked((ulong)traversalCellCount));
+            traversalStep = ResolvePermutationStep(
+                traversalCellCount,
+                MixHash(epochHash + 0xD1B54A32D192ED03UL));
+            traversalInitialized = true;
         }
 
         private void ProcessRetiringAndCooldown(
@@ -893,7 +1049,11 @@ namespace ProgrammaticStylized3D.Weather
                 }
 
                 Candidate candidateToRetire = candidates[farthestIndex];
-                BeginRetirement(controller, ref candidateToRetire, now);
+                BeginRetirement(
+                    controller,
+                    ref candidateToRetire,
+                    now,
+                    "Automatic budget reduced");
                 candidates[farthestIndex] = candidateToRetire;
                 currentActive--;
             }
@@ -914,33 +1074,22 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                bool insideRegion = IsInsideActiveRegion(
-                    candidate.GroundPosition);
-                float clearance = 0.0f;
-                uint dataVersion = 0u;
-                bool valid = insideRegion &&
-                    TryEvaluateCloudFootprint(
-                        settings,
-                        candidate.GroundPosition,
-                        out clearance,
-                        out dataVersion);
-                if (valid)
+                if (candidate.SpawnedAt > 0.0 &&
+                    candidate.AssignedLifetimeSeconds > 0f &&
+                    now - candidate.SpawnedAt >=
+                        candidate.AssignedLifetimeSeconds)
                 {
-                    candidate.Clearance = clearance;
-                    candidate.CloudDataVersion = dataVersion;
-                    candidate.InvalidSince = 0.0;
-                    UpdateActiveOpening(
+                    BeginRetirement(
                         controller,
-                        settings,
-                        ref candidate);
+                        ref candidate,
+                        now,
+                        "Lifetime expired");
+                    candidates[index] = candidate;
+                    continue;
                 }
-                else
-                {
-                    if (!insideRegion)
-                    {
-                        Reject(RejectionReason.OutsideActiveRegion);
-                    }
 
+                if (!IsInsideActiveRegion(candidate.GroundPosition))
+                {
                     if (candidate.InvalidSince <= 0.0)
                     {
                         candidate.InvalidSince = now;
@@ -948,130 +1097,24 @@ namespace ProgrammaticStylized3D.Weather
                     else if (now - candidate.InvalidSince >=
                         settings.InvalidGraceDurationSeconds)
                     {
-                        BeginRetirement(controller, ref candidate, now);
+                        BeginRetirement(
+                            controller,
+                            ref candidate,
+                            now,
+                            "Outside camera footprint");
                     }
+
+                    candidates[index] = candidate;
+                    continue;
                 }
 
+                candidate.InvalidSince = 0.0;
+                UpdateActiveOpening(
+                    controller,
+                    settings,
+                    ref candidate);
                 candidates[index] = candidate;
             }
-        }
-
-        private int EvaluatePendingCandidates(
-            WeatherLightRayController controller,
-            in Settings settings,
-            double now,
-            int budget)
-        {
-            if (budget <= 0)
-            {
-                return 0;
-            }
-
-            int consumed = 0;
-            int visited = 0;
-            while (visited < candidates.Length && consumed < budget)
-            {
-                if (pendingCursor >= candidates.Length)
-                {
-                    pendingCursor = 0;
-                }
-
-                int index = pendingCursor++;
-                visited++;
-                Candidate candidate = candidates[index];
-                if (!candidate.Occupied ||
-                    candidate.State !=
-                        WeatherLightRayPopulationCandidateState.Pending)
-                {
-                    continue;
-                }
-
-                consumed++;
-                candidateChecksLastTick++;
-                if (!IsInsideActiveRegion(candidate.GroundPosition))
-                {
-                    Reject(RejectionReason.OutsideActiveRegion);
-                    EnterCooldown(ref candidate, now);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                if (!TryEvaluateCloudFootprint(
-                        settings,
-                        candidate.GroundPosition,
-                        out float clearance,
-                        out uint dataVersion))
-                {
-                    candidate.ValidSince = 0.0;
-                    candidate.ConsecutiveValidEvaluations = 0;
-                    EnterCooldown(ref candidate, now);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                candidate.Clearance = clearance;
-                candidate.CloudDataVersion = dataVersion;
-                candidate.ConsecutiveValidEvaluations++;
-                if (candidate.ValidSince <= 0.0)
-                {
-                    candidate.ValidSince = now;
-                }
-
-                bool durationPassed = now - candidate.ValidSince >=
-                    settings.QualificationDurationSeconds;
-                if (!durationPassed ||
-                    candidate.ConsecutiveValidEvaluations <
-                        MinimumQualificationEvaluations)
-                {
-                    Reject(RejectionReason.QualificationPending);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                if (CountState(
-                        WeatherLightRayPopulationCandidateState.Active) >=
-                    Mathf.Min(
-                        settings.DesiredCount,
-                        settings.MaximumCount))
-                {
-                    Reject(RejectionReason.DesiredCountMet);
-                    EnterCooldown(ref candidate, now);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                if (controller.AutomaticPopulationFreeSlotCount <= 0)
-                {
-                    Reject(RejectionReason.NoFreeSlot);
-                    EnterCooldown(ref candidate, now);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                if (!controller.IsAutomaticPopulationPositionClear(
-                        candidate.GroundPosition,
-                        settings.MinimumSpacingMetres,
-                        candidate.Identity))
-                {
-                    Reject(RejectionReason.TooClose);
-                    EnterCooldown(ref candidate, now);
-                    candidates[index] = candidate;
-                    continue;
-                }
-
-                if (!SpawnCandidate(
-                        controller,
-                        settings,
-                        ref candidate))
-                {
-                    Reject(RejectionReason.SpawnOrUpdateFailed);
-                    EnterCooldown(ref candidate, now);
-                }
-
-                candidates[index] = candidate;
-            }
-
-            return consumed;
         }
 
         private void EvaluateNewCandidates(
@@ -1096,18 +1139,19 @@ namespace ProgrammaticStylized3D.Weather
                 }
 
                 candidateChecksLastTick++;
-                Vector3 candidatePosition = ResolveCandidatePosition(
+                long identity = ResolveStableIdentity(
                     settings.Seed,
-                    settings.IdentitySalt,
+                    cellX,
+                    cellZ,
+                    settings.DirectionalSource.Kind);
+                long activationIdentity = ResolveActivationIdentity(
+                    identity,
+                    turnoverEpoch);
+                Vector3 candidatePosition = ResolveCandidatePosition(
+                    activationIdentity,
                     cellX,
                     cellZ,
                     settings.MinimumSpacingMetres);
-                long identity = ResolveStableIdentity(
-                    settings.Seed,
-                    settings.IdentitySalt,
-                    settings.SourceKind,
-                    cellX,
-                    cellZ);
                 if (!IsInsideActiveRegion(candidatePosition))
                 {
                     Reject(RejectionReason.OutsideActiveRegion);
@@ -1150,7 +1194,7 @@ namespace ProgrammaticStylized3D.Weather
                 if (!controller.IsAutomaticPopulationPositionClear(
                         candidatePosition,
                         settings.MinimumSpacingMetres,
-                        identity) ||
+                        activationIdentity) ||
                     !IsSeparatedFromCandidateStates(
                         candidatePosition,
                         settings.MinimumSpacingMetres,
@@ -1168,10 +1212,19 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                if (!TryEvaluateCloudFootprint(
+                float assignedLifetimeSeconds = ResolveAssignedLifetime(
+                    activationIdentity,
+                    settings.MinimumRayLifetimeSeconds,
+                    settings.MaximumRayLifetimeSeconds);
+                if (!TryEvaluateCloudPlacement(
                         settings,
                         groundHit.point,
+                        assignedLifetimeSeconds,
                         out float clearance,
+                        out float presentCentreOpenness,
+                        out int presentSurroundingPassCount,
+                        out float predictedCentreOpenness,
+                        out float predictionHorizonSeconds,
                         out uint dataVersion))
                 {
                     continue;
@@ -1184,23 +1237,40 @@ namespace ProgrammaticStylized3D.Weather
                     return;
                 }
 
-                candidates[freeCandidateIndex] = new Candidate
+                Candidate candidate = new Candidate
                 {
                     Occupied = true,
                     Identity = identity,
+                    ActivationIdentity = activationIdentity,
                     CellX = cellX,
                     CellZ = cellZ,
                     GroundPosition = groundHit.point,
                     State = WeatherLightRayPopulationCandidateState.Pending,
                     Handle = default,
                     Clearance = clearance,
-                    ValidSince = now,
                     InvalidSince = 0.0,
                     CooldownUntil = 0.0,
-                    ConsecutiveValidEvaluations = 1,
+                    SpawnedAt = 0.0,
+                    AssignedLifetimeSeconds = assignedLifetimeSeconds,
+                    PresentCentreOpenness = presentCentreOpenness,
+                    PresentSurroundingPassCount =
+                        presentSurroundingPassCount,
+                    PredictedCentreOpenness = predictedCentreOpenness,
+                    PredictionHorizonSeconds = predictionHorizonSeconds,
+                    RetirementReason = string.Empty,
                     CloudDataVersion = dataVersion
                 };
-                Reject(RejectionReason.QualificationPending);
+                if (!SpawnCandidate(
+                        controller,
+                        settings,
+                        ref candidate,
+                        now))
+                {
+                    Reject(RejectionReason.SpawnOrUpdateFailed);
+                    EnterCooldown(ref candidate, now);
+                }
+
+                candidates[freeCandidateIndex] = candidate;
             }
         }
 
@@ -1209,7 +1279,7 @@ namespace ProgrammaticStylized3D.Weather
             Vector3 candidatePosition,
             out RaycastHit hit)
         {
-            float halfDistance = settings.GroundSearchDistanceMetres * 0.5f;
+            float halfDistance = settings.GroundRaycastDistanceMetres * 0.5f;
             Vector3 origin = new Vector3(
                 candidatePosition.x,
                 focusWorld.y + halfDistance,
@@ -1219,7 +1289,7 @@ namespace ProgrammaticStylized3D.Weather
                     origin,
                     Vector3.down,
                     out hit,
-                    settings.GroundSearchDistanceMetres,
+                    settings.GroundRaycastDistanceMetres,
                     settings.GroundMask,
                     QueryTriggerInteraction.Ignore))
             {
@@ -1238,236 +1308,168 @@ namespace ProgrammaticStylized3D.Weather
             return true;
         }
 
-        /// <summary>
-        /// Evaluates only the cloud policy supplied by the active population
-        /// rule. Ignored/Any rules return immediately and perform no cloud
-        /// sampling. Clear Footprint retains the bounded 13 x 4 forecast
-        /// contract. Distinct Cloud Opening adds only a bounded surrounding
-        /// ring contrast check; no full-cookie scan is permitted here.
-        /// </summary>
-        private bool TryEvaluateCloudFootprint(
+        private bool TryEvaluateCloudPlacement(
             in Settings settings,
             Vector3 centre,
-            out float minimumClearance,
+            float assignedLifetimeSeconds,
+            out float minimumOpenness,
+            out float presentCentreOpenness,
+            out int presentSurroundingPassCount,
+            out float predictedCentreOpenness,
+            out float predictionHorizonSeconds,
             out uint dataVersion)
         {
-            minimumClearance = 1f;
+            minimumOpenness = 0f;
+            presentCentreOpenness = 0f;
+            presentSurroundingPassCount = 0;
+            predictedCentreOpenness = 0f;
+            predictionHorizonSeconds = 0f;
             dataVersion = settings.CloudController != null
                 ? unchecked((uint)settings.CloudController.CurrentCookieSeed)
                 : 0u;
 
-            if (settings.CloudDataRequirement ==
-                    WeatherLightRayCloudDataRequirement.Ignored ||
-                settings.SpatialCloudPolicy ==
-                    WeatherLightRaySpatialCloudPolicy.AnyPosition)
-            {
-                return true;
-            }
-
-            WeatherCloudShadowController cloud = settings.CloudController;
-            bool producerAbsentOrDisabled = cloud == null ||
-                !cloud.IsPublished ||
-                !cloud.CloudShadowsEnabled;
-            if (producerAbsentOrDisabled)
-            {
-                if (settings.CloudDataRequirement ==
-                    WeatherLightRayCloudDataRequirement.Optional)
-                {
-                    dataVersion = 0u;
-                    return true;
-                }
-
-                Reject(RejectionReason.CloudUnavailable);
-                return false;
-            }
-
-            if (!cloud.CookieReady || settings.CloudProjectionLight == null)
+            if (settings.CloudController == null ||
+                settings.DirectionalSource.SourceLight == null)
             {
                 Reject(RejectionReason.CloudUnavailable);
                 return false;
             }
 
-            if (cloud.EvolutionInProgress &&
-                cloud.EvolutionProgress <
+            if (settings.CloudController.EvolutionInProgress &&
+                settings.CloudController.EvolutionProgress <
                     settings.CloudEvolutionResumeThreshold)
             {
                 Reject(RejectionReason.CloudEvolutionUnstable);
                 return false;
             }
 
+            if (!TrySampleNormalizedOpenness(
+                    settings,
+                    centre,
+                    0f,
+                    out presentCentreOpenness))
+            {
+                return false;
+            }
+
+            minimumOpenness = presentCentreOpenness;
+            if (presentCentreOpenness < settings.MinimumClearance)
+            {
+                Reject(RejectionReason.InsufficientPresentCentre);
+                return false;
+            }
+
             float radius = settings.ActivePreset.DefaultAreaDiameterMetres *
                 0.5f;
-            float halfRadius = radius * 0.5f;
-            float middleForecast = Mathf.Lerp(
-                AutomaticFadeInSeconds,
-                settings.MinimumViableOpeningDurationSeconds,
-                0.5f);
-
-            for (int forecastIndex = 0;
-                forecastIndex < ForecastSampleCount;
-                forecastIndex++)
+            for (int sampleIndex = 0; sampleIndex < 4; sampleIndex++)
             {
-                float forecastSeconds;
-                switch (forecastIndex)
-                {
-                    case 0:
-                        forecastSeconds = 0f;
-                        break;
-                    case 1:
-                        forecastSeconds = AutomaticFadeInSeconds;
-                        break;
-                    case 2:
-                        forecastSeconds = middleForecast;
-                        break;
-                    default:
-                        forecastSeconds =
-                            settings.MinimumViableOpeningDurationSeconds;
-                        break;
-                }
-
-                for (int sampleIndex = 0;
-                    sampleIndex < FootprintSampleCount;
-                    sampleIndex++)
-                {
-                    Vector3 samplePosition = centre +
-                        ResolveFootprintOffset(
-                            sampleIndex,
-                            radius,
-                            halfRadius);
-                    cloudSamplesLastTick++;
-                    if (!cloud.TrySampleCloudTransmissionAtTimeOffset(
-                            samplePosition,
-                            settings.CloudProjectionLight,
-                            forecastSeconds,
-                            out WeatherCloudTransmissionSample sample) ||
-                        !sample.IsUsable)
-                    {
-                        Reject(RejectionReason.CloudUnavailable);
-                        return false;
-                    }
-
-                    if (!sample.IsStable &&
-                        cloud.EvolutionProgress <
-                            settings.CloudEvolutionResumeThreshold)
-                    {
-                        Reject(RejectionReason.CloudEvolutionUnstable);
-                        return false;
-                    }
-
-                    float normalizedOpen = NormalizeTransmission(
-                        sample.Transmission,
-                        cloud.ShadedTransmission);
-                    minimumClearance = Mathf.Min(
-                        minimumClearance,
-                        normalizedOpen);
-                    if (minimumClearance < settings.MinimumClearance)
-                    {
-                        Reject(RejectionReason.InsufficientClearance);
-                        return false;
-                    }
-                }
-            }
-
-            if (settings.SpatialCloudPolicy !=
-                WeatherLightRaySpatialCloudPolicy.DistinctCloudOpening)
-            {
-                return true;
-            }
-
-            float surroundingRadius = radius +
-                Mathf.Max(0f, settings.SurroundingSampleRadiusMetres);
-            float surroundingOpenSum = 0f;
-            const int surroundingDirectionCount = 8;
-            for (int timeIndex = 0; timeIndex < 2; timeIndex++)
-            {
-                float forecastSeconds = timeIndex == 0
-                    ? 0f
-                    : settings.MinimumViableOpeningDurationSeconds;
-                for (int directionIndex = 0;
-                    directionIndex < surroundingDirectionCount;
-                    directionIndex++)
-                {
-                    float angle = directionIndex * 45f * Mathf.Deg2Rad;
-                    Vector3 position = centre + new Vector3(
-                        Mathf.Cos(angle) * surroundingRadius,
+                float angle = sampleIndex * 90f * Mathf.Deg2Rad;
+                Vector3 samplePosition = centre + new Vector3(
+                    Mathf.Cos(angle) * radius,
+                    0f,
+                    Mathf.Sin(angle) * radius);
+                if (!TrySampleNormalizedOpenness(
+                        settings,
+                        samplePosition,
                         0f,
-                        Mathf.Sin(angle) * surroundingRadius);
-                    cloudSamplesLastTick++;
-                    if (!cloud.TrySampleCloudTransmissionAtTimeOffset(
-                            position,
-                            settings.CloudProjectionLight,
-                            forecastSeconds,
-                            out WeatherCloudTransmissionSample sample) ||
-                        !sample.IsUsable)
-                    {
-                        Reject(RejectionReason.CloudUnavailable);
-                        return false;
-                    }
+                        out float surroundingOpenness))
+                {
+                    return false;
+                }
 
-                    surroundingOpenSum += NormalizeTransmission(
-                        sample.Transmission,
-                        cloud.ShadedTransmission);
+                if (surroundingOpenness >= settings.MinimumClearance)
+                {
+                    presentSurroundingPassCount++;
                 }
             }
 
-            float surroundingOpenAverage = surroundingOpenSum /
-                (surroundingDirectionCount * 2f);
-            float contrast = minimumClearance - surroundingOpenAverage;
-            if (contrast < settings.MinimumDistinctOpeningContrast)
+            if (presentSurroundingPassCount <
+                RequiredPresentSurroundingPassCount)
             {
-                Reject(RejectionReason.InsufficientClearance);
+                Reject(RejectionReason.InsufficientPresentSurrounding);
+                return false;
+            }
+
+            float lifetime = Mathf.Max(0.1f, assignedLifetimeSeconds);
+            float spawnFade = Mathf.Clamp(
+                settings.SpawnFadeDurationSeconds,
+                0f,
+                lifetime);
+            float stableWindow = Mathf.Max(0f, lifetime - spawnFade);
+            predictionHorizonSeconds = Mathf.Min(
+                lifetime,
+                spawnFade +
+                    PredictionStableWindowFraction * stableWindow);
+
+            if (!TrySampleNormalizedOpenness(
+                    settings,
+                    centre,
+                    predictionHorizonSeconds,
+                    out predictedCentreOpenness))
+            {
+                return false;
+            }
+
+            minimumOpenness = Mathf.Min(
+                minimumOpenness,
+                predictedCentreOpenness);
+            if (predictedCentreOpenness < settings.MinimumClearance)
+            {
+                Reject(RejectionReason.InsufficientPredictedCentre);
                 return false;
             }
 
             return true;
         }
 
-        private static float NormalizeTransmission(
-            float transmission,
-            float shadedTransmission)
+        private bool TrySampleNormalizedOpenness(
+            in Settings settings,
+            Vector3 samplePosition,
+            float futureSeconds,
+            out float normalizedOpenness)
         {
-            return Mathf.Clamp01(
-                (transmission - shadedTransmission) /
-                Mathf.Max(0.0001f, 1f - shadedTransmission));
-        }
-
-        private static Vector3 ResolveFootprintOffset(
-            int sampleIndex,
-            float radius,
-            float halfRadius)
-        {
-            if (sampleIndex == 0)
+            normalizedOpenness = 0f;
+            cloudSamplesLastTick++;
+            if (!settings.CloudController.
+                    TrySampleCloudTransmissionAtTimeOffset(
+                        samplePosition,
+                        settings.DirectionalSource.SourceLight,
+                        futureSeconds,
+                        out WeatherCloudTransmissionSample sample) ||
+                !sample.IsUsable)
             {
-                return Vector3.zero;
+                Reject(RejectionReason.CloudUnavailable);
+                return false;
             }
 
-            if (sampleIndex <= 4)
+            if (!sample.IsStable &&
+                settings.CloudController.EvolutionProgress <
+                    settings.CloudEvolutionResumeThreshold)
             {
-                float angle = (sampleIndex - 1) * 90f * Mathf.Deg2Rad;
-                return new Vector3(
-                    Mathf.Cos(angle) * halfRadius,
-                    0f,
-                    Mathf.Sin(angle) * halfRadius);
+                Reject(RejectionReason.CloudEvolutionUnstable);
+                return false;
             }
 
-            float perimeterAngle = (sampleIndex - 5) * 45f *
-                Mathf.Deg2Rad;
-            return new Vector3(
-                Mathf.Cos(perimeterAngle) * radius,
-                0f,
-                Mathf.Sin(perimeterAngle) * radius);
+            float shaded = settings.CloudController.ShadedTransmission;
+            normalizedOpenness = Mathf.Clamp01(
+                (sample.Transmission - shaded) /
+                Mathf.Max(0.0001f, 1f - shaded));
+            return true;
         }
 
         private bool SpawnCandidate(
             WeatherLightRayController controller,
             in Settings settings,
-            ref Candidate candidate)
+            ref Candidate candidate,
+            double now)
         {
             WeatherLightRayCloudOpening opening = BuildOpening(
                 settings,
                 candidate);
             WeatherLightRayCloudSpawnSettings spawnSettings =
-                BuildSpawnSettings(settings, candidate.Identity);
+                BuildSpawnSettings(
+                    settings,
+                    candidate.ActivationIdentity);
             WeatherLightRayHandle handle = candidate.Handle;
             if (!controller.TrySpawnOrUpdateResolvedCloudOpening(
                     ref handle,
@@ -1481,6 +1483,8 @@ namespace ProgrammaticStylized3D.Weather
 
             candidate.Handle = handle;
             candidate.State = WeatherLightRayPopulationCandidateState.Active;
+            candidate.SpawnedAt = now;
+            candidate.RetirementReason = string.Empty;
             candidate.InvalidSince = 0.0;
             return true;
         }
@@ -1494,7 +1498,9 @@ namespace ProgrammaticStylized3D.Weather
                 settings,
                 candidate);
             WeatherLightRayCloudSpawnSettings spawnSettings =
-                BuildSpawnSettings(settings, candidate.Identity);
+                BuildSpawnSettings(
+                    settings,
+                    candidate.ActivationIdentity);
             WeatherLightRayHandle handle = candidate.Handle;
             if (!controller.TrySpawnOrUpdateResolvedCloudOpening(
                     ref handle,
@@ -1507,7 +1513,8 @@ namespace ProgrammaticStylized3D.Weather
                 BeginRetirement(
                     controller,
                     ref candidate,
-                    Time.realtimeSinceStartupAsDouble);
+                    Time.realtimeSinceStartupAsDouble,
+                    "Opening update failed");
                 return;
             }
 
@@ -1519,10 +1526,10 @@ namespace ProgrammaticStylized3D.Weather
             in Candidate candidate)
         {
             return new WeatherLightRayCloudOpening(
-                candidate.Identity,
-                settings.SourceKind,
+                candidate.ActivationIdentity,
+                settings.DirectionalSource.Kind,
                 candidate.GroundPosition,
-                settings.RayDirectionWorld,
+                Vector3.zero,
                 settings.ActivePreset.DefaultAreaDiameterMetres,
                 candidate.Clearance,
                 0.5f,
@@ -1545,12 +1552,13 @@ namespace ProgrammaticStylized3D.Weather
                 localIntensityMultiplier: 1f,
                 lifetimePolicy:
                     WeatherLightRayLifetimePolicy.ExternallyControlled,
-                fadeInDurationSeconds: AutomaticFadeInSeconds,
+                fadeInDurationSeconds: settings.SpawnFadeDurationSeconds,
                 holdDurationSeconds: 0f,
-                fadeOutDurationSeconds: AutomaticFadeOutSeconds,
+                fadeOutDurationSeconds: settings.DespawnFadeDurationSeconds,
                 initiallyVisible: true,
                 runtimeCloudPolicy: WeatherLightRayCloudPolicy.IgnoreClouds,
-                sourceGatePolicy: settings.SourceGatePolicy,
+                sourceGatePolicy:
+                    WeatherLightRaySourceGatePolicy.RequireActiveSource,
                 movementPolicy: WeatherLightRayMovementPolicy.Static,
                 gameplayChannel: 0,
                 priority: WeatherLightRaySpawnPriority.Low,
@@ -1560,7 +1568,8 @@ namespace ProgrammaticStylized3D.Weather
         private void BeginRetirement(
             WeatherLightRayController controller,
             ref Candidate candidate,
-            double now)
+            double now,
+            string reason = "Invalidated")
         {
             if (candidate.State ==
                 WeatherLightRayPopulationCandidateState.Retiring)
@@ -1578,27 +1587,28 @@ namespace ProgrammaticStylized3D.Weather
                 candidate.State =
                     WeatherLightRayPopulationCandidateState.Retiring;
                 candidate.InvalidSince = now;
+                candidate.RetirementReason = reason;
                 return;
             }
 
             EnterCooldown(ref candidate, now);
         }
 
-        private static void EnterCooldown(
+        private void EnterCooldown(
             ref Candidate candidate,
             double now)
         {
             candidate.State = WeatherLightRayPopulationCandidateState.Cooldown;
             candidate.Handle = default;
-            candidate.ValidSince = 0.0;
             candidate.InvalidSince = 0.0;
-            candidate.ConsecutiveValidEvaluations = 0;
-            candidate.CooldownUntil = now + CandidateCooldownSeconds;
+            candidate.SpawnedAt = 0.0;
+            candidate.CooldownUntil = now + replacementDelaySeconds;
         }
 
         private void RetireAllAutomaticCandidates(
             WeatherLightRayController controller,
-            double now)
+            double now,
+            string reason)
         {
             if (candidates == null)
             {
@@ -1616,7 +1626,11 @@ namespace ProgrammaticStylized3D.Weather
                 if (candidate.State ==
                     WeatherLightRayPopulationCandidateState.Active)
                 {
-                    BeginRetirement(controller, ref candidate, now);
+                    BeginRetirement(
+                        controller,
+                        ref candidate,
+                        now,
+                        reason);
                 }
                 else if (candidate.State ==
                     WeatherLightRayPopulationCandidateState.Pending)
@@ -1701,11 +1715,31 @@ namespace ProgrammaticStylized3D.Weather
 
         private bool IsInsideActiveRegion(Vector3 position)
         {
-            Vector2 delta = new Vector2(
-                position.x - focusWorld.x,
-                position.z - focusWorld.z);
-            return delta.sqrMagnitude <=
-                activeRadiusMetres * activeRadiusMetres;
+            Vector2 point = new Vector2(position.x, position.z);
+            if (point.x < activeMinimumX || point.x > activeMaximumX ||
+                point.y < activeMinimumZ || point.y > activeMaximumZ)
+            {
+                return false;
+            }
+
+            bool inside = false;
+            int previous = activeFootprintCount - 1;
+            for (int current = 0; current < activeFootprintCount; current++)
+            {
+                Vector2 a = activeFootprint[current];
+                Vector2 b = activeFootprint[previous];
+                bool crosses = (a.y > point.y) != (b.y > point.y) &&
+                    point.x < (b.x - a.x) * (point.y - a.y) /
+                        (b.y - a.y) + a.x;
+                if (crosses)
+                {
+                    inside = !inside;
+                }
+
+                previous = current;
+            }
+
+            return inside;
         }
 
         private bool IsSeparatedFromCandidateStates(
@@ -1741,39 +1775,85 @@ namespace ProgrammaticStylized3D.Weather
         {
             cellX = 0;
             cellZ = 0;
-            if (!cellCursorInitialized || cellsInActiveRegion <= 0)
+            if (!traversalInitialized || traversalCellCount <= 0)
             {
                 return false;
             }
 
-            cellX = cellCursorX;
-            cellZ = cellCursorZ;
-            cellCursorX++;
-            if (cellCursorX > maximumCellX)
+            if (traversalCursor >= traversalCellCount)
             {
-                cellCursorX = minimumCellX;
-                cellCursorZ++;
-                if (cellCursorZ > maximumCellZ)
+                BeginCellTraversal(
+                    traversalSeed,
+                    advanceEpoch: true);
+                if (!traversalInitialized)
                 {
-                    cellCursorZ = minimumCellZ;
+                    return false;
                 }
             }
 
+            long permutedIndex =
+                (traversalOffset +
+                    (long)traversalCursor * traversalStep) %
+                traversalCellCount;
+            traversalCursor++;
+
+            int width = maximumCellX - minimumCellX + 1;
+            if (width <= 0)
+            {
+                return false;
+            }
+
+            cellX = minimumCellX + (int)(permutedIndex % width);
+            cellZ = minimumCellZ + (int)(permutedIndex / width);
             return true;
         }
 
+        private static int ResolvePermutationStep(
+            int cellCount,
+            ulong hash)
+        {
+            if (cellCount <= 1)
+            {
+                return 1;
+            }
+
+            int step = 1 + (int)(hash %
+                unchecked((ulong)(cellCount - 1)));
+            while (GreatestCommonDivisor(step, cellCount) != 1)
+            {
+                step++;
+                if (step >= cellCount)
+                {
+                    step = 1;
+                }
+            }
+
+            return step;
+        }
+
+        private static int GreatestCommonDivisor(int left, int right)
+        {
+            left = Mathf.Abs(left);
+            right = Mathf.Abs(right);
+            while (right != 0)
+            {
+                int remainder = left % right;
+                left = right;
+                right = remainder;
+            }
+
+            return Mathf.Max(1, left);
+        }
+
         private static Vector3 ResolveCandidatePosition(
-            int seed,
-            ulong identitySalt,
+            long activationIdentity,
             int cellX,
             int cellZ,
             float cellSize)
         {
             ulong hash = MixHash(
-                unchecked((ulong)(uint)seed) ^
-                identitySalt ^
-                (unchecked((ulong)(uint)cellX) << 32) ^
-                unchecked((uint)cellZ));
+                unchecked((ulong)activationIdentity) ^
+                0xA24BAED4963EE407UL);
             float offsetX = 0.15f + HashToUnitFloat(hash) * 0.70f;
             hash = MixHash(hash + 0x9E3779B97F4A7C15UL);
             float offsetZ = 0.15f + HashToUnitFloat(hash) * 0.70f;
@@ -1783,20 +1863,42 @@ namespace ProgrammaticStylized3D.Weather
                 (cellZ + offsetZ) * cellSize);
         }
 
+        private static float ResolveAssignedLifetime(
+            long identity,
+            float minimumSeconds,
+            float maximumSeconds)
+        {
+            float minimum = Mathf.Max(0.1f, minimumSeconds);
+            float maximum = Mathf.Max(minimum, maximumSeconds);
+            ulong hash = MixHash(unchecked((ulong)identity) ^
+                0xD6E8FEB86659FD93UL);
+            return Mathf.Lerp(minimum, maximum, HashToUnitFloat(hash));
+        }
+
         private static long ResolveStableIdentity(
             int seed,
-            ulong identitySalt,
-            WeatherLightRaySourceKind sourceKind,
             int cellX,
-            int cellZ)
+            int cellZ,
+            WeatherLightRaySourceKind sourceKind)
         {
-            ulong value = unchecked((ulong)(uint)seed) ^ identitySalt;
+            ulong value = unchecked((ulong)(uint)seed);
             value ^= unchecked((ulong)(uint)cellX) *
                 0x9E3779B185EBCA87UL;
             value ^= unchecked((ulong)(uint)cellZ) *
                 0xC2B2AE3D27D4EB4FUL;
             value ^= (ulong)sourceKind + 1UL;
             value = MixHash(value) | 0x4000000000000000UL;
+            long identity = unchecked((long)value);
+            return identity == 0L ? 1L : identity;
+        }
+
+        private static long ResolveActivationIdentity(
+            long cellIdentity,
+            ulong epoch)
+        {
+            ulong value = unchecked((ulong)cellIdentity);
+            value ^= MixHash(epoch + 0x94D049BB133111EBUL);
+            value = MixHash(value) | 0x2000000000000000UL;
             long identity = unchecked((long)value);
             return identity == 0L ? 1L : identity;
         }

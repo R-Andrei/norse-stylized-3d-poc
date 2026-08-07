@@ -108,7 +108,6 @@ namespace ProgrammaticStylized3D.Rivers
         private int materialStepCountSinceSession;
         private int birthCommandsThisFrame;
         private double lastBirthCommandAt = -1.0;
-        private float automaticShoreBirthAccumulator;
         private int automaticShoreBirthCursor;
         private int automaticShoreBirthSubmittedLastUpdate;
         private int automaticShoreBirthRejectedLastUpdate;
@@ -136,6 +135,16 @@ namespace ProgrammaticStylized3D.Rivers
         private int automaticPacketEnvelopeRejectedTotal;
         private int automaticPacketReservationActiveCount;
         private int activeAutomaticFoamSourceEventCount;
+        private int activeAutomaticShoreSourceEventCount;
+        private float automaticShorePopulationMeanHeadCount;
+        private int automaticShorePopulationMinimumHeadCount;
+        private int automaticShorePopulationMaximumHeadCount;
+        private int automaticShorePopulationTargetHeadCount;
+        private float automaticShorePopulationActiveBankLengthMetres;
+        private int automaticShorePopulationEpochIndex;
+        private float automaticShorePopulationNextBoundaryTime = -1f;
+        private int automaticShorePopulationAuthoritySignature = int.MinValue;
+        private bool automaticShorePopulationTargetRefreshPending = true;
         private int automaticSourceEventsRasterizedLastUpdate;
         private string automaticShoreBirthStatus =
             "Automatic source population disabled";
@@ -256,14 +265,14 @@ namespace ProgrammaticStylized3D.Rivers
             topologyStartupDistinctGeneratedSources = new();
         private bool topologyStartupSummaryLogged;
 
-        private readonly AutomaticFoamSourceEvent[] automaticFoamSourceEvents =
-            new AutomaticFoamSourceEvent[AutomaticFoamSourceEventCapacity];
-        private readonly AutomaticFoamPacketReservation[]
-            automaticFoamPacketReservations =
-                new AutomaticFoamPacketReservation[
-                    AutomaticFoamPacketReservationCapacity];
-        private readonly FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
-            new FoamSourceEventGpuData[AutomaticFoamSourceEventCapacity];
+        private int automaticFoamSourceEventCapacity;
+        private int automaticFoamPacketReservationCapacity;
+        private AutomaticFoamSourceEvent[] automaticFoamSourceEvents =
+            Array.Empty<AutomaticFoamSourceEvent>();
+        private AutomaticFoamPacketReservation[] automaticFoamPacketReservations =
+            Array.Empty<AutomaticFoamPacketReservation>();
+        private FoamSourceEventGpuData[] automaticFoamSourceEventGpuData =
+            Array.Empty<FoamSourceEventGpuData>();
         private readonly AutomaticRevealTimingTelemetry[]
             automaticRevealTimingByType =
                 new AutomaticRevealTimingTelemetry[9];
@@ -273,8 +282,8 @@ namespace ProgrammaticStylized3D.Rivers
             automaticObjectFoamSources = new();
         private readonly Dictionary<EntityId, AutomaticObjectSourceState>
             automaticObjectSourceStates = new();
-        private readonly Dictionary<int, float>
-            automaticShoreSlotNextStartTimes = new();
+        private readonly Dictionary<int, AutomaticShoreSlotScheduleState>
+            automaticShoreSlotSchedules = new();
         private readonly Dictionary<int, float>
             automaticFreeWaterSlotNextStartTimes = new();
         private readonly HashSet<EntityId> automaticObjectContactLiveSourceIds = new();

@@ -34,7 +34,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
         private bool showCookiePreview;
         private bool showActionsReports;
         private bool showBenchmark;
-        private bool showLiveStatus;
+        private bool showRuntimeStatus;
 
         private void OnEnable()
         {
@@ -71,10 +71,10 @@ namespace ProgrammaticStylized3D.Weather.Editor
             WeatherInspectorGui.DrawScriptReference(serializedObject);
             DrawImmediateWarnings(controller);
 
-            DrawActivationSource(controller);
-            DrawCloudPattern(controller);
-            DrawCloudMotion(controller);
-            DrawEvolution(controller);
+            DrawActivationSource();
+            DrawCloudPattern();
+            DrawCloudMotion();
+            DrawEvolution();
             DrawSunGate();
             DrawDebugVisualization(controller);
 
@@ -89,7 +89,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
             DrawCookiePreview(controller);
             DrawActionsReports(controller);
             DrawPerformanceBenchmark(controller);
-            DrawLiveStatus(controller);
+            DrawRuntimeStatus(controller);
         }
 
         private static void DrawImmediateWarnings(
@@ -130,8 +130,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
             }
         }
 
-        private void DrawActivationSource(
-            WeatherCloudShadowController controller)
+        private void DrawActivationSource()
         {
             if (!WeatherInspectorGui.Foldout(
                     ref showActivationSource,
@@ -159,23 +158,10 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Sun Override",
                     "Optional explicit directional Sun. When unassigned, RenderSettings.sun is authoritative.");
 
-                Light sun = controller.ResolvedSun;
-                WeatherInspectorGui.ReadOnlyObject("Resolved Sun", sun);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Source Resolution",
-                    sun == null
-                        ? "Unavailable"
-                        : serializedObject.FindProperty("sunOverride")?.objectReferenceValue != null
-                            ? "Sun Override"
-                            : "RenderSettings.sun");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Sun Gate",
-                    controller.SunGateActive ? "Active" : "Inactive");
             }
         }
 
-        private void DrawCloudPattern(
-            WeatherCloudShadowController controller)
+        private void DrawCloudPattern()
         {
             if (!WeatherInspectorGui.Foldout(
                     ref showCloudPattern,
@@ -241,17 +227,10 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 WeatherInspectorGui.Help(
                     "The generated texture stores direct-sun transmission: 1 is open " +
                     "sunlight; Clouded Sunlight Transmission is the fully clouded floor.");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Generated Cookie",
-                    controller.CookieReady ? "Ready" : "Not ready");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Estimated Texture Memory",
-                    $"{controller.EstimatedCookieTexelBytes:N0} bytes");
             }
         }
 
-        private void DrawCloudMotion(
-            WeatherCloudShadowController controller)
+        private void DrawCloudMotion()
         {
             if (!WeatherInspectorGui.Foldout(
                     ref showCloudMotion,
@@ -284,20 +263,10 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Fallback Direction (XZ)",
                     "Horizontal movement direction used when no authoritative Weather Wind Domain is published. The vector is normalized internally.");
 
-                WeatherInspectorGui.ReadOnlyObject(
-                    "Published Wind Domain",
-                    WeatherWindDomain.PublishedDomain);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Resolved Direction XZ",
-                    controller.ResolvedWindDirection.ToString("F3"));
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Current Cookie Offset",
-                    controller.CurrentCookieOffset.ToString("F3"));
             }
         }
 
-        private void DrawEvolution(
-            WeatherCloudShadowController controller)
+        private void DrawEvolution()
         {
             if (!WeatherInspectorGui.Foldout(
                     ref showEvolution,
@@ -335,41 +304,6 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Crossfade Update Rate (Hz)",
                     "Bounded texture blend/upload cadence during an active evolution. Higher values produce more uploads per transition.");
 
-                double secondsUntilNext = controller.SecondsUntilNextEvolution;
-                WeatherInspectorGui.ReadOnlyRow(
-                    "State",
-                    controller.EvolutionState.ToString());
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Current / Next Seed",
-                    controller.EvolutionInProgress
-                        ? $"{controller.CurrentCookieSeed} / {controller.NextEvolutionSeed}"
-                        : $"{controller.CurrentCookieSeed} / None");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Progress",
-                    controller.EvolutionProgress.ToString("P1"));
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Next Automatic Evolution",
-                    double.IsPositiveInfinity(secondsUntilNext)
-                        ? "Inactive"
-                        : $"{secondsUntilNext:0.0} s");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Uploads This Transition",
-                    controller.EvolutionUploadCount);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Uploaded Texel Bytes",
-                    controller.EvolutionUploadedTexelBytes);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Configured Upload Estimate",
-                    controller.EstimatedEvolutionUploadBytesPerTransition);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Last Preparation",
-                    $"{controller.LastEvolutionPreparationMilliseconds:0.###} ms");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Blend / Upload Total",
-                    $"{controller.EvolutionBlendUploadTotalMilliseconds:0.###} ms");
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Blend / Upload Maximum",
-                    $"{controller.EvolutionBlendUploadMaximumMilliseconds:0.###} ms");
             }
         }
 
@@ -477,10 +411,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Opening Colour",
                     "Colour used to identify sunlight openings in Cloud + Sun Openings mode.");
 
-                DrawResolvedDebugFocus(controller);
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Effective Overlay Size",
-                    $"{controller.EffectiveDebugOverlaySizeMetres:0.###} m");
+                DrawDebugFocusAuthoringWarnings(controller);
                 WeatherInspectorGui.Help(
                     "The overlay is diagnostic only. It does not change generation, " +
                     "receiver shaders, or sunlight. Default colours: magenta = cloud; cyan = open sunlight.");
@@ -527,18 +458,9 @@ namespace ProgrammaticStylized3D.Weather.Editor
             }
         }
 
-        private static void DrawResolvedDebugFocus(
+        private static void DrawDebugFocusAuthoringWarnings(
             WeatherCloudShadowController controller)
         {
-            WeatherInspectorGui.ReadOnlyObject(
-                "Resolved Focus",
-                controller.ResolvedDebugFocus);
-            WeatherInspectorGui.ReadOnlyRow(
-                "Focus Source",
-                FormatDebugFocusSource(controller.ResolvedDebugFocusSource));
-            WeatherInspectorGui.ReadOnlyRow(
-                "Resolved Position",
-                controller.ResolvedDebugFocusPosition.ToString("F3"));
 
             if (controller.RuntimeDebugFocusOverride != null)
             {
@@ -605,9 +527,6 @@ namespace ProgrammaticStylized3D.Weather.Editor
             Texture2D cookie = controller.GeneratedCookie;
             using (new EditorGUI.IndentLevelScope())
             {
-                WeatherInspectorGui.ReadOnlyRow(
-                    "Resolution",
-                    $"{controller.CookieResolution} × {controller.CookieResolution}");
                 if (cookie == null)
                 {
                     WeatherInspectorGui.Help(
@@ -869,12 +788,12 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 benchmarkEvolutionTimeoutSeconds);
         }
 
-        private void DrawLiveStatus(
+        private void DrawRuntimeStatus(
             WeatherCloudShadowController controller)
         {
             if (!WeatherInspectorGui.Foldout(
-                    ref showLiveStatus,
-                    "Live Status",
+                    ref showRuntimeStatus,
+                    "Runtime Status",
                     "Read-only publisher, cookie, evolution, focus, motion, and Sun-gate state."))
             {
                 return;
@@ -895,11 +814,34 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Resolution",
                     $"{controller.CookieResolution} × {controller.CookieResolution}");
                 WeatherInspectorGui.ReadOnlyRow(
+                    "Estimated Texture Memory",
+                    $"{controller.EstimatedCookieTexelBytes:N0} bytes");
+                WeatherInspectorGui.ReadOnlyRow(
                     "Repeat Period",
                     $"{controller.CookieWorldSizeMetres:0.###} m per axis");
                 WeatherInspectorGui.ReadOnlyRow(
                     "Evolution",
                     $"{controller.EvolutionState}; seed {controller.CurrentCookieSeed}; {controller.EvolutionProgress:P1}");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Next Evolution Seed",
+                    controller.EvolutionInProgress
+                        ? controller.NextEvolutionSeed.ToString()
+                        : "None");
+                double secondsUntilNext = controller.SecondsUntilNextEvolution;
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Next Automatic Evolution",
+                    double.IsPositiveInfinity(secondsUntilNext)
+                        ? "Inactive"
+                        : $"{secondsUntilNext:0.0} s");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Evolution Uploads / Bytes",
+                    $"{controller.EvolutionUploadCount} / {controller.EvolutionUploadedTexelBytes:N0}");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Evolution Preparation",
+                    $"{controller.LastEvolutionPreparationMilliseconds:0.###} ms");
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Evolution Blend Total / Max",
+                    $"{controller.EvolutionBlendUploadTotalMilliseconds:0.###} / {controller.EvolutionBlendUploadMaximumMilliseconds:0.###} ms");
                 WeatherInspectorGui.ReadOnlyObject(
                     "Debug Focus",
                     controller.ResolvedDebugFocus);
@@ -909,6 +851,12 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 WeatherInspectorGui.ReadOnlyRow(
                     "Focus Position",
                     controller.ResolvedDebugFocusPosition.ToString("F3"));
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Effective Overlay Size",
+                    $"{controller.EffectiveDebugOverlaySizeMetres:0.###} m");
+                WeatherInspectorGui.ReadOnlyObject(
+                    "Published Wind Domain",
+                    WeatherWindDomain.PublishedDomain);
                 WeatherInspectorGui.ReadOnlyRow(
                     "Wind Direction XZ",
                     controller.ResolvedWindDirection.ToString("F3"));

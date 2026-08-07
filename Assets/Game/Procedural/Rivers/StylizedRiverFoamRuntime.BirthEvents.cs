@@ -98,22 +98,21 @@ namespace ProgrammaticStylized3D.Rivers
         {
             public AutomaticShoreSourceProfile(
                 bool enabled,
-                float coverage,
                 float activity,
                 float patchSize,
                 float formationSpeedMetresPerSecond,
                 StylizedRiverFoamShorePattern pattern)
             {
                 Enabled = enabled;
-                Coverage = Mathf.Clamp01(coverage);
                 Activity = Mathf.Clamp01(activity);
                 PatchSize = Mathf.Clamp01(patchSize);
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond);
+                FormationSpeedMetresPerSecond = Mathf.Max(
+                    0.01f,
+                    formationSpeedMetresPerSecond);
                 Pattern = pattern;
             }
 
             public bool Enabled { get; }
-            public float Coverage { get; }
             public float Activity { get; }
             public float PatchSize { get; }
             public float FormationSpeedMetresPerSecond { get; }
@@ -121,8 +120,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             public float SlotSpacingMetres =>
                 AutomaticShoreSourceSlotSpacingMetres;
-            public float EventsPerSecond =>
-                AutomaticShoreSourceMaximumEventsPerSecond * Activity;
         }
 
 
@@ -268,7 +265,6 @@ namespace ProgrammaticStylized3D.Rivers
             river.FoamAutomaticBirthEnabled &&
             river.FreezeAmount < 0.999f && river.Domain.IsValid &&
             ((river.FoamAutomaticShoreBirthActive &&
-              river.FoamShoreFoamCoverage > 0.0001f &&
               river.FoamShoreFoamActivity > 0.0001f) ||
              (river.FoamAutomaticObjectBirthActive &&
               ((river.FoamObjectContactCyclesEnabled &&
@@ -298,58 +294,363 @@ namespace ProgrammaticStylized3D.Rivers
         {
             automaticShoreBirthSubmittedLastUpdate = 0;
             automaticShoreBirthRejectedLastUpdate = 0;
+            automaticShorePopulationActiveBankLengthMetres =
+                Mathf.Max(0f, validFieldLength) * 2f;
 
             if (!ResolveAutomaticShoreSourceProfile(
                     out AutomaticShoreSourceProfile shoreProfile,
                     out string inactiveStatus))
             {
-                automaticShoreBirthAccumulator = 0f;
-                automaticShoreBirthStatus = inactiveStatus;
-                return false;
-            }
-
-            automaticShoreBirthAccumulator += Mathf.Max(0f, deltaTime) *
-                shoreProfile.EventsPerSecond;
-            if (automaticShoreBirthAccumulator < 1f)
-            {
-                float secondsUntilNext =
-                    (1f - automaticShoreBirthAccumulator) /
-                    Mathf.Max(0.01f, shoreProfile.EventsPerSecond);
+                automaticShorePopulationMeanHeadCount = 0f;
+                automaticShorePopulationMinimumHeadCount = 0;
+                automaticShorePopulationMaximumHeadCount = 0;
+                automaticShorePopulationTargetHeadCount = 0;
+                automaticShorePopulationAuthoritySignature = int.MinValue;
+                automaticShorePopulationTargetRefreshPending = true;
+                automaticShorePopulationNextBoundaryTime = -1f;
                 automaticShoreBirthStatus =
-                    $"Armed / {river.FoamSourcePopulationPreset} / next shore source event in {secondsUntilNext:0.00}s";
+                    $"{inactiveStatus}; active {activeAutomaticShoreSourceEventCount}, " +
+                    "target 0, predicted 0";
                 return false;
             }
 
+            int totalSlotCount = ResolveAutomaticShoreTotalSlotCount(
+                validFieldLength);
+            UpdateAutomaticShorePopulationTarget(
+                shoreProfile,
+                now,
+                totalSlotCount);
+
+            string predictedRange =
+                automaticShorePopulationMinimumHeadCount ==
+                    automaticShorePopulationMaximumHeadCount
+                    ? automaticShorePopulationMinimumHeadCount.ToString()
+                    : $"{automaticShorePopulationMinimumHeadCount}-" +
+                      $"{automaticShorePopulationMaximumHeadCount}";
+
+            if (activeAutomaticShoreSourceEventCount >=
+                automaticShorePopulationTargetHeadCount)
+            {
+                automaticShoreBirthStatus =
+                    $"Active {activeAutomaticShoreSourceEventCount}; " +
+                    $"target {automaticShorePopulationTargetHeadCount}; " +
+                    $"predicted {predictedRange} " +
+                    $"(mean {automaticShorePopulationMeanHeadCount:0.##}); " +
+                    $"shoreline {automaticShorePopulationActiveBankLengthMetres:0.#} m";
+                return false;
+            }
+
+            int scanBudget = Mathf.Min(
+                Mathf.Max(2, totalSlotCount),
+                AutomaticShoreSourceMaximumScansPerUpdate);
             int startsThisUpdate = 0;
             int skippedThisUpdate = 0;
-            while (automaticShoreBirthAccumulator >= 1f &&
-                   startsThisUpdate < AutomaticShoreSourceMaximumStartsPerUpdate)
+            int initializedThisUpdate = 0;
+
+            for (int scan = 0;
+                 scan < scanBudget &&
+                 startsThisUpdate < AutomaticShoreSourceMaximumStartsPerUpdate &&
+                 activeAutomaticShoreSourceEventCount <
+                    automaticShorePopulationTargetHeadCount;
+                 scan++)
             {
-                if (TryStartAutomaticShoreSourceEvent(
-                        shoreProfile,
-                        now,
-                        out int skippedSlots))
+                int slotCursor = automaticShoreBirthCursor++;
+                int scanCycle = slotCursor / Mathf.Max(1, totalSlotCount);
+                int scanIndex = PositiveModulo(slotCursor, totalSlotCount);
+                int wrappedSlot = ResolvePermutedAutomaticShoreSlot(
+                    scanIndex,
+                    totalSlotCount,
+                    scanCycle);
+
+                if (!automaticShoreSlotSchedules.TryGetValue(
+                        wrappedSlot,
+                        out AutomaticShoreSlotScheduleState schedule) ||
+                    !schedule.Initialized)
                 {
-                    automaticShoreBirthAccumulator -= 1f;
-                    startsThisUpdate++;
-                    skippedThisUpdate += skippedSlots;
+                    schedule = CreateAutomaticShoreSlotSchedule(
+                        shoreProfile,
+                        wrappedSlot,
+                        now,
+                        0);
+                    automaticShoreSlotSchedules[wrappedSlot] = schedule;
+                    initializedThisUpdate++;
+                }
+
+                if (schedule.ActiveEventId > 0 ||
+                    now + 0.0001f < schedule.NextStartTime)
+                {
+                    skippedThisUpdate++;
                     continue;
                 }
 
-                automaticShoreBirthAccumulator = Mathf.Min(
-                    automaticShoreBirthAccumulator,
-                    0.999f);
-                skippedThisUpdate += skippedSlots;
-                break;
+                if (TryStartAutomaticShoreSourceEvent(
+                        shoreProfile,
+                        wrappedSlot,
+                        schedule.CycleIndex,
+                        out _,
+                        out int eventId))
+                {
+                    schedule.ActiveEventId = eventId;
+                    schedule.NextStartTime = float.PositiveInfinity;
+                    schedule.CycleIndex++;
+                    automaticShoreSlotSchedules[wrappedSlot] = schedule;
+                    startsThisUpdate++;
+                    idleSince = 0.0;
+                    continue;
+                }
+
+                schedule.CycleIndex++;
+                schedule.NextStartTime = now +
+                    ResolveAutomaticShoreRetryDelaySeconds();
+                automaticShoreSlotSchedules[wrappedSlot] = schedule;
+                skippedThisUpdate++;
             }
 
             automaticShoreBirthSubmittedLastUpdate = startsThisUpdate;
             automaticShoreBirthRejectedLastUpdate = skippedThisUpdate;
             automaticShoreBirthSubmittedTotal += startsThisUpdate;
-            automaticShoreBirthStatus = startsThisUpdate > 0
-                ? $"Started {startsThisUpdate} deterministic shore source event(s), skipped {skippedThisUpdate} slot(s)"
-                : $"Scanned deterministic shore source slots, started 0, skipped {skippedThisUpdate}";
+            string fillStatus = activeAutomaticShoreSourceEventCount <
+                    automaticShorePopulationTargetHeadCount
+                ? "waiting for packet clearance or a valid shoreline start"
+                : "target satisfied";
+            automaticShoreBirthStatus =
+                $"Active {activeAutomaticShoreSourceEventCount}; " +
+                $"target {automaticShorePopulationTargetHeadCount}; " +
+                $"predicted {predictedRange} " +
+                $"(mean {automaticShorePopulationMeanHeadCount:0.##}); " +
+                $"shoreline {automaticShorePopulationActiveBankLengthMetres:0.#} m; " +
+                $"{fillStatus}; started {startsThisUpdate}, " +
+                $"scanned {scanBudget}/{totalSlotCount}, skipped {skippedThisUpdate}, " +
+                $"initialized {initializedThisUpdate}";
             return startsThisUpdate > 0;
+        }
+
+        private static int ResolveAutomaticShoreLongitudinalSlotCount(
+            float lengthMetres)
+        {
+            return Mathf.Max(
+                1,
+                Mathf.CeilToInt(
+                    Mathf.Max(0f, lengthMetres) /
+                    Mathf.Max(0.25f, AutomaticShoreSourceSlotSpacingMetres)));
+        }
+
+        private static int ResolveAutomaticShoreTotalSlotCount(
+            float lengthMetres)
+        {
+            return ResolveAutomaticShoreLongitudinalSlotCount(lengthMetres) * 2;
+        }
+
+        private AutomaticShoreSlotScheduleState CreateAutomaticShoreSlotSchedule(
+            AutomaticShoreSourceProfile profile,
+            int slotId,
+            float now,
+            int cycleIndex)
+        {
+            float phaseWindow = Mathf.Min(
+                1f,
+                ResolveAutomaticShorePopulationBoundarySeconds(profile));
+            int resolvedCycleIndex = Mathf.Max(0, cycleIndex);
+            float phase = Hash01(
+                river.VisualSeed * 0.419f +
+                slotId * 23.117f +
+                resolvedCycleIndex * 31.619f);
+            return new AutomaticShoreSlotScheduleState
+            {
+                Initialized = true,
+                CycleIndex = resolvedCycleIndex,
+                ActiveEventId = 0,
+                NextStartTime = now + phase * phaseWindow
+            };
+        }
+
+        private void UpdateAutomaticShorePopulationTarget(
+            AutomaticShoreSourceProfile profile,
+            float now,
+            int totalSlotCount)
+        {
+            automaticShorePopulationActiveBankLengthMetres =
+                Mathf.Max(0f, validFieldLength) * 2f;
+            automaticShorePopulationMeanHeadCount = Mathf.Clamp(
+                profile.Activity *
+                automaticShorePopulationActiveBankLengthMetres /
+                Mathf.Max(
+                    0.01f,
+                    StylizedRiver.AutomaticShoreFullActivityHeadSpacingMetres),
+                0f,
+                Mathf.Max(0, totalSlotCount));
+            automaticShorePopulationMinimumHeadCount = Mathf.Clamp(
+                Mathf.FloorToInt(automaticShorePopulationMeanHeadCount),
+                0,
+                Mathf.Max(0, totalSlotCount));
+            automaticShorePopulationMaximumHeadCount = Mathf.Clamp(
+                Mathf.CeilToInt(automaticShorePopulationMeanHeadCount),
+                automaticShorePopulationMinimumHeadCount,
+                Mathf.Max(0, totalSlotCount));
+
+            int authoritySignature =
+                ResolveAutomaticShorePopulationAuthoritySignature(
+                    profile,
+                    totalSlotCount);
+            float boundarySeconds =
+                ResolveAutomaticShorePopulationBoundarySeconds(profile);
+            if (authoritySignature != automaticShorePopulationAuthoritySignature)
+            {
+                automaticShorePopulationAuthoritySignature = authoritySignature;
+                automaticShorePopulationEpochIndex = 0;
+                automaticShorePopulationNextBoundaryTime =
+                    now + boundarySeconds;
+                automaticShorePopulationTargetRefreshPending = true;
+            }
+            else if (automaticShorePopulationNextBoundaryTime < 0f)
+            {
+                automaticShorePopulationNextBoundaryTime =
+                    now + boundarySeconds;
+                automaticShorePopulationTargetRefreshPending = true;
+            }
+            else if (now + 0.0001f >=
+                automaticShorePopulationNextBoundaryTime)
+            {
+                int elapsedBoundaries = Mathf.Max(
+                    1,
+                    Mathf.FloorToInt(
+                        (now - automaticShorePopulationNextBoundaryTime) /
+                        boundarySeconds) + 1);
+                automaticShorePopulationEpochIndex += elapsedBoundaries;
+                automaticShorePopulationNextBoundaryTime +=
+                    elapsedBoundaries * boundarySeconds;
+                automaticShorePopulationTargetRefreshPending = true;
+            }
+
+            if (!automaticShorePopulationTargetRefreshPending)
+            {
+                return;
+            }
+
+            float fractionalDuty =
+                automaticShorePopulationMeanHeadCount -
+                automaticShorePopulationMinimumHeadCount;
+            float phase = Hash01(
+                river.VisualSeed * 0.613f +
+                automaticShorePopulationEpochIndex * 37.271f +
+                authoritySignature * 0.000173f);
+            automaticShorePopulationTargetHeadCount = Mathf.Clamp(
+                automaticShorePopulationMinimumHeadCount +
+                (phase < fractionalDuty ? 1 : 0),
+                0,
+                Mathf.Max(0, totalSlotCount));
+            automaticShorePopulationTargetRefreshPending = false;
+        }
+
+        private int ResolveAutomaticShorePopulationAuthoritySignature(
+            AutomaticShoreSourceProfile profile,
+            int totalSlotCount)
+        {
+            unchecked
+            {
+                int signature = 17;
+                signature = signature * 31 +
+                    Mathf.RoundToInt(profile.Activity * 10000f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(validFieldLength * 100f);
+                signature = signature * 31 + totalSlotCount;
+                signature = signature * 31 + (int)profile.Pattern;
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonLengthMinCells * 10f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonLengthMaxCells * 10f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonRevealSpeedCellsPerSecond * 100f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashAlongLengthMinCells * 10f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashAlongLengthMaxCells * 10f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashRevealSpeedCellsPerSecond * 100f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonPatternWeight * 1000f);
+                signature = signature * 31 +
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashPatternWeight * 1000f);
+                return signature;
+            }
+        }
+
+        private float ResolveAutomaticShorePopulationBoundarySeconds(
+            AutomaticShoreSourceProfile profile)
+        {
+            float materialStepDuration =
+                1f / Mathf.Max(1f, ResolveUpdateRate());
+            float ribbonLength = 0.5f * (
+                Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonLengthMinCells)) +
+                Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        river.FoamShoreRibbonLengthMaxCells)));
+            float ribbonDuration = ribbonLength /
+                Mathf.Max(0.01f, river.FoamShoreRibbonRevealSpeedCellsPerSecond);
+            float inwardAlong = 0.5f * (
+                Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashAlongLengthMinCells)) +
+                Mathf.Max(
+                    1,
+                    Mathf.RoundToInt(
+                        river.FoamInwardWashAlongLengthMaxCells)));
+            float inwardReach = 0.5f * (
+                Mathf.Max(0f, river.FoamInwardWashReachMinCells) +
+                Mathf.Max(0f, river.FoamInwardWashReachMaxCells));
+            float inwardDuration = Mathf.Sqrt(
+                    inwardAlong * inwardAlong +
+                    inwardReach * inwardReach) /
+                Mathf.Max(0.01f, river.FoamInwardWashRevealSpeedCellsPerSecond);
+
+            float referenceDuration;
+            switch (profile.Pattern)
+            {
+                case StylizedRiverFoamShorePattern.ShoreRibbons:
+                    referenceDuration = ribbonDuration;
+                    break;
+                case StylizedRiverFoamShorePattern.InwardWash:
+                    referenceDuration = inwardDuration;
+                    break;
+                default:
+                    float ribbonWeight = Mathf.Max(
+                        0f,
+                        river.FoamShoreRibbonPatternWeight);
+                    float inwardWeight = Mathf.Max(
+                        0f,
+                        river.FoamInwardWashPatternWeight);
+                    float totalWeight = ribbonWeight + inwardWeight;
+                    referenceDuration = totalWeight > 0.0001f
+                        ? (ribbonDuration * ribbonWeight +
+                           inwardDuration * inwardWeight) / totalWeight
+                        : ribbonDuration;
+                    break;
+            }
+
+            return Mathf.Clamp(
+                Mathf.Max(materialStepDuration, referenceDuration),
+                0.5f,
+                10f);
+        }
+
+        private float ResolveAutomaticShoreRetryDelaySeconds()
+        {
+            return Mathf.Max(
+                0.10f,
+                1f / Mathf.Max(1f, ResolveUpdateRate()));
         }
 
         private bool ResolveAutomaticShoreSourceProfile(
@@ -402,14 +703,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            float coverage = river.FoamShoreFoamCoverage;
             float activity = river.FoamShoreFoamActivity;
-            if (coverage <= 0.0001f)
-            {
-                inactiveStatus = "Shore foam coverage is zero";
-                return false;
-            }
-
             if (activity <= 0.0001f)
             {
                 inactiveStatus = "Shore foam activity is zero";
@@ -418,7 +712,6 @@ namespace ProgrammaticStylized3D.Rivers
 
             profile = new AutomaticShoreSourceProfile(
                 true,
-                coverage,
                 activity,
                 river.FoamShoreFoamPatchSize,
                 river.FoamShoreFoamFormationSpeedMetresPerSecond,
@@ -1132,6 +1425,37 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             return false;
+        }
+
+        private void CompleteAutomaticShoreSourceEvent(
+            AutomaticFoamSourceEvent sourceEvent)
+        {
+            if ((sourceEvent.Type != AutomaticFoamSourceEventType.ShoreRibbon &&
+                 sourceEvent.Type != AutomaticFoamSourceEventType.InwardWash) ||
+                sourceEvent.ShoreScheduleSlotId < 0)
+            {
+                return;
+            }
+
+            if (!automaticShoreSlotSchedules.TryGetValue(
+                    sourceEvent.ShoreScheduleSlotId,
+                    out AutomaticShoreSlotScheduleState schedule) ||
+                schedule.ActiveEventId != sourceEvent.EventId)
+            {
+                return;
+            }
+
+            schedule.ActiveEventId = 0;
+            float clearance = river != null
+                ? ResolveAutomaticPacketClearanceSeconds(
+                    river.FoamShoreMinimumPacketGapMetres)
+                : 0f;
+            schedule.NextStartTime = Time.realtimeSinceStartup + clearance;
+            automaticShoreSlotSchedules[sourceEvent.ShoreScheduleSlotId] =
+                schedule;
+            automaticShorePopulationEpochIndex++;
+            automaticShorePopulationNextBoundaryTime = -1f;
+            automaticShorePopulationTargetRefreshPending = true;
         }
 
         private void CompleteAutomaticObjectSourceEvent(
@@ -2798,89 +3122,175 @@ namespace ProgrammaticStylized3D.Rivers
 
         private bool TryStartAutomaticShoreSourceEvent(
             AutomaticShoreSourceProfile profile,
-            float now,
-            out int skippedSlots)
+            int slotId,
+            int cycleIndex,
+            out float eventDuration,
+            out int eventId)
         {
-            skippedSlots = 0;
+            eventDuration = 0f;
+            eventId = 0;
             if (river == null || !river.Domain.IsValid)
             {
                 return false;
             }
 
+            int longitudinalSlotCount =
+                ResolveAutomaticShoreLongitudinalSlotCount(validFieldLength);
+            int wrappedSlot = PositiveModulo(
+                slotId,
+                Mathf.Max(1, longitudinalSlotCount * 2));
+            int longitudinalIndex = wrappedSlot / 2;
+            int sideIndex = wrappedSlot & 1;
+            float sideSign = sideIndex == 0 ? -1f : 1f;
+            float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
+            float longitudinalCellSpacing =
+                ResolveSourceLongitudinalSpacingMetres();
+            float domainMinimum = river.Domain.GlobalDistanceMinimum;
+            float domainMaximum = Mathf.Min(
+                river.Domain.GlobalDistanceMaximum,
+                domainMinimum + validFieldLength);
             float spacing = Mathf.Max(0.25f, profile.SlotSpacingMetres);
-            int longitudinalSlotCount = Mathf.Max(
-                1,
-                Mathf.FloorToInt(validFieldLength / spacing));
-            int totalSlotCount = longitudinalSlotCount * 2;
-            int scanBudget = Mathf.Min(
-                Mathf.Max(2, totalSlotCount),
-                AutomaticShoreSourceMaximumScansPerUpdate);
-
-            for (int scan = 0; scan < scanBudget; scan++)
+            float bucketMinimum = domainMinimum + longitudinalIndex * spacing;
+            float bucketMaximum = Mathf.Min(
+                domainMaximum,
+                bucketMinimum + spacing);
+            if (bucketMaximum <= bucketMinimum + 0.0001f)
             {
-                int slotCursor = automaticShoreBirthCursor++;
-                int cycleIndex = slotCursor / Mathf.Max(1, totalSlotCount);
-                int scanIndex = PositiveModulo(slotCursor, totalSlotCount);
-                int wrappedSlot = ResolvePermutedAutomaticShoreSlot(
-                    scanIndex,
-                    totalSlotCount,
-                    cycleIndex);
-                int longitudinalIndex = wrappedSlot / 2;
-                int sideIndex = wrappedSlot & 1;
-                float sideSign = sideIndex == 0 ? -1f : 1f;
-                float identitySeed = river.VisualSeed * 0.137f +
-                    wrappedSlot * 17.317f;
-                float slotSeed = identitySeed + cycleIndex * 31.619f;
-
-                if (Hash01(identitySeed + 1.7f) > profile.Coverage ||
-                    (automaticShoreSlotNextStartTimes.TryGetValue(
-                         wrappedSlot,
-                         out float nextStartTime) &&
-                     now + 0.0001f < nextStartTime))
-                {
-                    skippedSlots++;
-                    continue;
-                }
-
-                float slotJitter = (Hash01(slotSeed + 2.9f) - 0.5f) * 0.45f;
-                float candidateT = (longitudinalIndex + 0.5f + slotJitter) /
-                    Mathf.Max(1, longitudinalSlotCount);
-                float globalDistance = Mathf.Lerp(
-                    river.Domain.GlobalDistanceMinimum,
-                    river.Domain.GlobalDistanceMinimum + validFieldLength,
-                    Mathf.Clamp01(candidateT));
-
-                StylizedRiverSplineSample sample =
-                    river.Domain.SampleAtGlobalDistance(globalDistance);
-                float visibleHalfWidth = sample.GetVisibleHalfWidth(sideSign);
-                if (visibleHalfWidth <= 0.05f)
-                {
-                    skippedSlots++;
-                    continue;
-                }
-
-                AutomaticShoreSourceRecipe recipe =
-                    ResolveAutomaticShoreRecipe(profile.Pattern, slotSeed);
-                if (TryBeginAutomaticShoreSourceEvent(
-                        profile,
-                        recipe,
-                        slotSeed,
-                        globalDistance,
-                        sideSign,
-                        visibleHalfWidth))
-                {
-                    automaticShoreSlotNextStartTimes[wrappedSlot] =
-                        now + ResolveLatestAutomaticSourceEventDurationSeconds() +
-                        ResolveAutomaticPacketClearanceSeconds(
-                            river.FoamShoreMinimumPacketGapMetres);
-                    idleSince = 0.0;
-                    return true;
-                }
-
-                skippedSlots++;
+                return false;
             }
 
-            return false;
+            float identitySeed = river.VisualSeed * 0.137f +
+                wrappedSlot * 17.317f;
+            float slotSeed = identitySeed + cycleIndex * 31.619f;
+            AutomaticShoreSourceRecipe recipe =
+                ResolveAutomaticShoreRecipe(profile.Pattern, slotSeed);
+            bool isInwardWash =
+                recipe == AutomaticShoreSourceRecipe.InwardWash;
+            int authoredMinimumLengthCells = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    isInwardWash
+                        ? river.FoamInwardWashAlongLengthMinCells
+                        : river.FoamShoreRibbonLengthMinCells));
+            int authoredMaximumLengthCells = Mathf.Max(
+                authoredMinimumLengthCells,
+                Mathf.RoundToInt(
+                    isInwardWash
+                        ? river.FoamInwardWashAlongLengthMaxCells
+                        : river.FoamShoreRibbonLengthMaxCells));
+
+            // Candidate placement is constrained only by the authored minimum.
+            // After the candidate is fixed, the event chooses uniformly from
+            // every authored whole-cell length that physically fits there.
+            float geometryMinimum;
+            float geometryMaximum;
+            if (isInwardWash)
+            {
+                float halfMinimumLengthMetres =
+                    authoredMinimumLengthCells *
+                    longitudinalCellSpacing * 0.5f;
+                geometryMinimum = domainMinimum + halfMinimumLengthMetres;
+                geometryMaximum = domainMaximum - halfMinimumLengthMetres;
+            }
+            else if (flowDirection >= 0f)
+            {
+                geometryMinimum = domainMinimum +
+                    longitudinalCellSpacing * 0.5f;
+                geometryMaximum = domainMaximum -
+                    (authoredMinimumLengthCells - 0.5f) *
+                    longitudinalCellSpacing;
+            }
+            else
+            {
+                geometryMinimum = domainMinimum +
+                    (authoredMinimumLengthCells - 0.5f) *
+                    longitudinalCellSpacing;
+                geometryMaximum = domainMaximum -
+                    longitudinalCellSpacing * 0.5f;
+            }
+
+            float candidateMinimum = Mathf.Max(
+                bucketMinimum,
+                geometryMinimum);
+            float candidateMaximum = Mathf.Min(
+                bucketMaximum,
+                geometryMaximum);
+            if (candidateMaximum < candidateMinimum - 0.0001f)
+            {
+                return false;
+            }
+
+            float candidate01 = Hash01(slotSeed + 2.9f);
+            float globalDistance = candidateMaximum > candidateMinimum
+                ? Mathf.Lerp(candidateMinimum, candidateMaximum, candidate01)
+                : candidateMinimum;
+            int maximumFittingLengthCells;
+            if (isInwardWash)
+            {
+                float availableHalfLengthMetres = Mathf.Min(
+                    globalDistance - domainMinimum,
+                    domainMaximum - globalDistance);
+                maximumFittingLengthCells = Mathf.FloorToInt(
+                    2f * Mathf.Max(0f, availableHalfLengthMetres) /
+                    longitudinalCellSpacing + 0.0001f);
+            }
+            else
+            {
+                float startBoundary = globalDistance -
+                    flowDirection * longitudinalCellSpacing * 0.5f;
+                float availableLengthMetres = flowDirection >= 0f
+                    ? domainMaximum - startBoundary
+                    : startBoundary - domainMinimum;
+                maximumFittingLengthCells = Mathf.FloorToInt(
+                    Mathf.Max(0f, availableLengthMetres) /
+                    longitudinalCellSpacing + 0.0001f);
+            }
+
+            int fittingMaximumLengthCells = Mathf.Min(
+                authoredMaximumLengthCells,
+                maximumFittingLengthCells);
+            if (fittingMaximumLengthCells < authoredMinimumLengthCells)
+            {
+                return false;
+            }
+
+            int effectiveAlongLengthCells = ResolveInclusiveCellCount(
+                authoredMinimumLengthCells,
+                fittingMaximumLengthCells,
+                Hash01(slotSeed + 6.5f));
+            StylizedRiverSplineSample sample =
+                river.Domain.SampleAtGlobalDistance(globalDistance);
+            float visibleHalfWidth = sample.GetVisibleHalfWidth(sideSign);
+            if (visibleHalfWidth <= 0.05f)
+            {
+                return false;
+            }
+
+            return TryBeginAutomaticShoreSourceEvent(
+                recipe,
+                wrappedSlot,
+                slotSeed,
+                globalDistance,
+                sideSign,
+                effectiveAlongLengthCells,
+                out eventDuration,
+                out eventId);
+        }
+
+        private static int ResolveInclusiveCellCount(
+            float authoredMinimum,
+            float authoredMaximum,
+            float deterministicSample)
+        {
+            int minimum = Mathf.Max(1, Mathf.RoundToInt(authoredMinimum));
+            int maximum = Mathf.Max(
+                minimum,
+                Mathf.RoundToInt(authoredMaximum));
+            int count = maximum - minimum + 1;
+            int offset = Mathf.Min(
+                count - 1,
+                Mathf.FloorToInt(Mathf.Clamp01(deterministicSample) * count));
+            return minimum + offset;
         }
 
         private AutomaticShoreSourceRecipe ResolveAutomaticShoreRecipe(
@@ -2916,63 +3326,49 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private bool TryBeginAutomaticShoreSourceEvent(
-            AutomaticShoreSourceProfile profile,
             AutomaticShoreSourceRecipe recipe,
+            int shoreScheduleSlotId,
             float seed,
             float globalDistance,
             float sideSign,
-            float visibleHalfWidth)
+            int effectiveAlongLengthCells,
+            out float eventDuration,
+            out int eventId)
         {
+            eventDuration = 0f;
+            eventId = 0;
             float flowDirection = river.FlowDirection >= 0f ? 1f : -1f;
-            float longitudinalCellSpacing = ResolveSourceLongitudinalSpacingMetres();
+            float longitudinalCellSpacing =
+                ResolveSourceLongitudinalSpacingMetres();
             float lateralCellSpacing = ResolveSourceLateralSpacingMetres(
                 globalDistance,
                 sideSign);
-            float lengthHash = Hash01(seed + 6.5f);
             float widthHash = Hash01(seed + 7.1f);
             float reachHash = Hash01(seed + 7.7f);
-            float offsetHash = Hash01(seed + 8.3f);
             float bendHash = Hash01(seed + 10.7f);
             float sourceKey = river.VisualSeed * 0.317f +
                 globalDistance * 13.731f +
                 sideSign * 29.137f +
                 seed * 0.071f +
-                (recipe == AutomaticShoreSourceRecipe.InwardWash ? 503f : 211f);
+                (recipe == AutomaticShoreSourceRecipe.InwardWash
+                    ? 503f
+                    : 211f);
 
-            bool isInwardWash = recipe == AutomaticShoreSourceRecipe.InwardWash;
-            float lengthCells = isInwardWash
-                ? Mathf.Lerp(
-                    river.FoamInwardWashAlongLengthMinCells,
-                    river.FoamInwardWashAlongLengthMaxCells,
-                    lengthHash)
-                : Mathf.Lerp(
-                    river.FoamShoreRibbonLengthMinCells,
-                    river.FoamShoreRibbonLengthMaxCells,
-                    lengthHash);
+            bool isInwardWash =
+                recipe == AutomaticShoreSourceRecipe.InwardWash;
+            float lengthCells = Mathf.Max(1, effectiveAlongLengthCells);
             float widthCells = isInwardWash
                 ? Mathf.Lerp(
                     river.FoamInwardWashWidthMinCells,
                     river.FoamInwardWashWidthMaxCells,
                     widthHash)
-                : Mathf.Lerp(
-                    river.FoamShoreRibbonWidthMinCells,
-                    river.FoamShoreRibbonWidthMaxCells,
-                    widthHash);
+                : 1f;
             float reachCells = isInwardWash
                 ? Mathf.Lerp(
                     river.FoamInwardWashReachMinCells,
                     river.FoamInwardWashReachMaxCells,
                     reachHash)
                 : 0f;
-            float offsetCells = isInwardWash
-                ? Mathf.Lerp(
-                    river.FoamInwardWashOffsetMinCells,
-                    river.FoamInwardWashOffsetMaxCells,
-                    offsetHash)
-                : Mathf.Lerp(
-                    river.FoamShoreRibbonOffsetMinCells,
-                    river.FoamShoreRibbonOffsetMaxCells,
-                    offsetHash);
             float bendCells = isInwardWash
                 ? Mathf.Lerp(
                     river.FoamInwardWashBendAmplitudeMinCells,
@@ -2981,35 +3377,55 @@ namespace ProgrammaticStylized3D.Rivers
                 : 0f;
             float headLengthCells = isInwardWash
                 ? river.FoamInwardWashHeadLengthCells
-                : river.FoamShoreRibbonHeadLengthCells;
+                : 1f;
             float headWidthCells = isInwardWash
                 ? river.FoamInwardWashHeadWidthCells
-                : river.FoamShoreRibbonHeadWidthCells;
+                : 1f;
             float revealSpeedCells = isInwardWash
                 ? river.FoamInwardWashRevealSpeedCellsPerSecond
                 : river.FoamShoreRibbonRevealSpeedCellsPerSecond;
 
-            lengthCells = Mathf.Max(1f, lengthCells);
             widthCells = Mathf.Max(1f, widthCells);
             headLengthCells = Mathf.Max(1f, headLengthCells);
             headWidthCells = Mathf.Max(1f, headWidthCells);
             reachCells = Mathf.Max(0f, reachCells);
-            offsetCells = Mathf.Max(0f, offsetCells);
 
-            float lengthMetres = lengthCells * longitudinalCellSpacing;
-            float halfLengthMetres = lengthMetres * 0.5f;
-            float startGlobalDistance = Mathf.Clamp(
-                globalDistance - flowDirection * halfLengthMetres,
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum);
-            float endGlobalDistance = Mathf.Clamp(
-                globalDistance + flowDirection * halfLengthMetres,
-                river.Domain.GlobalDistanceMinimum,
-                river.Domain.GlobalDistanceMaximum);
-            float resolvedAlongCells = Mathf.Abs(
-                endGlobalDistance - startGlobalDistance) /
-                Mathf.Max(0.005f, longitudinalCellSpacing);
-            if (resolvedAlongCells < 0.98f)
+            float domainMinimum = river.Domain.GlobalDistanceMinimum;
+            float domainMaximum = Mathf.Min(
+                river.Domain.GlobalDistanceMaximum,
+                domainMinimum + validFieldLength);
+            float startGlobalDistance;
+            float endGlobalDistance;
+            float resolvedAlongCells = effectiveAlongLengthCells;
+            if (isInwardWash)
+            {
+                float halfLengthMetres =
+                    effectiveAlongLengthCells * longitudinalCellSpacing * 0.5f;
+                startGlobalDistance = globalDistance -
+                    flowDirection * halfLengthMetres;
+                endGlobalDistance = globalDistance +
+                    flowDirection * halfLengthMetres;
+            }
+            else
+            {
+                startGlobalDistance = globalDistance -
+                    flowDirection * longitudinalCellSpacing * 0.5f;
+                endGlobalDistance = startGlobalDistance +
+                    flowDirection * effectiveAlongLengthCells *
+                    longitudinalCellSpacing;
+                widthCells = 1f;
+                headLengthCells = 1f;
+                headWidthCells = 1f;
+            }
+
+            float minimumEventDistance = Mathf.Min(
+                startGlobalDistance,
+                endGlobalDistance);
+            float maximumEventDistance = Mathf.Max(
+                startGlobalDistance,
+                endGlobalDistance);
+            if (minimumEventDistance < domainMinimum - 0.0001f ||
+                maximumEventDistance > domainMaximum + 0.0001f)
             {
                 foamCompositionRejectedCount++;
                 return false;
@@ -3020,60 +3436,74 @@ namespace ProgrammaticStylized3D.Rivers
                     resolvedAlongCells * resolvedAlongCells +
                     reachCells * reachCells)
                 : resolvedAlongCells;
-            float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
-            float rawDuration = pathCells / Mathf.Max(0.01f, revealSpeedCells);
-            float resolvedDuration = Mathf.Max(materialStepDuration, rawDuration);
+            float materialStepDuration =
+                1f / Mathf.Max(1f, ResolveUpdateRate());
+            float rawDuration =
+                pathCells / Mathf.Max(0.01f, revealSpeedCells);
+            float resolvedDuration = Mathf.Max(
+                materialStepDuration,
+                rawDuration);
             float representativeMetricSpeed = revealSpeedCells *
                 Mathf.Sqrt(longitudinalCellSpacing * lateralCellSpacing);
             ResolvedAutomaticRevealTiming revealTiming =
                 new ResolvedAutomaticRevealTiming(
-                    pathCells * Mathf.Sqrt(longitudinalCellSpacing * lateralCellSpacing),
+                    pathCells * Mathf.Sqrt(
+                        longitudinalCellSpacing * lateralCellSpacing),
                     representativeMetricSpeed,
                     rawDuration,
                     resolvedDuration,
                     rawDuration < materialStepDuration);
 
+            float materialHash = Hash01(seed + 12.1f);
             float amount = isInwardWash
                 ? Mathf.Lerp(
                     river.FoamInwardWashInitialPresenceMin,
                     river.FoamInwardWashInitialPresenceMax,
-                    lengthHash)
+                    materialHash)
                 : Mathf.Lerp(
                     river.FoamShoreRibbonInitialPresenceMin,
                     river.FoamShoreRibbonInitialPresenceMax,
-                    lengthHash);
+                    materialHash);
             float remainingLife = isInwardWash
                 ? Mathf.Lerp(
                     river.FoamInwardWashInitialLifeMin,
                     river.FoamInwardWashInitialLifeMax,
-                    lengthHash)
+                    materialHash)
                 : Mathf.Lerp(
                     river.FoamShoreRibbonInitialLifeMin,
                     river.FoamShoreRibbonInitialLifeMax,
-                    lengthHash);
+                    materialHash);
 
-            return BeginAutomaticFoamSourceEvent(
-                recipe,
-                sideSign,
-                startGlobalDistance,
-                endGlobalDistance,
-                revealTiming,
-                headLengthCells,
-                headWidthCells,
-                offsetCells,
-                widthCells,
-                reachCells,
-                revealSpeedCells,
-                pathCells,
-                amount,
-                remainingLife,
-                sourceKey,
-                bendCells);
+            if (!BeginAutomaticFoamSourceEvent(
+                    recipe,
+                    shoreScheduleSlotId,
+                    sideSign,
+                    startGlobalDistance,
+                    endGlobalDistance,
+                    revealTiming,
+                    headLengthCells,
+                    headWidthCells,
+                    0f,
+                    widthCells,
+                    reachCells,
+                    revealSpeedCells,
+                    pathCells,
+                    amount,
+                    remainingLife,
+                    sourceKey,
+                    bendCells,
+                    out eventId))
+            {
+                return false;
+            }
+
+            eventDuration = resolvedDuration;
+            return true;
         }
-
 
         private bool BeginAutomaticFoamSourceEvent(
             AutomaticShoreSourceRecipe recipe,
+            int shoreScheduleSlotId,
             float sideSign,
             float startGlobalDistance,
             float endGlobalDistance,
@@ -3088,8 +3518,10 @@ namespace ProgrammaticStylized3D.Rivers
             float amount,
             float remainingLife,
             float sourceKey,
-            float bendAmplitudeCells)
+            float bendAmplitudeCells,
+            out int createdEventId)
         {
+            createdEventId = 0;
             if (river == null || !river.FoamEnabled ||
                 river.FreezeAmount >= 0.999f || !river.Domain.IsValid)
             {
@@ -3116,6 +3548,7 @@ namespace ProgrammaticStylized3D.Rivers
                 EventId = eventId,
                 Type = sourceType,
                 SideSign = sideSign < 0f ? -1f : 1f,
+                ShoreScheduleSlotId = shoreScheduleSlotId,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
                 Duration = revealTiming.ResolvedDurationSeconds,
@@ -3144,7 +3577,23 @@ namespace ProgrammaticStylized3D.Rivers
                 BreakupScaleMetres = 0f,
                 BreakupStrength = 0f,
                 Curvature = bendAmplitudeCells,
-                SourceFillBlend = 0f
+                SourceFillBlend = 0f,
+                BodyLengthCells = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? Mathf.Max(1f, pathLengthCells)
+                        : 0f,
+                BodyWidthCells = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? 1f
+                        : 0f,
+                HeadLengthCells = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? 1f
+                        : 0f,
+                HeadWidthCells = sourceType ==
+                    AutomaticFoamSourceEventType.ShoreRibbon
+                        ? 1f
+                        : 0f
             };
 
             if (!TryReserveAutomaticFoamPacket(candidateEvent))
@@ -3158,7 +3607,9 @@ namespace ProgrammaticStylized3D.Rivers
             latestFoamCompositionEventId = eventId;
             latestFoamCompositionProgress = 0f;
             activeAutomaticFoamSourceEventCount++;
+            activeAutomaticShoreSourceEventCount++;
             RecordAutomaticRevealTiming(eventId, sourceType, revealTiming);
+            createdEventId = eventId;
             return true;
         }
 
@@ -3526,11 +3977,21 @@ namespace ProgrammaticStylized3D.Rivers
                 0,
                 automaticRevealTimingByType.Length);
             activeAutomaticFoamSourceEventCount = 0;
+            activeAutomaticShoreSourceEventCount = 0;
+            automaticShorePopulationMeanHeadCount = 0f;
+            automaticShorePopulationMinimumHeadCount = 0;
+            automaticShorePopulationMaximumHeadCount = 0;
+            automaticShorePopulationTargetHeadCount = 0;
+            automaticShorePopulationActiveBankLengthMetres = 0f;
+            automaticShorePopulationEpochIndex = 0;
+            automaticShorePopulationNextBoundaryTime = -1f;
+            automaticShorePopulationAuthoritySignature = int.MinValue;
+            automaticShorePopulationTargetRefreshPending = true;
             automaticPacketReservationActiveCount = 0;
             automaticPacketEnvelopeRejectedLastUpdate = 0;
             automaticSourceEventsRasterizedLastUpdate = 0;
             automaticObjectSourceStates.Clear();
-            automaticShoreSlotNextStartTimes.Clear();
+            automaticShoreSlotSchedules.Clear();
             automaticFreeWaterSlotNextStartTimes.Clear();
             automaticObjectContactLiveSourceIds.Clear();
             automaticObjectContactStaleSourceIds.Clear();

@@ -336,6 +336,10 @@ namespace ProgrammaticStylized3D.Rivers
         public const float MaximumStaticWakeVariationInterval = 2f;
         public const float DefaultStaticWakeVariationIntervalMin = 0.6f;
         public const float DefaultStaticWakeVariationIntervalMax = 0.9f;
+        // D8.16 maps normalized Shore Activity to a length-scaled active-head
+        // population. This is an invariant density coefficient, not an
+        // additional user-facing control.
+        public const float AutomaticShoreFullActivityHeadSpacingMetres = 17.5f;
 
         private const string LegacyCurrentObjectName =
             "__PS3D_RiverCurrentAccents";
@@ -400,6 +404,9 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MinimumFoamAcrossRiverCoherence = 0.5f;
         private const float MaximumFoamAcrossRiverCoherence = 4f;
         private const float DefaultFoamAcrossRiverCoherence = 1f;
+        private const float MinimumFoamShoreMovementSuppression = 0f;
+        private const float MaximumFoamShoreMovementSuppression = 1f;
+        private const float DefaultFoamShoreMovementSuppression = 0f;
         private const float MinimumFoamObstacleSlowdownStrength = 0f;
         private const float MaximumFoamObstacleSlowdownStrength = 1f;
         private const float DefaultFoamObstacleSlowdownStrength = 0.85f;
@@ -1086,13 +1093,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Enables the shore/contact source class when the source population preset allows shore birth. Shore foam creates real persistent material near the bank; support topology then decides how long it survives.")]
         [SerializeField] private bool foamAutomaticShoreBirthEnabled = true;
 
-        [Tooltip("How much of the shoreline can participate in deterministic shore source events over time. This controls slot eligibility, not opacity or patch size.")]
-        [FormerlySerializedAs("foamAutomaticShoreBirthAmount")]
-        [FormerlySerializedAs("foamShoreBirthDensity")]
-        [Range(0f, 1f)]
-        [SerializeField] private float foamShoreFoamCoverage = 0.45f;
-
-        [Tooltip("How promptly an eligible Shore source slot starts a new finite packet. Zero disables new starts. One fires immediately when packet clearance permits; Activity cannot bypass Minimum Packet Gap.")]
+        [Tooltip("Controls the target number of concurrent Shore heads from the represented shoreline length. Zero requests no heads. One requests approximately one head per 17.5 metres of bank length across both banks; Minimum Packet Gap and packet reservations may temporarily keep the live count below that target.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamActivity = 0.45f;
 
@@ -1142,14 +1143,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0.5f, 4f)]
         [SerializeField] private float foamShoreRibbonThicknessCells = 1f;
 
-        [Tooltip("Base inward offset from the live shore edge for Shore Ribbon sources, in metres. Keep this close to zero for contact-attached ribbons.")]
-        [Min(0f)]
-        [SerializeField] private float foamShoreRibbonOffsetMetres = 0.030f;
-
-        [Tooltip("Compatibility deterministic offset variation. LegacyNormalizedAcross interprets this in source-local cross-river Foam cells. FixedMetricLattice resolves it to source-local metres when the event is prepared.")]
-        [Range(0f, 0.5f)]
-        [SerializeField] private float foamShoreRibbonOffsetVariationCells = 0.25f;
-
         [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Shore Ribbon material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreRibbonInitialPresenceMin = 0.90f;
@@ -1195,14 +1188,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Tooltip("Maximum authored inward reach in metres for Inward Wash sources before global Patch Size and deterministic variation are applied.")]
         [Min(0.005f)]
         [SerializeField] private float foamInwardWashReachMaxMetres = 0.75f;
-
-        [Tooltip("Minimum starting offset from the live shore edge for Inward Wash sources.")]
-        [Min(0f)]
-        [SerializeField] private float foamInwardWashOffsetMinMetres = 0.006f;
-
-        [Tooltip("Maximum starting offset from the live shore edge for Inward Wash sources.")]
-        [Min(0f)]
-        [SerializeField] private float foamInwardWashOffsetMaxMetres = 0.040f;
 
         [Tooltip("Minimum intrinsic Presence written exactly to newly occupied Inward Wash material. Source shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only and do not attenuate this value.")]
         [Range(0f, 1f)]
@@ -1602,12 +1587,6 @@ namespace ProgrammaticStylized3D.Rivers
         // until the matching recipe is converted to the shared D8.3 raster contract.
         [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMinCells = 15f;
         [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMaxCells = 47f;
-        [Min(1f)] [SerializeField] private float foamShoreRibbonWidthMinCells = 1f;
-        [Min(1f)] [SerializeField] private float foamShoreRibbonWidthMaxCells = 1f;
-        [Min(1f)] [SerializeField] private float foamShoreRibbonHeadLengthCells = 1f;
-        [Min(1f)] [SerializeField] private float foamShoreRibbonHeadWidthCells = 1f;
-        [Min(0f)] [SerializeField] private float foamShoreRibbonOffsetMinCells = 0f;
-        [Min(0f)] [SerializeField] private float foamShoreRibbonOffsetMaxCells = 0.5f;
         [Min(0.01f)] [SerializeField] private float foamShoreRibbonRevealSpeedCellsPerSecond = 8f;
 
         [Min(1f)] [SerializeField] private float foamInwardWashAlongLengthMinCells = 5f;
@@ -1618,8 +1597,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(1f)] [SerializeField] private float foamInwardWashReachMaxCells = 5f;
         [Min(1f)] [SerializeField] private float foamInwardWashHeadLengthCells = 1f;
         [Min(1f)] [SerializeField] private float foamInwardWashHeadWidthCells = 1f;
-        [Min(0f)] [SerializeField] private float foamInwardWashOffsetMinCells = 0f;
-        [Min(0f)] [SerializeField] private float foamInwardWashOffsetMaxCells = 0.5f;
         [Min(0f)] [SerializeField] private float foamInwardWashBendAmplitudeMinCells = 0f;
         [Min(0f)] [SerializeField] private float foamInwardWashBendAmplitudeMaxCells = 2f;
         [Min(0.01f)] [SerializeField] private float foamInwardWashRevealSpeedCellsPerSecond = 6f;
@@ -1798,6 +1775,22 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamMotionFieldAcrossRiverCoherence =
             DefaultFoamAcrossRiverCoherence;
+
+        [Tooltip("Suppresses the signed lateral/cross-river component of canonical Foam velocity inside the existing Shore Support field. Zero preserves existing lateral velocity. One sets lateral velocity to exactly zero at full Shore Support, with the existing Shore Support fade controlling the transition.")]
+        [Range(
+            MinimumFoamShoreMovementSuppression,
+            MaximumFoamShoreMovementSuppression)]
+        [SerializeField]
+        private float foamShoreLateralMovementSuppression =
+            DefaultFoamShoreMovementSuppression;
+
+        [Tooltip("Suppresses the downstream component of canonical Foam velocity inside the existing Shore Support field. Zero preserves existing downstream velocity. One sets world downstream velocity to exactly zero at full Shore Support, with the existing Shore Support fade controlling the transition.")]
+        [Range(
+            MinimumFoamShoreMovementSuppression,
+            MaximumFoamShoreMovementSuppression)]
+        [SerializeField]
+        private float foamShoreDownstreamMovementSuppression =
+            DefaultFoamShoreMovementSuppression;
 
         [Tooltip("Controls how quickly the object-contact slowdown halo approaches its full authority. Zero disables contact slowdown. Any positive value reaches the exact Minimum Speed Factor at full contact influence.")]
         [Range(
@@ -2551,8 +2544,6 @@ namespace ProgrammaticStylized3D.Rivers
                 StylizedRiverFoamSourcePopulationPreset.BalancedMixedTest ||
             FoamSourcePopulationPreset ==
                 StylizedRiverFoamSourcePopulationPreset.Off;
-        public float FoamShoreFoamCoverage =>
-            Mathf.Clamp01(foamShoreFoamCoverage);
         public float FoamShoreFoamActivity =>
             Mathf.Clamp01(foamShoreFoamActivity);
         public float FoamShoreMinimumPacketGapMetres =>
@@ -2585,10 +2576,6 @@ namespace ProgrammaticStylized3D.Rivers
             Mathf.Max(FoamShoreRibbonLengthMinMetres, foamShoreRibbonLengthMaxMetres);
         public float FoamShoreRibbonThicknessCells =>
             Mathf.Clamp(foamShoreRibbonThicknessCells, 0.5f, 4f);
-        public float FoamShoreRibbonOffsetMetres =>
-            Mathf.Max(0f, foamShoreRibbonOffsetMetres);
-        public float FoamShoreRibbonOffsetVariationCells =>
-            Mathf.Clamp(foamShoreRibbonOffsetVariationCells, 0f, 0.5f);
         public float FoamShoreRibbonInitialPresenceMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamShoreRibbonInitialPresenceMin,
@@ -2625,12 +2612,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamInwardWashReachMaxMetres));
         public float FoamInwardWashReachMaxMetres =>
             Mathf.Max(FoamInwardWashReachMinMetres, foamInwardWashReachMaxMetres);
-        public float FoamInwardWashOffsetMinMetres =>
-            Mathf.Max(0f, Mathf.Min(
-                foamInwardWashOffsetMinMetres,
-                foamInwardWashOffsetMaxMetres));
-        public float FoamInwardWashOffsetMaxMetres =>
-            Mathf.Max(FoamInwardWashOffsetMinMetres, foamInwardWashOffsetMaxMetres);
         public float FoamInwardWashInitialPresenceMin =>
             Mathf.Clamp01(Mathf.Min(
                 foamInwardWashInitialPresenceMin,
@@ -2937,12 +2918,6 @@ namespace ProgrammaticStylized3D.Rivers
         // consume these until their D8.3 recipe conversion is complete.
         public float FoamShoreRibbonLengthMinCells => Mathf.Max(1f, foamShoreRibbonLengthMinCells);
         public float FoamShoreRibbonLengthMaxCells => Mathf.Max(FoamShoreRibbonLengthMinCells, foamShoreRibbonLengthMaxCells);
-        public float FoamShoreRibbonWidthMinCells => Mathf.Max(1f, foamShoreRibbonWidthMinCells);
-        public float FoamShoreRibbonWidthMaxCells => Mathf.Max(FoamShoreRibbonWidthMinCells, foamShoreRibbonWidthMaxCells);
-        public float FoamShoreRibbonHeadLengthCells => Mathf.Max(1f, foamShoreRibbonHeadLengthCells);
-        public float FoamShoreRibbonHeadWidthCells => Mathf.Max(1f, foamShoreRibbonHeadWidthCells);
-        public float FoamShoreRibbonOffsetMinCells => Mathf.Max(0f, foamShoreRibbonOffsetMinCells);
-        public float FoamShoreRibbonOffsetMaxCells => Mathf.Max(FoamShoreRibbonOffsetMinCells, foamShoreRibbonOffsetMaxCells);
         public float FoamShoreRibbonRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamShoreRibbonRevealSpeedCellsPerSecond);
 
         public float FoamInwardWashAlongLengthMinCells => Mathf.Max(1f, foamInwardWashAlongLengthMinCells);
@@ -2953,8 +2928,6 @@ namespace ProgrammaticStylized3D.Rivers
         public float FoamInwardWashReachMaxCells => Mathf.Max(FoamInwardWashReachMinCells, foamInwardWashReachMaxCells);
         public float FoamInwardWashHeadLengthCells => Mathf.Max(1f, foamInwardWashHeadLengthCells);
         public float FoamInwardWashHeadWidthCells => Mathf.Max(1f, foamInwardWashHeadWidthCells);
-        public float FoamInwardWashOffsetMinCells => Mathf.Max(0f, foamInwardWashOffsetMinCells);
-        public float FoamInwardWashOffsetMaxCells => Mathf.Max(FoamInwardWashOffsetMinCells, foamInwardWashOffsetMaxCells);
         public float FoamInwardWashBendAmplitudeMinCells => Mathf.Max(0f, foamInwardWashBendAmplitudeMinCells);
         public float FoamInwardWashBendAmplitudeMaxCells => Mathf.Max(FoamInwardWashBendAmplitudeMinCells, foamInwardWashBendAmplitudeMaxCells);
         public float FoamInwardWashRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamInwardWashRevealSpeedCellsPerSecond);
@@ -3094,6 +3067,16 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMotionFieldAcrossRiverCoherence,
                 MinimumFoamAcrossRiverCoherence,
                 MaximumFoamAcrossRiverCoherence);
+        public float FoamShoreLateralMovementSuppression =>
+            Mathf.Clamp(
+                foamShoreLateralMovementSuppression,
+                MinimumFoamShoreMovementSuppression,
+                MaximumFoamShoreMovementSuppression);
+        public float FoamShoreDownstreamMovementSuppression =>
+            Mathf.Clamp(
+                foamShoreDownstreamMovementSuppression,
+                MinimumFoamShoreMovementSuppression,
+                MaximumFoamShoreMovementSuppression);
         public float FoamObstacleSlowdownStrength =>
             Mathf.Clamp(
                 foamObstacleSlowdownStrength,
@@ -3392,13 +3375,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamShoreRibbonThicknessCells,
                 0.5f,
                 4f);
-            foamShoreRibbonOffsetMetres = Mathf.Max(
-                0f,
-                foamShoreRibbonOffsetMetres);
-            foamShoreRibbonOffsetVariationCells = Mathf.Clamp(
-                foamShoreRibbonOffsetVariationCells,
-                0f,
-                0.5f);
             SanitizeUnitRange(
                 ref foamShoreRibbonInitialPresenceMin,
                 ref foamShoreRibbonInitialPresenceMax);
@@ -3422,10 +3398,6 @@ namespace ProgrammaticStylized3D.Rivers
                 ref foamInwardWashReachMinMetres,
                 ref foamInwardWashReachMaxMetres,
                 0.005f);
-            SanitizePositiveRange(
-                ref foamInwardWashOffsetMinMetres,
-                ref foamInwardWashOffsetMaxMetres,
-                0f);
             SanitizeUnitRange(
                 ref foamInwardWashInitialPresenceMin,
                 ref foamInwardWashInitialPresenceMax);
@@ -3614,10 +3586,6 @@ namespace ProgrammaticStylized3D.Rivers
         private void SanitizeD8CellSourceControls()
         {
             SanitizePositiveRange(ref foamShoreRibbonLengthMinCells, ref foamShoreRibbonLengthMaxCells, 1f);
-            SanitizePositiveRange(ref foamShoreRibbonWidthMinCells, ref foamShoreRibbonWidthMaxCells, 1f);
-            foamShoreRibbonHeadLengthCells = Mathf.Max(1f, foamShoreRibbonHeadLengthCells);
-            foamShoreRibbonHeadWidthCells = Mathf.Max(1f, foamShoreRibbonHeadWidthCells);
-            SanitizePositiveRange(ref foamShoreRibbonOffsetMinCells, ref foamShoreRibbonOffsetMaxCells, 0f);
             foamShoreRibbonRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamShoreRibbonRevealSpeedCellsPerSecond);
 
             SanitizePositiveRange(ref foamInwardWashAlongLengthMinCells, ref foamInwardWashAlongLengthMaxCells, 1f);
@@ -3625,7 +3593,6 @@ namespace ProgrammaticStylized3D.Rivers
             SanitizePositiveRange(ref foamInwardWashReachMinCells, ref foamInwardWashReachMaxCells, 1f);
             foamInwardWashHeadLengthCells = Mathf.Max(1f, foamInwardWashHeadLengthCells);
             foamInwardWashHeadWidthCells = Mathf.Max(1f, foamInwardWashHeadWidthCells);
-            SanitizePositiveRange(ref foamInwardWashOffsetMinCells, ref foamInwardWashOffsetMaxCells, 0f);
             SanitizePositiveRange(ref foamInwardWashBendAmplitudeMinCells, ref foamInwardWashBendAmplitudeMaxCells, 0f);
             foamInwardWashRevealSpeedCellsPerSecond = Mathf.Max(0.01f, foamInwardWashRevealSpeedCellsPerSecond);
 
@@ -4029,6 +3996,10 @@ namespace ProgrammaticStylized3D.Rivers
                 MinimumFoamLaneAdvectionRatio,
                 MaximumFoamLaneAdvectionRatio);
 
+            foamShoreLateralMovementSuppression =
+                DefaultFoamShoreMovementSuppression;
+            foamShoreDownstreamMovementSuppression =
+                DefaultFoamShoreMovementSuppression;
             foamObstacleSlowdownStrength =
                 DefaultFoamObstacleSlowdownStrength;
             foamObstacleMinimumDownstreamFactor =
@@ -5433,8 +5404,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamConnectorWeakSpanAmount);
             foamFreeWaterEventAmount = Mathf.Clamp01(
                 foamFreeWaterEventAmount);
-            foamShoreFoamCoverage = Mathf.Clamp01(
-                foamShoreFoamCoverage);
             foamShoreFoamActivity = Mathf.Clamp01(
                 foamShoreFoamActivity);
             foamShoreMinimumPacketGapMetres = Mathf.Clamp(
@@ -5498,6 +5467,14 @@ namespace ProgrammaticStylized3D.Rivers
                 foamMotionFieldAcrossRiverCoherence,
                 MinimumFoamAcrossRiverCoherence,
                 MaximumFoamAcrossRiverCoherence);
+            foamShoreLateralMovementSuppression = Mathf.Clamp(
+                foamShoreLateralMovementSuppression,
+                MinimumFoamShoreMovementSuppression,
+                MaximumFoamShoreMovementSuppression);
+            foamShoreDownstreamMovementSuppression = Mathf.Clamp(
+                foamShoreDownstreamMovementSuppression,
+                MinimumFoamShoreMovementSuppression,
+                MaximumFoamShoreMovementSuppression);
             foamObstacleSlowdownStrength = Mathf.Clamp(
                 foamObstacleSlowdownStrength,
                 MinimumFoamObstacleSlowdownStrength,

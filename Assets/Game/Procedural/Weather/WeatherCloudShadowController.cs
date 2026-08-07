@@ -218,12 +218,6 @@ namespace ProgrammaticStylized3D.Weather
         private byte[] currentCookiePixels;
         private byte[] nextCookiePixels;
         private byte[] blendedCookiePixels;
-        // WEATHER LIGHTRAY CLOUD-COVER CONTRACT.
-        // Measured coverage is derived only when cookie pixels are generated.
-        // Steady runtime consumers read O(1) cached values; never add a per-frame
-        // cookie scan or GPU readback for LightRay selection/population.
-        private float currentMeasuredCloudCover;
-        private float nextMeasuredCloudCover;
         private WeatherCloudShadowCookieGenerator.Workspace generationWorkspace;
         private CookieEvolutionState evolutionState;
         private int currentCookieSeed;
@@ -296,24 +290,6 @@ namespace ProgrammaticStylized3D.Weather
         public float EvolutionProgress => evolutionProgress;
         public int CurrentCookieSeed => currentCookieSeed;
         public int NextEvolutionSeed => nextEvolutionSeed;
-        public float MeasuredCloudCover
-        {
-            get
-            {
-                if (!EvolutionInProgress)
-                {
-                    return Mathf.Clamp01(currentMeasuredCloudCover);
-                }
-
-                float smoothProgress = evolutionProgress *
-                    evolutionProgress * (3f - 2f * evolutionProgress);
-                return Mathf.Clamp01(
-                    Mathf.Lerp(
-                        currentMeasuredCloudCover,
-                        nextMeasuredCloudCover,
-                        smoothProgress));
-            }
-        }
         public double SecondsUntilNextEvolution
         {
             get
@@ -932,8 +908,6 @@ namespace ProgrammaticStylized3D.Weather
             builder.Append("Cookie repeat period: ")
                 .Append(cookieWorldSizeMetres.ToString("0.###"))
                 .AppendLine(" m per axis (globally tiled)");
-            builder.Append("Measured normalized cloud cover: ")
-                .AppendLine(MeasuredCloudCover.ToString("0.###"));
             builder.Append("Debug focus: ")
                 .Append(resolvedDebugFocus != null
                     ? resolvedDebugFocus.name
@@ -1278,10 +1252,6 @@ namespace ProgrammaticStylized3D.Weather
                 SwapPixelBuffers(
                     ref currentCookiePixels,
                     ref blendedCookiePixels);
-                currentMeasuredCloudCover = MeasureCloudCover(
-                    currentCookiePixels,
-                    shadedTransmission);
-                nextMeasuredCloudCover = currentMeasuredCloudCover;
                 currentCookieSeed = seed;
                 cookieDirty = false;
                 lastGenerationError = string.Empty;
@@ -1315,36 +1285,6 @@ namespace ProgrammaticStylized3D.Weather
                 transitionSoftnessMetres,
                 minimumOpeningDiameterMetres,
                 shadedTransmission);
-        }
-
-
-        /// <summary>
-        /// Computes normalized cloud coverage from an already generated R8
-        /// transmission field. This dirty-time helper is the only LightRay
-        /// selection/population coverage measurement path. Do not call it from
-        /// Update, camera rendering, or candidate evaluation.
-        /// </summary>
-        private static float MeasureCloudCover(
-            byte[] pixels,
-            float shadedTransmissionValue)
-        {
-            if (pixels == null || pixels.Length == 0)
-            {
-                return 0f;
-            }
-
-            float shaded = Mathf.Clamp01(shadedTransmissionValue);
-            float inverseRange = 1f / Mathf.Max(0.0001f, 1f - shaded);
-            double cloudSum = 0.0;
-            for (int index = 0; index < pixels.Length; index++)
-            {
-                float transmission = pixels[index] / 255f;
-                float open = Mathf.Clamp01(
-                    (transmission - shaded) * inverseRange);
-                cloudSum += 1.0 - open;
-            }
-
-            return Mathf.Clamp01((float)(cloudSum / pixels.Length));
         }
 
         private void EnsureCookieBuffers(int pixelCount)
@@ -1433,9 +1373,6 @@ namespace ProgrammaticStylized3D.Weather
                     settings,
                     nextCookiePixels,
                     generationWorkspace);
-                nextMeasuredCloudCover = MeasureCloudCover(
-                    nextCookiePixels,
-                    shadedTransmission);
                 lastEvolutionPreparationMilliseconds =
                     ResolveElapsedMilliseconds(
                         preparationStartTimestamp);
@@ -1544,8 +1481,6 @@ namespace ProgrammaticStylized3D.Weather
             SwapPixelBuffers(
                 ref currentCookiePixels,
                 ref nextCookiePixels);
-            currentMeasuredCloudCover = nextMeasuredCloudCover;
-            nextMeasuredCloudCover = currentMeasuredCloudCover;
             seed = nextEvolutionSeed;
             currentCookieSeed = seed;
             evolutionSequence++;

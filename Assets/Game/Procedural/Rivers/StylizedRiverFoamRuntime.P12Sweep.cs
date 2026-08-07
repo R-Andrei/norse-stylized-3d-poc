@@ -424,7 +424,6 @@ namespace ProgrammaticStylized3D.Rivers
         {
             ClearSteadyStateWorkAccounting(false);
             ClearFoam();
-            automaticShoreBirthAccumulator = 0f;
             automaticShoreBirthCursor = 0;
             automaticObjectBirthAccumulator = 0f;
             automaticObjectBirthCursor = 0;

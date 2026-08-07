@@ -109,6 +109,8 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamMotionLaneScrollCells("Foam Motion Lane Scroll Cells", Float) = 0
         [HideInInspector] _FoamBaseDownstreamSpeed("Foam Base Downstream Speed", Float) = 0
         [HideInInspector] _FoamMaximumLateralSpeedRatio("Foam Maximum Lateral Speed Ratio", Float) = 0.22
+        [HideInInspector] _FoamShoreLateralMovementSuppression("Foam Shore Lateral Movement Suppression", Range(0, 1)) = 0
+        [HideInInspector] _FoamShoreDownstreamMovementSuppression("Foam Shore Downstream Movement Suppression", Range(0, 1)) = 0
         [HideInInspector] _FoamObstacleSlowdownStrength("Foam Obstacle Slowdown Strength", Float) = 0.85
         [HideInInspector] _FoamObstacleMinimumDownstreamFactor("Foam Obstacle Minimum Downstream Factor", Float) = 0.12
         [HideInInspector] _FoamInterpolation("Foam Interpolation", Range(0, 1)) = 1
@@ -344,11 +346,14 @@ Shader "PS3D/Stylized River Water"
                 float _FoamMotionLaneScrollCells;
                 float _FoamBaseDownstreamSpeed;
                 float _FoamMaximumLateralSpeedRatio;
+                float _FoamShoreLateralMovementSuppression;
+                float _FoamShoreDownstreamMovementSuppression;
                 float _FoamObstacleSlowdownStrength;
                 float _FoamObstacleMinimumDownstreamFactor;
                 float4 _FoamCurrent_TexelSize;
                 float4 _FoamBirthDebug_TexelSize;
                 float4 _FoamObstacleExclusion_TexelSize;
+                float4 _FoamTopologySources_TexelSize;
                 float4 _FoamMotionLane_TexelSize;
                 float4 _FoamObstacleRouting_TexelSize;
                 float4 _FoamGridDescriptorContract;
@@ -1301,13 +1306,28 @@ Shader "PS3D/Stylized River Water"
                     float obstacleFootprint = saturate(
                         _FoamObstacleExclusion.Load(
                             int3(obstacleCoordinate, 0)).r);
+                    int2 topologySourceDimensions = int2(
+                        max(1.0, _FoamTopologySources_TexelSize.z),
+                        max(1.0, _FoamTopologySources_TexelSize.w));
+                    int2 topologySourceCoordinate = clamp(
+                        (int2)floor(
+                            foamMotionFieldUV *
+                            (float2)topologySourceDimensions),
+                        int2(0, 0),
+                        topologySourceDimensions - 1);
+                    float shoreInfluence = saturate(
+                        _FoamTopologySources.Load(
+                            int3(topologySourceCoordinate, 0)).b);
                     RiverWaterFoamResolvedVelocity resolvedVelocity =
                         RiverWaterResolveFoamVelocityContract(
                             lane,
                             obstacleRouting.x,
                             obstacleRouting.y,
+                            shoreInfluence,
                             _FoamBaseDownstreamSpeed,
                             _FoamMaximumLateralSpeedRatio,
+                            _FoamShoreLateralMovementSuppression,
+                            _FoamShoreDownstreamMovementSuppression,
                             _FoamObstacleSlowdownStrength,
                             _FoamObstacleMinimumDownstreamFactor,
                             1.0 - obstacleFootprint);
@@ -1579,26 +1599,60 @@ Shader "PS3D/Stylized River Water"
 
                 if (foamDebug == 2)
                 {
+                    float4 committedState =
+                        SampleCommittedFoamState(foam.fieldUV);
+                    float committedCoverage;
+                    float committedPresence;
+                    float committedRemainingLife;
+                    float committedPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        committedCoverage,
+                        committedPresence,
+                        committedRemainingLife,
+                        committedPattern);
+                    float trailMask = smoothstep(
+                        0.02,
+                        0.10,
+                        saturate(committedCoverage));
+                    float3 trailColour =
+                        trailMask * float3(0.28, 0.30, 0.32);
+
                     int2 birthDebugDimensions = int2(
                         max(1.0, _FoamBirthDebug_TexelSize.z),
                         max(1.0, _FoamBirthDebug_TexelSize.w));
+                    float2 birthDebugUV = foam.fieldUV - float2(
+                        _FoamCurrentBulkPhaseCells *
+                            _FoamBirthDebug_TexelSize.x,
+                        0.0);
+                    bool birthDebugInside = all(birthDebugUV >= 0.0) &&
+                        all(birthDebugUV <= 1.0);
                     int2 birthDebugCoordinate = clamp(
                         (int2)floor(
-                            foam.fieldUV *
+                            saturate(birthDebugUV) *
                             (float2)birthDebugDimensions),
                         int2(0, 0),
                         birthDebugDimensions - 1);
-                    float4 birthDebug = saturate(
-                        _FoamBirthDebug.Load(
-                            int3(birthDebugCoordinate, 0)));
-                    float3 debugColour =
+                    float4 birthDebug = birthDebugInside
+                        ? saturate(
+                            _FoamBirthDebug.Load(
+                                int3(birthDebugCoordinate, 0)))
+                        : 0.0.xxxx;
+                    float3 sourceColour =
                         birthDebug.r * float3(1.00, 0.84, 0.05) +
                         birthDebug.g * float3(0.05, 0.90, 1.00) +
                         birthDebug.b * float3(1.00, 0.05, 0.78);
-                    debugColour = lerp(
-                        saturate(debugColour),
+                    sourceColour = lerp(
+                        saturate(sourceColour),
                         1.0.xxx,
                         birthDebug.a);
+                    float sourceMask = saturate(
+                        max(max(birthDebug.r, birthDebug.g),
+                            max(birthDebug.b, birthDebug.a)));
+                    float3 debugColour = lerp(
+                        trailColour,
+                        saturate(sourceColour),
+                        sourceMask);
                     return half4(saturate(debugColour), 1.0);
                 }
 

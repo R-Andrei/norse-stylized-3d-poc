@@ -309,6 +309,93 @@ namespace ProgrammaticStylized3D.Rivers
 
         private bool TryResolveAutomaticSourceDispatchRange(
             AutomaticFoamSourceEvent sourceEvent,
+            FoamSourceEventGpuData gpuData,
+            bool includePersistentDebugHead,
+            out P7SourceDispatchRange range)
+        {
+            if (sourceEvent.Type != AutomaticFoamSourceEventType.ShoreRibbon)
+            {
+                return TryResolveAutomaticSourceDispatchRange(
+                    sourceEvent,
+                    out range);
+            }
+
+            range = default;
+            int totalCellCount = Mathf.Max(
+                1,
+                Mathf.RoundToInt(
+                    sourceEvent.BodyLengthCells > 0f
+                        ? sourceEvent.BodyLengthCells
+                        : sourceEvent.RevealPathDistanceMetres));
+            int previousHeadCell = gpuData.Deposit.z > 0.5f
+                ? ResolveShoreRibbonHeadCellIndex(
+                    sourceEvent,
+                    gpuData.Deposit.y)
+                : -1;
+            int currentHeadCell = ResolveShoreRibbonHeadCellIndex(
+                sourceEvent,
+                gpuData.Header.z);
+            int firstRequiredCell = previousHeadCell < currentHeadCell
+                ? previousHeadCell + 1
+                : currentHeadCell;
+            if (!includePersistentDebugHead &&
+                firstRequiredCell > currentHeadCell)
+            {
+                return false;
+            }
+
+            firstRequiredCell = Mathf.Clamp(
+                firstRequiredCell,
+                0,
+                totalCellCount - 1);
+            float pathLengthMetres = Mathf.Abs(
+                sourceEvent.EndGlobalDistance -
+                sourceEvent.StartGlobalDistance);
+            float longitudinalCellSpacing = Mathf.Max(
+                0.005f,
+                pathLengthMetres / totalCellCount);
+            float flowDirection = sourceEvent.EndGlobalDistance >=
+                    sourceEvent.StartGlobalDistance
+                ? 1f
+                : -1f;
+            float firstWorldGlobal = sourceEvent.StartGlobalDistance +
+                flowDirection *
+                (firstRequiredCell + 0.5f) * longitudinalCellSpacing;
+            float lastWorldGlobal = sourceEvent.StartGlobalDistance +
+                flowDirection *
+                (currentHeadCell + 0.5f) * longitudinalCellSpacing;
+            float firstStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    firstWorldGlobal);
+            float lastStorageGlobal =
+                WorldGlobalDistanceToFoamStorageGlobalDistance(
+                    lastWorldGlobal);
+            float halfCellPadding = longitudinalCellSpacing * 0.55f;
+            if (!TryResolveSourceLongitudinalRange(
+                    gridDescriptor,
+                    fieldWidth,
+                    fieldLength,
+                    Mathf.Min(firstStorageGlobal, lastStorageGlobal) -
+                        halfCellPadding,
+                    Mathf.Max(firstStorageGlobal, lastStorageGlobal) +
+                        halfCellPadding,
+                    1,
+                    out int startX,
+                    out int countX))
+            {
+                return false;
+            }
+
+            range = new P7SourceDispatchRange(
+                startX,
+                countX,
+                0,
+                fieldHeight);
+            return range.IsValid;
+        }
+
+        private bool TryResolveAutomaticSourceDispatchRange(
+            AutomaticFoamSourceEvent sourceEvent,
             out P7SourceDispatchRange range)
         {
             return TryResolveAutomaticSourceDispatchRange(

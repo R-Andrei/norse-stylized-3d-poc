@@ -244,29 +244,49 @@ namespace ProgrammaticStylized3D.Rivers
                         automaticFoamSourceEventGpuData[index];
                     bool depositionPhaseChanged = Mathf.Abs(
                         gpuData.Header.y - gpuData.Deposit.x) > 0.0001f;
-                    bool hasNewDeposition =
+                    bool shoreRibbon = sourceEvent.Type ==
+                        AutomaticFoamSourceEventType.ShoreRibbon;
+                    bool debugHeadRequired = shoreRibbon &&
+                        IsAutomaticBirthSourcesDebugActive;
+                    bool hasNewDeposition = shoreRibbon ||
                         gpuData.Deposit.z < 0.5f ||
                         depositionPhaseChanged ||
                         gpuData.Header.z >
                             gpuData.Deposit.y + 0.000001f;
-                    if (hasNewDeposition)
+
+                    if (hasNewDeposition || debugHeadRequired)
                     {
                         DispatchAutomaticFoamSourceEvent(
                             index,
                             sourceEvent,
-                            target);
+                            gpuData,
+                            target,
+                            shoreRibbon || debugHeadRequired);
                         automaticSourceEventsRasterizedLastUpdate++;
-                        injectedLastUpdate++;
+                        if (hasNewDeposition)
+                        {
+                            injectedLastUpdate++;
+                        }
                     }
 
                     if (sourceEvent.Elapsed >= sourceEvent.Duration - 0.00001f)
                     {
+                        CompleteAutomaticShoreSourceEvent(sourceEvent);
                         CompleteAutomaticObjectSourceEvent(sourceEvent);
                         automaticFoamSourceEvents[index] = default;
                         automaticFoamSourceEventGpuData[index] = default;
                         activeAutomaticFoamSourceEventCount = Mathf.Max(
                             0,
                             activeAutomaticFoamSourceEventCount - 1);
+                        if (sourceEvent.Type ==
+                                AutomaticFoamSourceEventType.ShoreRibbon ||
+                            sourceEvent.Type ==
+                                AutomaticFoamSourceEventType.InwardWash)
+                        {
+                            activeAutomaticShoreSourceEventCount = Mathf.Max(
+                                0,
+                                activeAutomaticShoreSourceEventCount - 1);
+                        }
                         foamCompositionCompletedCount++;
                     }
                 }
@@ -288,6 +308,23 @@ namespace ProgrammaticStylized3D.Rivers
         {
             return sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
+        }
+
+        private static int ResolveShoreRibbonHeadCellIndex(
+            AutomaticFoamSourceEvent sourceEvent,
+            float progress)
+        {
+            float authoredCellCount = sourceEvent.BodyLengthCells > 0f
+                ? sourceEvent.BodyLengthCells
+                : sourceEvent.RevealPathDistanceMetres;
+            int totalCellCount = Mathf.Max(
+                1,
+                Mathf.RoundToInt(authoredCellCount));
+            return Mathf.Clamp(
+                Mathf.FloorToInt(
+                    Mathf.Clamp01(progress) * totalCellCount + 0.00001f),
+                0,
+                totalCellCount - 1);
         }
 
         private static void ResolveAutomaticSourceDepositionState(
@@ -550,11 +587,15 @@ namespace ProgrammaticStylized3D.Rivers
         private void DispatchAutomaticFoamSourceEvent(
             int eventIndex,
             AutomaticFoamSourceEvent sourceEvent,
-            RenderTexture target)
+            FoamSourceEventGpuData gpuData,
+            RenderTexture target,
+            bool includePersistentDebugHead)
         {
             ConfigureGridDescriptorComputeParameters();
             if (!TryResolveAutomaticSourceDispatchRange(
                     sourceEvent,
+                    gpuData,
+                    includePersistentDebugHead,
                     out P7SourceDispatchRange dispatchRange))
             {
                 return;
