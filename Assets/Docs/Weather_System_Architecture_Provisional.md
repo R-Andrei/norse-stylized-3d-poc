@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-07-31`
+**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-08-07-A3`
 
 This document defines current subsystem ownership and integration boundaries. Detailed implementation contracts remain in the subsystem documents:
 
@@ -111,6 +111,13 @@ A LightRay request or producer may be supplied a runtime directional source for 
 
 Gameplay systems may request rays or consume LightRay influence. They own healing, damage, buffs, quest logic, objective state, and other gameplay consequences. The visual system does not own those effects.
 
+
+### Vegetation LightRay sidecar
+
+Weather LightRay vegetation metadata is supplied only through the indexed per-additional-light sidecar. The legacy global Spot/direction/intensity/coverage bridge and false-colour diagnostic path are removed in `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`. The renderer-owned two-`float4` record layout, camera-local URP ordering, zero fallback binding, and ordinary-light behavior remain unchanged.
+
+The LightRay preset-resolved intensity, coverage, and softness values are presentation inputs; they do not imply Weather, Sun, Moon, or gameplay ownership.
+
 ## 5. Inspector organization
 
 Each Weather component retains a dedicated custom Inspector.
@@ -133,7 +140,6 @@ The current cleanup does not implement:
 - visible cloud geometry or volumetrics;
 - new wind gameplay effects;
 - mandatory LightRay preset migration across scenes and prefabs;
-- vegetation diagnostic shader removal;
 - a new cloud receiver path.
 
 ## 7. Test-only LightRay preset

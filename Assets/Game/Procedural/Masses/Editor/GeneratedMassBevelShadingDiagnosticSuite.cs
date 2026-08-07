@@ -287,7 +287,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine("GENERATED MASS SURFACE-CAUSALITY SUITE");
-            builder.AppendLine("contract=GM-SURFACE-5N-H2-KEYWORD-FREE-BRDF-DECOMPOSITION-READBACK-ALIGNMENT");
+            builder.AppendLine("contract=GM-SURFACE-5N-H3-PIXELWISE-GPU-NORMAL-LAMBERT-PREFLIGHT");
             builder.AppendLine("generatedUtc=" +
                 DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             builder.AppendLine("terminal=" + (terminal ? 1 : 0));
@@ -352,6 +352,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     job.RenderAudit.TotalCases);
                 builder.AppendLine("auxiliaryIdentityCases=" +
                     job.RenderAudit.AuxiliaryIdentityCases);
+                builder.AppendLine("auxiliaryValidationCases=" +
+                    job.RenderAudit.AuxiliaryValidationCases);
                 builder.AppendLine("totalRenderPasses=" +
                     job.RenderAudit.TotalRenderPasses);
                 builder.AppendLine("perTriangleCsv=" + CsvPath);
@@ -390,6 +392,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         ",brdfVariant=" + result.BrdfVariant +
                         ",lambertPreflight=" +
                             (result.IsLambertPreflight ? 1 : 0) +
+                        ",lambertNormalCapture=" +
+                            (result.IsLambertNormalCapture ? 1 : 0) +
                         ",identityFlipRelativeToLighting=" +
                             (result.IdentityFlipRelativeToLighting ? 1 : 0) +
                         ",foregroundAlignmentIoU=" +
@@ -402,13 +406,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             result.IdentityForegroundPixelCount +
                         ",lambertContractValid=" +
                             (result.LambertContractValid ? 1 : 0) +
-                        ",lambertEligibleTriangles=" +
-                            result.LambertEligibleTriangleCount +
-                        ",lambertPositiveResponseTriangles=" +
-                            result.LambertPositiveResponseTriangleCount +
-                        ",lambertScale=" + F(result.LambertScale) +
-                        ",lambertNormalizedRmse=" +
-                            F(result.LambertNormalizedRmse) +
+                        ",lambertValidNormalPixels=" +
+                            result.LambertValidNormalPixelCount +
+                        ",lambertPositiveExpectedPixels=" +
+                            result.LambertPositiveExpectedPixelCount +
+                        ",lambertPositiveObservedPixels=" +
+                            result.LambertPositiveObservedPixelCount +
+                        ",lambertConfiguredNormalizedRmse=" +
+                            F(result.LambertConfiguredNormalizedRmse) +
+                        ",lambertOppositeNormalizedRmse=" +
+                            F(result.LambertOppositeNormalizedRmse) +
+                        ",lambertBestFitScale=" +
+                            F(result.LambertBestFitScale) +
+                        ",lambertBestFitNormalizedRmse=" +
+                            F(result.LambertBestFitNormalizedRmse) +
                         ",lambertMeanForegroundLuma=" +
                             F(result.LambertMeanForegroundLuma) +
                         ",visibleTriangles=" +
@@ -735,6 +746,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         summary.CompletedDecisionCases);
                     builder.AppendLine("auxiliaryIdentityCases=" +
                         summary.AuxiliaryIdentityCases);
+                    builder.AppendLine("auxiliaryValidationCases=" +
+                        summary.AuxiliaryValidationCases);
                     builder.AppendLine("readbackErrorCount=" +
                         summary.ReadbackErrorCount);
                     builder.AppendLine("minimumCaseCoverageRatio=" +
@@ -756,14 +769,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         F(summary.StageBActualStoredDielectricMeanAbsoluteResidual));
                     builder.AppendLine("lambertContractValid=" +
                         (summary.LambertContractValid ? 1 : 0));
-                    builder.AppendLine("lambertEligibleTriangles=" +
-                        summary.LambertEligibleTriangleCount);
-                    builder.AppendLine("lambertPositiveResponseTriangles=" +
-                        summary.LambertPositiveResponseTriangleCount);
-                    builder.AppendLine("lambertScale=" +
-                        F(summary.LambertScale));
-                    builder.AppendLine("lambertNormalizedRmse=" +
-                        F(summary.LambertNormalizedRmse));
+                    builder.AppendLine("lambertValidNormalPixels=" +
+                        summary.LambertValidNormalPixelCount);
+                    builder.AppendLine("lambertPositiveExpectedPixels=" +
+                        summary.LambertPositiveExpectedPixelCount);
+                    builder.AppendLine("lambertPositiveObservedPixels=" +
+                        summary.LambertPositiveObservedPixelCount);
+                    builder.AppendLine("lambertConfiguredNormalizedRmse=" +
+                        F(summary.LambertConfiguredNormalizedRmse));
+                    builder.AppendLine("lambertOppositeNormalizedRmse=" +
+                        F(summary.LambertOppositeNormalizedRmse));
+                    builder.AppendLine("lambertBestFitScale=" +
+                        F(summary.LambertBestFitScale));
+                    builder.AppendLine("lambertBestFitNormalizedRmse=" +
+                        F(summary.LambertBestFitNormalizedRmse));
                     builder.AppendLine("lambertMeanForegroundLuma=" +
                         F(summary.LambertMeanForegroundLuma));
                     builder.AppendLine("minimumForegroundAlignmentIoU=" +
@@ -824,7 +843,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine("- subject capture may trigger the named Stone Surface Profile to reassert its HLSL material during regeneration; the suite snapshots every source material slot plus global/per-slot property blocks before capture, restores them immediately and at finalization, and treats any restoration mismatch as terminal failure.");
             builder.AppendLine("- all rendered cases use hidden temporary meshes, renderers, cameras, material clones, and property blocks; the suite never assigns a diagnostic material or shader to the source renderer.");
             builder.AppendLine("- a dedicated editor-only depth-tested identity shader owns visible provenance attribution; alternate camera views receive separate validated identity maps and isolated class-only meshes are not used.");
-            builder.AppendLine("- a controlled Lambert preflight validates light publication, float readback, identity-to-lighting alignment, stored-normal attribution, and per-triangle reduction before Stage A is queued.");
+            builder.AppendLine("- a controlled pixelwise GPU-normal Lambert preflight validates light publication, float readback, identity-to-lighting alignment, exact interpolated stored-normal attribution, configured/opposite light direction, and scalar response before Stage A is queued.");
             builder.AppendLine("- Stage A captures six keyword-free neutral stored-normal variants under 27 deterministic light directions: legacy/HLSL full response and black-albedo specular-only response at F0 0.16 and F0 0.04; diffuse is derived as full minus specular-only.");
             builder.AppendLine("- Stage B reruns the four worst directions with actual albedo and generated/stored normal pairs at both F0 values; Stage C repeats the two worst directions from two additional camera azimuths; Stage D captures indirect and actual-scene closure.");
             builder.AppendLine("- every lighting case uses linear floating-point GPU capture and preserves per-triangle RGB, luminance, signed residuals, parent IDs, stored-normal NdotL/NdotV/NdotH predictions, and ordering; any non-finite sample is terminal.");

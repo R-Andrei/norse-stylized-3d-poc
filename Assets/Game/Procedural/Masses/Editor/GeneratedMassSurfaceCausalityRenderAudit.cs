@@ -54,10 +54,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private const float CurrentHlslF0 = 0.16f;
         private const float MinimumForegroundAlignmentIoU = 0.995f;
         private const float MaximumForegroundPixelCountDifferenceRatio = 0.01f;
-        private const int MinimumLambertEligibleTriangles = 32;
-        private const int MinimumLambertPositiveResponseTriangles = 24;
+        private const int MinimumLambertValidNormalPixels = 20000;
+        private const int MinimumLambertPositiveExpectedPixels = 2000;
+        private const int MinimumLambertPositiveObservedPixels = 2000;
         private const float MinimumLambertMeanForegroundLuma = 0.02f;
-        private const float MaximumLambertNormalizedRmse = 0.05f;
+        private const float MaximumLambertConfiguredNormalizedRmse = 0.01f;
+        private const float LambertNormalMinimumLength = 0.5f;
+        private const float LambertPositiveResponseThreshold = 0.001f;
 
         private static readonly BrdfDirectionDefinition[] BaseBrdfDirections =
         {
@@ -287,6 +290,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal bool IsAuxiliaryIdentity;
             internal bool CountsTowardDecisionTotal = true;
             internal bool IsLambertPreflight;
+            internal bool IsLambertNormalCapture;
             internal bool TriangleIdentityContractValid;
             internal bool IdentityFlipRelativeToLighting;
             internal float ForegroundAlignmentIoU;
@@ -294,10 +298,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal int LightingForegroundPixelCount;
             internal int IdentityForegroundPixelCount;
             internal bool LambertContractValid;
-            internal int LambertEligibleTriangleCount;
-            internal int LambertPositiveResponseTriangleCount;
-            internal float LambertScale;
-            internal float LambertNormalizedRmse;
+            internal int LambertValidNormalPixelCount;
+            internal int LambertPositiveExpectedPixelCount;
+            internal int LambertPositiveObservedPixelCount;
+            internal float LambertConfiguredNormalizedRmse;
+            internal float LambertOppositeNormalizedRmse;
+            internal float LambertBestFitScale;
+            internal float LambertBestFitNormalizedRmse;
             internal float LambertMeanForegroundLuma;
             internal int TriangleIdentityPixelCount;
             internal int TriangleIdentityInvalidPixelCount;
@@ -412,6 +419,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal int ExpectedDecisionCases;
             internal int CompletedDecisionCases;
             internal int AuxiliaryIdentityCases;
+            internal int AuxiliaryValidationCases;
             internal int ReadbackErrorCount;
             internal float MinimumCaseCoverageRatio;
             internal float NeutralDiffuseMeanAbsoluteResidual;
@@ -422,10 +430,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal float StageBGeneratedNormalMeanReduction;
             internal float StageBActualStoredDielectricMeanAbsoluteResidual;
             internal bool LambertContractValid;
-            internal int LambertEligibleTriangleCount;
-            internal int LambertPositiveResponseTriangleCount;
-            internal float LambertScale;
-            internal float LambertNormalizedRmse;
+            internal int LambertValidNormalPixelCount;
+            internal int LambertPositiveExpectedPixelCount;
+            internal int LambertPositiveObservedPixelCount;
+            internal float LambertConfiguredNormalizedRmse;
+            internal float LambertOppositeNormalizedRmse;
+            internal float LambertBestFitScale;
+            internal float LambertBestFitNormalizedRmse;
             internal float LambertMeanForegroundLuma;
             internal float MinimumForegroundAlignmentIoU;
             internal float MaximumForegroundPixelCountDifferenceRatio;
@@ -447,6 +458,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private readonly Dictionary<string, Color32[]> masks = new();
         private readonly Dictionary<string, Color32[]> triangleIdentityPixels =
             new();
+        private Color[] lambertStoredNormalPixels = Array.Empty<Color>();
+        private bool lambertStoredNormalIdentityFlipRelativeToLighting;
         private readonly Material legacyMaterial;
         private readonly string legacyMaterialLoadStatus;
         private readonly Shader triangleIdentityShader;
@@ -593,6 +606,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             item.CountsTowardDecisionTotal);
         internal int AuxiliaryIdentityCases => results.Count(item =>
             item.IsTriangleIdentity);
+        internal int AuxiliaryValidationCases => results.Count(item =>
+            item.IsTriangleIdentity || item.IsLambertNormalCapture);
         internal int TotalCases => legacyMaterial == null
             ? 1
             : 1 + brdfDirections.Length * 6 +
@@ -600,7 +615,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 StageCDirectionCount * AlternateViews.Length * 5 +
                 6;
         internal int TotalRenderPasses =>
-            TotalCases + AlternateViews.Length + 1;
+            TotalCases + AlternateViews.Length + 2;
         internal bool IsComplete =>
             stageAQueued &&
             stageBQueued &&
@@ -614,7 +629,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? "Rendering causality pass " + (results.Count + 1) + "/" +
                     TotalRenderPasses + ": " + cases[nextCase].Name
                 : !stageAQueued
-                    ? "Validating Lambert preflight and queueing Stage A"
+                    ? "Validating pixelwise GPU-normal Lambert preflight and queueing Stage A"
                     : !stageBQueued
                         ? "Selecting four worst Stage A directions"
                         : !stageCQueued
@@ -753,10 +768,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             lines.Add("stageDCaseCount=" +
                 (legacyMaterial == null ? 0 : 6));
             lines.Add("decisionCaseCount=" + TotalCases);
+            lines.Add("lambertStoredNormalCaptureCaseCount=" +
+                (legacyMaterial == null ? 0 : 1));
             lines.Add("lambertPreflightCaseCount=" +
                 (legacyMaterial == null ? 0 : 1));
             lines.Add("auxiliaryIdentityPassBudget=" +
                 (AlternateViews.Length + 1));
+            lines.Add("auxiliaryValidationPassBudget=" +
+                (AlternateViews.Length + 2));
             lines.Add("totalRenderPassBudget=" + TotalRenderPasses);
             lines.Add("suspectClassifiedTriangles=" +
                 suspect.ClassifiedTriangleCount);
@@ -847,7 +866,41 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "CURRENT",
                 0f,
                 isAuxiliary: true);
+            AddLambertStoredNormalCaptureCase();
             AddLambertPreflightCase();
+        }
+
+
+        private void AddLambertStoredNormalCaptureCase()
+        {
+            Vector3 cameraPosition = ResolveAuditCameraPosition(0f);
+            Vector3 worldToLight = cameraPosition - cameraCenter;
+            Vector3 localToLight = suspect.CloneLocalToWorld.inverse
+                .MultiplyVector(worldToLight)
+                .normalized;
+            if (localToLight.sqrMagnitude <= 0.5f)
+            {
+                localToLight = Vector3.up;
+            }
+            BrdfDirectionDefinition direction =
+                new BrdfDirectionDefinition(
+                    "LAMBERT_CAMERA",
+                    localToLight);
+            RenderCase normalCapture = CreateBrdfCase(
+                direction,
+                "LAMBERT_STORED_NORMAL",
+                suspect.Material,
+                "HlslLambertStoredNormal",
+                0f,
+                constantNeutralAlbedo: true,
+                family: "LambertNormalCapture",
+                storedNormals: true);
+            normalCapture.CausalityMode = 14;
+            normalCapture.IsBrdfSweep = false;
+            normalCapture.IsAdaptiveBrdf = false;
+            normalCapture.IsLambertNormalCapture = true;
+            normalCapture.CountsTowardDecisionTotal = false;
+            cases.Add(normalCapture);
         }
 
         private void AddLambertPreflightCase()
@@ -1745,6 +1798,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 LightDirectionLocal = pendingCase.LightDirectionLocal,
                 CameraPositionWorld = pendingCameraPosition,
                 IsLambertPreflight = pendingCase.IsLambertPreflight,
+                IsLambertNormalCapture = pendingCase.IsLambertNormalCapture,
                 LocalToClip = pendingLocalToClip
             };
 
@@ -1861,6 +1915,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             lightingForegroundPixels;
                         result.IdentityForegroundPixelCount =
                             identityForegroundPixels;
+                        if (pendingCase.IsLambertNormalCapture)
+                        {
+                            lambertStoredNormalPixels = result.LinearPixels;
+                            lambertStoredNormalIdentityFlipRelativeToLighting =
+                                identityFlipRelativeToLighting;
+                        }
                         Color32[] alignedMask = BuildAlignedIdentityMask(
                             identityPixels,
                             identityFlipRelativeToLighting);
@@ -1935,14 +1995,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                                 result.ReadbackError = true;
                                 result.Error =
                                     "Lambert preflight contract failed: " +
-                                    "eligibleTriangles=" +
-                                    result.LambertEligibleTriangleCount +
-                                    ",positiveTriangles=" +
-                                    result.LambertPositiveResponseTriangleCount +
+                                    "diagnosis=" +
+                                    ResolveLambertFailureDiagnosis(result) +
+                                    ",validNormalPixels=" +
+                                    result.LambertValidNormalPixelCount +
+                                    ",positiveExpectedPixels=" +
+                                    result.LambertPositiveExpectedPixelCount +
+                                    ",positiveObservedPixels=" +
+                                    result.LambertPositiveObservedPixelCount +
                                     ",meanForegroundLuma=" +
                                     Format(result.LambertMeanForegroundLuma) +
-                                    ",normalizedRmse=" +
-                                    Format(result.LambertNormalizedRmse);
+                                    ",configuredNormalizedRmse=" +
+                                    Format(result.LambertConfiguredNormalizedRmse) +
+                                    ",oppositeNormalizedRmse=" +
+                                    Format(result.LambertOppositeNormalizedRmse) +
+                                    ",bestFitScale=" +
+                                    Format(result.LambertBestFitScale) +
+                                    ",bestFitNormalizedRmse=" +
+                                    Format(result.LambertBestFitNormalizedRmse);
                                 fatalIdentityContractFailure = true;
                                 fatalContractReason = result.Error;
                             }
@@ -2007,6 +2077,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ExpectedDecisionCases = TotalCases,
                 CompletedDecisionCases = CompletedCases,
                 AuxiliaryIdentityCases = AuxiliaryIdentityCases,
+                AuxiliaryValidationCases = AuxiliaryValidationCases,
                 ReadbackErrorCount = results.Count(item => item.ReadbackError),
                 MinimumCaseCoverageRatio = results
                     .Where(item => item.IsBrdfSweep)
@@ -2028,12 +2099,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             if (lambert != null)
             {
                 value.LambertContractValid = lambert.LambertContractValid;
-                value.LambertEligibleTriangleCount =
-                    lambert.LambertEligibleTriangleCount;
-                value.LambertPositiveResponseTriangleCount =
-                    lambert.LambertPositiveResponseTriangleCount;
-                value.LambertScale = lambert.LambertScale;
-                value.LambertNormalizedRmse = lambert.LambertNormalizedRmse;
+                value.LambertValidNormalPixelCount =
+                    lambert.LambertValidNormalPixelCount;
+                value.LambertPositiveExpectedPixelCount =
+                    lambert.LambertPositiveExpectedPixelCount;
+                value.LambertPositiveObservedPixelCount =
+                    lambert.LambertPositiveObservedPixelCount;
+                value.LambertConfiguredNormalizedRmse =
+                    lambert.LambertConfiguredNormalizedRmse;
+                value.LambertOppositeNormalizedRmse =
+                    lambert.LambertOppositeNormalizedRmse;
+                value.LambertBestFitScale = lambert.LambertBestFitScale;
+                value.LambertBestFitNormalizedRmse =
+                    lambert.LambertBestFitNormalizedRmse;
                 value.LambertMeanForegroundLuma =
                     lambert.LambertMeanForegroundLuma;
             }
@@ -2075,6 +2153,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 value.CompletenessFailure =
                     "IDENTITY_COMPLETENESS_FAILURE:" +
                     AuxiliaryIdentityCases + "/" + expectedIdentityCases;
+            }
+            else if (AuxiliaryValidationCases != expectedIdentityCases + 1 ||
+                     results.Count(item => item.IsLambertNormalCapture) != 1)
+            {
+                value.CompletenessFailure =
+                    "AUXILIARY_VALIDATION_COMPLETENESS_FAILURE:" +
+                    AuxiliaryValidationCases + "/" +
+                    (expectedIdentityCases + 1);
             }
             else if (results.Count != TotalRenderPasses)
             {
@@ -4261,53 +4347,241 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 : TriangleIdentityInvalid;
         }
 
-        private static void EvaluateLambertPreflight(CaseResult result)
+        private void EvaluateLambertPreflight(CaseResult result)
         {
-            List<TriangleLuminanceStatistics> eligible =
-                result.TriangleStatistics.Values
-                    .Where(item =>
-                        item.PixelCount >= MinimumTrianglePixels &&
-                        item.PredictedNdotL > 0.05f)
-                    .ToList();
-            result.LambertEligibleTriangleCount = eligible.Count;
-            result.LambertPositiveResponseTriangleCount = eligible.Count(
-                item => item.MeanLuma > 0.001f);
             result.LambertMeanForegroundLuma = result.MeanMaskedLuma;
-            double numerator = 0.0;
-            double denominator = 0.0;
-            foreach (TriangleLuminanceStatistics triangle in eligible)
+            if (lambertStoredNormalPixels == null ||
+                lambertStoredNormalPixels.Length != result.LinearPixels.Length ||
+                result.LinearPixels.Length != CaptureSize * CaptureSize ||
+                !triangleIdentityPixels.TryGetValue(
+                    IdentityKey(suspect, result.ViewName),
+                    out Color32[] identityPixels))
             {
-                numerator += triangle.PredictedNdotL * triangle.MeanLuma;
-                denominator += triangle.PredictedNdotL *
-                    triangle.PredictedNdotL;
+                result.LambertContractValid = false;
+                result.LambertConfiguredNormalizedRmse =
+                    float.PositiveInfinity;
+                result.LambertOppositeNormalizedRmse =
+                    float.PositiveInfinity;
+                result.LambertBestFitNormalizedRmse =
+                    float.PositiveInfinity;
+                lambertStoredNormalPixels = Array.Empty<Color>();
+                return;
             }
-            result.LambertScale = denominator > 1e-12
-                ? (float)(numerator / denominator)
+
+            Vector3 configuredDirectionWorld =
+                suspect.Target.transform.rotation *
+                result.LightDirectionLocal.normalized;
+            configuredDirectionWorld.Normalize();
+            Vector3 oppositeDirectionWorld = -configuredDirectionWorld;
+
+            double configuredSquaredError = 0.0;
+            double oppositeSquaredError = 0.0;
+            double bestFitNumerator = 0.0;
+            double bestFitDenominator = 0.0;
+            int validPixels = 0;
+            int positiveExpectedPixels = 0;
+            int positiveObservedPixels = 0;
+
+            for (int lightingIndex = 0;
+                 lightingIndex < result.LinearPixels.Length;
+                 lightingIndex++)
+            {
+                int identityIndex = MapLightingIndexToIdentityIndex(
+                    lightingIndex,
+                    result.IdentityFlipRelativeToLighting);
+                if (identityIndex < 0 ||
+                    identityIndex >= identityPixels.Length ||
+                    DecodeTriangleIdentity(identityPixels[identityIndex]) < 0)
+                {
+                    continue;
+                }
+
+                int normalLightingIndex = MapLightingIndexToIdentityIndex(
+                    identityIndex,
+                    lambertStoredNormalIdentityFlipRelativeToLighting);
+                if (normalLightingIndex < 0 ||
+                    normalLightingIndex >= lambertStoredNormalPixels.Length)
+                {
+                    continue;
+                }
+
+                Color encodedNormal =
+                    lambertStoredNormalPixels[normalLightingIndex];
+                Color observed = result.LinearPixels[lightingIndex];
+                if (encodedNormal.a <= 0.5f || observed.a <= 0.5f)
+                {
+                    continue;
+                }
+
+                Vector3 normalWorld = new Vector3(
+                    encodedNormal.r * 2f - 1f,
+                    encodedNormal.g * 2f - 1f,
+                    encodedNormal.b * 2f - 1f);
+                float normalLength = normalWorld.magnitude;
+                if (float.IsNaN(normalLength) ||
+                    float.IsInfinity(normalLength) ||
+                    normalLength < LambertNormalMinimumLength)
+                {
+                    continue;
+                }
+                normalWorld /= normalLength;
+
+                float configuredNdotL = Mathf.Max(
+                    0f,
+                    Vector3.Dot(normalWorld, configuredDirectionWorld));
+                float oppositeNdotL = Mathf.Max(
+                    0f,
+                    Vector3.Dot(normalWorld, oppositeDirectionWorld));
+                float configuredExpected = 0.5f * configuredNdotL;
+                float oppositeExpected = 0.5f * oppositeNdotL;
+                float observedLuma = LinearLuma(observed);
+
+                if (configuredExpected > LambertPositiveResponseThreshold)
+                {
+                    positiveExpectedPixels++;
+                }
+                if (observedLuma > LambertPositiveResponseThreshold)
+                {
+                    positiveObservedPixels++;
+                }
+
+                double configuredErrorR = observed.r - configuredExpected;
+                double configuredErrorG = observed.g - configuredExpected;
+                double configuredErrorB = observed.b - configuredExpected;
+                configuredSquaredError +=
+                    configuredErrorR * configuredErrorR +
+                    configuredErrorG * configuredErrorG +
+                    configuredErrorB * configuredErrorB;
+
+                double oppositeErrorR = observed.r - oppositeExpected;
+                double oppositeErrorG = observed.g - oppositeExpected;
+                double oppositeErrorB = observed.b - oppositeExpected;
+                oppositeSquaredError +=
+                    oppositeErrorR * oppositeErrorR +
+                    oppositeErrorG * oppositeErrorG +
+                    oppositeErrorB * oppositeErrorB;
+
+                bestFitNumerator += configuredNdotL * observedLuma;
+                bestFitDenominator += configuredNdotL * configuredNdotL;
+                validPixels++;
+            }
+
+            result.LambertValidNormalPixelCount = validPixels;
+            result.LambertPositiveExpectedPixelCount = positiveExpectedPixels;
+            result.LambertPositiveObservedPixelCount = positiveObservedPixels;
+            result.LambertBestFitScale = bestFitDenominator > 1e-12
+                ? (float)(bestFitNumerator / bestFitDenominator)
                 : 0f;
-            double squaredError = 0.0;
-            foreach (TriangleLuminanceStatistics triangle in eligible)
+
+            double bestFitSquaredError = 0.0;
+            if (validPixels > 0)
             {
-                double predicted = result.LambertScale *
-                    triangle.PredictedNdotL;
-                double error = triangle.MeanLuma - predicted;
-                squaredError += error * error;
+                for (int lightingIndex = 0;
+                     lightingIndex < result.LinearPixels.Length;
+                     lightingIndex++)
+                {
+                    int identityIndex = MapLightingIndexToIdentityIndex(
+                        lightingIndex,
+                        result.IdentityFlipRelativeToLighting);
+                    if (identityIndex < 0 ||
+                        identityIndex >= identityPixels.Length ||
+                        DecodeTriangleIdentity(identityPixels[identityIndex]) < 0)
+                    {
+                        continue;
+                    }
+                    int normalLightingIndex = MapLightingIndexToIdentityIndex(
+                        identityIndex,
+                        lambertStoredNormalIdentityFlipRelativeToLighting);
+                    if (normalLightingIndex < 0 ||
+                        normalLightingIndex >= lambertStoredNormalPixels.Length)
+                    {
+                        continue;
+                    }
+                    Color encodedNormal =
+                        lambertStoredNormalPixels[normalLightingIndex];
+                    Color observed = result.LinearPixels[lightingIndex];
+                    if (encodedNormal.a <= 0.5f || observed.a <= 0.5f)
+                    {
+                        continue;
+                    }
+                    Vector3 normalWorld = new Vector3(
+                        encodedNormal.r * 2f - 1f,
+                        encodedNormal.g * 2f - 1f,
+                        encodedNormal.b * 2f - 1f);
+                    float normalLength = normalWorld.magnitude;
+                    if (float.IsNaN(normalLength) ||
+                        float.IsInfinity(normalLength) ||
+                        normalLength < LambertNormalMinimumLength)
+                    {
+                        continue;
+                    }
+                    normalWorld /= normalLength;
+                    float ndotl = Mathf.Max(
+                        0f,
+                        Vector3.Dot(normalWorld, configuredDirectionWorld));
+                    float fitted = result.LambertBestFitScale * ndotl;
+                    float observedLuma = LinearLuma(observed);
+                    double error = observedLuma - fitted;
+                    bestFitSquaredError += error * error;
+                }
             }
-            float rmse = eligible.Count > 0
-                ? Mathf.Sqrt((float)(squaredError / eligible.Count))
+
+            float normalization = Mathf.Max(
+                MinimumLambertMeanForegroundLuma,
+                result.LambertMeanForegroundLuma);
+            float configuredRmse = validPixels > 0
+                ? Mathf.Sqrt((float)(configuredSquaredError /
+                    (validPixels * 3.0)))
                 : float.PositiveInfinity;
-            result.LambertNormalizedRmse = rmse /
-                Mathf.Max(
-                    MinimumLambertMeanForegroundLuma,
-                    result.LambertMeanForegroundLuma);
+            float oppositeRmse = validPixels > 0
+                ? Mathf.Sqrt((float)(oppositeSquaredError /
+                    (validPixels * 3.0)))
+                : float.PositiveInfinity;
+            float bestFitRmse = validPixels > 0
+                ? Mathf.Sqrt((float)(bestFitSquaredError / validPixels))
+                : float.PositiveInfinity;
+            result.LambertConfiguredNormalizedRmse =
+                configuredRmse / normalization;
+            result.LambertOppositeNormalizedRmse =
+                oppositeRmse / normalization;
+            result.LambertBestFitNormalizedRmse =
+                bestFitRmse / normalization;
             result.LambertContractValid =
-                result.LambertEligibleTriangleCount >=
-                    MinimumLambertEligibleTriangles &&
-                result.LambertPositiveResponseTriangleCount >=
-                    MinimumLambertPositiveResponseTriangles &&
+                result.LambertValidNormalPixelCount >=
+                    MinimumLambertValidNormalPixels &&
+                result.LambertPositiveExpectedPixelCount >=
+                    MinimumLambertPositiveExpectedPixels &&
+                result.LambertPositiveObservedPixelCount >=
+                    MinimumLambertPositiveObservedPixels &&
                 result.LambertMeanForegroundLuma >=
                     MinimumLambertMeanForegroundLuma &&
-                result.LambertNormalizedRmse <=
-                    MaximumLambertNormalizedRmse;
+                result.LambertConfiguredNormalizedRmse <=
+                    MaximumLambertConfiguredNormalizedRmse;
+            lambertStoredNormalPixels = Array.Empty<Color>();
+        }
+
+        private static string ResolveLambertFailureDiagnosis(
+            CaseResult result)
+        {
+            if (result.LambertOppositeNormalizedRmse <=
+                    MaximumLambertConfiguredNormalizedRmse &&
+                result.LambertOppositeNormalizedRmse <
+                    result.LambertConfiguredNormalizedRmse)
+            {
+                return "CONTROLLED_LIGHT_DIRECTION_REVERSED";
+            }
+            if (result.LambertBestFitNormalizedRmse <=
+                    MaximumLambertConfiguredNormalizedRmse &&
+                Mathf.Abs(result.LambertBestFitScale - 0.5f) > 0.01f)
+            {
+                return "CONTROLLED_LIGHT_SCALAR_MISMATCH";
+            }
+            if (result.LambertValidNormalPixelCount <
+                MinimumLambertValidNormalPixels)
+            {
+                return "STORED_NORMAL_PIXEL_COVERAGE_FAILURE";
+            }
+            return "DIRECT_LIGHT_SHADER_PATH_MISMATCH";
         }
 
         private static int CountNonFinitePixels(Color[] pixels)
@@ -6187,6 +6461,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal bool IsAblation;
             internal bool IsTriangleIdentity;
             internal bool IsLambertPreflight;
+            internal bool IsLambertNormalCapture;
             internal bool IsBrdfSweep;
             internal bool IsAdaptiveBrdf;
             internal string DirectionName = string.Empty;

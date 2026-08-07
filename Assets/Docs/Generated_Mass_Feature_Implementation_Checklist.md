@@ -351,3 +351,16 @@ The corrected delivery may include the unchanged remaining GM-SURFACE.5J files s
 - [ ] Compile in Unity 6000.5.0f1 with no new errors or warnings.
 - [ ] Run the complete suite and require 209/209 decision cases, three valid identity passes, 212 total renders, valid Lambert preflight, alignment contracts passing, zero readback/non-finite failures, and complete renderer-state restoration.
 - [ ] Review the mechanical ownership verdict before authoring a production visual correction.
+
+## GM-SURFACE.5N-H3 — Pixelwise GPU-normal Lambert preflight correction
+
+- [x] Record the 5N-H2 runtime evidence: identity valid with 41,494 pixels, zero invalid IDs, 87 visible triangles, 0.9999759 identity/light IoU, and non-empty finite Lambert response.
+- [x] Remove CPU averaged triangle normals from Lambert validity.
+- [x] Add one auxiliary current-view stored-normal capture using audit mode 14.
+- [x] Compare the stored GPU normal and mode-12 Lambert response pixel-by-pixel through each capture's independently resolved identity orientation.
+- [x] Report configured-direction RMSE, opposite-direction RMSE, best-fit scalar/RMSE, valid normal pixels, positive expected pixels, positive observed pixels, and mean foreground luminance.
+- [x] Require at least 20,000 valid normal pixels, 2,000 positive expected pixels, 2,000 positive observed pixels, mean foreground luminance at least 0.02, and configured normalized RMSE at most 0.01.
+- [x] Preserve all 209 Stage A/B/C/D decision cases; update to four auxiliary validation passes and 213 total render/readback passes.
+- [x] Complete final scope, symbol, matrix, unchanged-production, and package-integrity audit.
+- [ ] Compile in Unity 6000.5.0f1 with no new errors or warnings.
+- [ ] Run the complete suite and require the pixelwise Lambert contract plus all existing ownership-matrix contracts before selecting a production visual correction.

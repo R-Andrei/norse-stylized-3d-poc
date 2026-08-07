@@ -5134,3 +5134,31 @@ both at one -> full-Shore-Support cells resolve to zero velocity.
 The upstream invariant remains authoritative: the pure resolver returns nonnegative absolute downstream speed. In Bulk-Phase transport, a resolved absolute speed of zero becomes the existing negative residual that cancels bulk movement, producing zero world downstream travel rather than upstream travel.
 
 Object Contact slowdown remains independent and multiplicative. Its routing and slowdown field generation, authored controls, and minimum speed factor are unchanged.
+
+
+## RIVER-FOAM-VELOCITY-B1A accepted addendum — footprint-conservative Shore velocity contact
+
+B1A preserves canonical Shore Support in `_FoamTopologySources.b` exactly and adds no resource. The previously reserved alpha channel now stores an independent Layer B velocity-contact mask:
+
+```text
+Topology Sources R = Pressure Support
+Topology Sources G = Lee Support
+Topology Sources B = canonical Shore Support
+Topology Sources A = Shore Velocity Contact Support
+```
+
+Canonical Shore Support remains cell-centre sampled and continues to drive lifecycle/topology semantics. Shore Velocity Contact Support is footprint-conservative so a Foam texel whose lateral footprint intersects the current visible water edge participates in Shore velocity suppression even when its centre lies slightly outside that edge.
+
+For cell-centre signed shore distance `d` and local lateral half-cell width `h`:
+
+```text
+cellTouchesCurrentWater = d + h >= 0
+shoreVelocityDistance = max(0, d - h)
+shoreVelocitySupport = cellTouchesCurrentWater
+    ? 1 - smoothstep(coreWidth, coreWidth + fadeWidth, shoreVelocityDistance)
+    : 0
+```
+
+The stored alpha value additionally applies the existing valid-domain and exact obstacle-footprint gates. Compute canonical velocity and Motion Field debug modes consume alpha for Shore component suppression; lifecycle/material-topology consumers continue to consume blue.
+
+This change adds no texture, buffer, kernel, pass, dispatch, readback, shoreline solve, or additional canonical-velocity texture sample. It changes only which channel of the already loaded topology-source texel supplies Shore velocity influence.

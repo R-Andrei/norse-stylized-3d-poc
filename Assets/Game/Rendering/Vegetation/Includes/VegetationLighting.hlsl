@@ -29,26 +29,15 @@ struct VegetationAdditionalLightAccentData
     float4 sourceDirectionWS;
 };
 
-float4 _WeatherLightRayVegetationAccentDirectionWS;
-float _WeatherLightRayAccentLineIntensity;
-float _WeatherLightRayAccentLineResolvedScale;
-float _WeatherLightRayVegetationAccentCoverage;
-// Legacy diagnostic globals remain for report compatibility. Production
-// Weather accent selection uses the indexed additional-light sidecar below.
-float4 _WeatherLightRayVegetationAccentSpotPositionWS;
 StructuredBuffer<VegetationAdditionalLightAccentData>
     _VegetationAdditionalLightAccentData;
 int _VegetationAdditionalLightAccentDataCount;
-float _WeatherLightRayVegetationDiagnosticMode;
 
 
 struct VegetationDirectLightingResult
 {
     float3 body;
     float3 edge;
-    float lightRaySpotMatch;
-    float publishedDirectionActive;
-    float accentOverrideSelected;
 };
 
 struct VegetationLightingResult
@@ -58,15 +47,6 @@ struct VegetationLightingResult
     float3 localLights;
     float3 edgeAccent;
     float3 combined;
-    float lightLayersVariantActive;
-    float publishedSpotActive;
-    float anyAdditionalLightSeen;
-    float lightRaySpotMatchSeen;
-    float lightRayLayerMatch;
-    float publishedDirectionActive;
-    float accentOverrideSelected;
-    float lightRayBodyLuminance;
-    float lightRayEdgeLuminance;
 };
 
 uint VegetationHashU32(uint value)
@@ -150,20 +130,6 @@ bool VegetationLightMatchesRenderingLayer(
     #else
         return true;
     #endif
-}
-
-bool VegetationHasPublishedLightRaySpot()
-{
-    return _WeatherLightRayVegetationAccentDirectionWS.w > 0.5;
-}
-
-bool VegetationShouldEvaluateWeatherLightRayAccent()
-{
-    bool productionAccentActive =
-        _WeatherLightRayAccentLineResolvedScale > 0.0;
-    bool diagnosticActive =
-        _WeatherLightRayVegetationDiagnosticMode > 0.5;
-    return productionAccentActive || diagnosticActive;
 }
 
 VegetationAdditionalLightAccentData VegetationEmptyAccentData()
@@ -287,9 +253,6 @@ VegetationDirectLightingResult VegetationEvaluateDirectLight(
     VegetationDirectLightingResult result;
     float accentOverrideWeight =
         saturate(vegetationAccentData.parameters.w);
-    result.lightRaySpotMatch = accentOverrideWeight;
-    result.publishedDirectionActive = 0.0;
-    result.accentOverrideSelected = accentOverrideWeight;
 
     float diffuse = VegetationTwoSidedWrappedDiffuse(
         normalWS,
@@ -358,7 +321,6 @@ VegetationDirectLightingResult VegetationEvaluateDirectLight(
         {
             edgeLightDirectionWS = sourceDirectionWS *
                 rsqrt(sourceDirectionLengthSquared);
-            result.publishedDirectionActive = 1.0;
         }
         else
         {
@@ -398,7 +360,7 @@ VegetationDirectLightingResult VegetationEvaluateDirectLight(
     // min(4, ...) LightRay ceiling remains intentionally removed; the controller
     // is the explicit artistic authority.
     float edgeGain = 4.0 * accentResponse;
-    if (result.accentOverrideSelected > 0.5)
+    if (accentOverrideWeight > 0.5)
     {
         float formerAf5dMaximumGain = min(4.0, edgeGain * 12.0);
         float relativeAccentScale =
@@ -426,8 +388,7 @@ VegetationDirectLightingResult VegetationEvaluateDirectLight(
             localEnergy);
 
     float lightRayParticipation = 1.0;
-    if (result.accentOverrideSelected > 0.5 &&
-        _WeatherLightRayVegetationDiagnosticMode <= 0.5)
+    if (accentOverrideWeight > 0.5)
     {
         float coverage =
             saturate(vegetationAccentData.parameters.y);
@@ -441,7 +402,7 @@ VegetationDirectLightingResult VegetationEvaluateDirectLight(
     }
 
     float resolvedEdgeProfile = saturate(edgeMask);
-    if (result.accentOverrideSelected > 0.5)
+    if (accentOverrideWeight > 0.5)
     {
         // SOFTNESS CONTRACT:
         // 0 = crisp/narrow selected edge profile
@@ -495,25 +456,6 @@ VegetationLightingResult VegetationEvaluateLighting(
     float localEdgeActivationThreshold)
 {
     VegetationLightingResult result;
-    bool vegetationDiagnosticActive =
-        _WeatherLightRayVegetationDiagnosticMode > 0.5;
-    #if defined(_LIGHT_LAYERS)
-        result.lightLayersVariantActive = 1.0;
-    #else
-        result.lightLayersVariantActive = 0.0;
-    #endif
-    result.publishedSpotActive =
-        vegetationDiagnosticActive &&
-        _VegetationAdditionalLightAccentDataCount > 0
-            ? 1.0
-            : 0.0;
-    result.anyAdditionalLightSeen = 0.0;
-    result.lightRaySpotMatchSeen = 0.0;
-    result.lightRayLayerMatch = 0.0;
-    result.publishedDirectionActive = 0.0;
-    result.accentOverrideSelected = 0.0;
-    result.lightRayBodyLuminance = 0.0;
-    result.lightRayEdgeLuminance = 0.0;
 
     float3 resolvedNormalWS = normalize(inputData.normalWS);
     result.ambient =
@@ -569,28 +511,10 @@ VegetationLightingResult VegetationEvaluateLighting(
                 VegetationAdditionalLightAccentData additionalAccentData =
                     VegetationGetAdditionalLightAccentData(lightIndex);
 
-                bool isWeatherLightRay = false;
-                if (vegetationDiagnosticActive)
-                {
-                    result.anyAdditionalLightSeen = 1.0;
-                    isWeatherLightRay =
-                        additionalAccentData.parameters.w > 0.5;
-                    if (isWeatherLightRay)
-                    {
-                        result.lightRaySpotMatchSeen = 1.0;
-                    }
-                }
-
                 bool matchesRenderingLayer =
                     VegetationLightMatchesRenderingLayer(
                         additionalLight,
                         meshRenderingLayers);
-                if (vegetationDiagnosticActive &&
-                    isWeatherLightRay &&
-                    matchesRenderingLayer)
-                {
-                    result.lightRayLayerMatch = 1.0;
-                }
 
                 if (matchesRenderingLayer)
                 {
@@ -616,13 +540,6 @@ VegetationLightingResult VegetationEvaluateLighting(
                             0.0,
                             localEdgeActivationThreshold);
                     result.localLights += additionalResult.body;
-                    if (vegetationDiagnosticActive &&
-                        isWeatherLightRay)
-                    {
-                        result.lightRayBodyLuminance = max(
-                            result.lightRayBodyLuminance,
-                            VegetationLuminance(additionalResult.body));
-                    }
                 }
             }
         #endif
@@ -636,11 +553,6 @@ VegetationLightingResult VegetationEvaluateLighting(
                 half4(1.0, 1.0, 1.0, 1.0));
             VegetationAdditionalLightAccentData additionalAccentData =
                 VegetationGetAdditionalLightAccentData(lightIndex);
-
-            if (vegetationDiagnosticActive)
-            {
-                result.anyAdditionalLightSeen = 1.0;
-            }
 
             bool matchesRenderingLayer =
                 VegetationLightMatchesRenderingLayer(
@@ -672,24 +584,6 @@ VegetationLightingResult VegetationEvaluateLighting(
                         localEdgeActivationThreshold);
                 result.localLights += additionalResult.body;
                 result.edgeAccent += additionalResult.edge;
-                if (vegetationDiagnosticActive &&
-                    additionalResult.lightRaySpotMatch > 0.5)
-                {
-                    result.lightRaySpotMatchSeen = 1.0;
-                    result.lightRayLayerMatch = 1.0;
-                    result.publishedDirectionActive = max(
-                        result.publishedDirectionActive,
-                        additionalResult.publishedDirectionActive);
-                    result.accentOverrideSelected = max(
-                        result.accentOverrideSelected,
-                        additionalResult.accentOverrideSelected);
-                    result.lightRayBodyLuminance = max(
-                        result.lightRayBodyLuminance,
-                        VegetationLuminance(additionalResult.body));
-                    result.lightRayEdgeLuminance = max(
-                        result.lightRayEdgeLuminance,
-                        VegetationLuminance(additionalResult.edge));
-                }
             }
         LIGHT_LOOP_END
     #endif
@@ -700,52 +594,6 @@ VegetationLightingResult VegetationEvaluateLighting(
         result.localLights;
 
     return result;
-}
-
-float3 VegetationResolveLightRayDiagnosticColour(
-    VegetationLightingResult lighting)
-{
-    if (lighting.publishedSpotActive < 0.5)
-    {
-        return float3(1.0, 0.0, 1.0);
-    }
-
-    if (lighting.anyAdditionalLightSeen < 0.5)
-    {
-        return float3(1.0, 0.0, 0.0);
-    }
-
-    if (lighting.lightRaySpotMatchSeen < 0.5)
-    {
-        return float3(1.0, 0.25, 0.0);
-    }
-
-    if (lighting.lightRayLayerMatch < 0.5)
-    {
-        return float3(0.65, 0.0, 1.0);
-    }
-
-    if (lighting.publishedDirectionActive < 0.5)
-    {
-        return float3(1.0, 1.0, 0.0);
-    }
-
-    if (lighting.accentOverrideSelected < 0.5)
-    {
-        return float3(0.0, 1.0, 1.0);
-    }
-
-    if (lighting.lightRayBodyLuminance <= 0.00001)
-    {
-        return float3(0.0, 0.08, 0.35);
-    }
-
-    if (lighting.lightRayEdgeLuminance <= 0.00001)
-    {
-        return float3(0.0, 0.20, 1.0);
-    }
-
-    return float3(0.0, 1.0, 0.0);
 }
 
 float3 VegetationResolveLighting(

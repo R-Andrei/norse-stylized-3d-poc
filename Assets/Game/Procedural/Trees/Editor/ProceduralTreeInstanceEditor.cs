@@ -484,7 +484,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "Root Quality Evaluation",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds a temporary 8-case Wych Elm board for the grounded root-foot model: authored roots, the operator's 400-degree / 1.2 Reach / 0.9 Thickness profile, isolated Reach and Thickness stress, opposite twist handedness, and Persistence 0 / 1. Each case receives a neutral close-root capture and an exact game-camera context capture. The evaluation changes no recipes, exact controls, scene objects or gallery meshes; it advances incrementally, checkpoints partial output and remains cancellable.",
+                "Builds a temporary 15-case Wych Elm candidate board comparing Production Current against the TREE-ROOTS.4A immediate-quadratic foot shape and its 2% Root Height fallback. Candidate-only probes include Root Thickness 1.5 / 2.0 and Reach 2.0 without changing the public control range or bark algorithm. Each successful case receives a neutral close-root capture and an exact game-camera context capture. The evaluation changes no recipes, exact controls, scene objects or gallery meshes; it advances incrementally, checkpoints partial output and remains cancellable.",
                 MessageType.None);
             if (TreeRootQualityEvaluation.IsRunning)
             {
@@ -502,7 +502,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 EditorGUILayout.LabelField(
                     "Timing",
                     TreeRootQualityEvaluation.CurrentEta);
-                if (GUILayout.Button("Cancel Grounded Root-Foot Evaluation"))
+                if (GUILayout.Button("Cancel Root-Mass Candidate Evaluation"))
                 {
                     TreeRootQualityEvaluation.RequestCancel();
                 }
@@ -514,7 +514,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootCollapseTournament.IsRunning))
                 {
-                    if (GUILayout.Button("Run Grounded Root-Foot Board"))
+                    if (GUILayout.Button("Run Root-Mass Candidate Board"))
                     {
                         TreeRootQualityEvaluation.Start(instance);
                     }
@@ -525,16 +525,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 string.IsNullOrEmpty(
                     TreeRootQualityEvaluation.LastReportPath)))
             {
-                if (GUILayout.Button("Open Grounded Root-Foot Board"))
+                if (GUILayout.Button("Open Root-Mass Candidate Board"))
                 {
                     TreeRootQualityEvaluation.OpenBoard();
                 }
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Copy Grounded Root-Foot Report"))
+                if (GUILayout.Button("Copy Root-Mass Candidate Report"))
                 {
                     TreeRootQualityEvaluation.CopyLastReport();
                 }
-                if (GUILayout.Button("Open Grounded Root-Foot Folder"))
+                if (GUILayout.Button("Open Root-Mass Candidate Folder"))
                 {
                     TreeRootQualityEvaluation.OpenOutputFolder();
                 }

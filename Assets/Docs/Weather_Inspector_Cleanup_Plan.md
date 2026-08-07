@@ -2,9 +2,9 @@
 
 ## Status
 
-**Patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A`
+**Current patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`
 
-**Current state:** source implementation and static closure audit completed against the supplied Archive 48 source. Unity compilation, runtime validation, and the later serialized mandatory-preset migration remain pending.
+**Current state:** V1.3A plus the A1 footprint recovery and A2 stateless turnover correction are the accepted runtime baseline. V1.3A3 shared-vegetation closure is implemented and has passed the final static/cross-subsystem audit (`62 / 62`). Unity 6000.5.0f1 compilation and runtime validation remain pending. The serialized mandatory-preset migration remains a later bounded patch.
 
 ## Objective
 
@@ -23,7 +23,111 @@ The patch will:
 9. replace stale Weather documentation with the current agreed architecture;
 10. preserve `_TEST.asset` as an intentional high-strength testing preset that future production orchestration must ignore.
 
-## Approved files
+## V1.3A3 — Vegetation sidecar closure plan
+
+### Objective
+
+Finish the already-completed migration from legacy LightRay vegetation globals/geometric diagnostics to the indexed per-additional-light sidecar without changing the protected sidecar layout, renderer ordering, ordinary vegetation lighting, cloud behavior, automatic population, surface Spot geometry, or serialized LightRay authoring.
+
+V1.3A3 must also correct the remaining production intensity-authority defect: the indexed sidecar strength must be derived from the preset-resolved `AccentLineIntensity` value, including preset-transition interpolation, rather than directly from the legacy Controller fallback field.
+
+### Approved V1.3A3 files
+
+Modify:
+
+- `Assets/Docs/Weather_Inspector_Cleanup_Plan.md`
+- `Assets/Docs/Weather_Light_Ray_Architecture.md`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+- `Assets/Docs/Stylized_Vegetation_Architecture.md`
+- `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherLightRayController.cs`
+- `Assets/Game/Rendering/Vegetation/Includes/VegetationLighting.hlsl`
+- `Assets/Game/Rendering/Vegetation/Shaders/SH_StylizedVegetationBenchmark.shader`
+
+Protected and reviewed but byte-identical in this patch:
+
+- `Assets/Game/Rendering/Weather/WeatherLightRayRendererFeature.cs`
+
+No scene, prefab, material, renderer asset, preset asset, `.meta`, layer, tag, package, project-setting, cloud-runtime, population-runtime, Anchor, or serialized-asset change is approved.
+
+### Reviewed evidence
+
+- The current Controller still declares and republishes six legacy Weather vegetation shader globals, an inactive published Spot position/direction state, diagnostic-mode state, and two unused legacy direction helpers. Production per-Light metadata is already supplied through the Light-to-sidecar dictionaries consumed by the renderer feature.
+- The current vegetation include retains the protected two-`float4` sidecar plus legacy globals, diagnostic-only result fields, diagnostic-mode coverage bypass, diagnostic bookkeeping in both additional-light loops, and a false-colour diagnostic resolver.
+- The benchmark vegetation shader has one remaining diagnostic-mode fragment return before the normal production lighting resolve.
+- Repository-wide consumer search found no supported activation path for the legacy vegetation diagnostic mode and no production consumer of the legacy global Spot/direction/intensity/coverage bridge beyond the obsolete HLSL branches being removed.
+- The renderer feature publishes one camera-local sidecar record per URP additional light and is the protected producer. Its record stride, ordering, zero fallback buffer, binding pass, Forward/Forward+ index alignment, and publication telemetry are not modified.
+- The canonical vegetation architecture already defines the indexed sidecar as the active contract but retains historical sections that describe geometric matching as if current. Those sections must remain as history while current-state wording is corrected.
+
+### Invariants
+
+- `VegetationAdditionalLightAccentData` remains exactly two `float4` values in the same order and semantics.
+- `parameters.w` remains the explicit Weather-LightRay identity/override flag independently of artistic intensity. Intensity `0` must therefore still publish an active override record when the Spot is a LightRay so ordinary punctual edge-accent fallback cannot reappear.
+- URP `Light.direction`, attenuation, colour, cone, range, and rendering-layer filtering remain authoritative for ordinary vegetation body lighting.
+- Only indexed `sourceDirectionWS` may replace the radial Spot direction for the Weather-specific stylized blade-edge side selector.
+- Ordinary point/spot lights receive zero sidecar records and retain the generic punctual edge path.
+- Coverage remains a stable whole-card threshold and never scales surviving radiance.
+- Softness shapes only the selected Weather blade-edge profile.
+- The current surface Spot Light, atmospheric renderer, cloud producer, automatic population, beam evolution, lifecycle, and storage behavior remain unchanged.
+
+### Non-goals
+
+- no sidecar layout or stride change;
+- no renderer-feature modification;
+- no new diagnostic suite or false-colour replacement;
+- no vegetation material recalibration;
+- no coverage, softness, attenuation, or edge-profile redesign;
+- no cloud, automatic-population, source-orchestration, Anchor, preset-serialization, or `_TEST.asset` change;
+- no mandatory-preset migration.
+
+### File-by-file sequence
+
+1. Update this canonical plan and lock the V1.3A3 scope before implementation.
+2. Remove Controller legacy global-publication IDs/state/helpers/calls while preserving sidecar dictionaries, publication telemetry, surface Spots, and cached exponential scale.
+3. Change the cached exponential input from the serialized fallback field to the preset-resolved `AccentLineIntensity` property.
+4. Reduce the vegetation include to production body/edge result state plus the protected indexed sidecar; remove legacy globals, diagnostic bookkeeping, coverage diagnostic bypass, and false-colour resolver.
+5. Remove only the obsolete diagnostic fragment-return branch from the benchmark shader.
+6. Update current Weather and vegetation documentation while preserving clearly historical patch records.
+7. Run cross-subsystem shader/include audit, exact diff/scope audit, dead-symbol search, sidecar-layout comparison, syntax/static checks, and protected-renderer byte comparison.
+8. Record Unity compilation/runtime validation as pending with exact current Inspector routes verified from final source.
+
+### Risks and safeguards
+
+- **Sidecar layout regression:** compare the final HLSL record declaration with the protected C# record and require the renderer feature to remain byte-identical.
+- **Zero-intensity semantic regression:** keep `parameters.w = 1` for LightRay Spots even when the resolved strength is zero; only `parameters.x` becomes zero.
+- **Preset-transition regression:** resolve cache input through `AccentLineIntensity` so the cached exponential mapping follows current preset interpolation each controller tick when the resolved input changes.
+- **Ordinary-light regression:** remove only Weather-diagnostic branches and retain the generic punctual-light edge path byte-for-byte where practical.
+- **Shared-include regression:** repository-wide include search confirms the benchmark vegetation shader is the sole current shader consumer; final audit must repeat this search.
+- **D3D12 missing-SRV regression:** the renderer feature's per-camera zero fallback binding and sidecar binding pass are protected and unchanged.
+
+### Acceptance criteria
+
+- all six legacy Weather vegetation shader-global names are absent from production C#/HLSL source;
+- no legacy Spot position/direction publication, diagnostic-mode publication, diagnostic colour resolver, or diagnostic shader branch remains;
+- no `ProductionVegetationAccentMatchingEnabled`, `SupportedVegetationAccentSpots`, or legacy vegetation direction helper remains without a live consumer;
+- the sidecar remains two `float4` values with unchanged C#/HLSL semantics and renderer stride;
+- the renderer feature is byte-identical to the V1.3A2 baseline;
+- sidecar strength is calculated from preset-resolved `AccentLineIntensity`, not directly from the fallback field;
+- intensity `0` keeps the indexed override flag active for LightRay Spots while producing zero Weather-specific edge strength;
+- coverage and softness behavior are unchanged;
+- ordinary punctual-light body and edge response are unchanged;
+- Game and Scene View sidecar publication remains camera-local and the valid zero fallback remains bound for other cameras;
+- no missing sidecar SRV warning appears in Unity;
+- two or more simultaneous LightRay Spots retain vegetation accents in Unity;
+- Unity 6000.5.0f1 compiles C# and vegetation shaders with zero errors.
+
+### V1.3A3 status
+
+- [x] Complete review surface and repository-wide consumer scan.
+- [x] Record approved scope, invariants, risks, and acceptance gates in the canonical plan.
+- [x] Controller legacy bridge removal and intensity-authority correction.
+- [x] HLSL diagnostic/global cleanup.
+- [x] Benchmark shader diagnostic-branch removal.
+- [x] Current-state documentation reconciliation.
+- [x] Cross-subsystem final audit and static validation (`62 / 62`).
+- [ ] Unity compilation and runtime validation.
+
+## V1.3A approved files (historical completed scope)
 
 ### Modify
 
@@ -49,7 +153,7 @@ The patch will:
 - `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRayPopulation_Daylight.asset`
 - `Assets/Game/Demo/Profiles/Weather/LightRays/WeatherLightRayPopulation_IndependentNight.asset`
 
-No scene, prefab, material, renderer asset, shader, HLSL include, layer, tag, package, or project-setting change is approved.
+For V1.3A itself, no scene, prefab, material, renderer asset, shader, HLSL include, layer, tag, package, or project-setting change was approved. V1.3A3 supersedes only that earlier shader/HLSL exclusion with the explicitly bounded shared-vegetation scope above.
 
 ## Reviewed evidence
 
@@ -174,7 +278,7 @@ Delete:
 - separate Beam Evolution Runtime Audit;
 - Controller vegetation diagnostic suite state and Inspector actions only where removal does not touch shared shader/HLSL code.
 
-The legacy vegetation diagnostic shader globals and false-colour branches remain for the separately approved shader cleanup patch. This patch must not alter the indexed sidecar layout or shared vegetation files.
+Historical V1.3A stopped at the Controller/Inspector boundary and deliberately left the legacy vegetation shader globals and false-colour branches for a separately approved shared-shader cleanup. V1.3A3 is that bounded cleanup and preserves the indexed sidecar layout exactly.
 
 ## Preserved behavior and invariants
 

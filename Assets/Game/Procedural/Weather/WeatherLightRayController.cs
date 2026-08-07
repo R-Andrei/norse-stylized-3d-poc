@@ -23,34 +23,13 @@ namespace ProgrammaticStylized3D.Weather
         private const int DefaultRenderingLayerMask = 1;
         private const int SurfaceSpotRenderingLayerMask =
             DefaultRenderingLayerMask;
-        private const float VegetationAccentDirectionMinimumLengthSquared =
-            0.000001f;
         private const float SharedAccentLineMaximumRelativeScale = 1000f;
         private const float SharedAccentLineExponentialBase =
             SharedAccentLineMaximumRelativeScale + 1f;
         private const float SharedAccentLineOutputMultiplier = 0.2f;
         private const float SharedAccentLineBaselineDefault = 0.03f;
         private const string ImplementationPatchIdentifier =
-            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A";
-
-        private static readonly int VegetationAccentDirectionId =
-            Shader.PropertyToID(
-                "_WeatherLightRayVegetationAccentDirectionWS");
-        private static readonly int VegetationAccentSpotPositionId =
-            Shader.PropertyToID(
-                "_WeatherLightRayVegetationAccentSpotPositionWS");
-        private static readonly int VegetationAccentDiagnosticModeId =
-            Shader.PropertyToID(
-                "_WeatherLightRayVegetationDiagnosticMode");
-        private static readonly int AccentLineIntensityId =
-            Shader.PropertyToID(
-                "_WeatherLightRayAccentLineIntensity");
-        private static readonly int AccentLineResolvedScaleId =
-            Shader.PropertyToID(
-                "_WeatherLightRayAccentLineResolvedScale");
-        private static readonly int VegetationAccentCoverageId =
-            Shader.PropertyToID(
-                "_WeatherLightRayVegetationAccentCoverage");
+            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE";
 
         private struct RuntimeSlot
         {
@@ -233,14 +212,9 @@ namespace ProgrammaticStylized3D.Weather
         private WeatherLightRaySourceState moonSourceState;
         private Camera cachedMainCamera;
         private Camera resolvedRenderCamera;
-        private Vector3 publishedVegetationAccentDirection;
-        private Vector3 publishedVegetationAccentSpotPosition;
-        private float publishedVegetationAccentSpotRange;
         private float cachedAccentLineInput = float.NaN;
-        private float cachedAccentLineNormalized;
         private float cachedAccentLineResolvedScale;
         private bool sharedAccentLineCacheDirty = true;
-        private bool vegetationAccentOverrideActive;
         private string lastError = string.Empty;
         private readonly Dictionary<EntityId, Vector4> vegetationAccentOverridesByLight =
             new Dictionary<EntityId, Vector4>();
@@ -316,12 +290,6 @@ namespace ProgrammaticStylized3D.Weather
                 return cachedAccentLineResolvedScale;
             }
         }
-        public bool ProductionVegetationAccentMatchingEnabled =>
-            AccentLineResolvedScale > 0f;
-        public int SupportedVegetationAccentSpots => Mathf.Clamp(
-            StorageCapacity,
-            MinimumStorageCapacity,
-            MaximumStorageCapacity);
         public int PublishedVegetationAdditionalLightCount =>
             publishedVegetationAdditionalLightCount;
         public int PublishedVegetationWeatherOverrideCount =>
@@ -409,7 +377,6 @@ namespace ProgrammaticStylized3D.Weather
 
             PublishedController = this;
             MarkSharedAccentLineCacheDirty();
-            PublishVegetationAccentDiagnosticMode(false);
             EnsureStorage();
             TickController();
         }
@@ -1353,7 +1320,6 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             EnsureStorage();
-            PublishSharedAccentLineIntensity();
             ResolveSourceStates();
             ResolveRenderCamera();
             lastError = string.Empty;
@@ -1822,11 +1788,6 @@ namespace ProgrammaticStylized3D.Weather
             if (runtimeSlots == null)
             {
                 DisableAllSurfaceSpotLights();
-                PublishVegetationAccentOverride(
-                    Vector3.zero,
-                    0f,
-                    Vector3.zero,
-                    false);
                 return;
             }
 
@@ -1889,14 +1850,6 @@ namespace ProgrammaticStylized3D.Weather
                     }
                 }
             }
-
-            // V1.2C3 no longer publishes one production-match Spot. These
-            // globals remain inactive for the legacy diagnostic colour path.
-            PublishVegetationAccentOverride(
-                Vector3.zero,
-                0f,
-                Vector3.zero,
-                false);
 
             if (runtimeSurfaceLights == null)
             {
@@ -2090,48 +2043,6 @@ namespace ProgrammaticStylized3D.Weather
             return light.enabled;
         }
 
-        private static bool TryResolveVegetationAccentDirection(
-            WeatherLightRaySnapshot raySnapshot,
-            WeatherLightRaySourceState sourceState,
-            out Vector3 accentDirection)
-        {
-            accentDirection = ProjectHorizontalDirection(
-                -raySnapshot.RayDirectionWorld);
-            if (accentDirection.sqrMagnitude >=
-                VegetationAccentDirectionMinimumLengthSquared)
-            {
-                accentDirection.Normalize();
-                return true;
-            }
-
-            accentDirection = ProjectHorizontalDirection(
-                sourceState.DirectionToSourceWorld);
-            if (accentDirection.sqrMagnitude >=
-                VegetationAccentDirectionMinimumLengthSquared)
-            {
-                accentDirection.Normalize();
-                return true;
-            }
-
-            accentDirection = Vector3.zero;
-            return false;
-        }
-
-        private static Vector3 ProjectHorizontalDirection(
-            Vector3 direction)
-        {
-            if (direction.sqrMagnitude <
-                VegetationAccentDirectionMinimumLengthSquared)
-            {
-                return Vector3.zero;
-            }
-
-            Vector3 normalized = direction.normalized;
-            return normalized -
-                Vector3.up * Vector3.Dot(normalized, Vector3.up);
-        }
-
-
         private static float EvaluateSharedAccentLineRelativeScale(
             float normalizedIntensity)
         {
@@ -2153,7 +2064,7 @@ namespace ProgrammaticStylized3D.Weather
         private void RefreshSharedAccentLineCacheIfRequired()
         {
             float normalized = lightRaysEnabled
-                ? Mathf.Clamp01(accentLineIntensity)
+                ? Mathf.Clamp01(AccentLineIntensity)
                 : 0f;
             if (!sharedAccentLineCacheDirty &&
                 Mathf.Approximately(cachedAccentLineInput, normalized))
@@ -2162,79 +2073,9 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             cachedAccentLineInput = normalized;
-            cachedAccentLineNormalized = normalized;
             cachedAccentLineResolvedScale =
                 EvaluateSharedAccentLineRelativeScale(normalized);
             sharedAccentLineCacheDirty = false;
-        }
-
-        private void PublishSharedAccentLineIntensity()
-        {
-            if (PublishedController != this)
-            {
-                return;
-            }
-
-            RefreshSharedAccentLineCacheIfRequired();
-            Shader.SetGlobalFloat(
-                AccentLineIntensityId,
-                cachedAccentLineNormalized);
-            Shader.SetGlobalFloat(
-                AccentLineResolvedScaleId,
-                cachedAccentLineResolvedScale);
-            Shader.SetGlobalFloat(
-                VegetationAccentCoverageId,
-                lightRaysEnabled
-                    ? Mathf.Clamp01(lightRayVegetationAccentCoverage)
-                    : 0f);
-        }
-
-        private void PublishVegetationAccentOverride(
-            Vector3 spotPosition,
-            float spotRange,
-            Vector3 direction,
-            bool active)
-        {
-            bool valid = active &&
-                spotRange > SurfaceSpotEnableThreshold &&
-                direction.sqrMagnitude >=
-                    VegetationAccentDirectionMinimumLengthSquared;
-            publishedVegetationAccentSpotPosition = valid
-                ? spotPosition
-                : Vector3.zero;
-            publishedVegetationAccentSpotRange = valid
-                ? spotRange
-                : 0f;
-            publishedVegetationAccentDirection = valid
-                ? direction.normalized
-                : Vector3.zero;
-            vegetationAccentOverrideActive = valid;
-            Shader.SetGlobalVector(
-                VegetationAccentSpotPositionId,
-                new Vector4(
-                    publishedVegetationAccentSpotPosition.x,
-                    publishedVegetationAccentSpotPosition.y,
-                    publishedVegetationAccentSpotPosition.z,
-                    publishedVegetationAccentSpotRange));
-            Shader.SetGlobalVector(
-                VegetationAccentDirectionId,
-                new Vector4(
-                    publishedVegetationAccentDirection.x,
-                    publishedVegetationAccentDirection.y,
-                    publishedVegetationAccentDirection.z,
-                    valid ? 1f : 0f));
-        }
-
-        private void PublishVegetationAccentDiagnosticMode(bool active)
-        {
-            if (PublishedController != this)
-            {
-                return;
-            }
-
-            Shader.SetGlobalFloat(
-                VegetationAccentDiagnosticModeId,
-                active ? 1f : 0f);
         }
 
         private static Color ResolveSurfaceSpotLightColour(
@@ -3097,19 +2938,6 @@ namespace ProgrammaticStylized3D.Weather
                 automaticPopulationRuntime.Shutdown(
                     this,
                     true);
-            }
-
-            if (PublishedController == this)
-            {
-                Shader.SetGlobalFloat(AccentLineIntensityId, 0f);
-                Shader.SetGlobalFloat(AccentLineResolvedScaleId, 0f);
-                Shader.SetGlobalFloat(VegetationAccentCoverageId, 0f);
-                PublishVegetationAccentOverride(
-                    Vector3.zero,
-                    0f,
-                    Vector3.zero,
-                    false);
-                PublishVegetationAccentDiagnosticMode(false);
             }
 
             DestroyAllSurfaceSpotLights();

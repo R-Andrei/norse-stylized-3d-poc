@@ -5351,3 +5351,123 @@ Unavailable validation and concrete next action:
 - Unity 6000.5.0f1 C# compilation and compute/water-shader import: apply the changed files and provide complete Console output if any error appears.
 - Play Mode velocity validation: use Foam Motion Field and Foam Motion Field + Cell Grid with the exact control combinations in the validation section.
 - Runtime profiling: after visual acceptance, compare `SimulateFoam` GPU time at both controls zero versus one. The implementation adds one existing-texture Shore Support load per canonical velocity resolution and no additional pass or allocation.
+
+## RIVER-FOAM-VELOCITY-B1A — Conservative Shore-Contact Velocity Mask
+
+Status: implemented in source; Gate 1–4 offline review complete; Unity compilation/shader import and Play Mode visual validation pending.
+
+### Objective
+
+Close the visible one-cell gaps between the current-shore boundary and the Layer B Shore velocity-suppression zone without changing canonical Shore Support, lifecycle, spawning, transport mathematics, authored suppression controls, or adding any resource/pass.
+
+### Approved files
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+```
+
+No other file may change.
+
+### Reviewed evidence
+
+1. `CS_RiverFoam.compute::ComposeTopology()` computes canonical Shore Support from the Foam cell centre and writes it to `_FoamTopologySources.b`. A boundary cell whose footprint intersects water can therefore have `nearestCurrentShore < 0` at its centre and receive zero canonical Shore Support.
+2. `CS_RiverFoam.Motion.hlsl::FoamLoadShoreVelocityInfluence()` currently consumes `_FoamTopologySourcesRead.b` for the B1 component-suppression controls.
+3. `SH_CleanStylizedRiver.shader` Motion Field modes likewise consume `_FoamTopologySources.b`, so the debug view and transport share the same current gap.
+4. `_FoamTopologySources.a` is written as zero by `ComposeTopology()` and has no current material-topology consumer. `FoamResolveMaterialTopology()` consumes only RGB, preserving alpha for an independent velocity-only contact mask.
+5. `FoamMetricRow.widthsAndSpacing.w` is the local minimum lateral Foam-cell spacing and is available in `ComposeTopology()` without another lookup or resource.
+
+### Accepted design
+
+Preserve canonical Shore Support in channel B exactly. Reuse channel A for a velocity-only footprint-conservative Shore contact mask:
+
+```text
+Topology Sources R = Pressure Support
+Topology Sources G = Lee Support
+Topology Sources B = canonical Shore Support (unchanged)
+Topology Sources A = Shore Velocity Contact Support (new)
+```
+
+For signed cell-centre distance `d = nearestCurrentShore` and local half lateral cell width `h = 0.5 * metric.widthsAndSpacing.w`:
+
+```text
+cellTouchesCurrentWater = d + h >= 0
+shoreVelocityDistance = max(0, d - h)
+```
+
+Then:
+
+```text
+shoreVelocitySupport = cellTouchesCurrentWater
+    ? 1 - smoothstep(coreWidth, coreWidth + fadeWidth, shoreVelocityDistance)
+    : 0
+```
+
+The final alpha channel is:
+
+```text
+shoreVelocitySupport * validDomainMask * (1 - obstacleFootprint)
+```
+
+Transport and Motion Field debug both consume alpha instead of blue. Canonical Shore Support and all lifecycle/topology consumers continue using blue unchanged.
+
+### Acceptance criteria
+
+- With both Shore suppression controls at `1`, the zero-velocity band reaches every valid Foam cell whose footprint touches the current visible shore; no one-cell white velocity gaps remain between the bank and suppressed region.
+- Lateral-only and downstream-only suppression retain their B1 component semantics.
+- Motion Field and Motion Field + Cell Grid visibly match transport because both consume the same alpha mask.
+- Canonical Shore Support `.b`, lifecycle/aging, spawning, transport scheme mathematics, Object slowdown, scenes, prefabs, materials, and authored widths remain unchanged.
+- New textures/buffers/kernels/passes/dispatches/readbacks: zero.
+
+### File-by-file implementation sequence
+
+1. `CS_RiverFoam.compute`: derive the footprint-conservative velocity mask during existing `ComposeTopology()` and write it to `_FoamTopologySources.a` while leaving RGB unchanged.
+2. `CS_RiverFoam.Motion.hlsl`: consume `.a` in `FoamLoadShoreVelocityInfluence()`.
+3. `SH_CleanStylizedRiver.shader`: consume `.a` in Motion Field debug modes.
+4. `River_Foam_Stage6_Architecture.md`: document the independent channel-A velocity-contact contract and its non-impact on lifecycle.
+5. Re-read the full review surface, compare against the pre-B1A tree, run static scope/contract checks, and record Gate 4 evidence here.
+
+### Risks and constraints
+
+- Alpha must remain velocity-only; no lifecycle/material topology resolver may start consuming it.
+- The conservative edge test must not expand into dry cells farther than half a local lateral Foam cell beyond the current visible shore.
+- Obstacle footprint exclusion remains authoritative.
+- No new hot-path texture sample is permitted; B1 already loads the complete topology-source texel and will switch channel selection only.
+
+### Validation
+
+Pending Unity 6000.5.0f1 compilation/shader import and Play Mode Motion Field inspection in the user project.
+
+### Implementation and Gate 4 audit record
+
+Implemented differences from B1:
+
+1. `ComposeTopology()` preserves canonical Shore Support in `_FoamTopologySources.b` and writes footprint-conservative Shore Velocity Contact Support to the previously reserved alpha channel.
+2. `FoamLoadShoreVelocityInfluence()` consumes alpha; the shared B1 component-suppression mathematics are unchanged.
+3. Motion Field debug modes consume the same alpha mask, preserving direct transport/debug parity.
+4. Lifecycle/material-topology resolution continues to consume canonical blue Shore Support only.
+5. No new texture, buffer, kernel, pass, dispatch, readback, shoreline solve, control, serialized asset, or hot-path topology-source sample was added.
+
+Offline Gate 4 evidence:
+
+```text
+Changed files: exactly the 5 approved paths
+Serialized Unity assets changed: 0
+Static audit: 20/20 PASS
+Compute kernel count: unchanged (22)
+Canonical shoreSupport formula: preserved
+Material topology shoreSupport source: anchoredSources.b preserved
+Material topology alpha consumers: 0
+Compute velocity Shore influence: _FoamTopologySourcesRead.a
+Motion Field Shore influence: _FoamTopologySources.a
+New resource declarations in modified shader files: 0
+HLSL/Shader delimiter checks: PASS
+```
+
+Unavailable validation and concrete next action:
+
+- Unity 6000.5.0f1 compute/water-shader import: apply the changed files and provide the complete Console output if compilation/import fails.
+- Play Mode visual validation: with both Shore suppression controls at `1`, inspect Foam Motion Field and confirm the stationary band touches the visible shore without the prior one-cell white gaps.

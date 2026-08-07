@@ -179,3 +179,11 @@ The complete Generated Mass lighting-ownership audit no longer depends on `_SPEC
 Stage A uses black-albedo specular-only captures for the legacy material and both HLSL F0 values. Diffuse is derived per triangle as full response minus specular-only response, preserving signed RGB and luminance evidence without requiring a Shader Graph keyword. Stage B compares actual material response and generated/stored normals in the four worst directions; Stage C checks the two worst directions from two additional camera azimuths; Stage D closes indirect and actual-scene response. The editor-only contract is 209 decision cases plus three identity passes, 212 render passes total, with zero gameplay cost and no production asset mutation.
 
 The 5N-H2 offline audit passes `85 / 85`. The implementation delta is limited to the two editor diagnostic classes and three canonical documents; the dedicated identity shader and shared production forward includes remain byte-identical to 5N-H1. Unity compilation and runtime execution remain pending.
+
+## GM-SURFACE.5N-H3 pixelwise Lambert preflight
+
+The 5N-H2 identity and lighting readback infrastructure is retained. Runtime evidence showed the current-view identity/light buffers align at 0.9999759 IoU with zero invalid identity pixels, while the Lambert gate failed because it compared per-pixel shader lighting against one CPU-averaged normal per triangle.
+
+H3 replaces that approximation with one auxiliary audit-mode-14 stored-normal capture. The preflight compares the exact interpolated GPU normal field pixel-by-pixel against the controlled mode-12 Lambert response, evaluates configured and opposite light directions plus a best scalar fit, and only queues the existing ownership matrix after this exact contract passes. The 209 decision cases remain unchanged; the added normal capture raises auxiliary validation passes to four and total render/readback passes to 213.
+
+This remains editor-only, incremental, cancellable, and asynchronous. Production materials, shared shaders, geometry, scenes, prefabs, profiles, layers, tags, and runtime rendering cost are unchanged.

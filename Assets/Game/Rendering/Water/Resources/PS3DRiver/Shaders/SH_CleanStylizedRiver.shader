@@ -1317,7 +1317,7 @@ Shader "PS3D/Stylized River Water"
                         topologySourceDimensions - 1);
                     float shoreInfluence = saturate(
                         _FoamTopologySources.Load(
-                            int3(topologySourceCoordinate, 0)).b);
+                            int3(topologySourceCoordinate, 0)).a);
                     RiverWaterFoamResolvedVelocity resolvedVelocity =
                         RiverWaterResolveFoamVelocityContract(
                             lane,

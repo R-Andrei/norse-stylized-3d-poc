@@ -59,10 +59,10 @@ float FoamLoadShoreVelocityInfluence(float2 coordinate)
         return 0.0;
     }
 
-    // B = existing current Shore Support. Reuse the Layer A/B support
-    // product directly; no separate velocity mask or shoreline solve exists.
+    // A = footprint-conservative Shore Velocity Contact Support. Canonical
+    // Shore Support remains in B for lifecycle/topology consumers.
     return saturate(
-        _FoamTopologySourcesRead.Load(int3(texel, 0)).b);
+        _FoamTopologySourcesRead.Load(int3(texel, 0)).a);
 }
 
 float2 FoamLoadObstacleRoutingCell(float2 coordinate)

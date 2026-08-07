@@ -1172,7 +1172,7 @@ The patch remains editor-only and manually invoked. Active-gameplay CPU/GPU cost
 - [ ] Keyword-free cases implemented.
 - [ ] Alignment and Lambert preflight implemented.
 - [ ] Summary, CSV, report, and case totals reconciled.
-- [ ] Final scope/compliance audit complete.
+- [x] Final scope/compliance audit complete.
 - [ ] Unity compilation and runtime validation complete.
 
 
@@ -1193,3 +1193,69 @@ The patch remains editor-only and manually invoked. Active-gameplay CPU/GPU cost
 - The dedicated identity shader, its meta file, and both shared Pixel Surface includes are byte-identical to 5N-H1.
 - Offline scope, structural, duplicate-signature, member-resolution, case-matrix, keyword-removal, black-albedo decomposition, alignment, Lambert, finite-readback, and documentation audit passes `85 / 85`.
 - Unity 6000.5.0f1 compilation and runtime validation remain authoritative and pending.
+
+## GM-SURFACE.5N-H3 — Pixelwise GPU-normal Lambert preflight correction
+
+### Objective
+
+Replace the invalid triangle-average Lambert gate from GM-SURFACE.5N-H2 with an exact pixelwise comparison between the GPU-interpolated stored normal field and the GPU-rendered controlled Lambert response, while leaving the dedicated identity system and Stage A/B/C/D ownership matrix unchanged.
+
+### Reviewed evidence
+
+- The 5N-H2 runtime report completed the current-view identity pass with 41,494 valid foreground pixels, zero invalid IDs, 87 visible triangles, and exact CPU identity round-trip.
+- Identity-to-lighting alignment passed with foreground IoU `0.9999759` and foreground pixel-count difference ratio `0.00002409987`.
+- The Lambert render itself was non-empty and finite with mean foreground luminance `0.37365678` and 71 visible rendered triangles.
+- The terminal Lambert gate failed because it reduced each triangle to `FinalTriangleRecord.RenderNormal`, which is one averaged CPU triangle normal, while audit mode 12 evaluates the interpolated per-pixel `storedNormalWS`. The two quantities are not mathematically equivalent.
+- Audit mode 14 already emits the exact interpolated stored world normal as `storedNormalWS * 0.5 + 0.5`; no shared shader change is required.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Docs/Generated_Mass_Surface_Response_Architecture.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassSurfaceCausalityRenderAudit.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassBevelShadingDiagnosticSuite.cs`
+
+Create, delete, move, or rename: none.
+
+### Invariants and non-goals
+
+- Do not modify production materials, shared shaders, shader defaults, geometry, triangulation, scenes, prefabs, profiles, layers, tags, or Inspector controls.
+- Retain the dedicated identity shader, base-255 identity encoding, explicit identity/light readback alignment, floating-point lighting capture, asynchronous execution, cancellation, checkpointing, and source-renderer restoration.
+- Do not change Stage A, Stage B, Stage C, or Stage D ownership cases or thresholds in this correction.
+- Do not use CPU averaged triangle normals as a Lambert validity oracle.
+
+### Implementation sequence
+
+1. Queue one auxiliary current-view stored-normal capture immediately after the current-view identity pass and before the Lambert response case. Use existing audit mode 14 and the same camera/material isolation contract as the Lambert response.
+2. Preserve the stored-normal capture pixels until the Lambert response completes. Resolve each Lambert lighting pixel to the corresponding stored-normal pixel through the independently validated identity-relative vertical-orientation mapping for both captures.
+3. Decode each stored normal as `normalize(encoded * 2 - 1)` and evaluate three pixelwise prediction models over aligned foreground pixels: configured light direction, opposite light direction, and best scalar fit for the configured direction.
+4. Replace triangle-count Lambert thresholds with pixel-level completeness and error contracts. Require at least 20,000 valid normal pixels, at least 2,000 positive expected pixels, finite samples, foreground alignment IoU at least 0.995, foreground pixel-count difference no greater than one percent, and configured-direction normalized RMSE at most 0.01.
+5. Report configured/opposite RMSE, best-fit scale/RMSE, valid-normal pixel count, expected-positive pixel count, observed-positive pixel count, and mean foreground luminance. A failed preflight must identify direction reversal versus scalar mismatch versus general shader-path disagreement from these values.
+6. Keep 209 counted decision cases. Add one auxiliary stored-normal capture, making four auxiliary validation passes and 213 total GPU render/readback passes.
+7. Update summary, text report, completion contracts, progress accounting, and checklist/framework status to the corrected pixelwise preflight.
+
+### Performance
+
+The correction adds one 384×384 editor-only floating-point normal capture and one linear pixelwise comparison before the existing tournament. Active-gameplay CPU/GPU cost and persistent runtime memory remain zero. The additional transient normal buffer is bounded to one capture and is released after Lambert validation.
+
+### Validation
+
+- Whole-class C# delimiter, preprocessor, duplicate-signature, unresolved-symbol, and member-resolution scans.
+- Exact case accounting: 209 counted decision cases, four auxiliary validation passes, 213 total render/readback passes.
+- Verify the GPU-normal capture is mode 14, current-view only, and cannot queue Stage A by itself.
+- Verify configured/opposite/best-fit models use corresponding pixels resolved through each result's identity-relative orientation.
+- Verify no CPU triangle-average normal participates in Lambert validity.
+- Verify existing Stage A/B/C/D case construction and production shader/material files are byte-identical to 5N-H2.
+- Unity 6000.5.0f1 compilation and runtime report remain authoritative and pending.
+
+### Status
+
+- [x] Review and canonical plan recorded before implementation.
+- [x] Auxiliary stored-normal capture implemented.
+- [x] Pixelwise three-model Lambert validation implemented.
+- [x] Summary/report/case accounting reconciled.
+- [x] Final scope/compliance audit complete.
+- [ ] Unity compilation and runtime validation complete.

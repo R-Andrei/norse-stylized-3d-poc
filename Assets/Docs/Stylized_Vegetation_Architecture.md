@@ -431,7 +431,7 @@ The current pass is intentionally texture-free and fixed-cost apart from the bou
 - A master strength of `0` preserves the accepted VEG-V1C body-lighting result exactly.
 - The custom additional-light path uses Unity 6.5 `_CLUSTER_LIGHT_LOOP` / `USE_CLUSTER_LIGHT_LOOP` compatibility while retaining the ordinary Forward light loop.
 - This remains a light-directional vegetation response, not a camera Fresnel outline, ambient glow, or sun-driven field outline.
-- **Historical and rejected — `VEG-V1C.10`:** this version attempted to identify the LightRay Spot through an unregistered high Rendering Layer bit. AF5A runtime diagnostics proved that the bit did not survive into GPU additional-light data. The current implementation is `VEG-V1C.11` geometric Spot matching; the high-bit identity must not be restored.
+- **Historical and rejected — `VEG-V1C.10`:** this version attempted to identify the LightRay Spot through an unregistered high Rendering Layer bit. AF5A runtime diagnostics proved that the bit did not survive into GPU additional-light data. That later geometric Spot-matching implementation was itself superseded by the indexed per-additional-light sidecar; the high-bit identity must not be restored.
 
 The vegetation shader should probably carry more responsibility than the geometry.
 
@@ -717,6 +717,10 @@ The two completed INFRA.2A reports validated the runner and restoration paths bu
 - negative enabled-minus-disabled deltas are baseline fluctuation, never evidence that vegetation improves performance.
 
 
+### Historical progression — superseded by the indexed sidecar
+
+The following `VEG-V1C.11` through `WEATHER-LIGHT-RAY-V1.1D-AH1` entries are retained as implementation history. Their geometric Spot matching, global publication, diagnostic-mode, and diagnostic-coverage assumptions are **not** the current production contract. The active contract begins at **Additional-light accent authority — V1C.12 / V1.2D2** below and is closed by Weather LightRay cleanup V1.3A3.
+
 - `VEG-V1C.11` supersedes the failed runtime-only Rendering Layer identity from `VEG-V1C.10`. The Weather controller publishes the selected LightRay Spot position/range and horizontal source direction. Vegetation geometrically matches that Spot inside its existing additional-light loop, keeps the real Spot direction for body lighting, and uses the horizontal source direction only for the matched Spot's stylized blade-edge selector. Ordinary lights remain unchanged.
 
 
@@ -738,12 +742,12 @@ The two completed INFRA.2A reports validated the runner and restoration paths bu
 
 `WEATHER-LIGHT-RAY-V1.1D-AH` adds one Weather-controller-owned `LightRay Vegetation Accent Coverage` value in the `0..1` range, defaulting to `1`. It does not scale radiance. Instead, each vegetation blade/card receives a stable noninterpolated candidate hash generated from indirect instance ID and one discrete crossed-card index. Only the geometrically matched Weather LightRay Spot applies the threshold. Ordinary directional lights, ordinary punctual lights, `Hut_Warm_Point`, and LightRay body illumination do not read the coverage value.
 
-Production participation is deterministic: `0` selects no candidates, `1` selects all candidates, and intermediate values select approximately that fraction. Diagnostic mode bypasses the participation filter so all correctly matched candidates remain available for geometric and radiance classification. The benchmark shader wrapper is intentionally part of the patch because stable per-card selection cannot be derived safely from fragment world position under wind deformation. Unity validation remains pending.
+Historical AH participation was deterministic: `0` selected no candidates, `1` selected all candidates, and intermediate values selected approximately that fraction. Its diagnostic mode bypassed the participation filter so all correctly matched candidates remained available for geometric and radiance classification. That bypass is superseded and removed by Weather LightRay cleanup V1.3A3; stable whole-card production coverage remains.
 
 
 ### WEATHER-LIGHT-RAY-V1.1D-AH1 — whole-card LightRay coverage identity
 
-AH1 corrects the coverage-selection unit without changing the controller or response equation. The AH centreline input varied between the root, middle, and tip vertex rows, allowing separate triangles of one card to be accepted independently. The benchmark crossed-card mesh contains six vertices per card, so the vertex shader now derives `cardIndex = SV_VertexID / 6` and hashes `instanceId + cardIndex`. Every triangle and longitudinal segment of an accepted card retains the complete existing LightRay accent response; rejected cards contribute no LightRay accent. Ordinary lights, body illumination, diagnostic coverage bypass, wind deformation, and accent brightness remain unchanged. Unity validation must confirm that low coverage produces a strict whole-card subset of the full-coverage result.
+AH1 historically corrected the coverage-selection unit without changing the controller or response equation. The AH centreline input varied between the root, middle, and tip vertex rows, allowing separate triangles of one card to be accepted independently. The benchmark crossed-card mesh contains six vertices per card, so the vertex shader derives `cardIndex = SV_VertexID / 6` and hashes `instanceId + cardIndex`. Every triangle and longitudinal segment of an accepted card retains the complete existing LightRay accent response; rejected cards contribute no LightRay accent. Ordinary lights, body illumination, wind deformation, and accent brightness remain unchanged. The former diagnostic coverage bypass is removed by Weather LightRay cleanup V1.3A3.
 
 ---
 
@@ -754,6 +758,8 @@ Multiple authored and procedural LightRay Spots use direct indexed metadata alig
 ## Additional-light accent authority — V1C.12 / V1.2D2
 
 Vegetation evaluates every URP additional light through the existing lighting loop. Project-specific Weather LightRay accent parameters and horizontal source direction are supplied by one two-`float4` indexed sidecar record. Ordinary lights remain generic; Weather Spot proxies receive active-preset overrides. Rendering Layer identity bits, geometric Spot matching, and shader-side LightRay searches are not part of the production contract.
+
+`WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE` removes the obsolete global Spot/direction/intensity/coverage bridge, diagnostic-mode bookkeeping, and false-colour diagnostic output. The indexed sidecar is now the sole production Weather-LightRay metadata path. Its override flag remains active independently of intensity so `0` accent strength does not fall back to the ordinary punctual-light edge response.
 
 ## WEATHER-LIGHT-RAY-V1.2D2 — Protected LightRay edge-accent semantics
 

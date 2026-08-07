@@ -4297,7 +4297,7 @@ No file creation, deletion, move, scene edit, prefab edit, recipe edit, material
 - Pre-edit body and foot amplitudes were separate scalars, but both used the same continuously twisting radial direction. The distal foot therefore orbited with the trunk and could retract toward the body instead of preserving its base-sector ground direction.
 - The exact ground ring already has zero authored roll and a stabilized world-up/right root frame. It is therefore a deterministic anchor for every root sector and preserves the current ground footprint without a new control.
 - The recipe-only foot envelope is already strongest at the ground and collapses before the body/persistence envelope. It can drive a continuous anchored-foot-to-twisted-body release without changing Root Height or Buttress Persistence semantics.
-- Pre-edit high Root Thickness increased the root-mask profile power from `4` toward `12`, which created a broad flat crest. Width broadening already came from the requested angular support, so increasing the profile power was unnecessary and caused the observed blockiness.
+- Pre-edit high Root Thickness reduced the root-mask profile power from `4` toward `2`. At fixed emitted support this reduces off-centre mask mass for `0 < q < 1`; after Root Count sector saturation, increasing Thickness can therefore stop widening support and make the half-mass root profile narrower. Width broadening already comes from requested angular support.
 - Final trunk normals and tangents are derived from neighbouring final surface positions. A spatial foot correction in the shared surface evaluator therefore remains authoritative for positions, normals, tangents, topology preflight, caps, captures, and production mesh output.
 
 ### Invariants and non-goals
@@ -4349,3 +4349,122 @@ No file creation, deletion, move, scene edit, prefab edit, recipe edit, material
 - **Thickness regression:** changing the high-thickness profile could alter the neutral accepted root. Mitigation: keep the exact thickness-`0.5` exponent and change only the high-thickness interpolation.
 - **Diagnostic drift:** an evaluator that only checks topology would miss the silhouette defect. Mitigation: use close-root captures from both twist handednesses and the exact operator profile in addition to the ordinary topology result.
 - **Performance regression:** an extra per-vertex frame calculation could increase dirty-generation cost. Mitigation: use constant-time vector arithmetic in the existing build-only surface evaluator, add no rings solely for grounding, and retain the normal production geometry audit afterward.
+
+## TREE-ROOTS.4A — Root Mass + Foot-Trajectory Candidate
+
+Status: candidate-only source implementation and static/source audit complete. Unity compilation, generated-mesh topology execution, and close-root visual comparison remain pending. Production Bark Algorithm 26 and the public Root Thickness `0.10–1.00` contract remain unchanged until candidate evidence is accepted.
+
+### Objective
+
+Evaluate a topology-safe root-shape candidate that fixes two verified response defects without rewriting the accepted root-transition architecture:
+
+1. Root Thickness currently saturates at the Root Count sector boundary and then changes its angular profile in a way that can reduce half-mass breadth at high values.
+2. The recipe-only foot amplitude retains a protected 10% Root Height plateau and a smooth delayed collapse, which produces the observed rounded/vertical outer nose instead of an immediate long ground-entering slope.
+
+The candidate must preserve the accepted continuous axial roll, stabilized lower root frame, grounded-foot direction, Root Reach crest amplitude, Root Height ownership, Buttress Persistence, contour-owned radial resolution, mixed-resolution stitching, and topology gates.
+
+### Acceptance criteria
+
+- Production `Build` remains behaviorally identical to Bark Algorithm 26 when no candidate is active.
+- The candidate uses one fixed `q^4` angular basis for recipe-only root masks; high Thickness broadening is owned by requested support rather than by changing the profile exponent.
+- Candidate requested support extends the existing mapping continuously beyond Thickness `1.0`: `0.10 -> 18°`, `0.50 -> 60°`, `1.00 -> 112°`, `2.00 -> 216°`.
+- Emitted individual-root support remains clamped to one Root Count sector. Requested width beyond that sector is converted into a bounded shared lower-base merge term rather than overlapping neighbouring root lobes.
+- Shared base merge is zero at the root crest, increases toward valleys, is bounded so no valley exceeds the crest contribution, follows the grounded foot direction, and fades with the candidate foot-shape envelope.
+- The preferred candidate foot-shape envelope is `(1-u)^2` from the ground to the existing effective foot-collapse endpoint, with no amplitude plateau. A fallback candidate retains only a 2% Root Height plateau before the same quadratic collapse.
+- Ground-foot directional anchoring continues to use the accepted production foot envelope. Candidate foot shape and foot anchoring are intentionally separate functions.
+- The exact ground crest remains `1 + Root Reach`; the existing effective foot-collapse endpoint remains unchanged; no terrain query or new spatial root mesh is introduced.
+- Candidate Thickness values above the public `1.0` limit are evaluated only through an isolated bark-build override. Public descriptors, resolved-control clamps, recipes, settings versions, and ordinary production generation remain unchanged.
+- Candidate builds pass the existing topology preflight/final audit and do not require weakened thresholds.
+- The focused board compares Production Current, preferred no-plateau candidate, and 2%-plateau fallback with close-root and game-context captures while remaining incremental, cancellable, checkpointed, and unsaved.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeRootQualityEvaluation.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+
+No file creation, deletion, move, scene edit, prefab edit, recipe edit, material edit, layer edit, tag edit, settings-schema change, structural-generator change, public control-range change, or Bark Algorithm promotion is approved.
+
+### Reviewed evidence
+
+- Current production is structural generator `7`, Bark Algorithm `26`, bark settings `10`.
+- Current production geometry audit completed `60 / 60` cases with Production Current topology `20 / 20`; the root-shape candidate must preserve these gates after promotion, but this candidate patch does not alter Production Current.
+- Recipe-only Root Thickness currently requests `18°` at `0.10`, `60°` at `0.50`, and `112°` at `1.00`, then clamps emitted support to `360 / Root Count`.
+- For five roots, support therefore saturates at approximately Thickness `0.615`; for six roots it saturates at `0.500`. Additional Thickness cannot widen the emitted lobe under the current contract.
+- The current high-thickness mask changes profile power from `4` toward `2`. At fixed support this reduces off-centre mask mass for `0 < q < 1`; the implementation and historical prose describing this response are inconsistent and the source equation is authoritative.
+- Recipe-only root amplitude currently holds its full foot value through `Root Height * 0.10` and then applies the active smootherstep collapse raised to the production foot exponent. The grounded-foot directional release introduced by TREE-ROOTS.3 uses this same foot envelope as its anchor weight.
+- The production root sampler already guarantees 24 lower-root collapse intervals under Current and also limits root-envelope changes to `0.075`; a quadratic candidate envelope does not intrinsically require a global tessellation increase.
+- The accepted root contour owns all final positions used by finite-difference normals/tangents, topology preflight, mixed-resolution stitching, and final topology audit; the candidate therefore remains inside the existing validation architecture.
+
+### Invariants and non-goals
+
+- Do not change Bark Algorithm `26`, settings `10`, structural generator `7`, or public Root Thickness range in this candidate patch.
+- Do not alter continuous axial roll, Signed Path Spiral, root phase identity, root count, Root Reach semantics, Root Height endpoints, Buttress Persistence, branch structure, foliage, shaders, materials, scenes, prefabs, layers, tags, or geometry-efficiency thresholds.
+- Do not add hidden production clamps, terrain conformance, separate root meshes, bones, runtime objects, per-frame deformation, or author-facing controls.
+- Do not promote a candidate on topology alone. Close-root silhouette evidence is mandatory because the current fixed-camera geometry audit cannot measure silhouette deviation for the present gallery framing.
+
+### File-by-file implementation sequence
+
+1. **Canonical plan — complete.** Record the candidate equations, production isolation, evidence, invariants, risks, and validation contract before code changes.
+2. **Candidate bark path — complete.** Added a thread-scoped root-shape candidate strategy and isolated candidate build entry point. Ordinary production Build remains Bark Algorithm 26 and candidate state is restored through `try/finally`.
+3. **Candidate response equations — complete.** Added fixed-q4 support, bounded shared-base merge, preferred quadratic no-plateau foot shape, 2%-plateau fallback, and separate production anchor-envelope resolution. Shared-base merge fills only the deficit between authored root contribution and the candidate foot target, so it cannot grow a ground valley beyond the root crest.
+4. **Focused evaluation — complete in source.** Retargeted the temporary root-quality board to 15 Production / preferred / fallback cases covering the operator profile, Thickness `0.5`, `1.0`, candidate-only `1.5` / `2.0`, Reach `2.0`, opposite twist, and Persistence `0` / `1` without changing public control clamps.
+5. **Inspector — complete.** Retargeted the existing Root Quality Evaluation actions to the candidate board; no new section was added.
+6. **Audit — complete for available static/source checks.** Final source comparison, scope/API/schema/math checks, and production-helper equivalence passed. Unity compilation, generated-mesh topology execution, and preview captures remain pending.
+
+### Risks and mitigations
+
+- **Strip-0 regression after removing the 10% amplitude plateau:** test both no-plateau and 2%-plateau candidates through unchanged topology gates; promote the smallest plateau only if required by evidence.
+- **Excess valley mass:** compute merge only from requested support beyond one sector, bound it below crest amplitude, and multiply by `(1 - bodyMask)` so the root crest never grows beyond Root Reach.
+- **Base mass orbiting under twist:** add merge to the grounded-foot contribution, not the fully twisted body contribution.
+- **Candidate under-sampling:** make adaptive sampling and root-contour validation consume the candidate foot-shape envelope while keeping foot directional anchoring on the production envelope.
+- **Candidate state leaking into production builds:** use thread-scoped state with `try/finally` restoration and restore any temporary resolved Thickness override after every candidate build.
+- **Misleading Thickness > 1 test:** report requested candidate Thickness separately from the public exact-control value and do not change serialized controls or recipe ranges.
+- **Performance regression:** candidate adds only constant-time scalar/vector calculations to build-time root evaluation and no per-frame work; no new rings are requested solely for base merge.
+
+
+### Candidate implementation result
+
+- Production Bark Algorithm remains `26`; settings remain `10`; structural generator remains `7`.
+- Candidate state is thread-scoped and restored after every isolated build. Candidate Thickness above `1.0` is applied only to the temporary resolved bark parameters and restored afterward.
+- Candidate requested support is `18°` at Thickness `0.10`, `60°` at `0.50`, `112°` at `1.00`, and `216°` at `2.00`; individual support remains sector-clamped.
+- Requested width beyond one sector resolves to `excess / (1 + excess)` shared-base merge. The implementation applies this only to the remaining deficit toward `Root Reach × footShapeEnvelope`, multiplied by `(1 - bodyMask)`, so candidate merge cannot make a ground valley exceed the crest.
+- Candidate angular masks use fixed `q^4`. Production high-thickness `q^4 → q^2` behavior remains unchanged outside the candidate.
+- Preferred foot shape is immediate `(1-u)^2`; fallback holds full amplitude for `Root Height × 0.02` and then uses the same quadratic.
+- TREE-ROOTS.3 directional anchoring remains driven by the unchanged production foot envelope in both candidates. Candidate foot shape and anchor release are separate.
+- Candidate input fingerprints receive a candidate-only strategy marker; ordinary Production Current fingerprints remain unchanged.
+- The focused evaluator reports requested/evaluated Thickness, requested/emitted support, support clamping, shared-base merge, shape-plateau endpoint, half-mass width, geometry counts, topology outcome, and both captures.
+
+### Candidate static/source audit
+
+- Result: `48 / 48` checks passed.
+- Exact modified-file scope: four approved files only.
+- C# lexical delimiter/string/comment checks passed for all three modified C# sources.
+- Production root-envelope implementation is exact against the pre-candidate implementation after helper renaming.
+- Production ground half-extension telemetry implementation is exact against the pre-candidate implementation after helper renaming.
+- Focused CSV header/data schema alignment: `42 / 42`.
+- No deprecated `FindObjectsSortMode` use was introduced.
+- Public Root Thickness range owners, structural generator, bark settings, and bark algorithm version were not modified.
+- Mathematical sweep over Root Count `3…8`, candidate Thickness `0.10…2.00`, and dense angular samples proved candidate ground merge never exceeds the crest contribution.
+- Candidate half-mass width was monotonic across Thickness `0.10…2.00` for every Root Count `3…8`.
+- Five-root operator reconstruction at Thickness `0.9`: Production half-mass width `38.811°`; candidate half-mass width `52.205°`; candidate shared-base merge `0.291339`.
+- Thickness `0.5` retains the exact H4 ground half-mass width (`41.411534°`) before candidate foot-shape evolution above the ground.
+- Preferred and fallback quadratic foot-shape envelopes are monotonic, equal `1` at their ground/plateau start, and reach `0` at the unchanged effective foot-collapse endpoint.
+- Changed-files overlay reconstruction against the accepted pre-candidate source: PASS.
+- Unified-patch application reconstruction against the accepted pre-candidate source: PASS.
+
+### Candidate validation status
+
+- Review gate: complete.
+- Canonical plan gate: complete.
+- Candidate source implementation: complete.
+- Static/source/math audit: `48 / 48` passed.
+- Unity compilation: pending.
+- 15-case root-mass candidate board: pending.
+- Generated candidate topology evidence: pending.
+- Close-root operator-profile comparison: pending.
+- Production promotion / Bark Algorithm `27`: not authorized by this patch and remains pending explicit acceptance after candidate evidence.
+- Public Root Thickness `0.10–2.00` promotion: not authorized by this patch and remains pending explicit acceptance after candidate evidence.

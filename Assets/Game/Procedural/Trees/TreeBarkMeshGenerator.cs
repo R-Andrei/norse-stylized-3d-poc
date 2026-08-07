@@ -88,6 +88,9 @@ namespace ProgrammaticStylized3D.Trees
         public float RequestedRootSupportAngularWidthDegrees { get; internal set; }
         public float EmittedRootSupportAngularWidthDegrees { get; internal set; }
         public bool RootSupportWidthClampedByCount { get; internal set; }
+        public float EvaluatedRootThickness { get; internal set; }
+        public float GroundRootBaseMergeFactor { get; internal set; }
+        public float RootFootShapePlateauEndNormalized { get; internal set; }
         public float RootTopRootOnlyMultiplier { get; internal set; }
         public float AuthoredRootHeightNormalized { get; internal set; }
         public float EffectiveRootTransitionHeightNormalized { get; internal set; }
@@ -168,6 +171,12 @@ namespace ProgrammaticStylized3D.Trees
         TransportedContourBlend = 4
     }
 
+    public enum TreeRootMassCandidateStrategy
+    {
+        QuadraticImmediate = 0,
+        QuadraticTwoPercentPlateau = 1
+    }
+
     internal readonly struct TreeRootCollapseTournamentProfile
     {
         internal TreeRootCollapseTournamentProfile(
@@ -206,6 +215,9 @@ namespace ProgrammaticStylized3D.Trees
         [ThreadStatic]
         private static TreeRootCollapseTournamentStrategy?
             activeTournamentStrategy;
+        [ThreadStatic]
+        private static TreeRootMassCandidateStrategy?
+            activeRootMassCandidateStrategy;
         [ThreadStatic] private static float activeBoundaryMaximumMismatch;
         [ThreadStatic] private static bool activeBoundaryMismatchEvaluated;
         [ThreadStatic] private static bool activeBoundaryCandidateActivated;
@@ -230,6 +242,46 @@ namespace ProgrammaticStylized3D.Trees
             finally
             {
                 activeTournamentStrategy = previous;
+            }
+        }
+
+        public static TreeBarkMeshBuildResult BuildForRootMassCandidate(
+            TreeDefinition definition,
+            TreeBarkMeshSettings settings,
+            Mesh targetMesh,
+            TreeRootMassCandidateStrategy strategy,
+            float? rootThicknessOverride = null)
+        {
+            TreeRootMassCandidateStrategy? previousStrategy =
+                activeRootMassCandidateStrategy;
+            TreeResolvedParameters parameters = definition != null
+                ? definition.ResolvedParameters
+                : null;
+            float previousThickness = parameters != null
+                ? parameters.RootThickness
+                : 0f;
+            activeRootMassCandidateStrategy = strategy;
+            try
+            {
+                if (parameters != null &&
+                    parameters.RecipeOnlyControlSource &&
+                    rootThicknessOverride.HasValue)
+                {
+                    parameters.RootThickness = Mathf.Clamp(
+                        rootThicknessOverride.Value,
+                        0.10f,
+                        2f);
+                }
+
+                return Build(definition, settings, targetMesh);
+            }
+            finally
+            {
+                if (parameters != null)
+                {
+                    parameters.RootThickness = previousThickness;
+                }
+                activeRootMassCandidateStrategy = previousStrategy;
             }
         }
 
@@ -474,6 +526,9 @@ namespace ProgrammaticStylized3D.Trees
             float groundRootHalfExtensionChordWidth = 0f;
             float requestedRootSupportAngularWidthDegrees = 0f;
             float emittedRootSupportAngularWidthDegrees = 0f;
+            float evaluatedRootThickness = 0f;
+            float groundRootBaseMergeFactor = 0f;
+            float rootFootShapePlateauEndNormalized = 0f;
             float rootTopRootOnlyMultiplier = 0f;
             float maximumGroundButtressCrestTurnDegrees = 0f;
             float authoredRootHeightNormalized = 0f;
@@ -511,6 +566,11 @@ namespace ProgrammaticStylized3D.Trees
                     rootGroundPlateauEndNormalized = rootHeight * 0.10f;
                     rootLobeCollapseEndNormalized =
                         CalculateEffectiveRootCollapseHeight(resolved);
+                    evaluatedRootThickness = resolved.RootThickness;
+                    groundRootBaseMergeFactor =
+                        EvaluateGroundRootBaseMergeFactor(resolved);
+                    rootFootShapePlateauEndNormalized =
+                        CalculateRootFootShapePlateauEnd(resolved);
                     minimumGroundCrossSectionMultiplier =
                         CalculateMinimumTrunkCrossSectionMultiplier(
                             resolved,
@@ -597,6 +657,10 @@ namespace ProgrammaticStylized3D.Trees
             result.RootSupportWidthClampedByCount =
                 emittedRootSupportAngularWidthDegrees + 0.0001f <
                 requestedRootSupportAngularWidthDegrees;
+            result.EvaluatedRootThickness = evaluatedRootThickness;
+            result.GroundRootBaseMergeFactor = groundRootBaseMergeFactor;
+            result.RootFootShapePlateauEndNormalized =
+                rootFootShapePlateauEndNormalized;
             CopyAxialTwistTelemetry(result, axialTwistTelemetry);
 
             for (int branchIndex = 0;
@@ -833,6 +897,10 @@ namespace ProgrammaticStylized3D.Trees
             result.RootSupportWidthClampedByCount =
                 emittedRootSupportAngularWidthDegrees + 0.0001f <
                 requestedRootSupportAngularWidthDegrees;
+            result.EvaluatedRootThickness = evaluatedRootThickness;
+            result.GroundRootBaseMergeFactor = groundRootBaseMergeFactor;
+            result.RootFootShapePlateauEndNormalized =
+                rootFootShapePlateauEndNormalized;
             result.RootTopRootOnlyMultiplier =
                 rootTopRootOnlyMultiplier;
             result.AuthoredRootHeightNormalized =
@@ -4006,7 +4074,7 @@ namespace ProgrammaticStylized3D.Trees
                 angle,
                 out float bodyContribution,
                 out float footContribution,
-                out float footEnvelope);
+                out float footAnchorEnvelope);
             if (!parameters.RecipeOnlyControlSource)
             {
                 crossSectionMultiplier = Mathf.Max(
@@ -4025,7 +4093,7 @@ namespace ProgrammaticStylized3D.Trees
                 parameters,
                 sample.NormalizedDistance,
                 angle,
-                footEnvelope);
+                footAnchorEnvelope);
             Vector3 offset = bodyOffset +
                 footRadial * sample.Radius * footContribution;
             crossSectionMultiplier = offset.magnitude /
@@ -4347,7 +4415,7 @@ namespace ProgrammaticStylized3D.Trees
             float angle,
             out float bodyContribution,
             out float footContribution,
-            out float footEnvelope)
+            out float footAnchorEnvelope)
         {
             int buttressCount = Mathf.Clamp(
                 parameters.RootButtressCount,
@@ -4357,7 +4425,13 @@ namespace ProgrammaticStylized3D.Trees
                 parameters,
                 normalizedDistance,
                 out float bodyEnvelope,
-                out footEnvelope);
+                out float footShapeEnvelope);
+            footAnchorEnvelope = activeRootMassCandidateStrategy.HasValue &&
+                parameters.RecipeOnlyControlSource
+                    ? EvaluateRootFootAnchorEnvelope(
+                        parameters,
+                        normalizedDistance)
+                    : footShapeEnvelope;
             float shoulderWidth =
                 EvaluateButtressAngularWidthScale(bodyEnvelope);
             EvaluateButtressMasks(
@@ -4375,8 +4449,21 @@ namespace ProgrammaticStylized3D.Trees
                 float reach = Mathf.Max(0f, parameters.RootReach);
                 bodyContribution =
                     reach * 0.28f * bodyEnvelope * bodyMask;
+                float mergeFactor = EvaluateGroundRootBaseMergeFactor(
+                    parameters);
+                float mergeMask = Mathf.Clamp01(1f - bodyMask);
+                float authoredFootContribution =
+                    reach * 0.72f * footShapeEnvelope * footMask;
+                float authoredRootContribution =
+                    bodyContribution + authoredFootContribution;
+                float mergeTarget = reach * footShapeEnvelope;
+                float mergeDeficit = Mathf.Max(
+                    0f,
+                    mergeTarget - authoredRootContribution);
+                float mergedBaseContribution =
+                    mergeDeficit * mergeFactor * mergeMask;
                 footContribution =
-                    reach * 0.72f * footEnvelope * footMask;
+                    authoredFootContribution + mergedBaseContribution;
                 return;
             }
 
@@ -4391,14 +4478,14 @@ namespace ProgrammaticStylized3D.Trees
                 0.75f *
                 (Mathf.Max(1f, parameters.RootFlareScale) - 1f);
             footContribution =
-                footAmplitude * footEnvelope * footMask;
+                footAmplitude * footShapeEnvelope * footMask;
         }
 
         private static Vector3 ResolveGroundAnchoredRootFootRadial(
             TreeResolvedParameters parameters,
             float normalizedDistance,
             float angle,
-            float footEnvelope)
+            float footAnchorEnvelope)
         {
             Vector3 anchoredNormal = Vector3.right;
             Vector3 anchoredBinormal = Vector3.Cross(
@@ -4408,7 +4495,7 @@ namespace ProgrammaticStylized3D.Trees
                 anchoredNormal * Mathf.Cos(angle) +
                 anchoredBinormal * Mathf.Sin(angle),
                 anchoredNormal);
-            float anchorWeight = Mathf.Clamp01(footEnvelope);
+            float anchorWeight = Mathf.Clamp01(footAnchorEnvelope);
             float releasedRollDegrees =
                 ResolveAuthoredTrunkSurfaceRollDegrees(
                     parameters,
@@ -4459,14 +4546,6 @@ namespace ProgrammaticStylized3D.Trees
                 return;
             }
 
-            // Recipe-only root-width contract. Thickness 0.5 reproduces
-            // the accepted H4 six-root support exactly: one 60-degree support
-            // sector with the original q^4 profile. Lower values reduce the
-            // requested support. Higher values broaden support while tapering
-            // toward a rounder crest; the emitted support remains clamped
-            // to one root sector so neighbouring lobes still meet at a true
-            // zero valley. Root Count therefore changes width only when the
-            // requested absolute support would physically overlap.
             float requestedFullWidthDegrees =
                 EvaluateRequestedRootFullWidthDegrees(rootThickness);
             float sectorDegrees = 360f / safeCount;
@@ -4488,11 +4567,19 @@ namespace ProgrammaticStylized3D.Trees
             }
 
             float q = Mathf.Clamp01(deltaToNearest / halfSupport);
-            float highThickness = Mathf.InverseLerp(
-                0.50f,
-                1f,
-                Mathf.Clamp(rootThickness, 0.50f, 1f));
-            float profilePower = Mathf.Lerp(4f, 2f, highThickness);
+            float profilePower;
+            if (activeRootMassCandidateStrategy.HasValue)
+            {
+                profilePower = 4f;
+            }
+            else
+            {
+                float highThickness = Mathf.InverseLerp(
+                    0.50f,
+                    1f,
+                    Mathf.Clamp(rootThickness, 0.50f, 1f));
+                profilePower = Mathf.Lerp(4f, 2f, highThickness);
+            }
             float basis = Mathf.Max(
                 0f,
                 1f - Mathf.Pow(q, profilePower));
@@ -4503,7 +4590,13 @@ namespace ProgrammaticStylized3D.Trees
         private static float EvaluateRequestedRootFullWidthDegrees(
             float rootThickness)
         {
-            float thickness = Mathf.Clamp(rootThickness, 0.10f, 1f);
+            float maximumThickness = activeRootMassCandidateStrategy.HasValue
+                ? 2f
+                : 1f;
+            float thickness = Mathf.Clamp(
+                rootThickness,
+                0.10f,
+                maximumThickness);
             if (thickness <= 0.50f)
             {
                 return Mathf.Lerp(
@@ -4512,10 +4605,35 @@ namespace ProgrammaticStylized3D.Trees
                     Mathf.InverseLerp(0.10f, 0.50f, thickness));
             }
 
-            return Mathf.Lerp(
-                60f,
-                112f,
-                Mathf.InverseLerp(0.50f, 1f, thickness));
+            if (!activeRootMassCandidateStrategy.HasValue)
+            {
+                return Mathf.Lerp(
+                    60f,
+                    112f,
+                    Mathf.InverseLerp(0.50f, 1f, thickness));
+            }
+
+            return 60f + (thickness - 0.50f) * 104f;
+        }
+
+        private static float EvaluateGroundRootBaseMergeFactor(
+            TreeResolvedParameters parameters)
+        {
+            if (!activeRootMassCandidateStrategy.HasValue ||
+                parameters == null ||
+                !parameters.RecipeOnlyControlSource)
+            {
+                return 0f;
+            }
+
+            int count = Mathf.Clamp(parameters.RootButtressCount, 3, 8);
+            float sectorDegrees = 360f / count;
+            float requestedDegrees = EvaluateRequestedRootFullWidthDegrees(
+                parameters.RootThickness);
+            float excessRatio = Mathf.Max(
+                0f,
+                requestedDegrees / Mathf.Max(Epsilon, sectorDegrees) - 1f);
+            return excessRatio / (1f + excessRatio);
         }
 
         private static float EvaluateButtressAngularWidthScale(
@@ -4551,6 +4669,34 @@ namespace ProgrammaticStylized3D.Trees
         }
 
         private static void EvaluateRootEnvelopes(
+            TreeResolvedParameters parameters,
+            float normalizedDistance,
+            out float bodyEnvelope,
+            out float footShapeEnvelope)
+        {
+            EvaluateProductionRootEnvelopes(
+                parameters,
+                normalizedDistance,
+                out bodyEnvelope,
+                out float productionFootEnvelope);
+            if (!activeRootMassCandidateStrategy.HasValue ||
+                !parameters.RecipeOnlyControlSource)
+            {
+                footShapeEnvelope = productionFootEnvelope;
+                return;
+            }
+
+            float plateauEnd = CalculateRootFootShapePlateauEnd(parameters);
+            float collapseEnd = CalculateEffectiveRootCollapseHeight(parameters);
+            float u = Mathf.InverseLerp(
+                plateauEnd,
+                Mathf.Max(plateauEnd + Epsilon, collapseEnd),
+                normalizedDistance);
+            float linear = 1f - Mathf.Clamp01(u);
+            footShapeEnvelope = linear * linear;
+        }
+
+        private static void EvaluateProductionRootEnvelopes(
             TreeResolvedParameters parameters,
             float normalizedDistance,
             out float bodyEnvelope,
@@ -4598,6 +4744,41 @@ namespace ProgrammaticStylized3D.Trees
                 profile.FootExponent);
         }
 
+        private static float EvaluateRootFootAnchorEnvelope(
+            TreeResolvedParameters parameters,
+            float normalizedDistance)
+        {
+            EvaluateProductionRootEnvelopes(
+                parameters,
+                normalizedDistance,
+                out _,
+                out float footEnvelope);
+            return footEnvelope;
+        }
+
+        private static float CalculateRootFootShapePlateauEnd(
+            TreeResolvedParameters parameters)
+        {
+            if (parameters == null)
+            {
+                return 0f;
+            }
+            if (!activeRootMassCandidateStrategy.HasValue ||
+                !parameters.RecipeOnlyControlSource)
+            {
+                return CalculateRootGroundPlateauEnd(parameters);
+            }
+
+            switch (activeRootMassCandidateStrategy.Value)
+            {
+                case TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau:
+                    return Mathf.Max(0.01f, parameters.RootButtressHeight) *
+                        0.02f;
+                default:
+                    return 0f;
+            }
+        }
+
         private static float EvaluateRootOnlyContribution(
             TreeResolvedParameters parameters,
             float branchPhase,
@@ -4612,7 +4793,7 @@ namespace ProgrammaticStylized3D.Trees
                 parameters,
                 normalizedDistance,
                 out float bodyEnvelope,
-                out float footEnvelope);
+                out float footShapeEnvelope);
             float widthScale =
                 EvaluateButtressAngularWidthScale(bodyEnvelope);
 
@@ -4628,8 +4809,18 @@ namespace ProgrammaticStylized3D.Trees
             if (parameters.RecipeOnlyControlSource)
             {
                 float reach = Mathf.Max(0f, parameters.RootReach);
-                return reach * 0.28f * bodyEnvelope * bodyMask +
-                    reach * 0.72f * footEnvelope * footMask;
+                float mergeFactor = EvaluateGroundRootBaseMergeFactor(
+                    parameters);
+                float mergeMask = Mathf.Clamp01(1f - bodyMask);
+                float authoredContribution =
+                    reach * 0.28f * bodyEnvelope * bodyMask +
+                    reach * 0.72f * footShapeEnvelope * footMask;
+                float mergeTarget = reach * footShapeEnvelope;
+                float mergeDeficit = Mathf.Max(
+                    0f,
+                    mergeTarget - authoredContribution);
+                return authoredContribution +
+                    mergeDeficit * mergeFactor * mergeMask;
             }
 
             float strength = Mathf.Max(
@@ -4642,7 +4833,7 @@ namespace ProgrammaticStylized3D.Trees
                 0.75f *
                 (Mathf.Max(1f, parameters.RootFlareScale) - 1f);
             return bodyContribution +
-                footAmplitude * footEnvelope * footMask;
+                footAmplitude * footShapeEnvelope * footMask;
         }
 
         private static float CalculateButtressCrestMultiplier(
@@ -4670,6 +4861,89 @@ namespace ProgrammaticStylized3D.Trees
         }
 
         private static void CalculateGroundRootHalfExtensionWidth(
+            TreeResolvedParameters parameters,
+            float branchPhase,
+            float baseRadius,
+            out float fullAngularWidthDegrees,
+            out float chordWidth)
+        {
+            if (!activeRootMassCandidateStrategy.HasValue)
+            {
+                CalculateProductionGroundRootHalfExtensionWidth(
+                    parameters,
+                    branchPhase,
+                    baseRadius,
+                    out fullAngularWidthDegrees,
+                    out chordWidth);
+                return;
+            }
+
+            fullAngularWidthDegrees = 0f;
+            chordWidth = 0f;
+            if (!parameters.RecipeOnlyControlSource)
+            {
+                return;
+            }
+
+            int buttressCount = Mathf.Clamp(
+                parameters.RootButtressCount,
+                3,
+                8);
+            float sector = TwoPi / buttressCount;
+            float crestAngle = ResolveRootPhase(branchPhase);
+            float crestContribution = EvaluateRootOnlyContribution(
+                parameters,
+                branchPhase,
+                0f,
+                crestAngle);
+            if (crestContribution <= Epsilon)
+            {
+                return;
+            }
+
+            const int samples = 2048;
+            float threshold = crestContribution * 0.5f;
+            float previousDelta = 0f;
+            float previousContribution = crestContribution;
+            float resolvedDelta = sector * 0.5f;
+            for (int index = 1; index <= samples; index++)
+            {
+                float delta = sector * 0.5f * index / samples;
+                float contribution = EvaluateRootOnlyContribution(
+                    parameters,
+                    branchPhase,
+                    0f,
+                    crestAngle + delta);
+                if (contribution <= threshold)
+                {
+                    float denominator =
+                        previousContribution - contribution;
+                    float interpolation = denominator > Epsilon
+                        ? Mathf.Clamp01(
+                            (previousContribution - threshold) /
+                            denominator)
+                        : 0f;
+                    resolvedDelta = Mathf.Lerp(
+                        previousDelta,
+                        delta,
+                        interpolation);
+                    break;
+                }
+
+                previousDelta = delta;
+                previousContribution = contribution;
+            }
+
+            fullAngularWidthDegrees =
+                resolvedDelta * 2f * Mathf.Rad2Deg;
+            float radiusAtHalfExtension =
+                Mathf.Max(Epsilon, baseRadius) *
+                (1f + threshold);
+            chordWidth = 2f * radiusAtHalfExtension *
+                Mathf.Sin(resolvedDelta);
+        }
+
+        private static void CalculateProductionGroundRootHalfExtensionWidth(
             TreeResolvedParameters parameters,
             float branchPhase,
             float baseRadius,
@@ -6293,6 +6567,15 @@ namespace ProgrammaticStylized3D.Trees
             TreeDeterministicUtility.Append(
                 ref hash,
                 parameters.RootThickness);
+            if (activeRootMassCandidateStrategy.HasValue)
+            {
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    0x524D4341);
+                TreeDeterministicUtility.Append(
+                    ref hash,
+                    (int)activeRootMassCandidateStrategy.Value);
+            }
             return TreeDeterministicUtility.FormatHash(hash);
         }
 

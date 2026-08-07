@@ -15,14 +15,14 @@ namespace ProgrammaticStylized3D.Trees.Editor
     internal static class TreeRootQualityEvaluation
     {
         private const string OutputDirectory =
-            "Library/PS3D/Trees/GroundedRootFootEvaluation";
+            "Library/PS3D/Trees/RootMassCandidateEvaluation";
         private const string CaptureDirectoryName = "Captures";
         private const string ReportFileName =
-            "TreeGroundedRootFootEvaluationReport.md";
+            "TreeRootMassCandidateEvaluationReport.md";
         private const string CsvFileName =
-            "TreeGroundedRootFootEvaluation.csv";
+            "TreeRootMassCandidateEvaluation.csv";
         private const string BoardFileName =
-            "TreeGroundedRootFootEvaluationBoard.html";
+            "TreeRootMassCandidateEvaluationBoard.html";
         private const int CloseCaptureWidth = 640;
         private const int CloseCaptureHeight = 640;
         private const int GameCaptureHeight = 432;
@@ -62,6 +62,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             internal Representative Representative;
             internal string Label;
             internal string Slug;
+            internal TreeRootMassCandidateStrategy? CandidateStrategy;
             internal float? AxialTwist;
             internal float? RootThickness;
             internal float? RootReach;
@@ -176,7 +177,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (representatives.Count != 1)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.3] The ground-anchored root-foot evaluation requires the initialized Wych Elm Leaning curated gallery representative. Found " +
+                    "[TREE-ROOTS.4A] The root-mass candidate evaluation requires the initialized Wych Elm Leaning curated gallery representative. Found " +
                     representatives.Count + ". Rebuild the curated recipe gallery first.");
                 return false;
             }
@@ -185,7 +186,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (mainCamera == null)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.3] No enabled MainCamera-tagged Camera was found. The evaluation requires the current game-camera projection for its context captures.");
+                    "[TREE-ROOTS.4A] No enabled MainCamera-tagged Camera was found. The evaluation requires the current game-camera projection for its context captures.");
                 return false;
             }
 
@@ -206,14 +207,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 false,
                 Encoding.UTF8);
             csvWriter.WriteLine(
-                "CaseIndex,Representative,Family,Case,Status," +
-                "AxialTwist,RootThickness,RootReach,RootHeight,ButtressPersistence," +
+                "CaseIndex,Representative,Family,Case,Status,Mode," +
+                "AxialTwist,RequestedRootThickness,EvaluatedRootThickness,RootReach,RootHeight,ButtressPersistence," +
                 "RequestedTwist,MeasuredTwist,TwistError,FirstTwistDistance," +
                 "TwistAtGroundPlateau,TwistAtRootCollapse," +
                 "TwistAtEarliestTransition,TwistAtEffectiveTransition," +
                 "MaximumTwistStep,AllowedTwistStep," +
                 "MaximumTwistStepStart,MaximumTwistStepEnd," +
                 "Vertices,Triangles,RootIntervals,RootCrestMultiplier," +
+                "RequestedSupportDegrees,EmittedSupportDegrees,SupportClamped," +
+                "GroundBaseMergeFactor,FootShapePlateauEnd," +
                 "RootHalfWidthDegrees,RootHalfChordWidth," +
                 "EffectiveTransitionHeight,TrunkRadialMin,TrunkRadialMax," +
                 "BuildMilliseconds,CloseCapture,GameCapture,Failure");
@@ -257,7 +260,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             lastReportPath = reportPath;
             lastBoardPath = boardPath;
             currentProgress = 0f;
-            currentDetail = "Preparing first continuous-twist case";
+            currentDetail = "Preparing first root-mass candidate case";
             currentEta = "ETA calculating";
             WriteCheckpoint(activeJob, "RUNNING", null);
             EditorApplication.update += Tick;
@@ -265,7 +268,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             EditorApplication.quitting += AbortForQuit;
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
             Debug.Log(
-                "[TREE-ROOTS.3] Incremental 8-case ground-anchored root-foot evaluation started. Output: " +
+                "[TREE-ROOTS.4A] Incremental 15-case root-mass candidate evaluation started. Output: " +
                 boardPath);
             return true;
         }
@@ -426,7 +429,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             switch (stage)
             {
                 case EvaluationStage.Build:
-                    return "building temporary production bark";
+                    return "building temporary production/candidate bark";
                 case EvaluationStage.BeginCloseCapture:
                 case EvaluationStage.WaitCloseCapture:
                     return "capturing close root view";
@@ -474,17 +477,24 @@ namespace ProgrammaticStylized3D.Trees.Editor
             result.Definition = generation.Definition;
             result.Mesh = new Mesh
             {
-                name = "TREE-ROOTS.3 " +
+                name = "TREE-ROOTS.4A " +
                     evaluationCase.Representative.Name + " " +
                     evaluationCase.Label,
                 hideFlags = HideFlags.HideAndDontSave
             };
             TreeBarkMeshSettings settings =
                 TreeBarkMeshSettings.CreateRecipeOnlyDefaults();
-            result.Bark = TreeBarkMeshGenerator.Build(
-                result.Definition,
-                settings,
-                result.Mesh);
+            result.Bark = evaluationCase.CandidateStrategy.HasValue
+                ? TreeBarkMeshGenerator.BuildForRootMassCandidate(
+                    result.Definition,
+                    settings,
+                    result.Mesh,
+                    evaluationCase.CandidateStrategy.Value,
+                    evaluationCase.RootThickness)
+                : TreeBarkMeshGenerator.Build(
+                    result.Definition,
+                    settings,
+                    result.Mesh);
             result.BarkPassed = result.Bark != null && result.Bark.Passed;
             result.TopologyPassed = result.BarkPassed &&
                 result.Bark.TopologyAudit != null &&
@@ -576,7 +586,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 previewSceneCreated = true;
 
                 var treeObject = new GameObject(
-                    "TREE-ROOTS.3 Capture Tree")
+                    "TREE-ROOTS.4A Capture Tree")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -609,7 +619,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 CreateCaptureLights(previewScene);
 
                 var cameraObject = new GameObject(
-                    "TREE-ROOTS.3 Capture Camera")
+                    "TREE-ROOTS.4A Capture Camera")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -654,7 +664,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     RenderTextureFormat.ARGB32,
                     RenderTextureReadWrite.sRGB)
                 {
-                    name = "TREE-ROOTS.3 Async Capture",
+                    name = "TREE-ROOTS.4A Async Capture",
                     hideFlags = HideFlags.HideAndDontSave,
                     antiAliasing = 1,
                     useMipMap = false,
@@ -777,7 +787,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             GameObject ground = GameObject.CreatePrimitive(
                 PrimitiveType.Plane);
-            ground.name = "TREE-ROOTS.3 Capture Ground";
+            ground.name = "TREE-ROOTS.4A Capture Ground";
             ground.hideFlags = HideFlags.HideAndDontSave;
             SceneManager.MoveGameObjectToScene(ground, previewScene);
             Collider collider = ground.GetComponent<Collider>();
@@ -812,12 +822,12 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.3 Key Light",
+                "TREE-ROOTS.4A Key Light",
                 Quaternion.Euler(48f, -35f, 0f),
                 1.25f);
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.3 Fill Light",
+                "TREE-ROOTS.4A Fill Light",
                 Quaternion.Euler(25f, 145f, 0f),
                 0.48f);
         }
@@ -1148,8 +1158,14 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 Csv(evaluationCase.Representative.Family.ToString()),
                 Csv(evaluationCase.Label),
                 result.Passed ? "PASS" : "FAIL",
+                Csv(ModeLabel(evaluationCase)),
                 F(evaluationCase.AxialTwist ?? baseline.AxialTwist),
                 F(evaluationCase.RootThickness ?? baseline.RootThickness),
+                bark != null
+                    ? F(bark.EvaluatedRootThickness)
+                    : F(Mathf.Min(
+                        evaluationCase.RootThickness ?? baseline.RootThickness,
+                        1f)),
                 F(evaluationCase.RootReach ?? baseline.RootReach),
                 F(evaluationCase.RootHeight ?? baseline.RootHeight),
                 F(evaluationCase.ButtressPersistence ??
@@ -1195,6 +1211,21 @@ namespace ProgrammaticStylized3D.Trees.Editor
                         CultureInfo.InvariantCulture)
                     : "0",
                 bark != null ? F(bark.GroundButtressCrestMultiplier) : "",
+                bark != null
+                    ? F(bark.RequestedRootSupportAngularWidthDegrees)
+                    : "",
+                bark != null
+                    ? F(bark.EmittedRootSupportAngularWidthDegrees)
+                    : "",
+                bark != null
+                    ? (bark.RootSupportWidthClampedByCount ? "1" : "0")
+                    : "",
+                bark != null
+                    ? F(bark.GroundRootBaseMergeFactor)
+                    : "",
+                bark != null
+                    ? F(bark.RootFootShapePlateauEndNormalized)
+                    : "",
                 bark != null
                     ? F(bark.GroundRootHalfExtensionAngularWidthDegrees)
                     : "",
@@ -1274,19 +1305,19 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (outcome == "COMPLETE")
             {
                 Debug.Log(
-                    "[TREE-ROOTS.3] Ground-anchored root-foot evaluation complete. Board: " +
+                    "[TREE-ROOTS.4A] Root-mass candidate evaluation complete. Board: " +
                     job.BoardPath);
             }
             else if (outcome == "FAILED")
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.3] Ground-anchored root-foot evaluation failed. Partial output: " +
+                    "[TREE-ROOTS.4A] Root-mass candidate evaluation failed. Partial output: " +
                     job.ReportPath + "\n" + failure);
             }
             else
             {
                 Debug.LogWarning(
-                    "[TREE-ROOTS.3] Ground-anchored root-foot evaluation cancelled. Partial output: " +
+                    "[TREE-ROOTS.4A] Root-mass candidate evaluation cancelled. Partial output: " +
                     job.ReportPath);
             }
         }
@@ -1306,7 +1337,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             string failure)
         {
             var report = new StringBuilder();
-            report.AppendLine("# TREE-ROOTS.3 — Ground-Anchored Root Foot Evaluation");
+            report.AppendLine("# TREE-ROOTS.4A — Root Mass + Foot-Trajectory Candidate Evaluation");
             report.AppendLine();
             report.Append("- Outcome: **").Append(outcome).AppendLine("**");
             report.Append("- Generated UTC: ")
@@ -1314,6 +1345,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.Append("- Completed cases: ")
                 .Append(job.Results.Count).Append(" / ")
                 .AppendLine(job.Cases.Count.ToString());
+            report.AppendLine("- Production Current remains bark algorithm 26; candidate cases are temporary evaluation-only builds.");
+            report.AppendLine("- Candidate contract: fixed q^4 support profile, bounded shared-base merge after support saturation, and a quadratic foot-shape envelope with either no plateau or a 2% Root Height plateau.");
+            report.AppendLine("- Ground-foot directional anchoring remains the accepted TREE-ROOTS.3 production envelope in every candidate case.");
             report.AppendLine("- Captures per successful case: neutral close-root three-quarter view; exact game-camera context view.");
             report.AppendLine("- Contract: temporary validation definitions and meshes only; no scene objects, recipes, exact-control snapshots, generated gallery meshes, or serialized assets are modified.");
             report.Append("- Game camera: ")
@@ -1326,89 +1360,54 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.AppendLine();
             report.AppendLine("## Cases");
             report.AppendLine();
-            report.AppendLine("| # | Representative | Case | Status | Twist | Root T/R/H/P | Requested / measured / error | First roll t | Root-boundary roll G/C/E/P | Max step / limit @ interval | V/T | Close | Game | Finding |");
+            report.AppendLine("| # | Case | Mode | Status | Twist | Thickness req/eval | Reach / Height / Persistence | Support req/emitted | Base merge | Shape plateau t | V/T | Close | Game | Finding |");
             report.AppendLine("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|");
             for (int index = 0; index < job.Results.Count; index++)
             {
                 CaseResult result = job.Results[index];
                 EvaluationCase evaluationCase = result.Case;
-                TreeResolvedControls baseline =
-                    evaluationCase.Representative.Controls;
+                TreeResolvedControls baseline = evaluationCase.Representative.Controls;
+                TreeBarkMeshBuildResult bark = result.Bark;
                 report.Append("| ").Append(evaluationCase.Index)
-                    .Append(" | ")
-                    .Append(evaluationCase.Representative.Name)
                     .Append(" | ").Append(evaluationCase.Label)
+                    .Append(" | ").Append(ModeLabel(evaluationCase))
                     .Append(" | ").Append(result.Passed ? "PASS" : "FAIL")
-                    .Append(" | ")
-                    .Append(F(evaluationCase.AxialTwist ??
-                        baseline.AxialTwist))
-                    .Append(" | ")
-                    .Append(F(evaluationCase.RootThickness ??
-                        baseline.RootThickness))
-                    .Append("/")
-                    .Append(F(evaluationCase.RootReach ?? baseline.RootReach))
-                    .Append("/")
-                    .Append(F(evaluationCase.RootHeight ?? baseline.RootHeight))
-                    .Append("/")
-                    .Append(F(evaluationCase.ButtressPersistence ??
-                        baseline.ButtressTransition))
-                    .Append(" | ")
-                    .Append(result.Bark != null
-                        ? F(result.Bark.RequestedAxialTwistDegrees) + "/" +
-                            F(result.Bark.MeasuredAxialTwistDegrees) + "/" +
-                            F(result.Bark.AxialTwistErrorDegrees)
+                    .Append(" | ").Append(F(evaluationCase.AxialTwist ?? baseline.AxialTwist))
+                    .Append(" | ").Append(F(evaluationCase.RootThickness ?? baseline.RootThickness))
+                    .Append("/").Append(bark != null
+                        ? F(bark.EvaluatedRootThickness)
+                        : F(Mathf.Min(evaluationCase.RootThickness ?? baseline.RootThickness, 1f)))
+                    .Append(" | ").Append(F(evaluationCase.RootReach ?? baseline.RootReach))
+                    .Append(" / ").Append(F(evaluationCase.RootHeight ?? baseline.RootHeight))
+                    .Append(" / ").Append(F(evaluationCase.ButtressPersistence ?? baseline.ButtressTransition))
+                    .Append(" | ").Append(bark != null
+                        ? F(bark.RequestedRootSupportAngularWidthDegrees) + "/" +
+                            F(bark.EmittedRootSupportAngularWidthDegrees)
                         : "n/a")
-                    .Append(" | ")
-                    .Append(result.Bark != null
-                        ? F(result.Bark.FirstAuthoredAxialTwistNormalizedDistance)
+                    .Append(" | ").Append(bark != null
+                        ? F(bark.GroundRootBaseMergeFactor)
                         : "n/a")
-                    .Append(" | ")
-                    .Append(result.Bark != null
-                        ? F(result.Bark.AxialTwistAtGroundPlateauEndDegrees) +
-                            "/" +
-                            F(result.Bark.AxialTwistAtRootCollapseEndDegrees) +
-                            "/" +
-                            F(result.Bark.AxialTwistAtEarliestRootTransitionDegrees) +
-                            "/" +
-                            F(result.Bark.AxialTwistAtEffectiveRootTransitionDegrees)
+                    .Append(" | ").Append(bark != null
+                        ? F(bark.RootFootShapePlateauEndNormalized)
                         : "n/a")
-                    .Append(" | ")
-                    .Append(result.Bark != null
-                        ? F(result.Bark.MaximumAuthoredAxialTwistStepDegrees) +
-                            "/" +
-                            F(result.Bark.MaximumAllowedAxialTwistStepDegrees) +
-                            " @ " +
-                            F(result.Bark.MaximumAuthoredAxialTwistStepStartNormalizedDistance) +
-                            "→" +
-                            F(result.Bark.MaximumAuthoredAxialTwistStepEndNormalizedDistance)
+                    .Append(" | ").Append(bark != null
+                        ? bark.VertexCount.ToString(CultureInfo.InvariantCulture) + "/" +
+                            bark.TriangleCount.ToString(CultureInfo.InvariantCulture)
                         : "n/a")
-                    .Append(" | ")
-                    .Append(result.Bark != null
-                        ? result.Bark.VertexCount + "/" +
-                            result.Bark.TriangleCount
-                        : "0/0")
-                    .Append(" | ")
-                    .Append(RelativeCaptureLink(
-                        job,
-                        result.CloseCapturePath,
-                        "close"))
-                    .Append(" | ")
-                    .Append(RelativeCaptureLink(
-                        job,
-                        result.GameCapturePath,
-                        "game"))
-                    .Append(" | ")
-                    .Append(string.IsNullOrEmpty(result.Failure)
-                        ? "Review visually"
-                        : FirstFailureLine(result.Failure))
+                    .Append(" | ").Append(RelativeCaptureLink(job, result.CloseCapturePath, "close"))
+                    .Append(" | ").Append(RelativeCaptureLink(job, result.GameCapturePath, "game"))
+                    .Append(" | ").Append(FirstFailureLine(result.Failure))
                     .AppendLine(" |");
             }
+
             report.AppendLine();
-            report.Append("- CSV: `").Append(job.CsvPath).AppendLine("`");
-            report.Append("- Visual board: `")
-                .Append(job.BoardPath).AppendLine("`");
-            report.Append("- Captures: `")
-                .Append(job.CaptureDirectory).AppendLine("`");
+            report.AppendLine("## Decision use");
+            report.AppendLine();
+            report.AppendLine("- Compare Production — Operator Profile against Preferred and Fallback operator-profile cases first.");
+            report.AppendLine("- Preferred is promotable only if topology passes and its close-root outline enters the ground cleanly without the production bulb/vertical nose.");
+            report.AppendLine("- Fallback exists only to recover the smallest necessary amplitude plateau if immediate quadratic decay creates first-strip topology failures.");
+            report.AppendLine("- Thickness 1.5/2.0 cases are candidate-only range probes; they do not alter the public 0.1–1.0 control contract.");
+
             File.WriteAllText(job.ReportPath, report.ToString(), Encoding.UTF8);
         }
 
@@ -1417,23 +1416,22 @@ namespace ProgrammaticStylized3D.Trees.Editor
             var html = new StringBuilder();
             html.AppendLine("<!doctype html>");
             html.AppendLine("<html><head><meta charset=\"utf-8\">");
-            html.AppendLine("<title>TREE-ROOTS.3 Ground-Anchored Root Foot Evaluation</title>");
+            html.AppendLine("<title>TREE-ROOTS.4A Root Mass + Foot-Trajectory Candidate</title>");
             html.AppendLine("<style>");
             html.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;background:#171717;color:#eee;margin:24px}h1,h2{margin:0 0 12px}h2{margin-top:32px;border-bottom:1px solid #555;padding-bottom:6px}.meta{color:#bbb;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.card{background:#242424;border:1px solid #444;border-radius:8px;padding:12px}.card.fail{border-color:#a44}.title{font-weight:700;margin-bottom:8px}.values{font-size:12px;color:#bbb;margin-bottom:8px}.views{display:grid;grid-template-columns:1fr 1fr;gap:8px}.views img{width:100%;height:auto;background:#111;border:1px solid #444}.caption{font-size:11px;color:#aaa;text-align:center;margin-top:3px}.missing{aspect-ratio:1/1;background:#111;display:flex;align-items:center;justify-content:center;color:#a88;border:1px solid #633}.finding{font-size:12px;color:#d9b0b0;margin-top:8px}</style>");
             html.AppendLine("</head><body>");
-            html.AppendLine("<h1>TREE-ROOTS.3 — Ground-Anchored Root Foot Evaluation</h1>");
+            html.AppendLine("<h1>TREE-ROOTS.4A — Root Mass + Foot-Trajectory Candidate</h1>");
             html.Append("<div class=\"meta\">Outcome: ")
                 .Append(Html(outcome)).Append(" · Completed ")
                 .Append(job.Results.Count).Append(" / ")
                 .Append(job.Cases.Count)
-                .AppendLine(" cases · Compare the authored, operator, isolated Reach/Thickness, handedness, and persistence profiles.</div>");
+                .AppendLine(" cases · Production versus immediate-quadratic and 2%-plateau candidate root shapes. Public controls remain unchanged.</div>");
 
             for (int representativeIndex = 0;
                 representativeIndex < job.Representatives.Count;
                 representativeIndex++)
             {
-                Representative representative =
-                    job.Representatives[representativeIndex];
+                Representative representative = job.Representatives[representativeIndex];
                 html.Append("<h2>").Append(Html(representative.Name))
                     .AppendLine("</h2><div class=\"grid\">");
                 for (int resultIndex = 0;
@@ -1447,6 +1445,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     }
 
                     TreeResolvedControls baseline = representative.Controls;
+                    TreeBarkMeshBuildResult bark = result.Bark;
                     html.Append("<div class=\"card")
                         .Append(result.Passed ? string.Empty : " fail")
                         .AppendLine("\">");
@@ -1454,43 +1453,32 @@ namespace ProgrammaticStylized3D.Trees.Editor
                         .Append(result.Case.Index.ToString("D2"))
                         .Append(" · ").Append(Html(result.Case.Label))
                         .AppendLine("</div>");
-                    html.Append("<div class=\"values\">Twist ")
-                        .Append(F(result.Case.AxialTwist ??
-                            baseline.AxialTwist))
-                        .Append("° · Thickness ")
-                        .Append(F(result.Case.RootThickness ??
-                            baseline.RootThickness))
-                        .Append(" · Reach ")
-                        .Append(F(result.Case.RootReach ?? baseline.RootReach))
-                        .Append(" · Height ")
-                        .Append(F(result.Case.RootHeight ?? baseline.RootHeight))
-                        .Append(" · Persistence ")
-                        .Append(F(result.Case.ButtressPersistence ??
-                            baseline.ButtressTransition));
-                    if (result.Bark != null)
+                    html.Append("<div class=\"values\">")
+                        .Append(Html(ModeLabel(result.Case)))
+                        .Append(" · Twist ").Append(F(result.Case.AxialTwist ?? baseline.AxialTwist)).Append("°")
+                        .Append(" · Thickness ").Append(F(result.Case.RootThickness ?? baseline.RootThickness));
+                    if (bark != null)
                     {
-                        html.Append(" · First roll t ")
-                            .Append(F(result.Bark
-                                .FirstAuthoredAxialTwistNormalizedDistance))
-                            .Append(" · Max step ")
-                            .Append(F(result.Bark
-                                .MaximumAuthoredAxialTwistStepDegrees))
-                            .Append("° / ")
-                            .Append(F(result.Bark
-                                .MaximumAllowedAxialTwistStepDegrees))
-                            .Append("°");
+                        html.Append("→").Append(F(bark.EvaluatedRootThickness));
                     }
-                    html.AppendLine("</div><div class=\"views\">");
-                    AppendBoardImage(
-                        html,
-                        job,
-                        result.CloseCapturePath,
-                        "Close root");
-                    AppendBoardImage(
-                        html,
-                        job,
-                        result.GameCapturePath,
-                        "Game context");
+                    html.Append(" · Reach ").Append(F(result.Case.RootReach ?? baseline.RootReach))
+                        .Append(" · Height ").Append(F(result.Case.RootHeight ?? baseline.RootHeight))
+                        .Append(" · Persistence ").Append(F(result.Case.ButtressPersistence ?? baseline.ButtressTransition));
+                    if (bark != null)
+                    {
+                        html.Append(" · Support ")
+                            .Append(F(bark.RequestedRootSupportAngularWidthDegrees))
+                            .Append("°→")
+                            .Append(F(bark.EmittedRootSupportAngularWidthDegrees))
+                            .Append("° · Merge ")
+                            .Append(F(bark.GroundRootBaseMergeFactor))
+                            .Append(" · Shape plateau t ")
+                            .Append(F(bark.RootFootShapePlateauEndNormalized));
+                    }
+                    html.AppendLine("</div>");
+                    html.AppendLine("<div class=\"views\">");
+                    AppendBoardImage(html, job, result.CloseCapturePath, "close root");
+                    AppendBoardImage(html, job, result.GameCapturePath, "game camera");
                     html.AppendLine("</div>");
                     if (!string.IsNullOrEmpty(result.Failure))
                     {
@@ -1504,7 +1492,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
 
             html.AppendLine("</body></html>");
-            File.WriteAllText(job.BoardPath, html.ToString(), Encoding.UTF8);
+            File.WriteAllText(job.BoardPath, html.ToString());
         }
 
         private static void AppendBoardImage(
@@ -1617,31 +1605,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (representatives == null || representatives.Count != 1)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.3 expected one Wych Elm representative.");
+                    "TREE-ROOTS.4A expected one Wych Elm representative.");
             }
 
             Representative twisted = representatives[0];
-            var cases = new List<EvaluationCase>(8);
+            var cases = new List<EvaluationCase>(15);
             AddCase(
                 cases,
                 twisted,
-                "Authored Wych Profile",
-                "AuthoredWychProfile");
-            AddCase(
-                cases,
-                twisted,
-                "Operator Roots + Twist 0",
-                "OperatorRoots_Twist0",
-                axialTwist: 0f,
-                rootThickness: 0.9f,
-                rootReach: 1.2f,
-                rootHeight: 0.2874f,
-                buttressPersistence: 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Operator Roots + Twist 400",
-                "OperatorRoots_Twist400",
+                "Production — Operator Profile",
+                "Production_OperatorProfile",
+                candidateStrategy: null,
                 axialTwist: 400f,
                 rootThickness: 0.9f,
                 rootReach: 1.2f,
@@ -1650,58 +1624,106 @@ namespace ProgrammaticStylized3D.Trees.Editor
             AddCase(
                 cases,
                 twisted,
-                "Twist 400 + High Reach",
-                "Twist400_HighReach",
-                axialTwist: 400f,
-                rootThickness: 0.5f,
-                rootReach: 2f,
-                rootHeight: 0.28f,
-                buttressPersistence: 0.5f);
+                "Preferred — Operator Profile",
+                "Preferred_OperatorProfile",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 0.9f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Twist 400 + High Thickness",
-                "Twist400_HighThickness",
-                axialTwist: 400f,
-                rootThickness: 1f,
-                rootReach: 1f,
-                rootHeight: 0.28f,
-                buttressPersistence: 0.5f);
+                "Fallback — Operator Profile",
+                "Fallback_OperatorProfile",
+                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
+                400f, 0.9f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Positive Combined + Persistence 0",
-                "PositiveCombined_Persistence0",
-                axialTwist: 460f,
-                rootThickness: 1f,
-                rootReach: 2f,
-                rootHeight: 0.28f,
-                buttressPersistence: 0f);
+                "Preferred — Thickness 0.5",
+                "Preferred_Thickness05",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 0.5f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Negative Combined + Persistence 0.5",
-                "NegativeCombined_Persistence05",
-                axialTwist: -460f,
-                rootThickness: 1f,
-                rootReach: 2f,
-                rootHeight: 0.28f,
-                buttressPersistence: 0.5f);
+                "Preferred — Thickness 1.0",
+                "Preferred_Thickness10",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 1.0f, 1.2f, 0.2874f, 0.5f);
             AddCase(
                 cases,
                 twisted,
-                "Positive Combined + Persistence 1",
-                "PositiveCombined_Persistence1",
-                axialTwist: 460f,
-                rootThickness: 1f,
-                rootReach: 2f,
-                rootHeight: 0.28f,
-                buttressPersistence: 1f);
+                "Preferred — Thickness 1.5",
+                "Preferred_Thickness15",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 1.5f, 1.2f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Thickness 2.0",
+                "Preferred_Thickness20",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 2.0f, 1.2f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Fallback — Thickness 2.0",
+                "Fallback_Thickness20",
+                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
+                400f, 2.0f, 1.2f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Reach 2.0 / Thickness 0.9",
+                "Preferred_Reach20_Thickness09",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 0.9f, 2.0f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Reach 2.0 / Thickness 2.0",
+                "Preferred_Reach20_Thickness20",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 2.0f, 2.0f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Fallback — Reach 2.0 / Thickness 2.0",
+                "Fallback_Reach20_Thickness20",
+                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau,
+                400f, 2.0f, 2.0f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Twist 0",
+                "Preferred_Twist0",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                0f, 0.9f, 1.2f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Twist -400",
+                "Preferred_TwistNegative400",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                -400f, 0.9f, 1.2f, 0.2874f, 0.5f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Persistence 0",
+                "Preferred_Persistence0",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 0.9f, 1.2f, 0.2874f, 0f);
+            AddCase(
+                cases,
+                twisted,
+                "Preferred — Persistence 1",
+                "Preferred_Persistence1",
+                TreeRootMassCandidateStrategy.QuadraticImmediate,
+                400f, 0.9f, 1.2f, 0.2874f, 1f);
 
-            if (cases.Count != 8)
+            if (cases.Count != 15)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.3 expected 8 cases but built " +
+                    "TREE-ROOTS.4A expected 15 cases but built " +
                     cases.Count + ".");
             }
 
@@ -1713,6 +1735,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             Representative representative,
             string label,
             string slug,
+            TreeRootMassCandidateStrategy? candidateStrategy = null,
             float? axialTwist = null,
             float? rootThickness = null,
             float? rootReach = null,
@@ -1725,12 +1748,27 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 Representative = representative,
                 Label = label,
                 Slug = slug,
+                CandidateStrategy = candidateStrategy,
                 AxialTwist = axialTwist,
                 RootThickness = rootThickness,
                 RootReach = rootReach,
                 RootHeight = rootHeight,
                 ButtressPersistence = buttressPersistence
             });
+        }
+
+        private static string ModeLabel(EvaluationCase evaluationCase)
+        {
+            if (evaluationCase == null ||
+                !evaluationCase.CandidateStrategy.HasValue)
+            {
+                return "Production Current";
+            }
+
+            return evaluationCase.CandidateStrategy.Value ==
+                TreeRootMassCandidateStrategy.QuadraticTwoPercentPlateau
+                    ? "Candidate — 2% plateau"
+                    : "Candidate — no plateau";
         }
 
         private static void ApplyOverrides(

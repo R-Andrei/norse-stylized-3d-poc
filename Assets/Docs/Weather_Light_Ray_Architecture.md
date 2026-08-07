@@ -2,11 +2,11 @@
 
 ## Status
 
-**Architecture identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A`
+**Architecture identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`
 
-**Current state:** the generic multi-ray renderer, lifecycle, beam evolution, surface-light response, vegetation-accent publication, cloud-aware request path, and cloud-opening atmospheric population exist. The V1.3A cleanup removes disconnected selection infrastructure and obsolete non-shader diagnostics, corrects cloud-transition population policy, and establishes the current Inspector and ownership contracts.
+**Current state:** the generic multi-ray renderer, lifecycle, beam evolution, surface-light response, indexed vegetation-accent publication, cloud-aware request path, and cloud-opening atmospheric population exist. V1.3A removed disconnected selection infrastructure and obsolete non-shader diagnostics, A1 recovered robust camera-footprint construction, A2 added stateless turnover randomization, and A3 closes the obsolete vegetation-global/false-colour bridge while preserving the indexed sidecar contract.
 
-Unity 6000.5.0f1 compilation and runtime validation of V1.3A remain required in the live project.
+Unity 6000.5.0f1 compilation and runtime validation of V1.3A3 remain required in the live project. V1.3A/A1/A2 have already received the user runtime validation described in their corresponding patch records.
 
 ## 1. Core principle
 
@@ -224,7 +224,9 @@ Production vegetation response uses the indexed per-additional-light sidecar. Ea
 
 The protected GPU layout remains two `float4` values per indexed additional light.
 
-Legacy geometric-match and false-colour diagnostic shader infrastructure still exists after V1.3A and is scheduled for a separate shader cleanup. V1.3A removes its Controller Inspector suite and report exposure but does not alter shared HLSL or shader resources.
+V1.3A3 makes this indexed sidecar the sole production Weather-LightRay vegetation metadata path. The obsolete global Spot/direction/intensity/coverage bridge, unreachable diagnostic-mode bookkeeping, and false-colour diagnostic return are removed. The protected two-`float4` layout and renderer publication contract are unchanged.
+
+The sidecar override identity is independent of artistic strength: a Weather LightRay Spot keeps `parameters.w = 1` even when its resolved accent intensity is `0`. That produces zero Weather-specific edge radiance without falling back to the ordinary punctual-light edge-accent path. Accent intensity is resolved from `AccentLineIntensity`, so an active preset and preset transition now drive the production sidecar strength consistently with coverage and softness.
 
 ## 7. Preset authority and migration boundary
 
@@ -326,7 +328,6 @@ V1.3A requires live Unity validation in Unity 6000.5.0f1:
 
 - serialized mandatory-preset and Anchor migration;
 - preset `SourceKind` removal;
-- legacy vegetation diagnostic HLSL/shader removal;
 - deliberate Weather orchestration and production preset eligibility;
 - standalone Player and broader Weather-system validation where already deferred by the frozen subsystem documents.
 

@@ -432,14 +432,6 @@ Shader "PS3D/Vegetation/Stylized Vegetation Benchmark"
                         _EdgeHighlightWhiteness,
                         _LocalEdgeFalloffPower,
                         _LocalEdgeActivationThreshold);
-                if (_WeatherLightRayVegetationDiagnosticMode > 0.5)
-                {
-                    return half4(
-                        VegetationResolveLightRayDiagnosticColour(
-                            vegetationLighting),
-                        1.0);
-                }
-
                 float3 lighting = VegetationResolveLighting(
                     vegetationLighting,
                     _MinimumNightVisibility);
