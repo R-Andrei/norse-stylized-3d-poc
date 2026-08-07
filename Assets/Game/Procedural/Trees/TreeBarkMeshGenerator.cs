@@ -21,6 +21,9 @@ namespace ProgrammaticStylized3D.Trees
         public int MixedResolutionStripCount { get; internal set; }
         public int StitchTriangleCount { get; internal set; }
         public float RootLobeAverageRadialSegments { get; internal set; }
+        public int GroundContactRadialSegments { get; internal set; }
+        public int GroundContactBoostedRingCount { get; internal set; }
+        public float GroundContactBoostReleaseNormalizedDistance { get; internal set; }
         public float ButtressPersistenceAverageRadialSegments { get; internal set; }
         public float OrdinaryTrunkAverageRadialSegments { get; internal set; }
         public int SideVertexCount { get; internal set; }
@@ -203,7 +206,7 @@ namespace ProgrammaticStylized3D.Trees
 
     public static class TreeBarkMeshGenerator
     {
-        public const int BarkAlgorithmVersion = 27;
+        public const int BarkAlgorithmVersion = 28;
         private const float TwoPi = Mathf.PI * 2f;
         private const float Epsilon = 0.000001f;
         private const float TriangleAreaSquaredEpsilon = 0.0000000001f;
@@ -945,6 +948,7 @@ namespace ProgrammaticStylized3D.Trees
             int authoredSegments,
             TreeBarkMeshSettings settings,
             out bool[] lobeOwnedRings,
+            out bool[] groundContactBoostedRings,
             out int minimumSegments,
             out int maximumSegments,
             out float averageSegments,
@@ -953,6 +957,7 @@ namespace ProgrammaticStylized3D.Trees
             int ringCount = samples != null ? samples.Count : 0;
             var resolved = new int[ringCount];
             lobeOwnedRings = new bool[ringCount];
+            groundContactBoostedRings = new bool[ringCount];
             minimumSegments = 0;
             maximumSegments = 0;
             averageSegments = 0f;
@@ -1003,6 +1008,23 @@ namespace ProgrammaticStylized3D.Trees
                     int samplesPerLobe =
                         settings.ResolveLobedTrunkSamplesPerLobe(
                             lobeAmplitude);
+                    int boostedSamplesPerLobe = samplesPerLobe;
+                    if (settings.EfficiencyPolicy ==
+                            TreeBarkMeshEfficiencyPolicy.Current &&
+                        parameters.RecipeOnlyControlSource)
+                    {
+                        boostedSamplesPerLobe =
+                            ResolveGroundContactSamplesPerLobe(
+                                parameters,
+                                sample.NormalizedDistance,
+                                lobeAmplitude,
+                                samplesPerLobe,
+                                rootCount,
+                                safeAuthored);
+                    }
+                    groundContactBoostedRings[index] =
+                        boostedSamplesPerLobe > samplesPerLobe;
+                    samplesPerLobe = boostedSamplesPerLobe;
                     int circularFloor =
                         settings.ResolveCircularTrunkRadialSegments(
                             sample.Radius,
@@ -1055,6 +1077,70 @@ namespace ProgrammaticStylized3D.Trees
 
             averageSegments = segmentSum / (float)ringCount;
             return resolved;
+        }
+
+        private static int ResolveGroundContactSamplesPerLobe(
+            TreeResolvedParameters parameters,
+            float normalizedDistance,
+            float lobeAmplitude,
+            int baselineSamplesPerLobe,
+            int rootCount,
+            int authoredMaximumSegments)
+        {
+            int safeBaseline = Mathf.Max(3, baselineSamplesPerLobe);
+            if (parameters == null ||
+                !parameters.RecipeOnlyControlSource ||
+                rootCount < 3 ||
+                authoredMaximumSegments < rootCount * safeBaseline)
+            {
+                return safeBaseline;
+            }
+
+            int maximumCompatibleSamplesPerLobe = Mathf.Clamp(
+                authoredMaximumSegments / rootCount,
+                safeBaseline,
+                10);
+            if (maximumCompatibleSamplesPerLobe <= safeBaseline)
+            {
+                return safeBaseline;
+            }
+
+            float amplitudeDemand = Mathf.InverseLerp(
+                0.35f,
+                0.85f,
+                Mathf.Max(0f, lobeAmplitude));
+            amplitudeDemand = amplitudeDemand * amplitudeDemand *
+                (3f - 2f * amplitudeDemand);
+            if (amplitudeDemand <= Epsilon)
+            {
+                return safeBaseline;
+            }
+
+            EvaluateRootEnvelopes(
+                parameters,
+                normalizedDistance,
+                out _,
+                out float footShapeEnvelope);
+            float contactWeight = Mathf.InverseLerp(
+                0.25f,
+                1f,
+                footShapeEnvelope);
+            contactWeight = contactWeight * contactWeight *
+                (3f - 2f * contactWeight);
+            float combinedWeight = Mathf.Clamp01(
+                amplitudeDemand * contactWeight);
+            if (combinedWeight <= Epsilon)
+            {
+                return safeBaseline;
+            }
+
+            return Mathf.Clamp(
+                Mathf.RoundToInt(Mathf.Lerp(
+                    safeBaseline,
+                    maximumCompatibleSamplesPerLobe,
+                    combinedWeight)),
+                safeBaseline,
+                maximumCompatibleSamplesPerLobe);
         }
 
         private static int ResolveNextLowerRadialTier(
@@ -1321,6 +1407,7 @@ namespace ProgrammaticStylized3D.Trees
             float averageRadialSegments;
             int radialTransitionCount;
             bool[] lobeOwnedRings;
+            bool[] groundContactBoostedRings;
             int[] ringRadialSegments = BuildRingRadialSegments(
                 definition,
                 branch,
@@ -1328,6 +1415,7 @@ namespace ProgrammaticStylized3D.Trees
                 radialSegments,
                 settings,
                 out lobeOwnedRings,
+                out groundContactBoostedRings,
                 out minimumRadialSegments,
                 out maximumRadialSegments,
                 out averageRadialSegments,
@@ -1678,6 +1766,7 @@ namespace ProgrammaticStylized3D.Trees
                     branch,
                     samples,
                     ringRadialSegments,
+                    groundContactBoostedRings,
                     radialTransitionCount,
                     branch.BranchOrder == 0
                         ? trunkMixedResolutionStripCount
@@ -2068,6 +2157,7 @@ namespace ProgrammaticStylized3D.Trees
             TreeBranchDefinition branch,
             IReadOnlyList<RenderSample> samples,
             IReadOnlyList<int> ringRadialSegments,
+            IReadOnlyList<bool> groundContactBoostedRings,
             int radialTransitionCount,
             int mixedResolutionStripCount,
             int stitchTriangleCount,
@@ -2085,7 +2175,9 @@ namespace ProgrammaticStylized3D.Trees
         {
             if (accounting == null || branch == null || samples == null ||
                 ringRadialSegments == null ||
-                ringRadialSegments.Count != samples.Count)
+                ringRadialSegments.Count != samples.Count ||
+                groundContactBoostedRings == null ||
+                groundContactBoostedRings.Count != samples.Count)
             {
                 return;
             }
@@ -2131,6 +2223,9 @@ namespace ProgrammaticStylized3D.Trees
             int ordinaryVertices = 0;
             int ordinaryTriangles = 0;
             long rootLobeRadialSum = 0L;
+            int groundContactRadialSegments = 0;
+            int groundContactBoostedRingCount = 0;
+            float groundContactBoostReleaseNormalizedDistance = 0f;
             long persistenceRadialSum = 0L;
             long ordinaryRadialSum = 0L;
             int ordinaryRings = 0;
@@ -2144,6 +2239,17 @@ namespace ProgrammaticStylized3D.Trees
                 {
                     float distance = samples[index].NormalizedDistance;
                     int segments = Mathf.Max(3, ringRadialSegments[index]);
+                    if (index == 0)
+                    {
+                        groundContactRadialSegments = segments;
+                    }
+                    if (groundContactBoostedRings[index])
+                    {
+                        groundContactBoostedRingCount++;
+                        groundContactBoostReleaseNormalizedDistance = Mathf.Max(
+                            groundContactBoostReleaseNormalizedDistance,
+                            distance);
+                    }
                     int verticesAtRing = segments + 1;
                     if (distance <= rootLobeLimit + Epsilon)
                     {
@@ -2218,6 +2324,10 @@ namespace ProgrammaticStylized3D.Trees
                 RootLobeAverageRadialSegments = rootLobeRings > 0
                     ? rootLobeRadialSum / (float)rootLobeRings
                     : 0f,
+                GroundContactRadialSegments = groundContactRadialSegments,
+                GroundContactBoostedRingCount = groundContactBoostedRingCount,
+                GroundContactBoostReleaseNormalizedDistance =
+                    groundContactBoostReleaseNormalizedDistance,
                 ButtressPersistenceAverageRadialSegments =
                     persistenceRings > 0
                         ? persistenceRadialSum / (float)persistenceRings

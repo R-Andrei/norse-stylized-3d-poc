@@ -20,7 +20,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
             WeatherInspectorGui.DrawScriptReference(serializedObject);
 
             WeatherInspectorGui.Info(
-                "This Anchor owns placement, lifecycle, seed, and local intensity. Shared appearance and evolution come from the Controller's active LightRay preset.");
+                "This Anchor owns placement, lifecycle, source policy, seed, and local intensity. Appearance resolves from Preset Override when assigned, otherwise from the Controller Default Preset.");
 
             if (!string.IsNullOrEmpty(anchor.LastError))
             {
@@ -56,9 +56,19 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Optional explicit Weather LightRay Controller. When empty, the published controller is used.");
                 WeatherInspectorGui.Property(
                     serializedObject,
+                    "presetOverride",
+                    "Preset Override",
+                    "Optional per-ray visual preset. None inherits the Controller Default Preset.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
                     "previewInEditMode",
                     "Preview In Edit Mode",
                     "Keeps this authored proof registered outside Play Mode.");
+                WeatherInspectorGui.Property(
+                    serializedObject,
+                    "sourceKind",
+                    "Source Kind",
+                    "Chooses how this individual ray resolves its directional/source state. This policy belongs to the ray, not its visual preset.");
                 WeatherInspectorGui.Property(
                     serializedObject,
                     "cloudPolicy",
@@ -150,7 +160,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     serializedObject,
                     "overridePresetBeamSpacing",
                     "Override Preset Beam Spacing",
-                    "Enable only when this authored placement needs different granularity from the active global preset.");
+                    "Enable only when this authored placement needs different granularity from its resolved preset.");
                 SerializedProperty spacingOverride = serializedObject.FindProperty("overridePresetBeamSpacing");
                 if (spacingOverride != null && spacingOverride.boolValue)
                 {
@@ -164,10 +174,15 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     serializedObject.FindProperty("areaDiameterMetres");
                 SerializedProperty spacingProperty =
                     serializedObject.FindProperty("beamSpacingMetres");
+                WeatherLightRayPreset resolvedPreset = anchor.PresetOverride != null
+                    ? anchor.PresetOverride
+                    : anchor.RegisteredController != null
+                        ? anchor.RegisteredController.DefaultPreset
+                        : null;
                 float resolvedSpacing = spacingOverride != null && spacingOverride.boolValue
                     ? spacingProperty != null ? spacingProperty.floatValue : anchor.BeamSpacingMetres
-                    : anchor.RegisteredController != null && anchor.RegisteredController.ActivePreset != null
-                        ? anchor.RegisteredController.ActivePreset.BeamSpacingMetres
+                    : resolvedPreset != null
+                        ? resolvedPreset.BeamSpacingMetres
                         : anchor.BeamSpacingMetres;
                 WeatherLightRayAreaLayout layout =
                     WeatherLightRayAreaLayout.Calculate(
@@ -179,9 +194,9 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Beam Spacing Source",
                     spacingOverride != null && spacingOverride.boolValue
                         ? "Local Override"
-                        : anchor.RegisteredController != null && anchor.RegisteredController.ActivePreset != null
-                            ? anchor.RegisteredController.ActivePreset.DisplayName
-                            : "Legacy Fallback");
+                        : resolvedPreset != null
+                            ? resolvedPreset.DisplayName
+                            : "Missing Preset");
                 WeatherInspectorGui.ReadOnlyRow(
                     "Derived Footprint Radius",
                     layout.RadiusMetres,
@@ -223,12 +238,12 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     serializedObject,
                     "variationSeed",
                     "Variation Seed",
-                    "Deterministic seed for this zone's independent endpoint sequence. Shared evolution behaviour comes from the active preset.");
+                    "Deterministic seed for this zone's independent endpoint sequence. Shared evolution behaviour comes from this ray's resolved preset.");
                 WeatherInspectorGui.Property(
                     serializedObject,
                     "localIntensityMultiplier",
                     "Local Intensity Multiplier",
-                    "Scales this ray relative to the active preset without changing the global appearance contract.");
+                    "Scales this ray relative to its resolved preset without creating a second appearance authority.");
             }
         }
 
@@ -285,6 +300,14 @@ namespace ProgrammaticStylized3D.Weather.Editor
                         anchor.Handle,
                         out WeatherLightRaySnapshot snapshot))
                 {
+                    WeatherInspectorGui.ReadOnlyObject(
+                        "Resolved Preset",
+                        snapshot.ResolvedPreset);
+                    WeatherInspectorGui.ReadOnlyRow(
+                        "Preset Source",
+                        snapshot.InheritsDefaultPreset
+                            ? "Controller Default"
+                            : "Per-Ray Override");
                     WeatherInspectorGui.ReadOnlyRow(
                         "Source / Lifetime",
                         $"{snapshot.SourceKind} / {snapshot.LifetimePolicy}");
@@ -328,6 +351,11 @@ namespace ProgrammaticStylized3D.Weather.Editor
                         $"{snapshot.Descriptor.SurfaceSpotLightIntensity:0.###} / " +
                         $"{snapshot.Descriptor.ScreenSpaceSurfaceIntensity:0.###} / " +
                         $"{snapshot.Descriptor.FootprintEdgeSoftness:0.###}");
+                    WeatherInspectorGui.ReadOnlyRow(
+                        "Vegetation Accent I / C / S",
+                        $"{snapshot.Descriptor.VegetationAccentIntensity:0.###} / " +
+                        $"{snapshot.Descriptor.VegetationAccentCoverage:0.###} / " +
+                        $"{snapshot.Descriptor.VegetationAccentSoftness:0.###}");
                     Light surfaceSpot = anchor.RegisteredController
                         .GetSurfaceSpotLight(anchor.Handle);
                     WeatherInspectorGui.ReadOnlyObject(

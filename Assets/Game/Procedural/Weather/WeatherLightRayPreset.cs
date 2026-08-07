@@ -9,9 +9,7 @@ namespace ProgrammaticStylized3D.Weather
     /// presentation. It must never decide when it is active, which runtime
     /// source is required, whether clouds are required, or how automatic rays
     /// are populated. Those policies belong to the runtime request owner and,
-    /// eventually, the Weather orchestration layer. The legacy SourceKind field
-    /// is retained only for serialized compatibility until curated asset
-    /// migration and must not be read by production request or population code.
+    /// eventually, the Weather orchestration layer.
     /// </summary>
     [CreateAssetMenu(
         fileName = "WeatherLightRayPreset",
@@ -20,13 +18,6 @@ namespace ProgrammaticStylized3D.Weather
     {
         [Header("Identity")]
         [SerializeField] private string displayName = "LightRay Preset";
-        [SerializeField]
-        [Tooltip(
-            "Legacy serialized metadata only. Runtime request owners and " +
-            "Weather orchestration must supply source dependencies explicitly.")]
-        private WeatherLightRaySourceKind sourceKind =
-            WeatherLightRaySourceKind.Sun;
-
         [Header("Shared Atmospheric Presentation")]
         [SerializeField] private Color colourMultiplier = Color.white;
         [SerializeField, Range(0f, 1f)] private float warmthContribution = 0.5f;
@@ -68,11 +59,6 @@ namespace ProgrammaticStylized3D.Weather
 
 
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? name : displayName;
-        /// <summary>
-        /// Legacy serialized metadata. Do not use for runtime selection,
-        /// source gating, or automatic population.
-        /// </summary>
-        public WeatherLightRaySourceKind SourceKind => sourceKind;
         public Color ColourMultiplier => colourMultiplier;
         public float WarmthContribution => Mathf.Clamp01(warmthContribution);
         public float AtmosphericIntensity => Mathf.Max(0f, atmosphericIntensity);
@@ -132,6 +118,15 @@ namespace ProgrammaticStylized3D.Weather
             float resolvedFootprintSoftness = previousPresentationPreset != null
                 ? Mathf.Lerp(previousPresentationPreset.FootprintEdgeSoftness, FootprintEdgeSoftness, blend)
                 : FootprintEdgeSoftness;
+            float resolvedVegetationAccentIntensity = previousPresentationPreset != null
+                ? Mathf.Lerp(previousPresentationPreset.AccentLineIntensity, AccentLineIntensity, blend)
+                : AccentLineIntensity;
+            float resolvedVegetationAccentCoverage = previousPresentationPreset != null
+                ? Mathf.Lerp(previousPresentationPreset.VegetationAccentCoverage, VegetationAccentCoverage, blend)
+                : VegetationAccentCoverage;
+            float resolvedVegetationAccentSoftness = previousPresentationPreset != null
+                ? Mathf.Lerp(previousPresentationPreset.VegetationAccentSoftness, VegetationAccentSoftness, blend)
+                : VegetationAccentSoftness;
             return new WeatherLightRayDescriptor(
                 localDescriptor.SourceKind,
                 localDescriptor.OriginKind,
@@ -158,6 +153,9 @@ namespace ProgrammaticStylized3D.Weather
                 resolvedSurfaceSpot,
                 resolvedScreenSurface,
                 resolvedFootprintSoftness,
+                resolvedVegetationAccentIntensity,
+                resolvedVegetationAccentCoverage,
+                resolvedVegetationAccentSoftness,
                 EvolutionPreset,
                 EvolutionStrength,
                 EvolutionSpeed,

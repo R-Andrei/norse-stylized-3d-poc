@@ -719,7 +719,7 @@ The two completed INFRA.2A reports validated the runner and restoration paths bu
 
 ### Historical progression — superseded by the indexed sidecar
 
-The following `VEG-V1C.11` through `WEATHER-LIGHT-RAY-V1.1D-AH1` entries are retained as implementation history. Their geometric Spot matching, global publication, diagnostic-mode, and diagnostic-coverage assumptions are **not** the current production contract. The active contract begins at **Additional-light accent authority — V1C.12 / V1.2D2** below and is closed by Weather LightRay cleanup V1.3A3.
+The following `VEG-V1C.11` through `WEATHER-LIGHT-RAY-V1.1D-AH1` entries are retained as implementation history. Their geometric Spot matching, global publication, diagnostic-mode, and diagnostic-coverage assumptions are **not** the current production contract. The active contract begins at **Additional-light accent authority — V1C.12 / V1.2D2** below, was stripped to the indexed sidecar only by Weather LightRay cleanup V1.3A3, and gains true per-ray preset authority in V1.3A4.
 
 - `VEG-V1C.11` supersedes the failed runtime-only Rendering Layer identity from `VEG-V1C.10`. The Weather controller publishes the selected LightRay Spot position/range and horizontal source direction. Vegetation geometrically matches that Spot inside its existing additional-light loop, keeps the real Spot direction for body lighting, and uses the horizontal source direction only for the matched Spot's stylized blade-edge selector. Ordinary lights remain unchanged.
 
@@ -757,9 +757,13 @@ Multiple authored and procedural LightRay Spots use direct indexed metadata alig
 
 ## Additional-light accent authority — V1C.12 / V1.2D2
 
-Vegetation evaluates every URP additional light through the existing lighting loop. Project-specific Weather LightRay accent parameters and horizontal source direction are supplied by one two-`float4` indexed sidecar record. Ordinary lights remain generic; Weather Spot proxies receive active-preset overrides. Rendering Layer identity bits, geometric Spot matching, and shader-side LightRay searches are not part of the production contract.
+Vegetation evaluates every URP additional light through the existing lighting loop. Project-specific Weather LightRay accent parameters and horizontal source direction are supplied by one two-`float4` indexed sidecar record. Ordinary lights remain generic; each Weather Spot proxy receives the values resolved for that specific LightRay descriptor/preset. Rendering Layer identity bits, Controller-global accent authority, geometric Spot matching, and shader-side LightRay searches are not part of the production contract.
 
 `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE` removes the obsolete global Spot/direction/intensity/coverage bridge, diagnostic-mode bookkeeping, and false-colour diagnostic output. The indexed sidecar is now the sole production Weather-LightRay metadata path. Its override flag remains active independently of intensity so `0` accent strength does not fall back to the ordinary punctual-light edge response.
+
+`WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY` moves the three vegetation presentation values into each resolved `WeatherLightRayDescriptor`. The CPU sidecar publisher now writes intensity, coverage, and softness from the descriptor belonging to that specific LightRay Spot. Simultaneous rays may therefore use different vegetation response without changing the protected C#/HLSL record layout, URP additional-light ordering, or ordinary-light behavior.
+
+User authoring remains preset-owned: select the `WeatherLightRayPreset` asset and use **Inspector → Surface Response → Vegetation Accent Intensity / Vegetation Accent Coverage / Vegetation Accent Softness**. The Controller and Anchor do not duplicate those controls.
 
 ## WEATHER-LIGHT-RAY-V1.2D2 — Protected LightRay edge-accent semantics
 
@@ -768,7 +772,7 @@ The indexed Weather LightRay sidecar now restores the direction contract establi
 - real Spot direction is used for ordinary vegetation body lighting;
 - normalized horizontal celestial/LightRay source direction is used only for Weather blade-edge side selection;
 - each camera builds records in its own URP additional-light order;
-- the record contains preset-resolved intensity, stable whole-card coverage, selected edge-profile softness, override state, and source direction.
+- the record contains that LightRay descriptor's preset-resolved intensity, stable whole-card coverage, selected edge-profile softness, override state, and source direction.
 
 Control semantics are frozen:
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-08-07-A3`
+**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-08-07-A4`
 
 This document defines current subsystem ownership and integration boundaries. Detailed implementation contracts remain in the subsystem documents:
 
@@ -54,15 +54,17 @@ The system supports atmospheric weather rays, authored beams, quests, objectives
 
 A specific runtime request or producer may receive:
 
-- a directional source;
+- an optional per-ray Preset Override;
+- a directional source or source policy;
 - a source availability gate;
 - a cloud policy;
-- lifecycle and placement policy;
-- an appearance preset.
+- lifecycle and placement policy.
 
-Those dependencies apply to that request. They do not become global LightRay ownership.
+Every ray resolves its appearance preset independently: explicit per-ray override first, Controller Default Preset second. The preset remains appearance-only. Those dependencies apply to that request and do not become global LightRay ownership.
 
-The current automatic implementation is one cloud-opening atmospheric producer. Its current Controller wiring may supply the resolved daylight directional source, but production code does not read preset source-family metadata and does not define all automatic rays as sunlight.
+The runtime descriptor/snapshot is the downstream authority. Surface Spots, vegetation publication, and atmospheric rendering consume each ray's resolved state rather than consulting one Controller-wide appearance/source family.
+
+The current automatic implementation is one cloud-opening atmospheric producer. It inherits the Controller Default Preset and its current Controller wiring may supply the resolved daylight directional source, but production code does not read preset source-family metadata and does not define all automatic rays as sunlight.
 
 ### 2.4 Time of day and celestial sources
 
@@ -105,7 +107,13 @@ The cloud cookie is installed only on the resolved authoritative directional Sun
 
 ### Directional source to LightRay
 
-A LightRay request or producer may be supplied a runtime directional source for orientation, source gating, cloud projection, or surface presentation. Other rays may use custom, vertical, scripted, or source-independent direction.
+A LightRay request or producer may be supplied a runtime directional source for orientation, source gating, cloud projection, or surface presentation. The Controller resolves numeric colour/intensity/direction state per ray before renderer publication. The atmospheric renderer does not select one global `SourceKind` family. Other rays may use custom, vertical, scripted, or source-independent direction simultaneously.
+
+### Atmospheric presentation grouping
+
+The atmospheric renderer may display simultaneous rays with different presets and source policies. Individual beam-mask drawing remains per ray. Final softening/compositing is partitioned into bounded presentation groups based on the resolved parameters that actually must be shared by a full-screen final pass.
+
+Compatible weather rays remain one group and retain the common single mask/soften/composite path. Additional full-screen sequences occur only when genuinely incompatible presentations coexist. Grouping is preallocated/bounded by LightRay capacity and does not use per-frame dictionary/LINQ allocation.
 
 ### LightRay to gameplay
 
@@ -116,7 +124,7 @@ Gameplay systems may request rays or consume LightRay influence. They own healin
 
 Weather LightRay vegetation metadata is supplied only through the indexed per-additional-light sidecar. The legacy global Spot/direction/intensity/coverage bridge and false-colour diagnostic path are removed in `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`. The renderer-owned two-`float4` record layout, camera-local URP ordering, zero fallback binding, and ordinary-light behavior remain unchanged.
 
-The LightRay preset-resolved intensity, coverage, and softness values are presentation inputs; they do not imply Weather, Sun, Moon, or gameplay ownership.
+The LightRay preset-resolved intensity, coverage, and softness values are presentation inputs; they do not imply Weather, Sun, Moon, or gameplay ownership. In A4 those values are carried by each resolved ray descriptor and each LightRay Spot publishes its own indexed sidecar record. Different simultaneous presets may therefore drive different vegetation response without changing the protected two-`float4` GPU contract.
 
 ## 5. Inspector organization
 
@@ -139,7 +147,7 @@ The current cleanup does not implement:
 - hardcoded Sun/Moon LightRay ownership;
 - visible cloud geometry or volumetrics;
 - new wind gameplay effects;
-- mandatory LightRay preset migration across scenes and prefabs;
+- destructive deletion/migration of legacy serialized LightRay Controller/Anchor fallback fields before the live scene/prefab audit;
 - a new cloud receiver path.
 
 ## 7. Test-only LightRay preset
@@ -152,6 +160,6 @@ Future production orchestration must exclude it from automatic selection. It is 
 
 The cloud-shadow V0 producer and receiver path are frozen based on its recorded Unity validation and benchmark evidence.
 
-The V1.3A LightRay/Inspector cleanup requires fresh Unity 6000.5.0f1 compilation and runtime validation after application to the live project.
+V1.3A/A1/A2/A3 are runtime-accepted. V1.3A4 adds per-ray preset authority, per-ray vegetation response, resolved per-ray source presentation, and atmospheric presentation grouping; it requires fresh Unity 6000.5.0f1 compilation and mixed-preset runtime validation.
 
-Serialized mandatory-preset migration remains blocked until the live project’s complete `.meta`, scene, prefab, Controller, and Anchor state is audited.
+Destructive serialized fallback-field removal remains blocked until the live project's complete `.meta`, scene, prefab, Controller, and Anchor state is audited.

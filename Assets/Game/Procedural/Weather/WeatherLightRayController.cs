@@ -29,7 +29,7 @@ namespace ProgrammaticStylized3D.Weather
         private const float SharedAccentLineOutputMultiplier = 0.2f;
         private const float SharedAccentLineBaselineDefault = 0.03f;
         private const string ImplementationPatchIdentifier =
-            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE";
+            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY";
 
         private struct RuntimeSlot
         {
@@ -52,6 +52,11 @@ namespace ProgrammaticStylized3D.Weather
             public float EvolutionBlend;
             public int CompletedEvolutionTransitions;
             public bool EvolutionInitialized;
+            public WeatherLightRayPreset ResolvedPreset;
+            public WeatherLightRayPreset PreviousResolvedPreset;
+            public bool InheritsDefaultPreset;
+            public double PresetTransitionStartedAt;
+            public float PresetTransitionDurationSeconds;
             public WeatherLightRaySnapshot Snapshot;
         }
 
@@ -212,9 +217,6 @@ namespace ProgrammaticStylized3D.Weather
         private WeatherLightRaySourceState moonSourceState;
         private Camera cachedMainCamera;
         private Camera resolvedRenderCamera;
-        private float cachedAccentLineInput = float.NaN;
-        private float cachedAccentLineResolvedScale;
-        private bool sharedAccentLineCacheDirty = true;
         private string lastError = string.Empty;
         private readonly Dictionary<EntityId, Vector4> vegetationAccentOverridesByLight =
             new Dictionary<EntityId, Vector4>();
@@ -235,7 +237,13 @@ namespace ProgrammaticStylized3D.Weather
         }
 
         public bool LightRaysEnabled => lightRaysEnabled;
+        /// <summary>
+        /// Controller-level inherited preset. Kept under the historical
+        /// ActivePreset API name for source compatibility; authoring presents
+        /// this value as the Default Preset.
+        /// </summary>
         public WeatherLightRayPreset ActivePreset => activePreset;
+        public WeatherLightRayPreset DefaultPreset => activePreset;
         public bool UsesPresetAuthority => activePreset != null;
         public bool PreviewInEditMode => previewInEditMode;
         public bool IsPublished => PublishedController == this;
@@ -282,14 +290,6 @@ namespace ProgrammaticStylized3D.Weather
         public float EvolutionSpeed => activePreset != null
             ? activePreset.EvolutionSpeed
             : ResolveEvolutionSpeed(evolutionPreset, evolutionSpeed);
-        public float AccentLineResolvedScale
-        {
-            get
-            {
-                RefreshSharedAccentLineCacheIfRequired();
-                return cachedAccentLineResolvedScale;
-            }
-        }
         public int PublishedVegetationAdditionalLightCount =>
             publishedVegetationAdditionalLightCount;
         public int PublishedVegetationWeatherOverrideCount =>
@@ -376,7 +376,6 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             PublishedController = this;
-            MarkSharedAccentLineCacheDirty();
             EnsureStorage();
             TickController();
         }
@@ -449,7 +448,6 @@ namespace ProgrammaticStylized3D.Weather
                 lightRayVegetationAccentCoverage);
             evolutionStrength = Mathf.Clamp01(evolutionStrength);
             evolutionSpeed = Mathf.Clamp01(evolutionSpeed);
-            MarkSharedAccentLineCacheDirty();
 
             if (isActiveAndEnabled)
             {
@@ -608,6 +606,81 @@ namespace ProgrammaticStylized3D.Weather
             }
         }
 
+        private WeatherLightRayPreset ResolvePresetOverride(
+            WeatherLightRayPreset presetOverride)
+        {
+            return presetOverride != null
+                ? presetOverride
+                : activePreset;
+        }
+
+        private bool TryResolveSlotPreset(
+            ref RuntimeSlot slot,
+            WeatherLightRayPreset desiredPreset,
+            bool inheritsDefaultPreset,
+            double now,
+            out WeatherLightRayPreset resolvedPreset,
+            out WeatherLightRayPreset previousPreset,
+            out float presentationBlend)
+        {
+            resolvedPreset = desiredPreset;
+            previousPreset = null;
+            presentationBlend = 1f;
+            if (desiredPreset == null)
+            {
+                return false;
+            }
+
+            bool firstResolution = slot.ResolvedPreset == null;
+            bool targetChanged = slot.ResolvedPreset != desiredPreset ||
+                slot.InheritsDefaultPreset != inheritsDefaultPreset;
+            if (firstResolution || targetChanged)
+            {
+                bool canJoinDefaultTransition = inheritsDefaultPreset &&
+                    activePreset == desiredPreset &&
+                    previousPresentationPreset != null &&
+                    presetTransitionDurationSeconds > 0f &&
+                    (!firstResolution
+                        ? slot.InheritsDefaultPreset &&
+                            slot.ResolvedPreset == previousPresentationPreset
+                        : true);
+
+                slot.ResolvedPreset = desiredPreset;
+                slot.InheritsDefaultPreset = inheritsDefaultPreset;
+                if (canJoinDefaultTransition)
+                {
+                    slot.PreviousResolvedPreset = previousPresentationPreset;
+                    slot.PresetTransitionStartedAt = presetTransitionStartedAt;
+                    slot.PresetTransitionDurationSeconds =
+                        presetTransitionDurationSeconds;
+                }
+                else
+                {
+                    slot.PreviousResolvedPreset = null;
+                    slot.PresetTransitionStartedAt = now;
+                    slot.PresetTransitionDurationSeconds = 0f;
+                }
+            }
+
+            if (slot.PreviousResolvedPreset != null &&
+                slot.PresetTransitionDurationSeconds > 0f)
+            {
+                presentationBlend = Mathf.Clamp01((float)(
+                    (now - slot.PresetTransitionStartedAt) /
+                    slot.PresetTransitionDurationSeconds));
+                if (presentationBlend >= 1f)
+                {
+                    slot.PreviousResolvedPreset = null;
+                    slot.PresetTransitionDurationSeconds = 0f;
+                    presentationBlend = 1f;
+                }
+            }
+
+            resolvedPreset = slot.ResolvedPreset;
+            previousPreset = slot.PreviousResolvedPreset;
+            return true;
+        }
+
         public bool TrySetActivePreset(
             WeatherLightRayPreset preset,
             float transitionDurationSeconds,
@@ -654,6 +727,16 @@ namespace ProgrammaticStylized3D.Weather
                 return false;
             }
 
+            WeatherLightRayPreset resolvedPreset = ResolvePresetOverride(
+                anchor.PresetOverride);
+            if (resolvedPreset == null)
+            {
+                handle = default;
+                error =
+                    "The authored LightRay requires either a Preset Override or a Controller Default Preset.";
+                return false;
+            }
+
             EnsureStorage();
             if (TryResolveAuthoredSlot(anchor, handle, out int existingIndex))
             {
@@ -684,6 +767,11 @@ namespace ProgrammaticStylized3D.Weather
             slot.LifecycleRevision = anchor.LifecycleRevision;
             slot.LastUpdateTime = 0.0;
             slot.SpawnTime = Time.realtimeSinceStartupAsDouble;
+            slot.ResolvedPreset = null;
+            slot.PreviousResolvedPreset = null;
+            slot.InheritsDefaultPreset = false;
+            slot.PresetTransitionStartedAt = slot.SpawnTime;
+            slot.PresetTransitionDurationSeconds = 0f;
             ResetEvolutionState(ref slot);
             slot.Snapshot = default;
             runtimeSlots[freeIndex] = slot;
@@ -747,10 +835,12 @@ namespace ProgrammaticStylized3D.Weather
                 return false;
             }
 
-            if (activePreset == null)
+            WeatherLightRayPreset resolvedPreset = ResolvePresetOverride(
+                request.PresetOverride);
+            if (resolvedPreset == null)
             {
                 error =
-                    "Procedural LightRay spawning requires an assigned Active Preset.";
+                    "Procedural LightRay spawning requires either a Preset Override or a Controller Default Preset.";
                 return false;
             }
 
@@ -780,6 +870,11 @@ namespace ProgrammaticStylized3D.Weather
             slot.LifecycleRevision = 1u;
             slot.LastUpdateTime = 0.0;
             slot.SpawnTime = now;
+            slot.ResolvedPreset = null;
+            slot.PreviousResolvedPreset = null;
+            slot.InheritsDefaultPreset = false;
+            slot.PresetTransitionStartedAt = now;
+            slot.PresetTransitionDurationSeconds = 0f;
             ResetEvolutionState(ref slot);
             slot.Snapshot = default;
             runtimeSlots[freeIndex] = slot;
@@ -945,6 +1040,13 @@ namespace ProgrammaticStylized3D.Weather
                     update.SpawnRequest,
                     out error))
             {
+                return false;
+            }
+
+            if (ResolvePresetOverride(update.SpawnRequest.PresetOverride) == null)
+            {
+                error =
+                    "The procedural LightRay update requires either a Preset Override or a Controller Default Preset.";
                 return false;
             }
 
@@ -1189,14 +1291,14 @@ namespace ProgrammaticStylized3D.Weather
         {
             var builder = new StringBuilder(4096);
             builder.AppendLine(
-                "[Weather LightRay Cleanup V1.3A Comprehensive Report]");
+                "[Weather LightRay Cleanup V1.3A4 Comprehensive Report]");
             builder.Append("Implementation patch: ")
                 .AppendLine(ImplementationPatchIdentifier);
             builder.Append("Published / active controllers: ")
                 .Append(IsPublished ? "Yes" : "No")
                 .Append(" / ")
                 .AppendLine(ActiveControllerCount.ToString());
-            builder.Append("Enabled / edit preview / active preset: ")
+            builder.Append("Enabled / edit preview / default preset: ")
                 .Append(lightRaysEnabled ? "Yes" : "No")
                 .Append(" / ")
                 .Append(previewInEditMode ? "Yes" : "No")
@@ -1220,12 +1322,19 @@ namespace ProgrammaticStylized3D.Weather
                     : "None")
                 .Append(" / ")
                 .AppendLine(renderDebugView.ToString());
-            builder.Append("Shared vegetation accent intensity / coverage / softness: ")
-                .Append(AccentLineIntensity.ToString("0.###"))
-                .Append(" / ")
-                .Append(LightRayVegetationAccentCoverage.ToString("0.###"))
-                .Append(" / ")
-                .AppendLine(LightRayVegetationAccentSoftness.ToString("0.###"));
+            builder.Append("Default-preset vegetation accent intensity / coverage / softness: ");
+            if (activePreset != null)
+            {
+                builder.Append(AccentLineIntensity.ToString("0.###"))
+                    .Append(" / ")
+                    .Append(LightRayVegetationAccentCoverage.ToString("0.###"))
+                    .Append(" / ")
+                    .AppendLine(LightRayVegetationAccentSoftness.ToString("0.###"));
+            }
+            else
+            {
+                builder.AppendLine("N/A (no Controller Default Preset)");
+            }
             builder.Append("Published vegetation additional lights / Weather overrides / buffer capacity / overflow: ")
                 .Append(publishedVegetationAdditionalLightCount)
                 .Append(" / ")
@@ -1280,6 +1389,21 @@ namespace ProgrammaticStylized3D.Weather
                         .Append(slot.Procedural ? "Procedural" : "Authored")
                         .Append(" | handle ")
                         .Append(snapshot.Handle)
+                        .Append(" | preset ")
+                        .Append(snapshot.ResolvedPreset != null
+                            ? snapshot.ResolvedPreset.DisplayName
+                            : "None")
+                        .Append(snapshot.InheritsDefaultPreset
+                            ? " (Default)"
+                            : " (Override)")
+                        .Append(" | preset blend ")
+                        .Append(snapshot.PresetPresentationBlend.ToString("0.###"))
+                        .Append(" | veg I/C/S ")
+                        .Append(snapshot.Descriptor.VegetationAccentIntensity.ToString("0.###"))
+                        .Append('/')
+                        .Append(snapshot.Descriptor.VegetationAccentCoverage.ToString("0.###"))
+                        .Append('/')
+                        .Append(snapshot.Descriptor.VegetationAccentSoftness.ToString("0.###"))
                         .Append(" | source ")
                         .Append(snapshot.SourceKind)
                         .Append(" | lifecycle ")
@@ -1513,7 +1637,8 @@ namespace ProgrammaticStylized3D.Weather
                 movementPolicy: settings.MovementPolicy,
                 gameplayChannel: settings.GameplayChannel,
                 externalIdentity: opening.StableIdentity,
-                priority: settings.Priority);
+                priority: settings.Priority,
+                presetOverride: settings.PresetOverride);
             return TryValidateProceduralRequest(request, out error);
         }
 
@@ -1747,6 +1872,11 @@ namespace ProgrammaticStylized3D.Weather
             slot.EvolutionDurationSeconds = 0f;
             slot.EvolutionBlend = 0f;
             slot.CompletedEvolutionTransitions = 0;
+            slot.ResolvedPreset = null;
+            slot.PreviousResolvedPreset = null;
+            slot.InheritsDefaultPreset = false;
+            slot.PresetTransitionStartedAt = 0.0;
+            slot.PresetTransitionDurationSeconds = 0f;
             slot.Snapshot = default;
             runtimeSlots[slotIndex] = slot;
             activeRayCount = Mathf.Max(0, activeRayCount - 1);
@@ -1792,11 +1922,6 @@ namespace ProgrammaticStylized3D.Weather
             }
 
             EnsureSurfaceLightStorage(runtimeSlots.Length);
-            Vector4 accentData = new Vector4(
-                AccentLineResolvedScale,
-                LightRayVegetationAccentCoverage,
-                LightRayVegetationAccentSoftness,
-                1f);
             for (int slotIndex = 0;
                 slotIndex < runtimeSlots.Length;
                 slotIndex++)
@@ -1821,17 +1946,25 @@ namespace ProgrammaticStylized3D.Weather
                     continue;
                 }
 
-                WeatherLightRaySourceState renderableSource =
-                    ResolveRenderableSourceState(raySnapshot);
                 if (UpdateSurfaceSpotLight(
                         proxy,
-                        raySnapshot,
-                        renderableSource))
+                        raySnapshot))
                 {
                     activeSurfaceSpotLightCount++;
                     if (proxy.Light != null)
                     {
                         EntityId lightEntityId = proxy.Light.GetEntityId();
+                        WeatherLightRayDescriptor descriptor =
+                            raySnapshot.Descriptor;
+                        float accentScale = lightRaysEnabled
+                            ? EvaluateSharedAccentLineRelativeScale(
+                                descriptor.VegetationAccentIntensity)
+                            : 0f;
+                        Vector4 accentData = new Vector4(
+                            accentScale,
+                            descriptor.VegetationAccentCoverage,
+                            descriptor.VegetationAccentSoftness,
+                            1f);
                         vegetationAccentOverridesByLight[lightEntityId] = accentData;
                         Vector3 directionToSource = -raySnapshot.RayDirectionWorld;
                         directionToSource.y = 0f;
@@ -1970,8 +2103,7 @@ namespace ProgrammaticStylized3D.Weather
 
         private static bool UpdateSurfaceSpotLight(
             RuntimeSurfaceLight proxy,
-            WeatherLightRaySnapshot raySnapshot,
-            WeatherLightRaySourceState sourceState)
+            WeatherLightRaySnapshot raySnapshot)
         {
             if (proxy == null || proxy.Light == null)
             {
@@ -2006,11 +2138,8 @@ namespace ProgrammaticStylized3D.Weather
 
             Color resolvedColour = ResolveSurfaceSpotLightColour(
                 raySnapshot,
-                sourceState,
                 out float colourPeak);
-            float sourceIntensity = sourceState.SourceLight != null
-                ? Mathf.Max(0f, sourceState.Intensity)
-                : 1f;
+            float sourceIntensity = raySnapshot.ResolvedSourceIntensity;
             float appliedIntensity =
                 descriptor.SurfaceSpotLightIntensity *
                 raySnapshot.CurrentIntensity *
@@ -2056,37 +2185,14 @@ namespace ProgrammaticStylized3D.Weather
                 (Mathf.Pow(SharedAccentLineExponentialBase, clamped) - 1f);
         }
 
-        private void MarkSharedAccentLineCacheDirty()
-        {
-            sharedAccentLineCacheDirty = true;
-        }
-
-        private void RefreshSharedAccentLineCacheIfRequired()
-        {
-            float normalized = lightRaysEnabled
-                ? Mathf.Clamp01(AccentLineIntensity)
-                : 0f;
-            if (!sharedAccentLineCacheDirty &&
-                Mathf.Approximately(cachedAccentLineInput, normalized))
-            {
-                return;
-            }
-
-            cachedAccentLineInput = normalized;
-            cachedAccentLineResolvedScale =
-                EvaluateSharedAccentLineRelativeScale(normalized);
-            sharedAccentLineCacheDirty = false;
-        }
-
-        private static Color ResolveSurfaceSpotLightColour(
-            WeatherLightRaySnapshot raySnapshot,
-            WeatherLightRaySourceState sourceState,
-            out float colourPeak)
+        private static Color ResolveSourcePresentationColour(
+            WeatherLightRayDescriptor descriptor,
+            WeatherLightRaySourceState sourceState)
         {
             Color sourceColour = sourceState.SourceLight != null
                 ? sourceState.Colour
                 : Color.white;
-            if (raySnapshot.SourceKind == WeatherLightRaySourceKind.Sun)
+            if (descriptor.SourceKind == WeatherLightRaySourceKind.Sun)
             {
                 Color warmSunColour = new Color(
                     1f,
@@ -2096,10 +2202,17 @@ namespace ProgrammaticStylized3D.Weather
                 sourceColour = Color.Lerp(
                     sourceColour,
                     warmSunColour,
-                    raySnapshot.Descriptor.WarmthContribution);
+                    descriptor.WarmthContribution);
             }
 
-            Color effectiveColour = sourceColour *
+            return sourceColour;
+        }
+
+        private static Color ResolveSurfaceSpotLightColour(
+            WeatherLightRaySnapshot raySnapshot,
+            out float colourPeak)
+        {
+            Color effectiveColour = raySnapshot.ResolvedSourceColour *
                 raySnapshot.Descriptor.ColourMultiplier;
             colourPeak = Mathf.Max(
                 0f,
@@ -2240,20 +2353,31 @@ namespace ProgrammaticStylized3D.Weather
             double now)
         {
             RuntimeSlot slot = runtimeSlots[slotIndex];
-            WeatherLightRayDescriptor descriptor = anchor.BuildDescriptor(
-                EvolutionPreset,
-                EvolutionStrength,
-                EvolutionSpeed);
-            if (activePreset != null)
+            WeatherLightRayPreset desiredPreset = ResolvePresetOverride(
+                anchor.PresetOverride);
+            bool inheritsDefaultPreset = anchor.PresetOverride == null;
+            if (!TryResolveSlotPreset(
+                    ref slot,
+                    desiredPreset,
+                    inheritsDefaultPreset,
+                    now,
+                    out WeatherLightRayPreset resolvedPreset,
+                    out WeatherLightRayPreset previousPreset,
+                    out float presentationBlend))
             {
-                descriptor = activePreset.ApplyTo(
-                    descriptor,
-                    anchor.OverridePresetBeamSpacing,
-                    anchor.BeamSpacingMetres,
-                    anchor.LocalIntensityMultiplier,
-                    previousPresentationPreset,
-                    PresetPresentationBlend);
+                lastError =
+                    "An authored LightRay requires either a Preset Override or a Controller Default Preset.";
+                ReleaseSlot(slotIndex);
+                return;
             }
+
+            WeatherLightRayDescriptor descriptor = resolvedPreset.ApplyTo(
+                anchor.BuildLocalDescriptor(),
+                anchor.OverridePresetBeamSpacing,
+                anchor.BeamSpacingMetres,
+                anchor.LocalIntensityMultiplier,
+                previousPreset,
+                presentationBlend);
 
             if (slot.LifecycleRevision != anchor.LifecycleRevision)
             {
@@ -2261,6 +2385,7 @@ namespace ProgrammaticStylized3D.Weather
                 slot.SpawnTime = now;
             }
 
+            runtimeSlots[slotIndex] = slot;
             UpdateRuntimeSlot(
                 slotIndex,
                 descriptor,
@@ -2268,7 +2393,11 @@ namespace ProgrammaticStylized3D.Weather
                 Vector3.zero,
                 anchor.ExternallyControlledVisible,
                 now,
-                false);
+                false,
+                resolvedPreset,
+                previousPreset,
+                inheritsDefaultPreset,
+                presentationBlend);
         }
 
         private void UpdateProceduralSlot(int slotIndex, double now)
@@ -2279,19 +2408,32 @@ namespace ProgrammaticStylized3D.Weather
                 return;
             }
 
-            if (activePreset == null)
+            WeatherLightRaySpawnRequest request = slot.ProceduralRequest;
+            WeatherLightRayPreset desiredPreset = ResolvePresetOverride(
+                request.PresetOverride);
+            bool inheritsDefaultPreset = request.PresetOverride == null;
+            if (!TryResolveSlotPreset(
+                    ref slot,
+                    desiredPreset,
+                    inheritsDefaultPreset,
+                    now,
+                    out WeatherLightRayPreset resolvedPreset,
+                    out WeatherLightRayPreset previousPreset,
+                    out float presentationBlend))
             {
                 lastError =
-                    "An active procedural LightRay requires an assigned Active Preset.";
+                    "An active procedural LightRay requires either a Preset Override or a Controller Default Preset.";
                 ReleaseSlot(slotIndex);
                 return;
             }
 
-            WeatherLightRaySpawnRequest request = slot.ProceduralRequest;
             WeatherLightRayDescriptor descriptor =
                 BuildProceduralDescriptor(
                     request,
-                    PresetPresentationBlend);
+                    resolvedPreset,
+                    previousPreset,
+                    presentationBlend);
+            runtimeSlots[slotIndex] = slot;
             UpdateRuntimeSlot(
                 slotIndex,
                 descriptor,
@@ -2299,22 +2441,28 @@ namespace ProgrammaticStylized3D.Weather
                 request.RayDirectionWorld,
                 slot.ProceduralVisible,
                 now,
-                true);
+                true,
+                resolvedPreset,
+                previousPreset,
+                inheritsDefaultPreset,
+                presentationBlend);
         }
 
-        private WeatherLightRayDescriptor BuildProceduralDescriptor(
+        private static WeatherLightRayDescriptor BuildProceduralDescriptor(
             in WeatherLightRaySpawnRequest request,
+            WeatherLightRayPreset resolvedPreset,
+            WeatherLightRayPreset previousPreset,
             float presentationBlend)
         {
             float height = request.OverrideHeight
                 ? request.HeightMetres
-                : activePreset.DefaultHeightMetres;
+                : resolvedPreset.DefaultHeightMetres;
             float lean = request.OverrideMaximumVisualLean
                 ? request.MaximumVisualLeanDegrees
-                : activePreset.DefaultMaximumVisualLeanDegrees;
+                : resolvedPreset.DefaultMaximumVisualLeanDegrees;
             float spacing = request.OverrideBeamSpacing
                 ? request.BeamSpacingMetres
-                : activePreset.BeamSpacingMetres;
+                : resolvedPreset.BeamSpacingMetres;
             var localDescriptor = new WeatherLightRayDescriptor(
                 request.SourceKind,
                 WeatherLightRayOriginKind.Procedural,
@@ -2326,35 +2474,38 @@ namespace ProgrammaticStylized3D.Weather
                 lean,
                 request.AreaDiameterMetres,
                 spacing,
-                activePreset.BeamWidthRatioRange,
-                activePreset.BeamIntensityVariation,
-                activePreset.BeamEdgeSoftness,
-                activePreset.BeamSoftnessVariation,
-                activePreset.UpperFade,
-                activePreset.GroundFade,
-                activePreset.ContactPlaneOpacity,
-                activePreset.ColourMultiplier,
-                activePreset.WarmthContribution,
-                activePreset.AtmosphericIntensity,
-                activePreset.SofteningStrength,
-                activePreset.CameraIntersectionFade,
-                activePreset.SurfaceSpotLightIntensity,
-                activePreset.ScreenSpaceSurfaceIntensity,
-                activePreset.FootprintEdgeSoftness,
-                activePreset.EvolutionPreset,
-                activePreset.EvolutionStrength,
-                activePreset.EvolutionSpeed,
+                Vector2.one,
+                0f,
+                0.5f,
+                0f,
+                0.1f,
+                0.1f,
+                0f,
+                Color.white,
+                0f,
+                1f,
+                0f,
+                0f,
+                0f,
+                0f,
+                1f,
+                0f,
+                0f,
+                0.5f,
+                WeatherLightRayEvolutionPreset.Static,
+                0f,
+                0f,
                 request.FadeInDurationSeconds,
                 request.HoldDurationSeconds,
                 request.FadeOutDurationSeconds,
                 request.GameplayChannel,
                 request.VariationSeed);
-            return activePreset.ApplyTo(
+            return resolvedPreset.ApplyTo(
                 localDescriptor,
                 request.OverrideBeamSpacing,
                 request.BeamSpacingMetres,
                 request.LocalIntensityMultiplier,
-                previousPresentationPreset,
+                previousPreset,
                 presentationBlend);
         }
 
@@ -2365,7 +2516,11 @@ namespace ProgrammaticStylized3D.Weather
             Vector3 rayDirectionOverride,
             bool externallyControlledVisible,
             double now,
-            bool releaseTimedExpiry)
+            bool releaseTimedExpiry,
+            WeatherLightRayPreset resolvedPreset,
+            WeatherLightRayPreset previousResolvedPreset,
+            bool inheritsDefaultPreset,
+            float presetPresentationBlend)
         {
             RuntimeSlot slot = runtimeSlots[slotIndex];
             WeatherLightRaySourceState sourceState = GetSourceState(
@@ -2482,6 +2637,16 @@ namespace ProgrammaticStylized3D.Weather
                 baseDirection,
                 sourceState.Profile,
                 descriptor.MaximumVisualLeanDegrees);
+            Color resolvedSourceColour = ResolveSourcePresentationColour(
+                descriptor,
+                sourceState);
+            float resolvedSourceIntensity = descriptor.SourceGatePolicy ==
+                    WeatherLightRaySourceGatePolicy.IgnoreSourceGate &&
+                !sourceState.Available
+                    ? Mathf.Max(1f, sourceState.Intensity)
+                    : sourceState.SourceLight != null
+                        ? Mathf.Max(0f, sourceState.Intensity)
+                        : 1f;
             UpdateEvolutionState(ref slot, descriptor, deltaTime);
             WeatherLightRayHandle handle = new WeatherLightRayHandle(
                 slotIndex,
@@ -2500,7 +2665,13 @@ namespace ProgrammaticStylized3D.Weather
                 slot.EvolutionNextSeed,
                 slot.EvolutionBlend,
                 slot.EvolutionDurationSeconds,
-                slot.CompletedEvolutionTransitions);
+                slot.CompletedEvolutionTransitions,
+                resolvedPreset,
+                previousResolvedPreset,
+                inheritsDefaultPreset,
+                presetPresentationBlend,
+                resolvedSourceColour,
+                resolvedSourceIntensity);
             runtimeSlots[slotIndex] = slot;
 
             if (releaseTimedExpiry &&

@@ -39,6 +39,9 @@ namespace ProgrammaticStylized3D.Weather
         private WeatherLightRayController controllerOverride;
 
         [SerializeField]
+        private WeatherLightRayPreset presetOverride;
+
+        [SerializeField]
         private bool previewInEditMode = true;
 
         [SerializeField]
@@ -204,6 +207,7 @@ namespace ProgrammaticStylized3D.Weather
 
         public WeatherLightRayController ControllerOverride =>
             controllerOverride;
+        public WeatherLightRayPreset PresetOverride => presetOverride;
         public bool PreviewInEditMode => previewInEditMode;
         public WeatherLightRaySourceKind SourceKind => sourceKind;
         public WeatherLightRayCloudPolicy CloudPolicy => cloudPolicy;
@@ -215,6 +219,8 @@ namespace ProgrammaticStylized3D.Weather
             externallyControlledVisible;
         public uint LifecycleRevision => lifecycleRevision;
         public float HeightMetres => heightMetres;
+        public float MaximumVisualLeanDegrees =>
+            Mathf.Clamp(maximumVisualLeanDegrees, 0f, 75f);
         public float AreaDiameterMetres => areaDiameterMetres;
         public float BeamSpacingMetres => beamSpacingMetres;
         public bool OverridePresetBeamSpacing => overridePresetBeamSpacing;
@@ -371,20 +377,15 @@ namespace ProgrammaticStylized3D.Weather
             }
         }
 
-        public WeatherLightRayDescriptor BuildDescriptor(
-            WeatherLightRayEvolutionPreset controllerPreset,
-            float controllerStrength,
-            float controllerSpeed)
+        /// <summary>
+        /// Builds request-local state only. Shared visual presentation is
+        /// applied by the Controller from the ray's resolved preset before
+        /// the descriptor may become active. Legacy serialized appearance
+        /// fields remain on the component solely for deferred migration and
+        /// are deliberately not consulted here.
+        /// </summary>
+        public WeatherLightRayDescriptor BuildLocalDescriptor()
         {
-            WeatherLightRayEvolutionPreset resolvedPreset = overrideControllerEvolution
-                ? evolutionPreset
-                : controllerPreset;
-            float resolvedStrength = overrideControllerEvolution
-                ? ResolveEvolutionStrength()
-                : Mathf.Clamp01(controllerStrength);
-            float resolvedSpeed = overrideControllerEvolution
-                ? ResolveEvolutionSpeed()
-                : Mathf.Clamp01(controllerSpeed);
             return new WeatherLightRayDescriptor(
                 sourceKind,
                 WeatherLightRayOriginKind.Authored,
@@ -396,24 +397,27 @@ namespace ProgrammaticStylized3D.Weather
                 maximumVisualLeanDegrees,
                 areaDiameterMetres,
                 beamSpacingMetres,
-                beamWidthRatioRange,
-                beamIntensityVariation,
-                beamEdgeSoftness,
-                beamSoftnessVariation,
-                upperFade,
-                groundFade,
-                contactPlaneOpacity,
-                colourMultiplier,
-                warmthContribution,
-                atmosphericIntensity * LocalIntensityMultiplier,
-                softeningStrength,
-                cameraIntersectionFade,
-                surfaceSpotLightIntensity,
-                screenSpaceSurfaceIntensity,
-                edgeSoftness,
-                resolvedPreset,
-                resolvedStrength,
-                resolvedSpeed,
+                Vector2.one,
+                0f,
+                0.5f,
+                0f,
+                0.1f,
+                0.1f,
+                0f,
+                Color.white,
+                0f,
+                1f,
+                0f,
+                0f,
+                0f,
+                0f,
+                1f,
+                0f,
+                0f,
+                0.5f,
+                WeatherLightRayEvolutionPreset.Static,
+                0f,
+                0f,
                 fadeInDurationSeconds,
                 holdDurationSeconds,
                 fadeOutDurationSeconds,

@@ -45,6 +45,14 @@ Remove the unrequested standalone trunk `Ridge Count` and `Ridge Depth` feature.
 - Removed obsolete ridge-interval gallery validation and telemetry.
 - Static source audit found no remaining standalone ridge symbols in the procedural-tree module.
 
+### Implemented source invariants
+
+- The accepted TREE-ROOTS.4B root mass, immediate quadratic foot amplitude, TREE-ROOTS.3 anchored-foot direction, continuous bark roll, and mixed-resolution stitcher are byte-for-byte unchanged from the pre-4C source in the audited method bodies.
+- The contact boost cannot exceed the radial segment count already available from the authored production trunk ceiling. For the common five-root and six-root Twisted cases this permits at most 50 and 60 sides respectively; no global radial maximum was increased.
+- Direct boost demand becomes zero once `footShapeEnvelope <= 0.25` or root-only amplitude is at/below `0.35`, and ordinary contour-owned radial resolution then resumes.
+- The boost is resolution-only: it changes no vertex target position equation, root envelope, root control value, topology threshold, axial render-sample density, branch radial policy, UV rule, material, or runtime component.
+- Normal gameplay receives no new per-frame work. The only expected cost is additional generated bark vertices/triangles in a small number of lowest trunk rings on roots with sufficiently strong contact demand.
+
 ### Non-goals
 
 - No scene, prefab, material, recipe asset, shader, layer, or tag edits.
@@ -3302,6 +3310,14 @@ The existing smooth frame-adoption curve is evaluated between the root-collapse 
 - Removed obsolete ridge-interval gallery validation and telemetry.
 - Static source audit found no remaining standalone ridge symbols in the procedural-tree module.
 
+### Implemented source invariants
+
+- The accepted TREE-ROOTS.4B root mass, immediate quadratic foot amplitude, TREE-ROOTS.3 anchored-foot direction, continuous bark roll, and mixed-resolution stitcher are byte-for-byte unchanged from the pre-4C source in the audited method bodies.
+- The contact boost cannot exceed the radial segment count already available from the authored production trunk ceiling. For the common five-root and six-root Twisted cases this permits at most 50 and 60 sides respectively; no global radial maximum was increased.
+- Direct boost demand becomes zero once `footShapeEnvelope <= 0.25` or root-only amplitude is at/below `0.35`, and ordinary contour-owned radial resolution then resumes.
+- The boost is resolution-only: it changes no vertex target position equation, root envelope, root control value, topology threshold, axial render-sample density, branch radial policy, UV rule, material, or runtime component.
+- Normal gameplay receives no new per-frame work. The only expected cost is additional generated bark vertices/triangles in a small number of lowest trunk rings on roots with sufficiently strong contact demand.
+
 ### Non-goals
 
 - No scene, prefab, material, shader or curated recipe asset edits.
@@ -3383,6 +3399,14 @@ Fix exact-control regeneration so the visible `Generated Bark Mesh` renderer rec
 - Renamed the visible control to Buttress Persistence and corrected its direction: `0.0` is earliest circularization; `1.0` carries root-owned lobes to the tip.
 - Removed obsolete ridge-interval gallery validation and telemetry.
 - Static source audit found no remaining standalone ridge symbols in the procedural-tree module.
+
+### Implemented source invariants
+
+- The accepted TREE-ROOTS.4B root mass, immediate quadratic foot amplitude, TREE-ROOTS.3 anchored-foot direction, continuous bark roll, and mixed-resolution stitcher are byte-for-byte unchanged from the pre-4C source in the audited method bodies.
+- The contact boost cannot exceed the radial segment count already available from the authored production trunk ceiling. For the common five-root and six-root Twisted cases this permits at most 50 and 60 sides respectively; no global radial maximum was increased.
+- Direct boost demand becomes zero once `footShapeEnvelope <= 0.25` or root-only amplitude is at/below `0.35`, and ordinary contour-owned radial resolution then resumes.
+- The boost is resolution-only: it changes no vertex target position equation, root envelope, root control value, topology threshold, axial render-sample density, branch radial policy, UV rule, material, or runtime component.
+- Normal gameplay receives no new per-frame work. The only expected cost is additional generated bark vertices/triangles in a small number of lowest trunk rings on roots with sufficiently strong contact demand.
 
 ### Non-goals
 
@@ -4527,6 +4551,14 @@ The response CSV must include Ground Root Base Merge so the second stage is dire
 
 Retarget the temporary root-quality evaluator from candidate comparison to production-only regression. Remove candidate/fallback strategy branching and candidate-only thickness override. Keep one compact Wych Elm regression board covering the accepted operator profile, Thickness 0.5 / 1.0 / 1.5 / 2.0, Reach 2.0 plus Thickness 2.0, Twist 0 / -400, and Persistence 0 / 1. All builds use ordinary Production Current.
 
+### Implemented source invariants
+
+- The accepted TREE-ROOTS.4B root mass, immediate quadratic foot amplitude, TREE-ROOTS.3 anchored-foot direction, continuous bark roll, and mixed-resolution stitcher are byte-for-byte unchanged from the pre-4C source in the audited method bodies.
+- The contact boost cannot exceed the radial segment count already available from the authored production trunk ceiling. For the common five-root and six-root Twisted cases this permits at most 50 and 60 sides respectively; no global radial maximum was increased.
+- Direct boost demand becomes zero once `footShapeEnvelope <= 0.25` or root-only amplitude is at/below `0.35`, and ordinary contour-owned radial resolution then resumes.
+- The boost is resolution-only: it changes no vertex target position equation, root envelope, root control value, topology threshold, axial render-sample density, branch radial policy, UV rule, material, or runtime component.
+- Normal gameplay receives no new per-frame work. The only expected cost is additional generated bark vertices/triangles in a small number of lowest trunk rings on roots with sufficiently strong contact demand.
+
 ### Non-goals
 
 - No exhaustive all-family safe-bound certification in this patch.
@@ -4579,3 +4611,106 @@ Retarget the temporary root-quality evaluator from candidate comparison to produ
 - No deprecated `FindObjectsSortMode` use was introduced in modified Editor sources.
 - Unity compilation, ten-case production regression, exhaustive control-response execution, twenty-tree geometry audit, and persistent gallery rebuild remain pending operator validation.
 
+
+## TREE-ROOTS.4C — Local Ground-Contact Radial Boost
+
+Status: source implementation complete; static/compliance validation complete; Unity compilation, focused visual/topology evaluation, and twenty-tree production audit pending.
+
+### Objective
+
+Increase circumferential resolution only in the lowest recipe-root contact zone so the ground silhouette of heavy buttresses no longer exposes obvious polygon corners, while preserving the accepted TREE-ROOTS.4B root-mass equations, TREE-ROOTS.3 grounded-foot direction, continuous axial twist, mixed-resolution topology, ordinary upper-trunk resolution, and branch resolution.
+
+### Operator evidence
+
+- Twisted gallery trees 1–5 all show visibly faceted ground-contact silhouettes; Twisted 3 and 4 are the strongest examples.
+- The visible defect is localized to the lowest root/earth contact contour. Upper buttress and trunk surfaces are not the target of this patch.
+- The operator explicitly approved local lower-root radial densification and requested Twisted 1–5 as the primary focused validation set.
+
+### Reviewed implementation evidence
+
+- `BuildRingRadialSegments` owns per-ring trunk circumferential resolution and already emits Root Count-compatible radial counts while lobes are active.
+- Production Current currently resolves at most six samples per lobe from lobe amplitude, which yields 30 sides for five-root rings and 36 sides for six-root rings.
+- `ResolveRadialSegments` already supplies an authored production trunk ceiling equivalent to Root Count × 10, capped at 64; the localized boost can therefore reuse existing authored radial budget without increasing the global ceiling.
+- `ResolveNextLowerRadialTier` already supports deterministic decreasing Root Count-compatible radial tiers, and `AppendMixedResolutionStrip` already stitches adjacent unequal ring counts sector-by-sector while both rings remain lobe-owned.
+- TREE-ROOTS.4B foot-shape amplitude is immediate quadratic `(1-u)^2`; this provides an existing deterministic measure of how strongly a ring still belongs to the distal root-foot/contact shape.
+
+### Approved files
+
+- `TreeBarkMeshGenerator.cs`
+- `TreeGeometryEfficiencyAudit.cs`
+- `TreeRootQualityEvaluation.cs`
+- `ProceduralTreeInstanceEditor.cs`
+- `Stylized_Nature_Tree_Integration_Handoff.md`
+
+No settings asset, scene, prefab, recipe, material, root-shape control, structural generator, shader, layer, tag, or terrain system is approved for modification.
+
+### Production contract
+
+1. Bark Algorithm advances from `27` to `28`; structural generator remains `7`; bark settings remain `10`.
+2. The boost applies only to recipe-only Production Current trunk rings that are still lobe-owned.
+3. Existing root-shape equations, Root Reach, Root Thickness, Root Height, Buttress Persistence, root phase, grounded-foot directional anchoring, and axial-roll equations remain unchanged.
+4. The ordinary production samples-per-lobe decision remains the baseline. The contact boost may raise that local decision but never above the existing authored Root Count-compatible radial ceiling.
+5. Ground-contact demand is derived from actual root-only amplitude: light roots receive little or no increase; heavy roots approach the available ten-samples-per-lobe ceiling.
+6. Boost influence is strongest at the ground and fades with the existing recipe foot-shape envelope; it is zero once foot-shape amplitude reaches 0.25 or less, so upper root/persistence/trunk rings retain ordinary production resolution.
+7. Every boosted lobe-owned ring remains an exact multiple of Root Count, preserving lobe-sector correspondence for mixed-resolution stitching.
+8. No global trunk, branch, cap, UV, normal, tangent, topology threshold, or axial sampling density is increased.
+
+### Focused validation contract
+
+Retarget the temporary root-quality evaluator to eight production cases:
+
+- Twisted 1
+- Twisted 2
+- Twisted 3
+- Twisted 4
+- Twisted 5
+- one Common control
+- one Pine control
+- one Dead control
+
+Each case uses its existing exact-control snapshot without overrides and produces a close low root-contact capture plus exact game-camera capture. Reports must include ground radial segments, boosted-ring count, last boosted normalized distance, total vertices/triangles, and topology result.
+
+### Acceptance criteria
+
+1. Twisted 1–5 complete and pass topology.
+2. Their lowest visible root-contact silhouettes no longer show the current large straight polygon facets/corners at ordinary close inspection.
+3. Ground-contact radial segments increase materially on the Twisted cases while the boost releases before the upper root/trunk region.
+4. Common/Pine/Dead controls remain visually stable and do not receive disproportionate geometry growth.
+5. Production twenty-tree topology remains 20/20.
+6. No root-shape, twist, persistence, branch, UV, normal, or mixed-resolution stitch regression is introduced.
+7. Aggregate geometry growth remains localized and justified; no global radial-density restoration is permitted.
+
+### Risks
+
+- Too much density over too much vertical extent would erase the contour-owned radial optimization. Mitigation: use root-foot amplitude as the release signal and preserve the authored radial ceiling.
+- Non-Root Count-compatible intermediate counts would break sector-aligned stitching. Mitigation: resolve only integer samples-per-lobe and multiply by Root Count.
+- A hard radial jump could increase stitch cost or expose topology issues. Mitigation: retain the existing deterministic decreasing tier resolver.
+- Light-root families could pay unnecessary cost. Mitigation: scale the ground target by actual root-only amplitude rather than family identity.
+
+### Implementation sequence
+
+1. **Canonical plan — complete.** Recorded before code modification.
+2. **Localized production radial rule — complete in source.** Production Current recipe-only lobe-owned trunk rings retain the ordinary 3–6 samples-per-lobe result as baseline. Ground-contact demand may raise that result toward the existing authored ceiling using `smoothstep(0.35, 0.85, rootOnlyAmplitude) × smoothstep(0.25, 1.0, footShapeEnvelope)`. The requested value is rounded as integer samples per lobe and therefore remains exactly Root Count-compatible. The ceiling is `min(10, authoredMaximum / RootCount)` samples per lobe, so the existing 64-side/global authored limit is never raised. Bark Algorithm is `28`; structural generator remains `7`; bark settings remain `10`.
+3. **Telemetry — complete in source.** Trunk accounting records the actual ground-ring radial count, number of rings whose direct contact-demand request exceeds the ordinary baseline, and the last normalized distance at which that direct boost is requested.
+4. **Focused eight-tree board — complete in source.** The existing temporary evaluator now uses exact-control snapshots for Twisted 1–5 plus Common 1, Pine 1, and Dead 1, produces close-root plus exact game-camera captures, runs normal production topology checks, and reports contact radial telemetry and geometry cost. It remains incremental, cancellable, and unsaved.
+5. **Geometry audit telemetry — complete in source.** The per-branch geometry-efficiency CSV now exposes ground-contact radial segments, directly boosted-ring count, and direct-boost release distance. The aggregate policy schema is otherwise unchanged.
+6. **Inspector text — complete in source.** The existing Root Quality Evaluation section is retargeted to the Ground-Contact Radial Board; no new Inspector section was added.
+7. **Static/compliance audit — complete.** Final source closure passed 64/64 checks: exact five-file scope, Bark/Generator/Settings versions, recipe-only Production Current gating, unchanged root-shape/twist/ground-anchor/mixed-stitch methods, Root Count-compatible monotonic radial counts for Root Counts 3–8, zero boost for low foot/amplitude demand, CSV schema alignment, lexical structure, and no deprecated `FindObjectsSortMode` use. The changed-files overlay and unified patch were each independently applied to the accepted pre-4C base and reproduced all five audited modified files byte-for-byte.
+8. **Unity validation — pending.** Unity compilation is unavailable in the delivery environment. Compile, run the focused eight-tree board, then run the normal twenty-tree geometry audit before any persistent gallery rebuild.
+
+### Implemented source invariants
+
+- The accepted TREE-ROOTS.4B root mass, immediate quadratic foot amplitude, TREE-ROOTS.3 anchored-foot direction, continuous bark roll, and mixed-resolution stitcher are byte-for-byte unchanged from the pre-4C source in the audited method bodies.
+- The contact boost cannot exceed the radial segment count already available from the authored production trunk ceiling. For the common five-root and six-root Twisted cases this permits at most 50 and 60 sides respectively; no global radial maximum was increased.
+- Direct boost demand becomes zero once `footShapeEnvelope <= 0.25` or root-only amplitude is at/below `0.35`, and ordinary contour-owned radial resolution then resumes.
+- The boost is resolution-only: it changes no vertex target position equation, root envelope, root control value, topology threshold, axial render-sample density, branch radial policy, UV rule, material, or runtime component.
+- Normal gameplay receives no new per-frame work. The only expected cost is additional generated bark vertices/triangles in a small number of lowest trunk rings on roots with sufficiently strong contact demand.
+
+### Non-goals
+
+- No further Root Thickness, Root Reach, foot-trajectory, base-merge, or twist tuning.
+- No global trunk radial increase.
+- No branch radial increase.
+- No distance LOD.
+- No exhaustive control-bound certification.
+- No recipe retuning or persistent gallery regeneration until validation passes.

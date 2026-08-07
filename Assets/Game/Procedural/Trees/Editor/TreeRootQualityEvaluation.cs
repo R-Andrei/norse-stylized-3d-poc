@@ -15,14 +15,14 @@ namespace ProgrammaticStylized3D.Trees.Editor
     internal static class TreeRootQualityEvaluation
     {
         private const string OutputDirectory =
-            "Library/PS3D/Trees/RootMassRegressionEvaluation";
+            "Library/PS3D/Trees/RootContactRadialEvaluation";
         private const string CaptureDirectoryName = "Captures";
         private const string ReportFileName =
-            "TreeRootMassRegressionEvaluationReport.md";
+            "TreeRootContactRadialEvaluationReport.md";
         private const string CsvFileName =
-            "TreeRootMassRegressionEvaluation.csv";
+            "TreeRootContactRadialEvaluation.csv";
         private const string BoardFileName =
-            "TreeRootMassRegressionEvaluationBoard.html";
+            "TreeRootContactRadialEvaluationBoard.html";
         private const int CloseCaptureWidth = 640;
         private const int CloseCaptureHeight = 640;
         private const int GameCaptureHeight = 432;
@@ -173,10 +173,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
             List<Representative> representatives =
                 CollectRepresentatives();
-            if (representatives.Count != 1)
+            if (representatives.Count != 8)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4B] The root-mass production regression requires the initialized Wych Elm Leaning curated gallery representative. Found " +
+                    "[TREE-ROOTS.4C] The ground-contact radial evaluation requires Twisted 1-5 plus Common 1, Pine 1, and Dead 1 exact-control gallery representatives. Found " +
                     representatives.Count + ". Rebuild the curated recipe gallery first.");
                 return false;
             }
@@ -185,7 +185,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (mainCamera == null)
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4B] No enabled MainCamera-tagged Camera was found. The regression requires the current game-camera projection for its context captures.");
+                    "[TREE-ROOTS.4C] No enabled MainCamera-tagged Camera was found. The evaluation requires the current game-camera projection for its context captures.");
                 return false;
             }
 
@@ -218,6 +218,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "GroundBaseMergeFactor,FootShapePlateauEnd," +
                 "RootHalfWidthDegrees,RootHalfChordWidth," +
                 "EffectiveTransitionHeight,TrunkRadialMin,TrunkRadialMax," +
+                "GroundContactRadialSegments,GroundContactBoostedRings,GroundContactBoostReleaseDistance," +
                 "BuildMilliseconds,CloseCapture,GameCapture,Failure");
             csvWriter.Flush();
 
@@ -259,7 +260,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             lastReportPath = reportPath;
             lastBoardPath = boardPath;
             currentProgress = 0f;
-            currentDetail = "Preparing first root-mass production regression case";
+            currentDetail = "Preparing first ground-contact radial evaluation case";
             currentEta = "ETA calculating";
             WriteCheckpoint(activeJob, "RUNNING", null);
             EditorApplication.update += Tick;
@@ -267,7 +268,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             EditorApplication.quitting += AbortForQuit;
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
             Debug.Log(
-                "[TREE-ROOTS.4B] Incremental 10-case root-mass production regression started. Output: " +
+                "[TREE-ROOTS.4C] Incremental 8-case ground-contact radial evaluation started. Output: " +
                 boardPath);
             return true;
         }
@@ -476,7 +477,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             result.Definition = generation.Definition;
             result.Mesh = new Mesh
             {
-                name = "TREE-ROOTS.4B " +
+                name = "TREE-ROOTS.4C " +
                     evaluationCase.Representative.Name + " " +
                     evaluationCase.Label,
                 hideFlags = HideFlags.HideAndDontSave
@@ -578,7 +579,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 previewSceneCreated = true;
 
                 var treeObject = new GameObject(
-                    "TREE-ROOTS.4B Capture Tree")
+                    "TREE-ROOTS.4C Capture Tree")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -611,7 +612,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 CreateCaptureLights(previewScene);
 
                 var cameraObject = new GameObject(
-                    "TREE-ROOTS.4B Capture Camera")
+                    "TREE-ROOTS.4C Capture Camera")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
@@ -656,7 +657,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     RenderTextureFormat.ARGB32,
                     RenderTextureReadWrite.sRGB)
                 {
-                    name = "TREE-ROOTS.4B Async Capture",
+                    name = "TREE-ROOTS.4C Async Capture",
                     hideFlags = HideFlags.HideAndDontSave,
                     antiAliasing = 1,
                     useMipMap = false,
@@ -779,7 +780,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             GameObject ground = GameObject.CreatePrimitive(
                 PrimitiveType.Plane);
-            ground.name = "TREE-ROOTS.4B Capture Ground";
+            ground.name = "TREE-ROOTS.4C Capture Ground";
             ground.hideFlags = HideFlags.HideAndDontSave;
             SceneManager.MoveGameObjectToScene(ground, previewScene);
             Collider collider = ground.GetComponent<Collider>();
@@ -814,12 +815,12 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.4B Key Light",
+                "TREE-ROOTS.4C Key Light",
                 Quaternion.Euler(48f, -35f, 0f),
                 1.25f);
             CreateDirectionalLight(
                 previewScene,
-                "TREE-ROOTS.4B Fill Light",
+                "TREE-ROOTS.4C Fill Light",
                 Quaternion.Euler(25f, 145f, 0f),
                 0.48f);
         }
@@ -1140,6 +1141,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
             CaseResult result)
         {
             TreeBarkMeshBuildResult bark = result.Bark;
+            TreeBarkMeshBranchGeometryAccounting trunk =
+                FindTrunkAccounting(bark);
             EvaluationCase evaluationCase = result.Case;
             TreeResolvedControls baseline =
                 evaluationCase.Representative.Controls;
@@ -1235,6 +1238,17 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     ? bark.MaximumEffectiveTrunkRadialSegments.ToString(
                         CultureInfo.InvariantCulture)
                     : "0",
+                trunk != null
+                    ? trunk.GroundContactRadialSegments.ToString(
+                        CultureInfo.InvariantCulture)
+                    : "0",
+                trunk != null
+                    ? trunk.GroundContactBoostedRingCount.ToString(
+                        CultureInfo.InvariantCulture)
+                    : "0",
+                trunk != null
+                    ? F(trunk.GroundContactBoostReleaseNormalizedDistance)
+                    : "",
                 result.BuildMilliseconds.ToString(
                     "F3",
                     CultureInfo.InvariantCulture),
@@ -1297,19 +1311,19 @@ namespace ProgrammaticStylized3D.Trees.Editor
             if (outcome == "COMPLETE")
             {
                 Debug.Log(
-                    "[TREE-ROOTS.4B] Root-mass production regression complete. Board: " +
+                    "[TREE-ROOTS.4C] Ground-contact radial evaluation complete. Board: " +
                     job.BoardPath);
             }
             else if (outcome == "FAILED")
             {
                 Debug.LogError(
-                    "[TREE-ROOTS.4B] Root-mass production regression failed. Partial output: " +
+                    "[TREE-ROOTS.4C] Ground-contact radial evaluation failed. Partial output: " +
                     job.ReportPath + "\n" + failure);
             }
             else
             {
                 Debug.LogWarning(
-                    "[TREE-ROOTS.4B] Root-mass production regression cancelled. Partial output: " +
+                    "[TREE-ROOTS.4C] Ground-contact radial evaluation cancelled. Partial output: " +
                     job.ReportPath);
             }
         }
@@ -1329,7 +1343,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             string failure)
         {
             var report = new StringBuilder();
-            report.AppendLine("# TREE-ROOTS.4B — Production Root-Mass Regression");
+            report.AppendLine("# TREE-ROOTS.4C — Local Ground-Contact Radial Boost Evaluation");
             report.AppendLine();
             report.Append("- Outcome: **").Append(outcome).AppendLine("**");
             report.Append("- Generated UTC: ")
@@ -1337,9 +1351,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.Append("- Completed cases: ")
                 .Append(job.Results.Count).Append(" / ")
                 .AppendLine(job.Cases.Count.ToString());
-            report.AppendLine("- Every case uses ordinary Production Current bark algorithm 27.");
-            report.AppendLine("- Production contract: fixed q^4 support profile, bounded shared-base merge after support saturation, and immediate quadratic foot-shape amplitude with no production plateau.");
-            report.AppendLine("- Ground-foot directional anchoring remains the accepted TREE-ROOTS.3 production envelope and is independent from the promoted foot-shape amplitude.");
+            report.AppendLine("- Every case uses ordinary Production Current bark algorithm 28.");
+            report.AppendLine("- Production root-shape equations remain TREE-ROOTS.4B; only the lowest lobe-owned ring resolution is locally increased from actual root/contact demand.");
+            report.AppendLine("- Ground-foot directional anchoring, foot-shape amplitude, continuous twist, Root Reach, Root Thickness, Root Height, and Buttress Persistence are unchanged.");
             report.AppendLine("- Captures per successful case: neutral close-root three-quarter view; exact game-camera context view.");
             report.AppendLine("- Contract: temporary validation definitions and meshes only; no scene objects, recipes, exact-control snapshots, generated gallery meshes, or serialized assets are modified.");
             report.Append("- Game camera: ")
@@ -1352,35 +1366,37 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.AppendLine();
             report.AppendLine("## Cases");
             report.AppendLine();
-            report.AppendLine("| # | Case | Mode | Status | Twist | Thickness req/eval | Reach / Height / Persistence | Support req/emitted | Base merge | Shape plateau t | V/T | Close | Game | Finding |");
-            report.AppendLine("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|");
+            report.AppendLine("| # | Tree | Status | Root Count | Reach / Thickness / Height | Ground radial | Boosted rings | Boost release t | Trunk radial min-max | V/T | Close | Game | Finding |");
+            report.AppendLine("|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---|---|---|");
             for (int index = 0; index < job.Results.Count; index++)
             {
                 CaseResult result = job.Results[index];
                 EvaluationCase evaluationCase = result.Case;
                 TreeResolvedControls baseline = evaluationCase.Representative.Controls;
                 TreeBarkMeshBuildResult bark = result.Bark;
+                TreeBarkMeshBranchGeometryAccounting trunk =
+                    FindTrunkAccounting(bark);
                 report.Append("| ").Append(evaluationCase.Index)
-                    .Append(" | ").Append(evaluationCase.Label)
-                    .Append(" | ").Append(ModeLabel(evaluationCase))
+                    .Append(" | ").Append(evaluationCase.Representative.Name)
                     .Append(" | ").Append(result.Passed ? "PASS" : "FAIL")
-                    .Append(" | ").Append(F(evaluationCase.AxialTwist ?? baseline.AxialTwist))
-                    .Append(" | ").Append(F(evaluationCase.RootThickness ?? baseline.RootThickness))
-                    .Append("/").Append(bark != null
-                        ? F(bark.EvaluatedRootThickness)
-                        : F(Mathf.Min(evaluationCase.RootThickness ?? baseline.RootThickness, 2f)))
-                    .Append(" | ").Append(F(evaluationCase.RootReach ?? baseline.RootReach))
-                    .Append(" / ").Append(F(evaluationCase.RootHeight ?? baseline.RootHeight))
-                    .Append(" / ").Append(F(evaluationCase.ButtressPersistence ?? baseline.ButtressTransition))
-                    .Append(" | ").Append(bark != null
-                        ? F(bark.RequestedRootSupportAngularWidthDegrees) + "/" +
-                            F(bark.EmittedRootSupportAngularWidthDegrees)
+                    .Append(" | ").Append(bark != null && bark.BranchGeometryAccounting != null
+                        ? result.Definition.ResolvedParameters.RootButtressCount.ToString(CultureInfo.InvariantCulture)
+                        : "n/a")
+                    .Append(" | ").Append(F(baseline.RootReach))
+                    .Append(" / ").Append(F(baseline.RootThickness))
+                    .Append(" / ").Append(F(baseline.RootHeight))
+                    .Append(" | ").Append(trunk != null
+                        ? trunk.GroundContactRadialSegments.ToString(CultureInfo.InvariantCulture)
+                        : "n/a")
+                    .Append(" | ").Append(trunk != null
+                        ? trunk.GroundContactBoostedRingCount.ToString(CultureInfo.InvariantCulture)
+                        : "n/a")
+                    .Append(" | ").Append(trunk != null
+                        ? F(trunk.GroundContactBoostReleaseNormalizedDistance)
                         : "n/a")
                     .Append(" | ").Append(bark != null
-                        ? F(bark.GroundRootBaseMergeFactor)
-                        : "n/a")
-                    .Append(" | ").Append(bark != null
-                        ? F(bark.RootFootShapePlateauEndNormalized)
+                        ? bark.MinimumEffectiveTrunkRadialSegments.ToString(CultureInfo.InvariantCulture) + "-" +
+                            bark.MaximumEffectiveTrunkRadialSegments.ToString(CultureInfo.InvariantCulture)
                         : "n/a")
                     .Append(" | ").Append(bark != null
                         ? bark.VertexCount.ToString(CultureInfo.InvariantCulture) + "/" +
@@ -1395,9 +1411,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
             report.AppendLine();
             report.AppendLine("## Decision use");
             report.AppendLine();
-            report.AppendLine("- All cases are production regression anchors for the promoted root-mass response.");
-            report.AppendLine("- Thickness 1.5 / 2.0 and Reach 2.0 / Thickness 2.0 directly exercise the expanded public Thickness range and high-mass base merge.");
-            report.AppendLine("- Any topology failure, grounded-foot regression, or unexpected loss of distinct root crests blocks promotion closure.");
+            report.AppendLine("- Twisted 1-5 are the primary silhouette acceptance set; each must show materially smoother ground-contact curvature without a root-shape change.");
+            report.AppendLine("- Common 1, Pine 1, and Dead 1 are cost/regression controls; localized demand gating should prevent disproportionate densification.");
+            report.AppendLine("- Any topology failure, unexpected upper-trunk densification, or unexplained geometry growth blocks acceptance.");
 
             File.WriteAllText(job.ReportPath, report.ToString(), Encoding.UTF8);
         }
@@ -1407,16 +1423,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
             var html = new StringBuilder();
             html.AppendLine("<!doctype html>");
             html.AppendLine("<html><head><meta charset=\"utf-8\">");
-            html.AppendLine("<title>TREE-ROOTS.4B Production Root-Mass Regression</title>");
+            html.AppendLine("<title>TREE-ROOTS.4C Local Ground-Contact Radial Boost</title>");
             html.AppendLine("<style>");
             html.AppendLine("body{font-family:Segoe UI,Arial,sans-serif;background:#171717;color:#eee;margin:24px}h1,h2{margin:0 0 12px}h2{margin-top:32px;border-bottom:1px solid #555;padding-bottom:6px}.meta{color:#bbb;margin-bottom:24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.card{background:#242424;border:1px solid #444;border-radius:8px;padding:12px}.card.fail{border-color:#a44}.title{font-weight:700;margin-bottom:8px}.values{font-size:12px;color:#bbb;margin-bottom:8px}.views{display:grid;grid-template-columns:1fr 1fr;gap:8px}.views img{width:100%;height:auto;background:#111;border:1px solid #444}.caption{font-size:11px;color:#aaa;text-align:center;margin-top:3px}.missing{aspect-ratio:1/1;background:#111;display:flex;align-items:center;justify-content:center;color:#a88;border:1px solid #633}.finding{font-size:12px;color:#d9b0b0;margin-top:8px}</style>");
             html.AppendLine("</head><body>");
-            html.AppendLine("<h1>TREE-ROOTS.4B — Production Root-Mass Regression</h1>");
+            html.AppendLine("<h1>TREE-ROOTS.4C — Local Ground-Contact Radial Boost</h1>");
             html.Append("<div class=\"meta\">Outcome: ")
                 .Append(Html(outcome)).Append(" · Completed ")
                 .Append(job.Results.Count).Append(" / ")
                 .Append(job.Cases.Count)
-                .AppendLine(" cases · Production Current regression across the promoted root-mass response and expanded Root Thickness range.</div>");
+                .AppendLine(" cases · Production Current Twisted 1-5 ground-contact smoothing with Common/Pine/Dead controls.</div>");
 
             for (int representativeIndex = 0;
                 representativeIndex < job.Representatives.Count;
@@ -1457,14 +1473,20 @@ namespace ProgrammaticStylized3D.Trees.Editor
                         .Append(" · Persistence ").Append(F(result.Case.ButtressPersistence ?? baseline.ButtressTransition));
                     if (bark != null)
                     {
-                        html.Append(" · Support ")
-                            .Append(F(bark.RequestedRootSupportAngularWidthDegrees))
-                            .Append("°→")
-                            .Append(F(bark.EmittedRootSupportAngularWidthDegrees))
-                            .Append("° · Merge ")
-                            .Append(F(bark.GroundRootBaseMergeFactor))
-                            .Append(" · Shape plateau t ")
-                            .Append(F(bark.RootFootShapePlateauEndNormalized));
+                        TreeBarkMeshBranchGeometryAccounting trunk =
+                            FindTrunkAccounting(bark);
+                        html.Append(" · Ground radial ")
+                            .Append(trunk != null
+                                ? trunk.GroundContactRadialSegments.ToString(CultureInfo.InvariantCulture)
+                                : "n/a")
+                            .Append(" · Boosted rings ")
+                            .Append(trunk != null
+                                ? trunk.GroundContactBoostedRingCount.ToString(CultureInfo.InvariantCulture)
+                                : "n/a")
+                            .Append(" · Release t ")
+                            .Append(trunk != null
+                                ? F(trunk.GroundContactBoostReleaseNormalizedDistance)
+                                : "n/a");
                     }
                     html.AppendLine("</div>");
                     html.AppendLine("<div class=\"views\">");
@@ -1544,128 +1566,94 @@ namespace ProgrammaticStylized3D.Trees.Editor
 
         private static List<Representative> CollectRepresentatives()
         {
-            const string recipeIdentity =
-                "tree-recipe-curated-wych-elm-leaning";
-            string stableSlot = TreeGenerationLibraryVariant.BuildStableKey(
-                TreeFamily.Twisted,
-                1);
             ProceduralTreeInstance[] instances =
                 UnityEngine.Object.FindObjectsByType<ProceduralTreeInstance>(
                     FindObjectsInactive.Include);
-            var representatives = new List<Representative>(1);
-            for (int index = 0; index < instances.Length; index++)
+            var representatives = new List<Representative>(8);
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Twisted, 1, "Twisted 1");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Twisted, 2, "Twisted 2");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Twisted, 3, "Twisted 3");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Twisted, 4, "Twisted 4");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Twisted, 5, "Twisted 5");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Common, 1, "Common 1");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Pine, 1, "Pine 1");
+            AddRepresentativeBySlot(
+                representatives, instances, TreeFamily.Dead, 1, "Dead 1");
+            return representatives;
+        }
+
+        private static void AddRepresentativeBySlot(
+            List<Representative> representatives,
+            IReadOnlyList<ProceduralTreeInstance> instances,
+            TreeFamily family,
+            int variant,
+            string name)
+        {
+            string stableSlot = TreeGenerationLibraryVariant.BuildStableKey(
+                family,
+                variant);
+            for (int index = 0; index < instances.Count; index++)
             {
                 ProceduralTreeInstance candidate = instances[index];
-                if (candidate == null || !candidate.HasExactControls)
-                {
-                    continue;
-                }
-
-                string identity = candidate.Recipe != null
-                    ? candidate.Recipe.StableIdentity
-                    : candidate.ExactControlsSourceRecipeIdentity;
-                if (identity != recipeIdentity ||
+                if (candidate == null ||
+                    !candidate.HasExactControls ||
+                    candidate.Family != family ||
                     candidate.StableSlotIdentity != stableSlot)
                 {
                     continue;
                 }
 
+                string sourceIdentity = !string.IsNullOrEmpty(
+                    candidate.ExactControlsSourceRecipeIdentity)
+                        ? candidate.ExactControlsSourceRecipeIdentity
+                        : candidate.Recipe != null
+                            ? candidate.Recipe.StableIdentity
+                            : stableSlot;
                 representatives.Add(new Representative
                 {
-                    Name = "Wych Elm",
+                    Name = name,
                     Family = candidate.Family,
                     Seed = candidate.MasterSeed,
-                    SourceIdentity = !string.IsNullOrEmpty(
-                        candidate.ExactControlsSourceRecipeIdentity)
-                            ? candidate.ExactControlsSourceRecipeIdentity
-                            : recipeIdentity,
+                    SourceIdentity = sourceIdentity,
                     Controls = CloneControls(candidate.ExactControls),
                     Position = candidate.transform.position,
                     Rotation = candidate.transform.rotation,
                     Scale = candidate.transform.lossyScale
                 });
-                break;
+                return;
             }
-
-            return representatives;
         }
 
         private static List<EvaluationCase> BuildCases(
             List<Representative> representatives)
         {
-            if (representatives == null || representatives.Count != 1)
+            if (representatives == null || representatives.Count != 8)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.4B expected one Wych Elm representative.");
+                    "TREE-ROOTS.4C expected eight gallery representatives.");
             }
 
-            Representative twisted = representatives[0];
-            var cases = new List<EvaluationCase>(10);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Operator Profile",
-                "Production_OperatorProfile",
-                400f, 0.9f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Thickness 0.5",
-                "Production_Thickness05",
-                400f, 0.5f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Thickness 1.0",
-                "Production_Thickness10",
-                400f, 1.0f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Thickness 1.5",
-                "Production_Thickness15",
-                400f, 1.5f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Thickness 2.0",
-                "Production_Thickness20",
-                400f, 2.0f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Reach 2.0 / Thickness 2.0",
-                "Production_Reach20_Thickness20",
-                400f, 2.0f, 2.0f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Twist 0",
-                "Production_Twist0",
-                0f, 0.9f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Twist -400",
-                "Production_TwistNegative400",
-                -400f, 0.9f, 1.2f, 0.2874f, 0.5f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Persistence 0",
-                "Production_Persistence0",
-                400f, 0.9f, 1.2f, 0.2874f, 0f);
-            AddCase(
-                cases,
-                twisted,
-                "Production — Persistence 1",
-                "Production_Persistence1",
-                400f, 0.9f, 1.2f, 0.2874f, 1f);
+            var cases = new List<EvaluationCase>(8);
+            for (int index = 0; index < representatives.Count; index++)
+            {
+                AddCase(
+                    cases,
+                    representatives[index],
+                    "Production Current",
+                    "ProductionCurrent");
+            }
 
-            if (cases.Count != 10)
+            if (cases.Count != 8)
             {
                 throw new InvalidOperationException(
-                    "TREE-ROOTS.4B expected 10 cases but built " +
+                    "TREE-ROOTS.4C expected eight cases but built " +
                     cases.Count + ".");
             }
 
@@ -1695,6 +1683,28 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 RootHeight = rootHeight,
                 ButtressPersistence = buttressPersistence
             });
+        }
+
+        private static TreeBarkMeshBranchGeometryAccounting
+            FindTrunkAccounting(TreeBarkMeshBuildResult bark)
+        {
+            if (bark?.BranchGeometryAccounting == null)
+            {
+                return null;
+            }
+
+            IReadOnlyList<TreeBarkMeshBranchGeometryAccounting> records =
+                bark.BranchGeometryAccounting;
+            for (int index = 0; index < records.Count; index++)
+            {
+                TreeBarkMeshBranchGeometryAccounting record = records[index];
+                if (record != null && record.BranchOrder == 0)
+                {
+                    return record;
+                }
+            }
+
+            return null;
         }
 
         private static string ModeLabel(EvaluationCase evaluationCase)

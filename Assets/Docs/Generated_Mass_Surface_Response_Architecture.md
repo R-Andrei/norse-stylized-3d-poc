@@ -1419,3 +1419,136 @@ The primary risk is future semantic drift: a later agent may optimize average br
 
 Final 5P audit result: exactly ten approved files differ from the post-5O baseline; all seven source/shader diffs are line-comment/XML-comment/blank-line only with zero changed executable lines; the three canonical documents contain the frozen orientation-ordering invariant; the cold-grey material and all files outside the approved scope are byte-identical to the post-5O baseline.
 
+
+## GM-SURFACE.5Q-DIAG — exhaustive surface-orientation stage-attribution capture
+
+### Status
+
+- Approved by the user on 2026-08-07.
+- Plan recorded before implementation.
+- Stage E implementation authored within the approved six-file scope.
+- Final offline source/scope/symbol/mode/production-variant audit passed (`71 / 71`); final changed-file-only archive extraction/integrity audit passed.
+- Unity 6000.5.0f1 compilation/runtime validation pending.
+
+### Objective
+
+Build one deliberately heavy, fail-closed diagnostic that determines **where the new HLSL path first breaks the expected relationship between actual surface orientation and observed lighting response**. The diagnostic must capture enough evidence in one successful run to distinguish raw mesh-mask ownership, ordinary pixel-value breakup, exposure scaling, mottle, exposure tinting, crevice response, base response, dirt/deposit response, wet/frost/monolithic closure, normal choice, direct-light multiplication, and final PBR behavior.
+
+The test is not optimized for runtime. Completeness, reproducibility, per-pixel provenance, and per-triangle causal attribution have priority over case count.
+
+### Approved file scope
+
+Modify only:
+
+- `Assets/Docs/Generated_Mass_Surface_Response_Architecture.md`
+- `Assets/Docs/Generated_Mass_Framework.md`
+- `Assets/Docs/Generated_Mass_Feature_Implementation_Checklist.md`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassSurfaceCausalityRenderAudit.cs`
+- `Assets/Game/Procedural/Masses/Editor/GeneratedMassBevelShadingDiagnosticSuite.cs`
+- `Assets/Game/Rendering/PixelSurface/Includes/PixelSurfaceForwardPass.hlsl`
+
+Create, delete, move, or rename: none.
+
+### Reviewed evidence
+
+- The 5N-H3 run completed 209/209 decision cases, four auxiliary validation passes, zero readback errors, full triangle coverage, and a valid pixelwise stored-normal Lambert contract. The underlying identity/readback/light-direction infrastructure is therefore reusable.
+- The 5N-H3 Lambert preflight measured configured-direction normalized RMSE `6.684517E-08` with best-fit scale exactly `0.5`, proving the controlled stored-normal `N·L` path itself is numerically coherent.
+- Neutral stored-normal HLSL at dielectric F0 `0.04` matched the legacy neutral control to numerical precision, but actual-material stored-normal Stage B retained a large residual. This localizes a major discrepancy to the actual pre-light material/value path rather than the basic light-vector dot product.
+- The current mesh-output contract stores exposure in `Color.g`, crevice/base in `Color.b`, and dirt/deposit in `UV2.y`; source-face masks are generated from source-face normal/height terms and generated bevel interiors inherit/interpolate source-boundary samples.
+- The current forward path applies ordinary tonal breakup, exposure semantic scaling, generated-mass mottle, exposure tint, crevice, base, dirt/deposit, wet-damp, frost, global wet darkening, and monolithic closure before PBR receives the final albedo.
+- Existing audit modes already expose base colour, tonal colour, exposure-scaled colour, mottle colour, post-semantic colour, stored normal, direct-only response, and full PBR. 5Q extends this audit-only surface rather than altering production rendering.
+- The 5O visual trial retained the orientation-ordering defect after F0 parity and the cold-grey generated-normal bypass. 5Q must therefore test per-surface orientation/value causality directly instead of tuning global lighting magnitude.
+
+### Acceptance criteria
+
+1. Preserve the complete, already-working 5N-H3 identity/readback/Lambert and Stage A/B/C/D contracts.
+2. Add an exhaustive Stage E orientation-causality matrix using the current view plus both already-validated alternate views and every deterministic light direction already in the H3 basis.
+3. Capture the complete cumulative pre-light albedo chain, raw/generated material masks, relevant scalar fields, stored/geometric/current normals, and exact stored-normal `N·L` before evaluating final direct/PBR response.
+4. For every Stage E view/direction, capture GPU direct-light response after every cumulative material stage, production-HLSL full response, a stored-normal production-HLSL response, a legacy actual-material control, and targeted one-layer ablations for the suspected HLSL-only value authorities.
+5. Attribute every visible pixel to an exact triangle through the validated dedicated identity map; retain linear floating-point RGB and reject any non-finite sample.
+6. Compute per-triangle and per-logical-bevel orientation evidence: mean `N·L`, cumulative stage value, direct response, orientation-normalized response, parent/bevel/parent ordering, source-face rank inversions, first divergent stage, and one-layer ablation improvement.
+7. A bevel-parent envelope violation counts as an orientation defect only when the measured bevel `N·L` is itself between the two parent `N·L` values within tolerance. Brighter-than-both/darker-than-both is not universally invalid when the bevel normal legitimately faces the light more/less directly than both parents.
+8. Emit a dedicated orientation-attribution CSV in addition to the existing BRDF CSV so the complete raw per-triangle evidence survives report summarization.
+9. Fail closed unless every expected Stage E family/view/direction/stage is present, every identity/alignment contract passes, coverage is complete enough for attribution, and all GPU values are finite.
+10. Do not change material values, production shader behavior, geometry, mask generation, normal generation, scenes, prefabs, profiles, layers, tags, or Inspector controls.
+11. Keep the run incremental, cancellable, Editor-responsive, checkpointed, and ETA/progress aware despite the intentionally large case count.
+
+### Planned Stage E capture surface
+
+Static captures per validated camera view:
+
+- triangle/geometric normal;
+- stored normal;
+- current resolved normal;
+- raw mesh material channels;
+- generated height/upwardness and contract fields;
+- resolved exposure/crevice/base/dirt masks;
+- nonlinear exposure/crevice/base/dirt visual masks;
+- mottle field and material-response scalars;
+- base albedo;
+- after ordinary tonal breakup;
+- after exposure semantic scaling;
+- after mottle;
+- after exposure tint;
+- after crevice;
+- after base/contact;
+- after dirt/deposit;
+- after wet-damp gathering;
+- after frost;
+- after global wet darkening;
+- final monolithic/pre-PBR albedo.
+
+Directional captures for every deterministic light direction and validated camera view:
+
+- constant-neutral stored-normal direct response;
+- cumulative stored-normal direct response after every pre-light stage listed above;
+- actual production-HLSL full PBR response;
+- actual production-HLSL stored-normal full PBR response;
+- actual legacy material response on the same frozen mesh;
+- targeted final-albedo direct/full-PBR ablations with pixel/broad/warp breakup, exposure, mottle, crevice, base, dirt/deposit, and all generated semantic value authorities disabled one at a time and together.
+
+### Metrics and decision evidence
+
+The report must not select a fix from whole-object averages. It must produce:
+
+- per-stage source-face Spearman/Pearson orientation correlation;
+- pairwise source-face orientation-order inversion counts using a minimum `N·L` separation to reject near-ties;
+- parent–bevel–parent cases where bevel `N·L` is genuinely intermediate and the first cumulative material stage that causes a lighting-envelope escape;
+- per-stage direct-response self-consistency against captured albedo × captured `N·L`;
+- per-triangle residual introduced by each cumulative pre-light stage;
+- correlation of that residual with raw exposure, crevice, dirt, height/upwardness, and mottle fields;
+- one-layer ablation reduction in orientation inversions and residuals;
+- legacy versus HLSL orientation-ranking disagreement under the same frozen mesh/light/view;
+- a ranked `firstDivergentStage`/`dominantAblation` summary backed by the raw triangle rows.
+
+The successful result may be `no single dominant stage`; the test is still valid if it preserves the complete evidence necessary to support that conclusion without another instrumentation patch.
+
+### File-by-file sequence
+
+1. Update this canonical plan first.
+2. Extend the audit-only forward modes with raw masks, cumulative albedo checkpoints, exact `N·L`, and cumulative direct checkpoints; production variants remain token/behavior equivalent outside `_SURFACE_CAUSALITY_AUDIT`.
+3. Extend the render-audit state machine after Stage D with the exhaustive Stage E static, directional, and ablation matrix and fail-closed completion accounting.
+4. Add orientation-specific per-triangle analysis, first-divergence/ablation ranking, and summary fields.
+5. Extend report/CSV output with the dedicated Stage E evidence and corrected conditional parent-envelope interpretation.
+6. Update the framework/checklist with 5Q status, then run final scope, production-token-isolation, matrix-count, symbol, and package-integrity audits.
+
+### Implemented Stage E matrix
+
+- 13 cumulative albedo/direct checkpoints: base, tonal, exposure scale, mottle, exposure tint, crevice, base/contact, dirt/deposit, wet-damp, frost, global wet darkening, final pre-light/monolithic, and final overall tint.
+- 6 raw/resolved mask/scalar captures plus triangle/current/stored normal captures per view.
+- 27 controlled directions × 3 validated views.
+- Per direction/view: exact GPU NdotL/attenuation, encoded GPU main-light direction, 13 cumulative direct checkpoints, legacy actual PBR, HLSL production PBR, HLSL stored-normal PBR, and 12 direct + 12 PBR ablations.
+- Stage E case count: `3 × (22 + 27 × 42) = 3,468`. Existing H3 counted matrix: `209`. Total counted cases: `3,677`. Existing auxiliary identity/validation passes: `4`. Total GPU render/readback passes: `3,681`.
+- Static cumulative albedo and directional NdotL/attenuation readbacks are retained only as managed audit evidence needed for exact pixelwise direct-product validation, then released when the audit is disposed.
+- Pixelwise direct-product attribution is fail-closed across render cases: the cached albedo, cached NdotL/attenuation, and direct checkpoint must report the same identity-relative readback orientation and identical lighting-foreground pixel count before their pixel indices are multiplied.
+- Every cumulative direct checkpoint reports pixel count, mean absolute residual, and normalized RMSE against captured `albedo × NdotL × distanceAttenuation × shadowAttenuation`.
+- Per-triangle orientation evidence additionally preserves luminance min/P10/median/P90/max/std-dev, provenance, source-group IDs, stored/authored/geometric normals, geometry condition/aspect/minimum angle, and all captured CPU mask/structural endpoint values.
+- The dedicated orientation CSV is streamed at finalization rather than constructed as one monolithic in-memory string. Render checkpoints remain incremental but are persisted every 32 completed render passes (plus startup/error/final boundaries) so the intentionally large run does not become quadratic in report-rebuild cost.
+
+### Risks and validation
+
+- The main risk is case-count/report-size growth. The run is intentionally heavy; responsiveness and cancellation are mandatory, not total duration.
+- Audit-only shader branches must compile only under `_SURFACE_CAUSALITY_AUDIT`; production Generated Mass rendering must be byte/behavior equivalent outside that keyword.
+- Existing H3 identity maps are reused for the same three views. Any added view is out of scope unless the plan is updated first.
+- Legacy Shader Graph internals are not instrumented. Legacy is therefore captured as the actual same-mesh behavioral reference, while exact stage attribution is performed inside the HLSL path.
+- Unity compilation/GPU execution is authoritative and remains pending after packaging. Static validation must prove case-family counts, mode uniqueness, no unresolved symbols, no production-material edits, and no executable change outside the audit keyword in the shared forward include.

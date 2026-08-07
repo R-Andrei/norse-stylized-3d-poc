@@ -398,3 +398,26 @@ The corrected delivery may include the unchanged remaining GM-SURFACE.5J files s
 - [x] Preserve all executable rendering math, serialized values, diagnostic thresholds, geometry, scenes, prefabs, profiles, layers, and tags.
 - [ ] Next production diagnosis/fix must directly validate surface orientation versus observed face/bevel response ordering under the same light.
 
+
+## GM-SURFACE.5Q-DIAG — Exhaustive surface-orientation stage attribution
+
+- [x] Record the canonical 5Q plan before implementation.
+- [x] Preserve the completed H3 identity/readback/Lambert and Stage A/B/C/D matrix.
+- [x] Add Stage E over all three validated camera views and all 27 deterministic light directions.
+- [x] Capture triangle/current/stored normals; raw generated-mass channels; dirt/height/upwardness; resolved and nonlinear exposure/crevice/base/dirt fields; mottle and response scalars.
+- [x] Capture every cumulative pre-light albedo stage and its stored-normal direct-light response.
+- [x] Capture GPU NdotL, distance attenuation, shadow attenuation, and actual main-light direction.
+- [x] Validate cumulative direct response pixel-by-pixel against captured albedo × captured NdotL × captured attenuation.
+- [x] Fail closed if cached albedo, NdotL/attenuation, and direct-response captures disagree on identity-relative readback orientation or foreground pixel count.
+- [x] Capture legacy actual-material, HLSL production-normal, and HLSL stored-normal PBR references for every Stage E view/direction.
+- [x] Capture direct and PBR one-layer ablations for tonal, exposure, mottle, crevice, base, dirt, wet, frost, monolithic, overall tint, specular-zero, and all pre-light value authorities together.
+- [x] Compute source-face NdotL/order inversions, conditional parent-bevel-parent violations, stage correlations, first divergent stage, and ablation reductions.
+- [x] Correct the parent-envelope criterion so it is applied only when bevel NdotL is genuinely intermediate between parent NdotL values.
+- [x] Preserve per-triangle provenance, geometry-quality, mask-endpoint, luminance-distribution, normal, and HLSL stage evidence in the dedicated streamed orientation CSV.
+- [x] Reconcile the matrix to 3,677 counted cases and 3,681 total render/readback passes.
+- [x] Preserve incremental/cancellable asynchronous execution; checkpoint the large run periodically rather than rebuilding the full growing report after every render.
+- [x] Complete final offline source/scope/symbol/mode/production-variant audit (`71 / 71`).
+- [x] Complete changed-file-only archive extraction/hash integrity audit.
+- [ ] Compile in Unity 6000.5.0f1 with no new C# or shader errors/warnings.
+- [ ] Run the complete 5Q suite and require 3,677/3,677 counted cases, 3,681 total render passes, zero readback/non-finite failures, valid identity/alignment/Lambert contracts, complete Stage E family coverage, and no completeness failure.
+- [ ] Submit the complete text report plus the dedicated orientation CSV for evidence-based root-cause analysis before any production material/shader change.

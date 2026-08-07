@@ -484,7 +484,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "Root Quality Evaluation",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Builds a temporary 10-case Wych Elm production regression board for the promoted TREE-ROOTS.4B root-mass response. It covers the operator profile, Root Thickness 0.5 / 1.0 / 1.5 / 2.0, Reach 2.0 with Thickness 2.0, opposite/zero twist, and Buttress Persistence 0 / 1. Each successful case receives a neutral close-root capture and an exact game-camera context capture. The evaluation changes no recipes, exact controls, scene objects or gallery meshes; it advances incrementally, checkpoints partial output and remains cancellable.",
+                "Builds a temporary 8-tree TREE-ROOTS.4C production board for local ground-contact radial smoothing: Twisted 1-5 are the primary silhouette set, with Common 1, Pine 1, and Dead 1 as cost/regression controls. Each case uses its existing exact-control snapshot and records ground radial segments, boosted-ring count, boost release distance, topology, geometry cost, a close root-contact capture, and exact game-camera context. The evaluation changes no recipes, exact controls, scene objects or gallery meshes; it advances incrementally, checkpoints partial output and remains cancellable.",
                 MessageType.None);
             if (TreeRootQualityEvaluation.IsRunning)
             {
@@ -502,7 +502,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 EditorGUILayout.LabelField(
                     "Timing",
                     TreeRootQualityEvaluation.CurrentEta);
-                if (GUILayout.Button("Cancel Root-Mass Regression"))
+                if (GUILayout.Button("Cancel Ground-Contact Radial Evaluation"))
                 {
                     TreeRootQualityEvaluation.RequestCancel();
                 }
@@ -514,7 +514,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootCollapseTournament.IsRunning))
                 {
-                    if (GUILayout.Button("Run Root-Mass Regression Board"))
+                    if (GUILayout.Button("Run Ground-Contact Radial Board"))
                     {
                         TreeRootQualityEvaluation.Start(instance);
                     }
@@ -525,16 +525,16 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 string.IsNullOrEmpty(
                     TreeRootQualityEvaluation.LastReportPath)))
             {
-                if (GUILayout.Button("Open Root-Mass Regression Board"))
+                if (GUILayout.Button("Open Ground-Contact Radial Board"))
                 {
                     TreeRootQualityEvaluation.OpenBoard();
                 }
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Copy Root-Mass Regression Report"))
+                if (GUILayout.Button("Copy Ground-Contact Radial Report"))
                 {
                     TreeRootQualityEvaluation.CopyLastReport();
                 }
-                if (GUILayout.Button("Open Root-Mass Regression Folder"))
+                if (GUILayout.Button("Open Ground-Contact Radial Folder"))
                 {
                     TreeRootQualityEvaluation.OpenOutputFolder();
                 }

@@ -68,10 +68,10 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "This controller is not the active Weather LightRay publisher.");
             }
 
-            if (controller.ActivePreset == null)
+            if (controller.DefaultPreset == null)
             {
                 WeatherInspectorGui.Warning(
-                    "No Active Preset is assigned. Procedural and automatic spawning are unavailable; authored fallback appearance remains only until the later serialized migration patch.");
+                    "No Default Preset is assigned. Automatic atmospheric population and rays that do not provide a Preset Override cannot become active. Explicit per-ray overrides remain valid.");
             }
 
             if (WeatherLightRayRendererFeature.ActiveFeatureCount == 0)
@@ -106,8 +106,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 WeatherInspectorGui.Property(
                     serializedObject,
                     "activePreset",
-                    "Active Preset",
-                    "Current shared appearance and beam-evolution preset. Selection is manual until a future Weather orchestration layer deliberately supplies another preset.");
+                    "Default Preset",
+                    "Inherited visual preset for rays that do not provide a Preset Override. Future Weather orchestration may change this default without affecting explicit per-ray overrides.");
                 WeatherInspectorGui.Property(
                     serializedObject,
                     "previewInEditMode",
@@ -330,8 +330,8 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     "Published",
                     controller.IsPublished ? "Yes" : "No");
                 WeatherInspectorGui.ReadOnlyObject(
-                    "Active Preset",
-                    controller.ActivePreset);
+                    "Default Preset",
+                    controller.DefaultPreset);
                 WeatherInspectorGui.ReadOnlyObject(
                     "Resolved Camera",
                     controller.ResolvedRenderCamera);
@@ -343,7 +343,7 @@ namespace ProgrammaticStylized3D.Weather.Editor
                     controller.ActiveSurfaceSpotLightCount);
 
                 EditorGUILayout.Space(4f);
-                EditorGUILayout.LabelField("Current Directional Source", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Sun Source Binding", EditorStyles.boldLabel);
                 WeatherLightRaySourceState source = controller.SunSourceState;
                 WeatherInspectorGui.ReadOnlyObject(
                     "Resolved Light",
@@ -374,6 +374,9 @@ namespace ProgrammaticStylized3D.Weather.Editor
                 WeatherInspectorGui.ReadOnlyRow(
                     "Debug View",
                     controller.RenderDebugView.ToString());
+                WeatherInspectorGui.ReadOnlyRow(
+                    "Presentation Groups",
+                    WeatherLightRayRenderPass.LastPresentationGroupCount);
                 WeatherInspectorGui.ReadOnlyRow(
                     "Vegetation Additional Lights / Overrides",
                     $"{controller.PublishedVegetationAdditionalLightCount} / {controller.PublishedVegetationWeatherOverrideCount}");

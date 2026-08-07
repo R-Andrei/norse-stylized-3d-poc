@@ -175,6 +175,7 @@ namespace ProgrammaticStylized3D.Weather
         public readonly long ExternalIdentity;
         public readonly WeatherLightRaySpawnPriority Priority;
         public readonly bool InitiallyVisible;
+        public readonly WeatherLightRayPreset PresetOverride;
 
         public WeatherLightRaySpawnRequest(
             Vector3 baseCentreWorld,
@@ -206,7 +207,8 @@ namespace ProgrammaticStylized3D.Weather
             int gameplayChannel = 0,
             long externalIdentity = 0,
             WeatherLightRaySpawnPriority priority =
-                WeatherLightRaySpawnPriority.Normal)
+                WeatherLightRaySpawnPriority.Normal,
+            WeatherLightRayPreset presetOverride = null)
         {
             BaseCentreWorld = baseCentreWorld;
             RayDirectionWorld = rayDirectionWorld;
@@ -241,6 +243,7 @@ namespace ProgrammaticStylized3D.Weather
             ExternalIdentity = externalIdentity;
             Priority = priority;
             InitiallyVisible = initiallyVisible;
+            PresetOverride = presetOverride;
         }
     }
 
@@ -370,6 +373,7 @@ namespace ProgrammaticStylized3D.Weather
         public readonly int GameplayChannel;
         public readonly WeatherLightRaySpawnPriority Priority;
         public readonly bool ResetLifecycleOnUpdate;
+        public readonly WeatherLightRayPreset PresetOverride;
 
         public WeatherLightRayCloudSpawnSettings(
             uint variationSeed,
@@ -396,7 +400,8 @@ namespace ProgrammaticStylized3D.Weather
             int gameplayChannel = 0,
             WeatherLightRaySpawnPriority priority =
                 WeatherLightRaySpawnPriority.Normal,
-            bool resetLifecycleOnUpdate = false)
+            bool resetLifecycleOnUpdate = false,
+            WeatherLightRayPreset presetOverride = null)
         {
             VariationSeed = variationSeed == 0u ? 1u : variationSeed;
             LocalIntensityMultiplier = Mathf.Max(
@@ -425,6 +430,7 @@ namespace ProgrammaticStylized3D.Weather
             GameplayChannel = gameplayChannel;
             Priority = priority;
             ResetLifecycleOnUpdate = resetLifecycleOnUpdate;
+            PresetOverride = presetOverride;
         }
     }
 
@@ -646,6 +652,9 @@ namespace ProgrammaticStylized3D.Weather
         public readonly float SurfaceSpotLightIntensity;
         public readonly float ScreenSpaceSurfaceIntensity;
         public readonly float FootprintEdgeSoftness;
+        public readonly float VegetationAccentIntensity;
+        public readonly float VegetationAccentCoverage;
+        public readonly float VegetationAccentSoftness;
 
         public readonly WeatherLightRayEvolutionPreset EvolutionPreset;
         public readonly float EvolutionStrength;
@@ -683,6 +692,9 @@ namespace ProgrammaticStylized3D.Weather
             float surfaceSpotLightIntensity,
             float screenSpaceSurfaceIntensity,
             float footprintEdgeSoftness,
+            float vegetationAccentIntensity,
+            float vegetationAccentCoverage,
+            float vegetationAccentSoftness,
             WeatherLightRayEvolutionPreset evolutionPreset,
             float evolutionStrength,
             float evolutionSpeed,
@@ -763,6 +775,12 @@ namespace ProgrammaticStylized3D.Weather
                 screenSpaceSurfaceIntensity);
             FootprintEdgeSoftness = Mathf.Clamp01(
                 footprintEdgeSoftness);
+            VegetationAccentIntensity = Mathf.Clamp01(
+                vegetationAccentIntensity);
+            VegetationAccentCoverage = Mathf.Clamp01(
+                vegetationAccentCoverage);
+            VegetationAccentSoftness = Mathf.Clamp01(
+                vegetationAccentSoftness);
             EvolutionPreset = evolutionPreset;
             EvolutionStrength = Mathf.Clamp01(evolutionStrength);
             EvolutionSpeed = Mathf.Clamp01(evolutionSpeed);
@@ -790,6 +808,12 @@ namespace ProgrammaticStylized3D.Weather
         public readonly float EvolutionBlend;
         public readonly float EvolutionDurationSeconds;
         public readonly int CompletedEvolutionTransitions;
+        public readonly WeatherLightRayPreset ResolvedPreset;
+        public readonly WeatherLightRayPreset PreviousResolvedPreset;
+        public readonly bool InheritsDefaultPreset;
+        public readonly float PresetPresentationBlend;
+        public readonly Color ResolvedSourceColour;
+        public readonly float ResolvedSourceIntensity;
 
         public WeatherLightRaySnapshot(
             WeatherLightRayHandle handle,
@@ -805,7 +829,13 @@ namespace ProgrammaticStylized3D.Weather
             uint evolutionNextSeed,
             float evolutionBlend,
             float evolutionDurationSeconds,
-            int completedEvolutionTransitions)
+            int completedEvolutionTransitions,
+            WeatherLightRayPreset resolvedPreset,
+            WeatherLightRayPreset previousResolvedPreset,
+            bool inheritsDefaultPreset,
+            float presetPresentationBlend,
+            Color resolvedSourceColour,
+            float resolvedSourceIntensity)
         {
             Handle = handle;
             Descriptor = descriptor;
@@ -822,6 +852,12 @@ namespace ProgrammaticStylized3D.Weather
             EvolutionBlend = Mathf.Clamp01(evolutionBlend);
             EvolutionDurationSeconds = Mathf.Max(0f, evolutionDurationSeconds);
             CompletedEvolutionTransitions = Mathf.Max(0, completedEvolutionTransitions);
+            ResolvedPreset = resolvedPreset;
+            PreviousResolvedPreset = previousResolvedPreset;
+            InheritsDefaultPreset = inheritsDefaultPreset;
+            PresetPresentationBlend = Mathf.Clamp01(presetPresentationBlend);
+            ResolvedSourceColour = resolvedSourceColour;
+            ResolvedSourceIntensity = Mathf.Max(0f, resolvedSourceIntensity);
         }
 
         public WeatherLightRaySourceKind SourceKind =>

@@ -281,29 +281,9 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 return;
             }
 
-            WeatherLightRaySourceState sourceState = default;
-            bool foundRenderable = false;
-            for (int index = 0; index < copied; index++)
-            {
-                if (snapshotBuffer[index].CurrentIntensity <= 0.0001f)
-                {
-                    continue;
-                }
-
-                sourceState = controller.ResolveRenderableSourceState(
-                    snapshotBuffer[index]);
-                foundRenderable = true;
-                break;
-            }
-            if (!foundRenderable)
-            {
-                return;
-            }
-
             renderPass.Setup(
                 snapshotBuffer,
                 copied,
-                sourceState,
                 controller.RenderDebugView,
                 camera);
             renderer.EnqueuePass(renderPass);

@@ -7928,7 +7928,7 @@ Static audit passed exact four-file vegetation scope, balanced source/preprocess
 
 ## Historical LightRay vegetation identity sequence — superseded
 
-The following `VEG-V1C.11` through `WEATHER-LIGHT-RAY-V1.1D-AH1` sections are retained as implementation history. Their geometric Spot matching, global shader publication, diagnostic-mode, and diagnostic coverage-bypass behavior are superseded. They must not be read as the current production path. The authoritative current path begins at **Active contract — indexed per-additional-light accent sidecar** below and is closed by `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`.
+The following `VEG-V1C.11` through `WEATHER-LIGHT-RAY-V1.1D-AH1` sections are retained as implementation history. Their geometric Spot matching, global shader publication, diagnostic-mode, and diagnostic coverage-bypass behavior are superseded. They must not be read as the current production path. The authoritative current path begins at **Active contract — indexed per-additional-light accent sidecar** below, is stripped to the sidecar-only bridge by `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`, and receives per-ray preset authority in V1.3A4.
 
 ## VEG-V1C.11 — Geometric Weather LightRay Spot match
 
@@ -8043,14 +8043,20 @@ parameters = strength scale, stable whole-card coverage, edge-profile softness, 
 sourceDirectionWS = normalized horizontal direction toward the LightRay source, direction-valid flag
 ```
 
-Ordinary lights receive a zero record and retain the established generic local-light accent response. Weather LightRay Spot proxies receive active-preset values plus their source direction. No nested LightRay search, position comparison, extra light loop, geometric Spot match, or GPU readback is permitted.
+Ordinary lights receive a zero record and retain the established generic local-light accent response. Each Weather LightRay Spot proxy receives the vegetation values and source direction resolved for that specific ray descriptor. No Controller-global accent lookup, nested LightRay search, position comparison, extra light loop, geometric Spot match, or GPU readback is permitted.
 
 
 ### WEATHER-LIGHT-RAY-CLEANUP-V1.3A3 — sidecar closure
 
 V1.3A3 completes removal of the superseded global/geometric diagnostic bridge. Production Weather-LightRay vegetation metadata now has one path only: the indexed per-additional-light sidecar described above. The Controller no longer publishes legacy global Spot position, horizontal direction, intensity, resolved scale, coverage, or diagnostic-mode state; the vegetation include no longer carries diagnostic-only result fields or false-colour resolution; and the benchmark shader no longer contains a diagnostic fragment-return branch.
 
-The protected C#/HLSL record remains exactly two `float4` values. `parameters.w` is an identity/override flag rather than an intensity test: Weather LightRay Spot records retain `w = 1` when resolved intensity is `0`, so Weather-specific edge radiance becomes zero without re-entering the generic punctual-light edge path. Production intensity scale is resolved from the active LightRay preset contract, including preset-transition interpolation; coverage and softness retain their existing semantics. The renderer feature, URP additional-light ordering, camera-local buffer binding, zero fallback record, body-lighting authority, and ordinary-light path are unchanged.
+The protected C#/HLSL record remains exactly two `float4` values. `parameters.w` is an identity/override flag rather than an intensity test: Weather LightRay Spot records retain `w = 1` when resolved intensity is `0`, so Weather-specific edge radiance becomes zero without re-entering the generic punctual-light edge path. Production intensity, coverage, and softness are preset-owned presentation values. The renderer feature, URP additional-light ordering, camera-local buffer binding, zero fallback record, body-lighting authority, and ordinary-light path are unchanged.
+
+### WEATHER-LIGHT-RAY-CLEANUP-V1.3A4 — per-ray vegetation authority
+
+V1.3A4 makes the indexed record genuinely per ray. `WeatherLightRayPreset.ApplyTo()` resolves Vegetation Accent Intensity, Coverage, and Softness into the ray descriptor, including default-preset transition interpolation for inherited rays. The Controller then builds that Spot's sidecar record from the descriptor instead of copying one Controller-default record to every LightRay Spot.
+
+This allows, for example, simultaneous weather and quest LightRays to use different vegetation accent presentations while preserving the same two-`float4` GPU layout. User authoring remains centralized on each `WeatherLightRayPreset` asset under **Surface Response**; no Controller/Anchor copies are introduced.
 
 
 ## WEATHER-LIGHT-RAY-V1.2D2 — Vegetation accent control contract closure
@@ -8067,7 +8073,7 @@ Protected receiver contracts:
 - URP `Light.direction`, attenuation, colour, cone, and range remain authoritative for vegetation body lighting.
 - Only a Weather override may use `sourceDirectionWS` for the stylized blade-edge side selector.
 - The punctual Spot's radial fragment direction must never be used as the Weather edge-selector direction; doing so creates centre rejection and rim-biased accents.
-- Intensity is resolved from the active Weather LightRay preset and scales only Weather edge radiance.
+- Intensity is resolved from that LightRay's resolved preset/descriptor and scales only Weather edge radiance.
 - Coverage is a deterministic whole-card threshold based on instance/card identity. `0` selects none, `1` selects all directionally eligible cards, and intermediate values produce a stable spatially unbiased subset. Coverage does not scale surviving radiance.
 - Softness shapes only the selected blade-edge profile after card participation and direction selection. It must not alter the participating-card set, directional gate, attenuation, LightRay footprint, or body illumination. `0.5` preserves the authored vegetation edge mask.
 - Ordinary local lights retain the established generic punctual-light path and receive zero Weather records.

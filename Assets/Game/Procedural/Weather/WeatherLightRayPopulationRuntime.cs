@@ -67,7 +67,7 @@ namespace ProgrammaticStylized3D.Weather
             internal readonly float ReplacementDelaySeconds;
             internal readonly float MaximumGroundSlopeDegrees;
             internal readonly float CloudEvolutionResumeThreshold;
-            internal readonly WeatherLightRayPreset ActivePreset;
+            internal readonly WeatherLightRayPreset DefaultPreset;
             internal readonly WeatherLightRaySourceState DirectionalSource;
             internal readonly WeatherCloudShadowController CloudController;
             internal readonly int CandidateChecksPerUpdate;
@@ -94,7 +94,7 @@ namespace ProgrammaticStylized3D.Weather
                 float replacementDelaySeconds,
                 float maximumGroundSlopeDegrees,
                 float cloudEvolutionResumeThreshold,
-                WeatherLightRayPreset activePreset,
+                WeatherLightRayPreset defaultPreset,
                 in WeatherLightRaySourceState directionalSource,
                 WeatherCloudShadowController cloudController)
             {
@@ -118,7 +118,7 @@ namespace ProgrammaticStylized3D.Weather
                 ReplacementDelaySeconds = replacementDelaySeconds;
                 MaximumGroundSlopeDegrees = maximumGroundSlopeDegrees;
                 CloudEvolutionResumeThreshold = cloudEvolutionResumeThreshold;
-                ActivePreset = activePreset;
+                DefaultPreset = defaultPreset;
                 DirectionalSource = directionalSource;
                 CandidateChecksPerUpdate = Mathf.Clamp(
                     MaximumCount * 2,
@@ -647,9 +647,9 @@ namespace ProgrammaticStylized3D.Weather
                 return "Weather LightRays are globally disabled.";
             }
 
-            if (settings.ActivePreset == null)
+            if (settings.DefaultPreset == null)
             {
-                return "Automatic population requires an Active Preset.";
+                return "Automatic population requires a Controller Default Preset.";
             }
 
             if (!settings.DirectionalSource.Available ||
@@ -1359,7 +1359,7 @@ namespace ProgrammaticStylized3D.Weather
                 return false;
             }
 
-            float radius = settings.ActivePreset.DefaultAreaDiameterMetres *
+            float radius = settings.DefaultPreset.DefaultAreaDiameterMetres *
                 0.5f;
             for (int sampleIndex = 0; sampleIndex < 4; sampleIndex++)
             {
@@ -1530,7 +1530,7 @@ namespace ProgrammaticStylized3D.Weather
                 settings.DirectionalSource.Kind,
                 candidate.GroundPosition,
                 Vector3.zero,
-                settings.ActivePreset.DefaultAreaDiameterMetres,
+                settings.DefaultPreset.DefaultAreaDiameterMetres,
                 candidate.Clearance,
                 0.5f,
                 candidate.Clearance,

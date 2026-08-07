@@ -15,11 +15,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     /// <summary>
     /// Integrated Generated Mass surface-causality audit.
     ///
-    /// GM-SURFACE.5P: the active defect is wrong per-surface/per-bevel response
-    /// ordering relative to orientation under the same light. Whole-rock darkness,
-    /// F0/specular magnitude, exposure, or average residual are not the definition
-    /// of success. Parent-bevel-parent and neighboring-face orientation ordering
-    /// must match the coherent legacy behavior before the defect can be closed.
+    /// GM-SURFACE.5Q: the active diagnostic exhaustively attributes wrong
+    /// per-surface response ordering to the first HLSL pre-light stage that causes
+    /// measured output to diverge from measured GPU NdotL. Parent-bevel-parent
+    /// envelope checks are conditional on the bevel NdotL being intermediate;
+    /// whole-object brightness/specular magnitude are not closure criteria.
     ///
     /// The production triangulation is deliberately not modified here. The
     /// suite captures the committed production mesh, classifies final triangles
@@ -32,8 +32,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
     {
         private const string ReportPath = "Library/GeneratedMassSurfaceCausalityAudit.txt";
         private const string CsvPath = "Library/GeneratedMassSurfaceCausalityAudit.csv";
+        private const string OrientationCsvPath =
+            "Library/GeneratedMassSurfaceOrientationAudit.csv";
         private const float PositionQuantization = 100000f;
         private const float ScalarEpsilon = 0.000001f;
+        private const int RenderCheckpointInterval = 32;
         private static Job activeJob;
         private static string lastReport = string.Empty;
         private static string lastSummary = string.Empty;
@@ -155,7 +158,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             previousCompletedRenderPasses)
                         {
                             job.CompletedUnits++;
-                            WriteCheckpoint(job, false, string.Empty);
+                            int completedRenderPasses =
+                                job.RenderAudit.Results.Count;
+                            bool checkpointDue =
+                                completedRenderPasses <= 4 ||
+                                completedRenderPasses %
+                                    RenderCheckpointInterval == 0 ||
+                                job.RenderAudit.Results[completedRenderPasses - 1].ReadbackError ||
+                                job.RenderAudit.IsComplete;
+                            if (checkpointDue)
+                            {
+                                WriteCheckpoint(job, false, string.Empty);
+                            }
                         }
                         break;
                     case Stage.Finalize:
@@ -262,6 +276,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     CsvPath,
                     BuildPerTriangleCsv(job.RenderAudit),
                     Encoding.UTF8);
+                WriteOrientationCsv(
+                    OrientationCsvPath,
+                    job.RenderAudit);
             }
             lastReport = report;
             EditorGUIUtility.systemCopyBuffer = report;
@@ -293,7 +310,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             StringBuilder builder = new StringBuilder(262144);
             builder.AppendLine("GENERATED MASS SURFACE-CAUSALITY SUITE");
-            builder.AppendLine("contract=GM-SURFACE-5N-H3-PIXELWISE-GPU-NORMAL-LAMBERT-PREFLIGHT");
+            builder.AppendLine("contract=GM-SURFACE-5Q-EXHAUSTIVE-SURFACE-ORIENTATION-STAGE-ATTRIBUTION");
             builder.AppendLine("generatedUtc=" +
                 DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
             builder.AppendLine("terminal=" + (terminal ? 1 : 0));
@@ -363,6 +380,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 builder.AppendLine("totalRenderPasses=" +
                     job.RenderAudit.TotalRenderPasses);
                 builder.AppendLine("perTriangleCsv=" + CsvPath);
+                builder.AppendLine("orientationCsv=" + OrientationCsvPath);
                 foreach (
                     GeneratedMassSurfaceCausalityRenderAudit.CaseResult result
                     in job.RenderAudit.Results)
@@ -381,6 +399,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         ",triangleIdentity=" +
                             (result.IsTriangleIdentity ? 1 : 0) +
                         ",brdfSweep=" + (result.IsBrdfSweep ? 1 : 0) +
+                        ",orientationSweep=" +
+                            (result.IsOrientationSweep ? 1 : 0) +
+                        ",orientationKind=" + result.OrientationKind +
+                        ",orientationStage=" + result.OrientationStage +
+                        ",orientationAblation=" + result.OrientationAblation +
+                        ",orientationDirectProductPixels=" +
+                            result.OrientationDirectProductPixelCount +
+                        ",orientationDirectProductMeanAbsResidual=" +
+                            F(result.OrientationDirectProductMeanAbsoluteResidual) +
+                        ",orientationDirectProductNormalizedRmse=" +
+                            F(result.OrientationDirectProductNormalizedRmse) +
                         ",adaptiveBrdf=" +
                             (result.IsAdaptiveBrdf ? 1 : 0) +
                         ",auxiliaryIdentity=" +
@@ -808,6 +837,84 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         F(summary.ActualSceneCurrentMeanAbsoluteResidual));
                     builder.AppendLine("actualSceneDielectricMeanAbsResidual=" +
                         F(summary.ActualSceneDielectricMeanAbsoluteResidual));
+                    builder.AppendLine("orientationCaptureAvailable=" +
+                        (summary.OrientationCaptureAvailable ? 1 : 0));
+                    builder.AppendLine("expectedOrientationCases=" +
+                        summary.ExpectedOrientationCases);
+                    builder.AppendLine("completedOrientationCases=" +
+                        summary.CompletedOrientationCases);
+                    builder.AppendLine("orientationFirstDivergentStage=" +
+                        summary.OrientationFirstDivergentStage);
+                    builder.AppendLine("orientationFirstDivergentStageCount=" +
+                        summary.OrientationFirstDivergentStageCount);
+                    builder.AppendLine("orientationDominantAblation=" +
+                        summary.OrientationDominantAblation);
+                    builder.AppendLine("orientationDominantAblationReduction=" +
+                        F(summary.OrientationDominantAblationReduction));
+                    builder.AppendLine("orientationLegacySourcePairInversions=" +
+                        summary.OrientationLegacySourcePairInversions);
+                    builder.AppendLine("orientationHlslSourcePairInversions=" +
+                        summary.OrientationHlslSourcePairInversions);
+                    builder.AppendLine(
+                        "orientationLegacyConditionalBevelViolations=" +
+                        summary.OrientationLegacyConditionalBevelViolations);
+                    builder.AppendLine(
+                        "orientationHlslConditionalBevelViolations=" +
+                        summary.OrientationHlslConditionalBevelViolations);
+                    foreach (var orientationStage in summary.OrientationStages)
+                    {
+                        builder.AppendLine(
+                            "orientationStage=" + orientationStage.StageName +
+                            ",sourceComparisons=" +
+                                orientationStage.SourcePairComparisons +
+                            ",sourceInversions=" +
+                                orientationStage.SourcePairInversions +
+                            ",introducedSourceInversions=" +
+                                orientationStage.IntroducedSourcePairInversions +
+                            ",conditionalBevelComparisons=" +
+                                orientationStage.ConditionalBevelComparisons +
+                            ",conditionalBevelViolations=" +
+                                orientationStage.ConditionalBevelEnvelopeViolations +
+                            ",introducedConditionalBevelViolations=" +
+                                orientationStage.IntroducedConditionalBevelViolations +
+                            ",pearsonNdotLToLuma=" +
+                                F(orientationStage.SourceOrientationPearson) +
+                            ",spearmanNdotLToLuma=" +
+                                F(orientationStage.SourceOrientationSpearman) +
+                            ",meanDirectToNdotLRatio=" +
+                                F(orientationStage.MeanDirectToNdotLRatio) +
+                            ",meanDirectProductNormalizedRmse=" +
+                                F(orientationStage.MeanDirectProductNormalizedRmse) +
+                            ",exposureCorrelation=" +
+                                F(orientationStage.ExposureCorrelation) +
+                            ",creviceCorrelation=" +
+                                F(orientationStage.CreviceCorrelation) +
+                            ",dirtCorrelation=" +
+                                F(orientationStage.DirtCorrelation) +
+                            ",heightCorrelation=" +
+                                F(orientationStage.HeightCorrelation) +
+                            ",mottleCorrelation=" +
+                                F(orientationStage.MottleCorrelation));
+                    }
+                    foreach (var orientationAblation in
+                        summary.OrientationAblations
+                            .OrderByDescending(item =>
+                                item.ReductionFromBaseline)
+                            .ThenBy(item => item.AblationName,
+                                StringComparer.Ordinal))
+                    {
+                        builder.AppendLine(
+                            "orientationAblation=" +
+                                orientationAblation.AblationName +
+                            ",sourceInversions=" +
+                                orientationAblation.SourcePairInversions +
+                            ",conditionalBevelViolations=" +
+                                orientationAblation.ConditionalBevelViolations +
+                            ",combinedError=" +
+                                F(orientationAblation.CombinedError) +
+                            ",reductionFromBaseline=" +
+                                F(orientationAblation.ReductionFromBaseline));
+                    }
                     builder.AppendLine("completenessFailure=" +
                         summary.CompletenessFailure);
                     builder.AppendLine("dominantContributor=" +
@@ -837,16 +944,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 job.RenderAudit?.FinalSummary;
             builder.AppendLine("causalOwnership=" +
                 (finalSummary == null ? "PENDING" : finalSummary.Ownership));
+            builder.AppendLine("orientationDecision=" +
+                (finalSummary == null
+                    ? "PENDING"
+                    : finalSummary.OrientationCaptureAvailable
+                        ? "CAPTURE_COMPLETE:firstDivergentStage=" +
+                            finalSummary.OrientationFirstDivergentStage +
+                            ",dominantAblation=" +
+                            finalSummary.OrientationDominantAblation
+                        : "ORIENTATION_CAPTURE_INCOMPLETE"));
             builder.AppendLine("productionFixSelected=0");
             builder.AppendLine("decision=" + ResolveDecision(job));
             builder.AppendLine();
 
-            // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
-            // Interpret this report around per-surface orientation response and
-            // parent-bevel-parent ordering. Whole-object darkness, F0/specular
-            // magnitude, exposure, ambient response, and aggregate residuals are
-            // secondary evidence and cannot close the defect while ordering
-            // inversions remain visible.
+            // GM-SURFACE.5Q ACTIVE DEFECT CONTRACT:
+            // Interpret this report around per-surface orientation response. A
+            // parent-bevel-parent envelope is only a correctness constraint when
+            // the measured bevel NdotL lies between the measured parent NdotL
+            // values. Whole-object darkness, specular magnitude, and aggregate
+            // residuals cannot substitute for that orientation evidence.
             builder.AppendLine("[Interpretation contract]");
             builder.AppendLine("- literal degeneracy, numerical under-resolution, and extreme sliver conditioning are separate classifications.");
             builder.AppendLine("- every uploaded and captured triangle is evaluated by MassGenerator.EvaluateFinalTriangleQuality; Vector3.normalized is not a validity oracle.");
@@ -858,11 +974,308 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.AppendLine("- a controlled pixelwise GPU-normal Lambert preflight validates light publication, float readback, identity-to-lighting alignment, exact interpolated stored-normal attribution, configured/opposite light direction, and scalar response before Stage A is queued.");
             builder.AppendLine("- Stage A captures six keyword-free neutral stored-normal variants under 27 deterministic light directions: legacy/HLSL full response and black-albedo specular-only response at F0 0.16 and F0 0.04; diffuse is derived as full minus specular-only.");
             builder.AppendLine("- Stage B reruns the four worst directions with actual albedo and generated/stored normal pairs at both F0 values; Stage C repeats the two worst directions from two additional camera azimuths; Stage D captures indirect and actual-scene closure.");
+            builder.AppendLine("- Stage E exhaustively captures all 27 controlled directions from the current and both validated alternate views, including stored/geometric/resolved normals, GPU NdotL/attenuation/light direction, raw and resolved generated-mass masks, every cumulative pre-light albedo checkpoint, direct response after every checkpoint, legacy/current/stored-normal PBR controls, and direct plus PBR one-layer ablations.");
+            builder.AppendLine("- Stage E source-face inversion counts compare measured GPU NdotL ordering against measured output ordering only when the NdotL separation is material; this is the primary surface-orientation causality criterion.");
+            builder.AppendLine("- Stage E parent-bevel-parent envelope violations are counted only when the measured bevel NdotL is itself between the measured parent NdotL values within tolerance; a bevel that genuinely faces the light more directly than both parents is not classified as an envelope defect.");
+            builder.AppendLine("- Stage E writes a dedicated per-triangle orientation CSV containing provenance, normals, raw/resolved masks, scalar response fields, GPU NdotL/attenuation/light vector, all cumulative albedo checkpoints, and every rendered stage/ablation result so the successful run remains independently analyzable even if the summary thresholds are later revised.");
             builder.AppendLine("- every lighting case uses linear floating-point GPU capture and preserves per-triangle RGB, luminance, signed residuals, parent IDs, stored-normal NdotL/NdotV/NdotH predictions, and ordering; any non-finite sample is terminal.");
             builder.AppendLine("- controlled stages disable fog, post-processing, shadows, additional lights, probes, ambient, reflections, and cookies as declared per case; actual-scene closure deliberately restores the scene environment.");
             builder.AppendLine("- the active selected mass is the suspect; when two masses are selected, the other selected mass is the reference.");
             builder.AppendLine("- a visual result can still override an inconclusive numerical classification; the suite reports evidence rather than silently authoring a fix.");
             return builder.ToString();
+        }
+
+        private static void WriteOrientationCsv(
+            string path,
+            GeneratedMassSurfaceCausalityRenderAudit audit)
+        {
+            using StreamWriter writer = new StreamWriter(
+                path,
+                false,
+                Encoding.UTF8,
+                1048576);
+            StringBuilder header = new StringBuilder(4096);
+            string[] albedoStages =
+            {
+                "BASE", "TONAL", "EXPOSURE_SCALE", "MOTTLE",
+                "EXPOSURE_TINT", "CREVICE", "BASE_LAYER", "DIRT",
+                "WET_DAMP", "FROST", "WET_GLOBAL", "FINAL_PRELIGHT",
+                "FINAL_WITH_OVERALL_TINT"
+            };
+            header.Append(
+                "caseName,view,direction,variant,kind,stage,ablation,mode," +
+                "alignmentIoU,coverageRatio,directProductPixels," +
+                "directProductMeanAbsResidual,directProductNormalizedRmse," +
+                "triangleIndex,surfaceClass," +
+                "logicalBevelId,parentFaceA,parentFaceB,provenanceKind," +
+                "provenanceIndex,surfaceGroup,pixelCount,meanLinearR," +
+                "meanLinearG,meanLinearB,meanLuma,minLuma,p10Luma," +
+                "medianLuma,p90Luma,maxLuma,stdDevLuma,storedNormalX," +
+                "storedNormalY,storedNormalZ,geometricNormalX," +
+                "geometricNormalY,geometricNormalZ,authoredNormalX," +
+                "authoredNormalY,authoredNormalZ,triangleCondition," +
+                "triangleAspectRatio,triangleMinimumAngleDegrees," +
+                "maskA_R,maskA_G,maskA_B,maskA_A,maskB_R,maskB_G," +
+                "maskB_B,maskB_A,maskC_R,maskC_G,maskC_B,maskC_A," +
+                "structuralA_R,structuralA_G,structuralA_B,structuralA_A," +
+                "structuralB_R,structuralB_G,structuralB_B,structuralB_A," +
+                "structuralC_R,structuralC_G,structuralC_B,structuralC_A," +
+                "predictedNdotL,predictedNdotV,predictedNdotH," +
+                "rawVariation,rawExposure," +
+                "rawCrevice,rawDirt,height01,encodedNormalY," +
+                "resolvedExposure,resolvedCrevice,resolvedBase," +
+                "resolvedDirt,exposureVisual,creviceVisual,baseVisual," +
+                "dirtVisual,mottleNoise,tonalScale,semanticScale," +
+                "profileContrast,gpuNdotL,distanceAttenuation," +
+                "shadowAttenuation,gpuLightDirEncodedR," +
+                "gpuLightDirEncodedG,gpuLightDirEncodedB");
+            foreach (string stage in albedoStages)
+            {
+                header.Append(",albedo_").Append(stage);
+            }
+            writer.WriteLine(header.ToString());
+
+            IReadOnlyList<GeneratedMassSurfaceCausalityRenderAudit.CaseResult>
+                results = audit.Results;
+            Dictionary<string,
+                GeneratedMassSurfaceCausalityRenderAudit.CaseResult>
+                orientationCases = results
+                    .Where(item => item.IsOrientationSweep)
+                    .GroupBy(item => OrientationCaseKey(
+                        item.ViewName,
+                        item.DirectionName,
+                        item.BrdfVariant),
+                        StringComparer.Ordinal)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First(),
+                        StringComparer.Ordinal);
+
+            foreach (GeneratedMassSurfaceCausalityRenderAudit.CaseResult result
+                in results.Where(item => item.IsOrientationSweep)
+                    .OrderBy(item => item.ViewName, StringComparer.Ordinal)
+                    .ThenBy(item => item.DirectionName, StringComparer.Ordinal)
+                    .ThenBy(item => item.OrientationKind, StringComparer.Ordinal)
+                    .ThenBy(item => item.BrdfVariant, StringComparer.Ordinal))
+            {
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RAW_VERTEX_MASKS"),
+                    out var rawMasks);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RAW_DIRT_HEIGHT_NORMALY"),
+                    out var dirtHeight);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RESOLVED_MASKS_A"),
+                    out var resolvedA);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RESOLVED_MASKS_B"),
+                    out var resolvedB);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RESOLVED_MASKS_C"),
+                    out var resolvedC);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        string.Empty,
+                        "RESPONSE_SCALARS"),
+                    out var responseScalars);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        result.DirectionName,
+                        "NDOTL_ATTENUATION_STORED"),
+                    out var ndotlCase);
+                orientationCases.TryGetValue(
+                    OrientationCaseKey(
+                        result.ViewName,
+                        result.DirectionName,
+                        "MAIN_LIGHT_DIRECTION"),
+                    out var lightDirectionCase);
+
+                foreach (var triangle in result.TriangleStatistics.Values
+                    .OrderBy(item => item.TriangleIndex))
+                {
+                    Vector3 raw = OrientationTriangleRgb(
+                        rawMasks, triangle.TriangleIndex);
+                    Vector3 dirt = OrientationTriangleRgb(
+                        dirtHeight, triangle.TriangleIndex);
+                    Vector3 masksA = OrientationTriangleRgb(
+                        resolvedA, triangle.TriangleIndex);
+                    Vector3 masksB = OrientationTriangleRgb(
+                        resolvedB, triangle.TriangleIndex);
+                    Vector3 masksC = OrientationTriangleRgb(
+                        resolvedC, triangle.TriangleIndex);
+                    Vector3 scalars = OrientationTriangleRgb(
+                        responseScalars, triangle.TriangleIndex);
+                    Vector3 ndotl = OrientationTriangleRgb(
+                        ndotlCase, triangle.TriangleIndex);
+                    Vector3 gpuLight = OrientationTriangleRgb(
+                        lightDirectionCase, triangle.TriangleIndex);
+
+                    StringBuilder row = new StringBuilder(4096);
+                    row.Append(Csv(result.Name)).Append(',')
+                        .Append(Csv(result.ViewName)).Append(',')
+                        .Append(Csv(result.DirectionName)).Append(',')
+                        .Append(Csv(result.BrdfVariant)).Append(',')
+                        .Append(Csv(result.OrientationKind)).Append(',')
+                        .Append(Csv(result.OrientationStage)).Append(',')
+                        .Append(Csv(result.OrientationAblation)).Append(',')
+                        .Append(result.CausalityMode).Append(',')
+                        .Append(F(result.ForegroundAlignmentIoU)).Append(',')
+                        .Append(F(result.TriangleCoverageRatio)).Append(',')
+                        .Append(result.OrientationDirectProductPixelCount).Append(',')
+                        .Append(F(result.OrientationDirectProductMeanAbsoluteResidual)).Append(',')
+                        .Append(F(result.OrientationDirectProductNormalizedRmse)).Append(',')
+                        .Append(triangle.TriangleIndex).Append(',')
+                        .Append(triangle.SurfaceClass).Append(',')
+                        .Append(triangle.LogicalBevelId).Append(',')
+                        .Append(triangle.ParentFaceA).Append(',')
+                        .Append(triangle.ParentFaceB).Append(',')
+                        .Append(triangle.ProvenanceKind).Append(',')
+                        .Append(triangle.ProvenanceIndex).Append(',')
+                        .Append(triangle.SurfaceGroup).Append(',')
+                        .Append(triangle.PixelCount).Append(',')
+                        .Append(F(triangle.MeanLinearRgb.x)).Append(',')
+                        .Append(F(triangle.MeanLinearRgb.y)).Append(',')
+                        .Append(F(triangle.MeanLinearRgb.z)).Append(',')
+                        .Append(F(triangle.MeanLuma)).Append(',')
+                        .Append(F(triangle.MinLuma)).Append(',')
+                        .Append(F(triangle.P10Luma)).Append(',')
+                        .Append(F(triangle.MedianLuma)).Append(',')
+                        .Append(F(triangle.P90Luma)).Append(',')
+                        .Append(F(triangle.MaxLuma)).Append(',')
+                        .Append(F(triangle.StandardDeviationLuma)).Append(',')
+                        .Append(F(triangle.StoredNormalLocal.x)).Append(',')
+                        .Append(F(triangle.StoredNormalLocal.y)).Append(',')
+                        .Append(F(triangle.StoredNormalLocal.z)).Append(',')
+                        .Append(F(triangle.GeometricNormalLocal.x)).Append(',')
+                        .Append(F(triangle.GeometricNormalLocal.y)).Append(',')
+                        .Append(F(triangle.GeometricNormalLocal.z)).Append(',')
+                        .Append(F(triangle.AuthoredNormalLocal.x)).Append(',')
+                        .Append(F(triangle.AuthoredNormalLocal.y)).Append(',')
+                        .Append(F(triangle.AuthoredNormalLocal.z)).Append(',')
+                        .Append(Csv(triangle.TriangleCondition)).Append(',')
+                        .Append(F((float)triangle.TriangleAspectRatio)).Append(',')
+                        .Append(F((float)triangle.TriangleMinimumAngleDegrees)).Append(',')
+                        .Append(F(triangle.MaskA.x)).Append(',')
+                        .Append(F(triangle.MaskA.y)).Append(',')
+                        .Append(F(triangle.MaskA.z)).Append(',')
+                        .Append(F(triangle.MaskA.w)).Append(',')
+                        .Append(F(triangle.MaskB.x)).Append(',')
+                        .Append(F(triangle.MaskB.y)).Append(',')
+                        .Append(F(triangle.MaskB.z)).Append(',')
+                        .Append(F(triangle.MaskB.w)).Append(',')
+                        .Append(F(triangle.MaskC.x)).Append(',')
+                        .Append(F(triangle.MaskC.y)).Append(',')
+                        .Append(F(triangle.MaskC.z)).Append(',')
+                        .Append(F(triangle.MaskC.w)).Append(',')
+                        .Append(F(triangle.StructuralA.x)).Append(',')
+                        .Append(F(triangle.StructuralA.y)).Append(',')
+                        .Append(F(triangle.StructuralA.z)).Append(',')
+                        .Append(F(triangle.StructuralA.w)).Append(',')
+                        .Append(F(triangle.StructuralB.x)).Append(',')
+                        .Append(F(triangle.StructuralB.y)).Append(',')
+                        .Append(F(triangle.StructuralB.z)).Append(',')
+                        .Append(F(triangle.StructuralB.w)).Append(',')
+                        .Append(F(triangle.StructuralC.x)).Append(',')
+                        .Append(F(triangle.StructuralC.y)).Append(',')
+                        .Append(F(triangle.StructuralC.z)).Append(',')
+                        .Append(F(triangle.StructuralC.w)).Append(',')
+                        .Append(F(triangle.PredictedNdotL)).Append(',')
+                        .Append(F(triangle.PredictedNdotV)).Append(',')
+                        .Append(F(triangle.PredictedNdotH)).Append(',')
+                        .Append(F(raw.x)).Append(',')
+                        .Append(F(raw.y)).Append(',')
+                        .Append(F(raw.z)).Append(',')
+                        .Append(F(dirt.x)).Append(',')
+                        .Append(F(dirt.y)).Append(',')
+                        .Append(F(dirt.z)).Append(',')
+                        .Append(F(masksA.x)).Append(',')
+                        .Append(F(masksA.y)).Append(',')
+                        .Append(F(masksA.z)).Append(',')
+                        .Append(F(masksB.x)).Append(',')
+                        .Append(F(masksB.y)).Append(',')
+                        .Append(F(masksB.z)).Append(',')
+                        .Append(F(masksC.x)).Append(',')
+                        .Append(F(masksC.y)).Append(',')
+                        .Append(F(masksC.z)).Append(',')
+                        .Append(F(scalars.x)).Append(',')
+                        .Append(F(scalars.y)).Append(',')
+                        .Append(F(scalars.z)).Append(',')
+                        .Append(F(ndotl.x)).Append(',')
+                        .Append(F(ndotl.y)).Append(',')
+                        .Append(F(ndotl.z)).Append(',')
+                        .Append(F(gpuLight.x)).Append(',')
+                        .Append(F(gpuLight.y)).Append(',')
+                        .Append(F(gpuLight.z));
+                    foreach (string stage in albedoStages)
+                    {
+                        orientationCases.TryGetValue(
+                            OrientationCaseKey(
+                                result.ViewName,
+                                string.Empty,
+                                "ALBEDO_" + stage),
+                            out var albedoCase);
+                        row.Append(',').Append(F(OrientationTriangleLuma(
+                            albedoCase,
+                            triangle.TriangleIndex)));
+                    }
+                    writer.WriteLine(row.ToString());
+                }
+            }
+        }
+
+        private static string OrientationCaseKey(
+            string view,
+            string direction,
+            string variant)
+        {
+            return (view ?? string.Empty) + "\u001f" +
+                (direction ?? string.Empty) + "\u001f" +
+                (variant ?? string.Empty);
+        }
+
+        private static Vector3 OrientationTriangleRgb(
+            GeneratedMassSurfaceCausalityRenderAudit.CaseResult result,
+            int triangleIndex)
+        {
+            if (result != null && result.TriangleStatistics.TryGetValue(
+                triangleIndex,
+                out GeneratedMassSurfaceCausalityRenderAudit
+                    .TriangleLuminanceStatistics triangle))
+            {
+                return triangle.MeanLinearRgb;
+            }
+            return Vector3.zero;
+        }
+
+        private static float OrientationTriangleLuma(
+            GeneratedMassSurfaceCausalityRenderAudit.CaseResult result,
+            int triangleIndex)
+        {
+            if (result != null && result.TriangleStatistics.TryGetValue(
+                triangleIndex,
+                out GeneratedMassSurfaceCausalityRenderAudit
+                    .TriangleLuminanceStatistics triangle))
+            {
+                return triangle.MeanLuma;
+            }
+            return float.NaN;
         }
 
         private static string BuildPerTriangleCsv(
@@ -1343,7 +1756,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     int captures = Reference == null ? 1 : 2;
                     int renderCases = RenderAudit == null
-                        ? 192
+                        ? 3681
                         : RenderAudit.TotalRenderPasses;
                     return captures + 2 + Mathf.Max(1, TotalBevels) + renderCases;
                 }

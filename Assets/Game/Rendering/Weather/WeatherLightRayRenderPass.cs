@@ -75,6 +75,15 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             public ShaderParameters Parameters;
             public int BeamCount;
             public int ZoneIndex;
+            public int GroupIndex;
+        }
+
+        private struct PresentationGroup
+        {
+            public ShaderParameters Parameters;
+            public Vector4 SofteningDirection;
+            public int DrawCount;
+            public bool HasScreenSpaceSurfaceResponse;
         }
 
         private sealed class MaskPassData
@@ -84,6 +93,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             public int DrawCount;
             public GraphicsBuffer BeamBuffer;
             public GraphicsBuffer ZoneBuffer;
+            public int GroupIndex;
         }
 
         private sealed class SofteningPassData
@@ -124,8 +134,6 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         private readonly Material compositeMaterial;
         private WeatherLightRaySnapshot[] snapshots;
         private int snapshotCount;
-        private WeatherLightRaySnapshot snapshot;
-        private WeatherLightRaySourceState sourceState;
         private WeatherLightRayRenderDebugView debugView;
         private Camera renderCamera;
         private bool hasSetup;
@@ -135,6 +143,9 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         private BeamRecord[] beamRecords = Array.Empty<BeamRecord>();
         private ZoneRecord[] zoneRecords = Array.Empty<ZoneRecord>();
         private ZoneDraw[] zoneDraws = Array.Empty<ZoneDraw>();
+        private PresentationGroup[] presentationGroups =
+            Array.Empty<PresentationGroup>();
+        private int presentationGroupCount;
         private float[] temporaryWidths = Array.Empty<float>();
         private float[] temporaryOverlaps = Array.Empty<float>();
         private float[] temporaryIntensities = Array.Empty<float>();
@@ -153,6 +164,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         public static int LastZoneBufferCapacity { get; private set; }
         public static int LastEndpointUploadCount { get; private set; }
         public static int LastZoneUploadCount { get; private set; }
+        public static int LastPresentationGroupCount { get; private set; }
 
         public WeatherLightRayRenderPass(
             Material maskMaterial,
@@ -168,13 +180,11 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         public void Setup(
             WeatherLightRaySnapshot[] snapshots,
             int snapshotCount,
-            WeatherLightRaySourceState sourceState,
             WeatherLightRayRenderDebugView debugView,
             Camera renderCamera)
         {
             this.snapshots = snapshots;
             this.snapshotCount = Mathf.Max(0, snapshotCount);
-            this.sourceState = sourceState;
             this.debugView = debugView;
             this.renderCamera = renderCamera;
             hasSetup = snapshots != null && snapshotCount > 0;
@@ -193,12 +203,6 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 return;
             }
 
-            int drawCount = PrepareZoneData();
-            if (drawCount <= 0 || beamBuffer == null || zoneBuffer == null)
-            {
-                return;
-            }
-
             UniversalResourceData resourceData =
                 frameData.Get<UniversalResourceData>();
             UniversalCameraData cameraData =
@@ -208,24 +212,21 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 return;
             }
 
-            TextureHandle sourceColour = resourceData.activeColorTexture;
-            TextureHandle depthTexture = resourceData.cameraDepthTexture;
             RenderTextureDescriptor cameraDescriptor =
                 cameraData.cameraTargetDescriptor;
-            ShaderParameters parameters = zoneDraws[0].Parameters;
-            float representativeBeamWidth =
-                WeatherLightRayAreaLayout.Calculate(
-                    snapshot.Descriptor.AreaDiameterMetres,
-                    snapshot.Descriptor.BeamSpacingMetres)
-                    .AverageAtmosphericBeamWidthMetres;
-            Vector4 softeningDirection = BuildSofteningDirection(
-                parameters.GroundContactAxisWorld,
-                representativeBeamWidth,
+            int drawCount = PrepareZoneData(
                 cameraDescriptor.width,
-                cameraDescriptor.height,
-                out float softeningRadiusPixels);
-            parameters.SofteningParameters.y = softeningRadiusPixels;
+                cameraDescriptor.height);
+            if (drawCount <= 0 ||
+                presentationGroupCount <= 0 ||
+                beamBuffer == null ||
+                zoneBuffer == null)
+            {
+                return;
+            }
 
+            TextureHandle currentColour = resourceData.activeColorTexture;
+            TextureHandle depthTexture = resourceData.cameraDepthTexture;
             RenderTextureDescriptor atmosphereDescriptor =
                 cameraDescriptor;
             atmosphereDescriptor.depthBufferBits = 0;
@@ -233,50 +234,60 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             atmosphereDescriptor.graphicsFormat = GraphicsFormat.R16_SFloat;
             atmosphereDescriptor.sRGB = false;
 
-            TextureHandle maskTexture =
-                UniversalRenderer.CreateRenderGraphTexture(
-                    renderGraph,
-                    atmosphereDescriptor,
-                    "_WeatherLightRayMaskTexture",
-                    true);
-            TextureHandle softenedTexture =
-                UniversalRenderer.CreateRenderGraphTexture(
-                    renderGraph,
-                    atmosphereDescriptor,
-                    "_WeatherLightRaySoftenedTexture",
-                    true);
             RenderTextureDescriptor destinationDescriptor = cameraDescriptor;
             destinationDescriptor.depthBufferBits = 0;
             destinationDescriptor.msaaSamples = 1;
-            TextureHandle destination =
-                UniversalRenderer.CreateRenderGraphTexture(
+
+            for (int groupIndex = 0;
+                groupIndex < presentationGroupCount;
+                groupIndex++)
+            {
+                PresentationGroup group = presentationGroups[groupIndex];
+                TextureHandle maskTexture =
+                    UniversalRenderer.CreateRenderGraphTexture(
+                        renderGraph,
+                        atmosphereDescriptor,
+                        "_WeatherLightRayMaskTexture",
+                        true);
+                TextureHandle softenedTexture =
+                    UniversalRenderer.CreateRenderGraphTexture(
+                        renderGraph,
+                        atmosphereDescriptor,
+                        "_WeatherLightRaySoftenedTexture",
+                        true);
+                TextureHandle destination =
+                    UniversalRenderer.CreateRenderGraphTexture(
+                        renderGraph,
+                        destinationDescriptor,
+                        "_WeatherLightRayCameraColor",
+                        false);
+
+                RecordMaskPass(
                     renderGraph,
-                    destinationDescriptor,
-                    "_WeatherLightRayCameraColor",
-                    false);
+                    currentColour,
+                    depthTexture,
+                    maskTexture,
+                    drawCount,
+                    groupIndex);
+                RecordSofteningPass(
+                    renderGraph,
+                    maskTexture,
+                    softenedTexture,
+                    group.SofteningDirection,
+                    group.Parameters.SofteningParameters);
+                RecordCompositePass(
+                    renderGraph,
+                    currentColour,
+                    depthTexture,
+                    maskTexture,
+                    softenedTexture,
+                    destination,
+                    group.Parameters,
+                    group.SofteningDirection);
+                currentColour = destination;
+            }
 
-            RecordMaskPass(
-                renderGraph,
-                depthTexture,
-                maskTexture,
-                drawCount);
-            RecordSofteningPass(
-                renderGraph,
-                maskTexture,
-                softenedTexture,
-                softeningDirection,
-                parameters.SofteningParameters);
-            RecordCompositePass(
-                renderGraph,
-                sourceColour,
-                depthTexture,
-                maskTexture,
-                softenedTexture,
-                destination,
-                parameters,
-                softeningDirection);
-
-            resourceData.cameraColor = destination;
+            resourceData.cameraColor = currentColour;
         }
 
         public void Dispose()
@@ -286,9 +297,11 @@ namespace ProgrammaticStylized3D.Weather.Rendering
 
         private void RecordMaskPass(
             RenderGraph renderGraph,
+            TextureHandle sequenceDependency,
             TextureHandle depthTexture,
             TextureHandle maskTexture,
-            int drawCount)
+            int drawCount,
+            int groupIndex)
         {
             using (var builder =
                 renderGraph.AddRasterRenderPass<MaskPassData>(
@@ -300,7 +313,14 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 passData.DrawCount = drawCount;
                 passData.BeamBuffer = beamBuffer;
                 passData.ZoneBuffer = zoneBuffer;
+                passData.GroupIndex = groupIndex;
 
+                // Each group reuses the same global mask/softened shader IDs.
+                // Reading the previous camera-colour result deliberately chains
+                // the next group's mask after the previous group's composite,
+                // preventing RenderGraph from reordering a later group's global
+                // texture publication ahead of an earlier composite.
+                builder.UseTexture(sequenceDependency, AccessFlags.Read);
                 builder.UseTexture(depthTexture, AccessFlags.Read);
                 builder.SetRenderAttachment(maskTexture, 0, AccessFlags.Write);
                 builder.SetGlobalTextureAfterPass(maskTexture, MaskTextureId);
@@ -316,6 +336,10 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                             drawIndex++)
                         {
                             ZoneDraw draw = data.Draws[drawIndex];
+                            if (draw.GroupIndex != data.GroupIndex)
+                            {
+                                continue;
+                            }
                             ApplyShaderParameters(context.cmd, draw.Parameters);
                             context.cmd.SetGlobalInt(ZoneIndexId, draw.ZoneIndex);
                             context.cmd.DrawProcedural(
@@ -448,44 +472,26 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             }
         }
 
-        private ShaderParameters BuildShaderParameters()
+        private ShaderParameters BuildShaderParameters(
+            in WeatherLightRaySnapshot raySnapshot)
         {
-            WeatherLightRayDescriptor descriptor = snapshot.Descriptor;
-            Vector3 rayDirection = snapshot.RayDirectionWorld.sqrMagnitude >
+            WeatherLightRayDescriptor descriptor = raySnapshot.Descriptor;
+            Vector3 rayDirection = raySnapshot.RayDirectionWorld.sqrMagnitude >
                 0.000001f
-                    ? snapshot.RayDirectionWorld.normalized
+                    ? raySnapshot.RayDirectionWorld.normalized
                     : Vector3.down;
             Vector3 contactAxis = BuildGroundContactAxis();
-            float sourceIntensity = sourceState.SourceLight != null
-                ? sourceState.Intensity
-                : 1f;
-            Color sourceColour = sourceState.SourceLight != null
-                ? sourceState.Colour
-                : Color.white;
-            if (descriptor.SourceKind == WeatherLightRaySourceKind.Sun)
-            {
-                Color warmSunColour = new Color(
-                    1f,
-                    0.76f,
-                    0.46f,
-                    1f);
-                sourceColour = Color.Lerp(
-                    sourceColour,
-                    warmSunColour,
-                    descriptor.WarmthContribution);
-            }
-
-            Color rayColour = sourceColour *
-                sourceIntensity *
+            Color rayColour = raySnapshot.ResolvedSourceColour *
+                raySnapshot.ResolvedSourceIntensity *
                 descriptor.ColourMultiplier;
             // AI4A frozen endpoint interpolation is supplied by the persistent beam
             // and zone buffers.
             return new ShaderParameters
             {
                 BaseCentreHeight = new Vector4(
-                    snapshot.BaseCentreWorld.x,
-                    snapshot.BaseCentreWorld.y,
-                    snapshot.BaseCentreWorld.z,
+                    raySnapshot.BaseCentreWorld.x,
+                    raySnapshot.BaseCentreWorld.y,
+                    raySnapshot.BaseCentreWorld.z,
                     descriptor.Height),
                 RayDirectionAreaDiameter = new Vector4(
                     rayDirection.x,
@@ -499,7 +505,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                     0f),
                 Colour = rayColour,
                 Intensity = new Vector4(
-                    snapshot.CurrentIntensity *
+                    raySnapshot.CurrentIntensity *
                         descriptor.AtmosphericIntensity,
                     1f,
                     descriptor.CameraIntersectionFade,
@@ -527,7 +533,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 SurfaceParameters0 = new Vector4(
                     descriptor.ScreenSpaceSurfaceIntensity,
                     descriptor.FootprintEdgeSoftness,
-                    snapshot.CurrentIntensity,
+                    raySnapshot.CurrentIntensity,
                     0f),
                 SurfaceParameters1 = new Vector4(
                     descriptor.FootprintRadiusMetres,
@@ -535,6 +541,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                     descriptor.BeamPitchMetres,
                     0f),
                 SurfaceScreenBounds = BuildSurfaceScreenBounds(
+                    raySnapshot,
                     rayDirection,
                     contactAxis,
                     descriptor),
@@ -549,6 +556,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         }
 
         private Vector4 BuildSofteningDirection(
+            in WeatherLightRaySnapshot raySnapshot,
             Vector4 contactAxisWorld,
             float representativeBeamWidthMetres,
             int fullWidth,
@@ -562,9 +570,9 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 contactAxisWorld.y,
                 contactAxisWorld.z);
             Vector3 baseViewport = renderCamera.WorldToViewportPoint(
-                snapshot.BaseCentreWorld);
+                raySnapshot.BaseCentreWorld);
             Vector3 unitViewport = renderCamera.WorldToViewportPoint(
-                snapshot.BaseCentreWorld + contactAxis);
+                raySnapshot.BaseCentreWorld + contactAxis);
             Vector2 deltaViewport = new Vector2(
                 unitViewport.x - baseViewport.x,
                 unitViewport.y - baseViewport.y);
@@ -586,7 +594,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                     deltaViewport.x * width,
                     deltaViewport.y * height).magnitude *
                 Mathf.Max(0.001f, representativeBeamWidthMetres));
-            float strength = snapshot.Descriptor.SofteningStrength;
+            float strength = raySnapshot.Descriptor.SofteningStrength;
             softeningRadiusPixels = Mathf.Clamp(
                 projectedBeamWidthPixels * Mathf.Lerp(
                     0.06f,
@@ -602,6 +610,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
         }
 
         private Vector4 BuildSurfaceScreenBounds(
+            in WeatherLightRaySnapshot raySnapshot,
             Vector3 rayDirection,
             Vector3 contactAxis,
             WeatherLightRayDescriptor descriptor)
@@ -612,7 +621,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             }
 
             Vector3 upwardAxis = -rayDirection;
-            Vector3 baseCentre = snapshot.BaseCentreWorld;
+            Vector3 baseCentre = raySnapshot.BaseCentreWorld;
             Vector3 topCentre = baseCentre +
                 upwardAxis * descriptor.Height;
             float bundleExtent = descriptor.FootprintRadiusMetres;
@@ -717,18 +726,17 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             return true;
         }
 
-        private int PrepareZoneData()
+        private int PrepareZoneData(int renderWidth, int renderHeight)
         {
             int bufferedZoneCount = 0;
             int visibleZoneCount = 0;
             int totalBeamCount = 0;
-            WeatherLightRaySourceKind sourceKind = sourceState.Kind;
+            presentationGroupCount = 0;
             GeometryUtility.CalculateFrustumPlanes(renderCamera, frustumPlanes);
             for (int index = 0; index < snapshotCount; index++)
             {
                 WeatherLightRaySnapshot candidate = snapshots[index];
-                if (candidate.CurrentIntensity <= 0.0001f ||
-                    candidate.SourceKind != sourceKind)
+                if (candidate.CurrentIntensity <= 0.0001f)
                 {
                     continue;
                 }
@@ -750,6 +758,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 LastVisibleZoneCount = 0;
                 LastBufferedZoneCount = bufferedZoneCount;
                 LastTotalBeamCount = totalBeamCount;
+                LastPresentationGroupCount = 0;
                 return 0;
             }
 
@@ -760,12 +769,10 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             int beamOffset = 0;
             int zoneIndex = 0;
             int drawIndex = 0;
-            WeatherLightRaySnapshot firstVisibleSnapshot = default;
             for (int index = 0; index < snapshotCount; index++)
             {
                 WeatherLightRaySnapshot candidate = snapshots[index];
-                if (candidate.CurrentIntensity <= 0.0001f ||
-                    candidate.SourceKind != sourceKind)
+                if (candidate.CurrentIntensity <= 0.0001f)
                 {
                     continue;
                 }
@@ -798,16 +805,32 @@ namespace ProgrammaticStylized3D.Weather.Rendering
 
                 if (IsPotentiallyVisible(candidate))
                 {
-                    snapshot = candidate;
-                    if (drawIndex == 0)
-                    {
-                        firstVisibleSnapshot = candidate;
-                    }
+                    ShaderParameters parameters = BuildShaderParameters(candidate);
+                    float representativeBeamWidth =
+                        WeatherLightRayAreaLayout.Calculate(
+                            candidate.Descriptor.AreaDiameterMetres,
+                            candidate.Descriptor.BeamSpacingMetres)
+                            .AverageAtmosphericBeamWidthMetres;
+                    Vector4 softeningDirection = BuildSofteningDirection(
+                        candidate,
+                        parameters.GroundContactAxisWorld,
+                        representativeBeamWidth,
+                        renderWidth,
+                        renderHeight,
+                        out float softeningRadiusPixels);
+                    parameters.SofteningParameters.y = softeningRadiusPixels;
+                    int groupIndex = ResolvePresentationGroup(
+                        parameters,
+                        softeningDirection);
+                    PresentationGroup group = presentationGroups[groupIndex];
+                    group.DrawCount++;
+                    presentationGroups[groupIndex] = group;
                     zoneDraws[drawIndex] = new ZoneDraw
                     {
-                        Parameters = BuildShaderParameters(),
+                        Parameters = parameters,
                         BeamCount = beamCount,
-                        ZoneIndex = zoneIndex
+                        ZoneIndex = zoneIndex,
+                        GroupIndex = groupIndex
                     };
                     drawIndex++;
                 }
@@ -822,8 +845,7 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 for (int index = 0; index < snapshotCount; index++)
                 {
                     WeatherLightRaySnapshot candidate = snapshots[index];
-                    if (candidate.CurrentIntensity <= 0.0001f ||
-                        candidate.SourceKind != sourceKind)
+                    if (candidate.CurrentIntensity <= 0.0001f)
                     {
                         continue;
                     }
@@ -849,8 +871,97 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             LastZoneBufferCapacity = zoneCapacity;
             LastEndpointUploadCount = endpointUploadCount;
             LastZoneUploadCount = zoneUploadCount;
-            snapshot = firstVisibleSnapshot;
+            LastPresentationGroupCount = presentationGroupCount;
             return drawIndex;
+        }
+
+        private int ResolvePresentationGroup(
+            ShaderParameters parameters,
+            Vector4 softeningDirection)
+        {
+            bool hasScreenSpaceSurfaceResponse =
+                parameters.SurfaceParameters0.x > 0.0001f;
+
+            // Debug views intentionally retain one combined diagnostic group.
+            if (debugView != WeatherLightRayRenderDebugView.FinalComposite)
+            {
+                if (presentationGroupCount == 0)
+                {
+                    presentationGroups[0] = new PresentationGroup
+                    {
+                        Parameters = parameters,
+                        SofteningDirection = softeningDirection,
+                        DrawCount = 0,
+                        HasScreenSpaceSurfaceResponse =
+                            hasScreenSpaceSurfaceResponse
+                    };
+                    presentationGroupCount = 1;
+                }
+                return 0;
+            }
+
+            if (!hasScreenSpaceSurfaceResponse)
+            {
+                for (int groupIndex = 0;
+                    groupIndex < presentationGroupCount;
+                    groupIndex++)
+                {
+                    PresentationGroup group =
+                        presentationGroups[groupIndex];
+                    if (!group.HasScreenSpaceSurfaceResponse &&
+                        PresentationGroupMatches(
+                            group,
+                            parameters,
+                            softeningDirection))
+                    {
+                        return groupIndex;
+                    }
+                }
+            }
+
+            int newGroupIndex = presentationGroupCount++;
+            presentationGroups[newGroupIndex] = new PresentationGroup
+            {
+                Parameters = parameters,
+                SofteningDirection = softeningDirection,
+                DrawCount = 0,
+                HasScreenSpaceSurfaceResponse =
+                    hasScreenSpaceSurfaceResponse
+            };
+            return newGroupIndex;
+        }
+
+        private static bool PresentationGroupMatches(
+            PresentationGroup group,
+            ShaderParameters parameters,
+            Vector4 softeningDirection)
+        {
+            const float tolerance = 0.0001f;
+            return Approximately(
+                    group.Parameters.Colour,
+                    parameters.Colour,
+                    tolerance) &&
+                Mathf.Abs(
+                    group.Parameters.SofteningParameters.x -
+                    parameters.SofteningParameters.x) <= tolerance &&
+                Mathf.Abs(
+                    group.Parameters.SofteningParameters.y -
+                    parameters.SofteningParameters.y) <= tolerance &&
+                Approximately(
+                    group.SofteningDirection,
+                    softeningDirection,
+                    tolerance);
+        }
+
+        private static bool Approximately(
+            Vector4 a,
+            Vector4 b,
+            float tolerance)
+        {
+            return Mathf.Abs(a.x - b.x) <= tolerance &&
+                Mathf.Abs(a.y - b.y) <= tolerance &&
+                Mathf.Abs(a.z - b.z) <= tolerance &&
+                Mathf.Abs(a.w - b.w) <= tolerance;
         }
 
         private bool IsPotentiallyVisible(
@@ -1208,6 +1319,13 @@ namespace ProgrammaticStylized3D.Weather.Rendering
                 int capacity = NextPowerOfTwo(zones);
                 Array.Resize(ref zoneRecords, capacity);
                 Array.Resize(ref zoneDraws, capacity);
+                Array.Resize(ref presentationGroups, capacity);
+            }
+            else if (presentationGroups.Length < zones)
+            {
+                Array.Resize(
+                    ref presentationGroups,
+                    NextPowerOfTwo(zones));
             }
         }
 
@@ -1264,6 +1382,8 @@ namespace ProgrammaticStylized3D.Weather.Rendering
             LastZoneBufferCapacity = 0;
             LastEndpointUploadCount = 0;
             LastZoneUploadCount = 0;
+            LastPresentationGroupCount = 0;
+            presentationGroupCount = 0;
         }
     }
 }

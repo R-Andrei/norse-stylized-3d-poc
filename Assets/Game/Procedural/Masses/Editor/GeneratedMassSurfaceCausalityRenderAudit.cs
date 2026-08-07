@@ -68,6 +68,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private const float MaximumLambertConfiguredNormalizedRmse = 0.01f;
         private const float LambertNormalMinimumLength = 0.5f;
         private const float LambertPositiveResponseThreshold = 0.001f;
+        private const float OrientationMinimumNdotLSeparation = 0.08f;
+        private const float OrientationIntermediateNdotLTolerance = 0.025f;
+        private const float OrientationOrderingLumaTolerance = 0.0005f;
+        private const float OrientationCorrelationEpsilon = 0.000001f;
+
+        private static readonly OrientationStageDefinition[] OrientationStages =
+        {
+            new OrientationStageDefinition("BASE", 20, 40),
+            new OrientationStageDefinition("TONAL", 21, 41),
+            new OrientationStageDefinition("EXPOSURE_SCALE", 22, 42),
+            new OrientationStageDefinition("MOTTLE", 23, 43),
+            new OrientationStageDefinition("EXPOSURE_TINT", 25, 44),
+            new OrientationStageDefinition("CREVICE", 26, 45),
+            new OrientationStageDefinition("BASE_LAYER", 27, 46),
+            new OrientationStageDefinition("DIRT", 28, 47),
+            new OrientationStageDefinition("WET_DAMP", 24, 48),
+            new OrientationStageDefinition("FROST", 29, 49),
+            new OrientationStageDefinition("WET_GLOBAL", 30, 50),
+            new OrientationStageDefinition("FINAL_PRELIGHT", 31, 51),
+            new OrientationStageDefinition("FINAL_WITH_OVERALL_TINT", 1, 54)
+        };
+
+        private static readonly string[] OrientationAblations =
+        {
+            "TONAL",
+            "EXPOSURE",
+            "MOTTLE",
+            "CREVICE",
+            "BASE",
+            "DIRT",
+            "WET",
+            "FROST",
+            "MONOLITHIC",
+            "OVERALL_TINT",
+            "SPECULAR_ZERO",
+            "ALL_PRELIGHT_VALUE"
+        };
 
         private static readonly BrdfDirectionDefinition[] BaseBrdfDirections =
         {
@@ -218,9 +255,29 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal int LogicalBevelId;
             internal int ParentFaceA = -1;
             internal int ParentFaceB = -1;
+            internal int ProvenanceKind;
+            internal int ProvenanceIndex = -1;
+            internal int SurfaceGroup = -1;
+            internal Vector3 GeometricNormalLocal;
+            internal Vector3 AuthoredNormalLocal;
+            internal Vector4 MaskA;
+            internal Vector4 MaskB;
+            internal Vector4 MaskC;
+            internal Vector4 StructuralA;
+            internal Vector4 StructuralB;
+            internal Vector4 StructuralC;
+            internal string TriangleCondition = string.Empty;
+            internal double TriangleAspectRatio;
+            internal double TriangleMinimumAngleDegrees;
             internal int PixelCount;
             internal Vector3 MeanLinearRgb;
             internal float MeanLuma;
+            internal float MinLuma;
+            internal float P10Luma;
+            internal float MedianLuma;
+            internal float P90Luma;
+            internal float MaxLuma;
+            internal float StandardDeviationLuma;
             internal Vector3 StoredNormalLocal;
             internal float PredictedNdotL;
             internal float PredictedNdotV;
@@ -298,6 +355,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal bool CountsTowardDecisionTotal = true;
             internal bool IsLambertPreflight;
             internal bool IsLambertNormalCapture;
+            internal bool IsOrientationSweep;
+            internal string OrientationKind = string.Empty;
+            internal string OrientationStage = string.Empty;
+            internal string OrientationAblation = string.Empty;
+            internal int OrientationDirectProductPixelCount;
+            internal float OrientationDirectProductMeanAbsoluteResidual;
+            internal float OrientationDirectProductNormalizedRmse;
             internal bool TriangleIdentityContractValid;
             internal bool IdentityFlipRelativeToLighting;
             internal float ForegroundAlignmentIoU;
@@ -453,6 +517,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal float IndirectDielectricMeanAbsoluteResidual;
             internal float ActualSceneCurrentMeanAbsoluteResidual;
             internal float ActualSceneDielectricMeanAbsoluteResidual;
+            internal bool OrientationCaptureAvailable;
+            internal int ExpectedOrientationCases;
+            internal int CompletedOrientationCases;
+            internal string OrientationFirstDivergentStage = "none";
+            internal int OrientationFirstDivergentStageCount;
+            internal string OrientationDominantAblation = "none";
+            internal float OrientationDominantAblationReduction;
+            internal int OrientationLegacySourcePairInversions;
+            internal int OrientationHlslSourcePairInversions;
+            internal int OrientationLegacyConditionalBevelViolations;
+            internal int OrientationHlslConditionalBevelViolations;
+            internal readonly List<OrientationStageSummary> OrientationStages = new();
+            internal readonly List<OrientationAblationSummary> OrientationAblations = new();
             internal string CompletenessFailure = string.Empty;
             internal readonly List<BrdfDirectionSummary> BrdfDirections = new();
             internal readonly List<CaseResult> RankedContributors = new();
@@ -465,6 +542,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private readonly Dictionary<string, Color32[]> masks = new();
         private readonly Dictionary<string, Color32[]> triangleIdentityPixels =
             new();
+        private sealed class OrientationPixelCapture
+        {
+            internal Color[] Pixels = Array.Empty<Color>();
+            internal bool IdentityFlipRelativeToLighting;
+            internal int LightingForegroundPixels;
+        }
+
+        private readonly Dictionary<string, OrientationPixelCapture> orientationAlbedoPixels =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<string, OrientationPixelCapture> orientationNdotLPixels =
+            new(StringComparer.Ordinal);
         private Color[] lambertStoredNormalPixels = Array.Empty<Color>();
         private bool lambertStoredNormalIdentityFlipRelativeToLighting;
         private readonly Material legacyMaterial;
@@ -496,6 +584,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private bool stageBQueued;
         private bool stageCQueued;
         private bool stageDQueued;
+        private bool stageEQueued;
         private readonly List<string> stageBDirections = new();
         private readonly List<string> stageCDirections = new();
         private bool disposed;
@@ -615,12 +704,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             item.IsTriangleIdentity);
         internal int AuxiliaryValidationCases => results.Count(item =>
             item.IsTriangleIdentity || item.IsLambertNormalCapture);
+        internal int OrientationViewCount => AlternateViews.Length + 1;
+        internal int OrientationStaticCasesPerView =>
+            OrientationStages.Length + 6 + 3;
+        internal int OrientationDirectionalCasesPerDirection =>
+            OrientationStages.Length + 2 + 3 + OrientationAblations.Length * 2;
+        internal int OrientationCaseCount => legacyMaterial == null
+            ? 0
+            : OrientationViewCount *
+                (OrientationStaticCasesPerView +
+                 brdfDirections.Length * OrientationDirectionalCasesPerDirection);
         internal int TotalCases => legacyMaterial == null
             ? 1
             : 1 + brdfDirections.Length * 6 +
                 StageBDirectionCount * 5 +
                 StageCDirectionCount * AlternateViews.Length * 5 +
-                6;
+                6 +
+                OrientationCaseCount;
         internal int TotalRenderPasses =>
             TotalCases + AlternateViews.Length + 2;
         internal bool IsComplete =>
@@ -628,6 +728,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             stageBQueued &&
             stageCQueued &&
             stageDQueued &&
+            stageEQueued &&
             nextCase >= cases.Count &&
             !waitingForReadback;
         internal string ProgressText => waitingForReadback
@@ -643,7 +744,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             ? "Selecting two worst Stage B directions"
                             : !stageDQueued
                                 ? "Queueing indirect and actual-scene closure"
-                                : "Finalizing complete lighting ownership matrix";
+                                : !stageEQueued
+                                    ? "Queueing exhaustive surface-orientation stage attribution"
+                                    : "Finalizing complete lighting and orientation-causality matrix";
 
         internal bool Advance()
         {
@@ -667,6 +770,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 stageBQueued = true;
                 stageCQueued = true;
                 stageDQueued = true;
+                stageEQueued = true;
                 nextCase = cases.Count;
                 if (summary == null)
                 {
@@ -699,6 +803,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     stageDQueued = true;
                     QueueStageDCases();
+                    return false;
+                }
+                if (!stageEQueued)
+                {
+                    stageEQueued = true;
+                    QueueStageECases();
                     return false;
                 }
                 summary = BuildSummary();
@@ -774,6 +884,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     : StageCDirectionCount * AlternateViews.Length * 5));
             lines.Add("stageDCaseCount=" +
                 (legacyMaterial == null ? 0 : 6));
+            lines.Add("stageEOrientationCaseCount=" + OrientationCaseCount);
+            lines.Add("orientationViewCount=" + OrientationViewCount);
+            lines.Add("orientationStaticCasesPerView=" +
+                OrientationStaticCasesPerView);
+            lines.Add("orientationDirectionalCasesPerDirection=" +
+                OrientationDirectionalCasesPerDirection);
             lines.Add("decisionCaseCount=" + TotalCases);
             lines.Add("lambertStoredNormalCaptureCaseCount=" +
                 (legacyMaterial == null ? 0 : 1));
@@ -1325,6 +1441,369 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 DielectricF0,
                 indirectOnly: false));
         }
+        private void QueueStageECases()
+        {
+            if (legacyMaterial == null)
+            {
+                fatalIdentityContractFailure = true;
+                fatalContractReason = "ORIENTATION_LEGACY_CONTROL_MISSING";
+                return;
+            }
+
+            foreach (ViewDefinition view in EnumerateOrientationViews())
+            {
+                AddOrientationStaticCase(
+                    view,
+                    "TRIANGLE_NORMAL",
+                    5,
+                    "StaticNormal");
+                AddOrientationStaticCase(
+                    view,
+                    "CURRENT_RESOLVED_NORMAL",
+                    6,
+                    "StaticNormal");
+                AddOrientationStaticCase(
+                    view,
+                    "STORED_NORMAL",
+                    14,
+                    "StaticNormal");
+
+                foreach (OrientationStageDefinition stage in OrientationStages)
+                {
+                    AddOrientationStaticCase(
+                        view,
+                        "ALBEDO_" + stage.Name,
+                        stage.AlbedoMode,
+                        "StaticAlbedo",
+                        stage.Name);
+                }
+
+                AddOrientationStaticCase(view, "RAW_VERTEX_MASKS", 32, "StaticMask");
+                AddOrientationStaticCase(view, "RAW_DIRT_HEIGHT_NORMALY", 33, "StaticMask");
+                AddOrientationStaticCase(view, "RESOLVED_MASKS_A", 34, "StaticMask");
+                AddOrientationStaticCase(view, "RESOLVED_MASKS_B", 35, "StaticMask");
+                AddOrientationStaticCase(view, "RESOLVED_MASKS_C", 36, "StaticMask");
+                AddOrientationStaticCase(view, "RESPONSE_SCALARS", 37, "StaticMask");
+
+                foreach (BrdfDirectionDefinition direction in brdfDirections)
+                {
+                    // Queue NdotL before cumulative direct stages so 5Q can
+                    // validate direct == capturedAlbedo * capturedNdotL *
+                    // captured attenuation pixel-by-pixel without retaining
+                    // every direct render in memory.
+                    cases.Add(CreateOrientationHlslCase(
+                        view,
+                        direction,
+                        "NDOTL_ATTENUATION_STORED",
+                        55,
+                        "NdotL",
+                        "NDOTL_ATTENUATION",
+                        storedNormals: true));
+
+                    foreach (OrientationStageDefinition stage in OrientationStages)
+                    {
+                        RenderCase directStage = CreateOrientationHlslCase(
+                            view,
+                            direction,
+                            "DIRECT_" + stage.Name,
+                            stage.DirectMode,
+                            "DirectStage",
+                            stage.Name,
+                            storedNormals: true);
+                        cases.Add(directStage);
+                    }
+
+                    cases.Add(CreateOrientationHlslCase(
+                        view,
+                        direction,
+                        "MAIN_LIGHT_DIRECTION",
+                        56,
+                        "LightVector",
+                        "MAIN_LIGHT_DIRECTION",
+                        storedNormals: true));
+
+                    cases.Add(CreateOrientationLegacyCase(
+                        view,
+                        direction,
+                        "PBR_LEGACY_ACTUAL"));
+                    cases.Add(CreateOrientationHlslCase(
+                        view,
+                        direction,
+                        "PBR_HLSL_PRODUCTION",
+                        0,
+                        "PBRReference",
+                        "PRODUCTION",
+                        storedNormals: false));
+                    cases.Add(CreateOrientationHlslCase(
+                        view,
+                        direction,
+                        "PBR_HLSL_STORED",
+                        0,
+                        "PBRReference",
+                        "STORED",
+                        storedNormals: true));
+
+                    foreach (string ablation in OrientationAblations)
+                    {
+                        RenderCase directAblation = CreateOrientationHlslCase(
+                            view,
+                            direction,
+                            "DIRECT_ABLATE_" + ablation,
+                            54,
+                            "AblationDirect",
+                            "FINAL_WITH_OVERALL_TINT",
+                            storedNormals: true);
+                        directAblation.OrientationAblation = ablation;
+                        ApplyOrientationAblation(directAblation, ablation);
+                        cases.Add(directAblation);
+
+                        RenderCase pbrAblation = CreateOrientationHlslCase(
+                            view,
+                            direction,
+                            "PBR_ABLATE_" + ablation,
+                            0,
+                            "AblationPBR",
+                            "PBR",
+                            storedNormals: true);
+                        pbrAblation.OrientationAblation = ablation;
+                        ApplyOrientationAblation(pbrAblation, ablation);
+                        cases.Add(pbrAblation);
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<ViewDefinition> EnumerateOrientationViews()
+        {
+            yield return new ViewDefinition("CURRENT", 0f);
+            foreach (ViewDefinition view in AlternateViews)
+            {
+                yield return view;
+            }
+        }
+
+        private void AddOrientationStaticCase(
+            ViewDefinition view,
+            string variant,
+            int mode,
+            string kind,
+            string stage = "")
+        {
+            RenderCase renderCase = new RenderCase
+            {
+                Name = "STAGEE__STATIC__" + view.Name + "__" + variant,
+                MeshSubject = suspect,
+                PropertySubject = suspect,
+                SourceMaterial = suspect.Material,
+                MaterialRole = "HlslOrientationStatic",
+                Family = "StageE",
+                DisableShadows = true,
+                DisableAdditionalLights = true,
+                DisablePost = true,
+                DisableLightProbes = true,
+                DisableReflectionProbes = true,
+                DisableAmbientEnvironment = true,
+                DisableReflectionEnvironment = true,
+                DisableLightCookies = true,
+                DisableAllLights = true,
+                DisableFog = true,
+                CausalityMode = mode,
+                IsOrientationSweep = true,
+                OrientationKind = kind,
+                OrientationStage = stage,
+                BrdfVariant = variant,
+                ViewName = view.Name,
+                CameraAzimuthDegrees = view.AzimuthDegrees
+            };
+            cases.Add(renderCase);
+        }
+
+        private RenderCase CreateOrientationHlslCase(
+            ViewDefinition view,
+            BrdfDirectionDefinition direction,
+            string variant,
+            int mode,
+            string kind,
+            string stage,
+            bool storedNormals)
+        {
+            RenderCase renderCase = new RenderCase
+            {
+                Name = "STAGEE__" + direction.Name + "__" +
+                    view.Name + "__" + variant,
+                MeshSubject = suspect,
+                PropertySubject = suspect,
+                SourceMaterial = suspect.Material,
+                MaterialRole = "HlslOrientation",
+                Family = "StageE",
+                DisableShadows = true,
+                DisableAdditionalLights = true,
+                DisablePost = true,
+                DisableLightProbes = true,
+                DisableReflectionProbes = true,
+                DisableAmbientEnvironment = true,
+                DisableReflectionEnvironment = true,
+                DisableLightCookies = true,
+                DisableFog = true,
+                UseControlledMainLight = true,
+                MainLightDirectionLocal = direction.LocalDirection,
+                MainLightIntensity = 1f,
+                CausalityMode = mode,
+                IsOrientationSweep = true,
+                OrientationKind = kind,
+                OrientationStage = stage,
+                DirectionName = direction.Name,
+                BrdfVariant = variant,
+                ViewName = view.Name,
+                CameraAzimuthDegrees = view.AzimuthDegrees,
+                LightDirectionLocal = direction.LocalDirection
+            };
+            renderCase.FloatOverrides["_SpecularStrength"] = DielectricF0;
+            renderCase.FloatOverrides["_SpecularHighlights"] = 1f;
+            if (storedNormals)
+            {
+                renderCase.FloatOverrides[
+                    "_GeneratedMassSurfaceNormalStrength"] = 0f;
+                renderCase.FloatOverrides["_FlatNormalStrength"] = 0f;
+            }
+            return renderCase;
+        }
+
+        private RenderCase CreateOrientationLegacyCase(
+            ViewDefinition view,
+            BrdfDirectionDefinition direction,
+            string variant)
+        {
+            return new RenderCase
+            {
+                Name = "STAGEE__" + direction.Name + "__" +
+                    view.Name + "__" + variant,
+                MeshSubject = suspect,
+                PropertySubject = suspect,
+                SourceMaterial = legacyMaterial,
+                MaterialRole = "LegacyOrientationReference",
+                Family = "StageE",
+                DisableShadows = true,
+                DisableAdditionalLights = true,
+                DisablePost = true,
+                DisableLightProbes = true,
+                DisableReflectionProbes = true,
+                DisableAmbientEnvironment = true,
+                DisableReflectionEnvironment = true,
+                DisableLightCookies = true,
+                DisableFog = true,
+                UseControlledMainLight = true,
+                MainLightDirectionLocal = direction.LocalDirection,
+                MainLightIntensity = 1f,
+                IsOrientationSweep = true,
+                OrientationKind = "PBRReference",
+                OrientationStage = "LEGACY",
+                DirectionName = direction.Name,
+                BrdfVariant = variant,
+                ViewName = view.Name,
+                CameraAzimuthDegrees = view.AzimuthDegrees,
+                LightDirectionLocal = direction.LocalDirection
+            };
+        }
+
+        private static void ApplyOrientationAblation(
+            RenderCase renderCase,
+            string ablation)
+        {
+            void DisableTonal()
+            {
+                renderCase.FloatOverrides["_PixelVariation"] = 0f;
+                renderCase.FloatOverrides["_PixelVertexVariation"] = 0f;
+                renderCase.FloatOverrides["_PixelBroadVariation"] = 0f;
+                renderCase.FloatOverrides["_PixelEffectStrength"] = 0f;
+                renderCase.FloatOverrides["_PixelWarpStrength"] = 0f;
+            }
+            void DisableExposure()
+            {
+                renderCase.FloatOverrides["_ExposureTintStrength"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassExposureResponse"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassExposureTintStrength"] = 0f;
+            }
+            void DisableMottle()
+            {
+                renderCase.FloatOverrides["_StoneMottleStrength"] = 0f;
+            }
+            void DisableCrevice()
+            {
+                renderCase.FloatOverrides["_CreviceDarkenStrength"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassCreviceResponse"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassCreviceTintStrength"] = 0f;
+            }
+            void DisableBase()
+            {
+                renderCase.FloatOverrides["_BaseDarkenStrength"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassBaseResponse"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassBaseTintStrength"] = 0f;
+            }
+            void DisableDirt()
+            {
+                renderCase.FloatOverrides["_StoneDirtResponse"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassDirtDepositResponse"] = 0f;
+                renderCase.FloatOverrides["_GeneratedMassDirtDepositTintStrength"] = 0f;
+            }
+
+            switch (ablation)
+            {
+                case "TONAL":
+                    DisableTonal();
+                    break;
+                case "EXPOSURE":
+                    DisableExposure();
+                    break;
+                case "MOTTLE":
+                    DisableMottle();
+                    break;
+                case "CREVICE":
+                    DisableCrevice();
+                    break;
+                case "BASE":
+                    DisableBase();
+                    break;
+                case "DIRT":
+                    DisableDirt();
+                    break;
+                case "WET":
+                    renderCase.FloatOverrides["_Wetness"] = 0f;
+                    break;
+                case "FROST":
+                    renderCase.FloatOverrides["_FrostStrength"] = 0f;
+                    break;
+                case "MONOLITHIC":
+                    renderCase.FloatOverrides["_MonolithicFlatten"] = 0f;
+                    break;
+                case "OVERALL_TINT":
+                    renderCase.FloatOverrides[
+                        "_GeneratedMassOverallRockTintStrength"] = 0f;
+                    break;
+                case "SPECULAR_ZERO":
+                    renderCase.FloatOverrides["_SpecularStrength"] = 0f;
+                    break;
+                case "ALL_PRELIGHT_VALUE":
+                    DisableTonal();
+                    DisableExposure();
+                    DisableMottle();
+                    DisableCrevice();
+                    DisableBase();
+                    DisableDirt();
+                    renderCase.FloatOverrides["_Wetness"] = 0f;
+                    renderCase.FloatOverrides["_FrostStrength"] = 0f;
+                    renderCase.FloatOverrides["_MonolithicFlatten"] = 0f;
+                    renderCase.FloatOverrides[
+                        "_GeneratedMassOverallRockTintStrength"] = 0f;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(ablation),
+                        ablation,
+                        "Unknown orientation ablation.");
+            }
+        }
+
         private RenderCase CreateBrdfCase(
             BrdfDirectionDefinition direction,
             string variant,
@@ -1806,6 +2285,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 CameraPositionWorld = pendingCameraPosition,
                 IsLambertPreflight = pendingCase.IsLambertPreflight,
                 IsLambertNormalCapture = pendingCase.IsLambertNormalCapture,
+                IsOrientationSweep = pendingCase.IsOrientationSweep,
+                OrientationKind = pendingCase.OrientationKind,
+                OrientationStage = pendingCase.OrientationStage,
+                OrientationAblation = pendingCase.OrientationAblation,
                 LocalToClip = pendingLocalToClip
             };
 
@@ -1965,7 +2448,15 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                             false,
                             out result.MeanMaskedLuma,
                             out result.SaturatedMaskedPixelFraction);
-                        if (pendingCase.IsBrdfSweep)
+                        if (pendingCase.IsOrientationSweep)
+                        {
+                            CaptureOrientationPixelEvidence(
+                                pendingCase,
+                                result);
+                        }
+                        if (!result.ReadbackError &&
+                            (pendingCase.IsBrdfSweep ||
+                             pendingCase.IsOrientationSweep))
                         {
                             CalculateTriangleStatistics(
                                 pendingCase.MeshSubject,
@@ -2083,11 +2574,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         : legacyMaterial.shader.name,
                 ExpectedDecisionCases = TotalCases,
                 CompletedDecisionCases = CompletedCases,
+                ExpectedOrientationCases = OrientationCaseCount,
+                CompletedOrientationCases = results.Count(item =>
+                    item.IsOrientationSweep),
                 AuxiliaryIdentityCases = AuxiliaryIdentityCases,
                 AuxiliaryValidationCases = AuxiliaryValidationCases,
                 ReadbackErrorCount = results.Count(item => item.ReadbackError),
                 MinimumCaseCoverageRatio = results
-                    .Where(item => item.IsBrdfSweep)
+                    .Where(item => item.IsBrdfSweep || item.IsOrientationSweep)
                     .Select(item => item.TriangleCoverageRatio)
                     .DefaultIfEmpty(0f)
                     .Min(),
@@ -2194,10 +2688,19 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     "IDENTITY_LIGHTING_ALIGNMENT_CONTRACT_FAILURE";
             }
             else if (results.Any(item =>
-                item.IsBrdfSweep && !CaseCoverageValid(item)))
+                (item.IsBrdfSweep || item.IsOrientationSweep) &&
+                !CaseCoverageValid(item)))
             {
                 value.CompletenessFailure =
                     "PER_TRIANGLE_COVERAGE_CONTRACT_FAILURE";
+            }
+            else if (value.CompletedOrientationCases !=
+                     value.ExpectedOrientationCases)
+            {
+                value.CompletenessFailure =
+                    "ORIENTATION_CASE_COMPLETENESS_FAILURE:" +
+                    value.CompletedOrientationCases + "/" +
+                    value.ExpectedOrientationCases;
             }
             else if (results.Count(item => item.Family ==
                          "LambertPreflight") != 1 ||
@@ -2207,7 +2710,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                          StageBDirectionCount * 5 ||
                      results.Count(item => item.Family == "StageC") !=
                          StageCDirectionCount * AlternateViews.Length * 5 ||
-                     results.Count(item => item.Family == "StageD") != 6)
+                     results.Count(item => item.Family == "StageD") != 6 ||
+                     results.Count(item => item.Family == "StageE") !=
+                         OrientationCaseCount)
             {
                 value.CompletenessFailure =
                     "MATRIX_CASE_FAMILY_COUNT_FAILURE";
@@ -2501,6 +3006,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 return value;
             }
 
+            PopulateOrientationSummary(value);
+            if (!value.OrientationCaptureAvailable)
+            {
+                value.CompletenessFailure =
+                    "ORIENTATION_ANALYSIS_CONTRACT_FAILURE";
+                value.Ownership = value.CompletenessFailure;
+                value.SurfaceLightingOwnership = value.Ownership;
+                value.BrdfWorkflowVerdict = value.Ownership;
+                return value;
+            }
+
             // GM-SURFACE.5P: these aggregate ownership labels are diagnostic
             // contributors, not the acceptance criterion for the visible defect.
             // A parameter can reduce mean RGB error and still leave individual
@@ -2563,6 +3079,698 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             value.BrdfWorkflowVerdict = value.Ownership;
             value.OwnershipConfidence = 1f;
             return value;
+        }
+
+        private void PopulateOrientationSummary(Summary summaryValue)
+        {
+            List<CaseResult> orientationResults = results
+                .Where(item => item.IsOrientationSweep)
+                .ToList();
+            if (orientationResults.Count != OrientationCaseCount)
+            {
+                return;
+            }
+
+            List<ViewDefinition> views = EnumerateOrientationViews().ToList();
+            Dictionary<string, HashSet<string>> previousSourceInversions =
+                new(StringComparer.Ordinal);
+            Dictionary<string, HashSet<string>> previousBevelViolations =
+                new(StringComparer.Ordinal);
+            bool allStageCasesPresent = true;
+
+            for (int stageIndex = 0;
+                 stageIndex < OrientationStages.Length;
+                 stageIndex++)
+            {
+                OrientationStageDefinition stage = OrientationStages[stageIndex];
+                OrientationStageSummary stageSummary =
+                    new OrientationStageSummary
+                    {
+                        StageName = stage.Name
+                    };
+                List<float> correlationNdotL = new();
+                List<float> correlationLuma = new();
+                List<float> directRatios = new();
+                List<float> directProductRmses = new();
+
+                foreach (ViewDefinition view in views)
+                {
+                    foreach (BrdfDirectionDefinition direction in brdfDirections)
+                    {
+                        CaseResult ndotl = FindOrientationCase(
+                            view.Name,
+                            direction.Name,
+                            "NDOTL_ATTENUATION_STORED");
+                        CaseResult direct = FindOrientationCase(
+                            view.Name,
+                            direction.Name,
+                            "DIRECT_" + stage.Name);
+                        if (ndotl == null || direct == null ||
+                            !CaseCoverageValid(ndotl) ||
+                            !CaseCoverageValid(direct))
+                        {
+                            allStageCasesPresent = false;
+                            continue;
+                        }
+
+                        string context = view.Name + "|" + direction.Name;
+                        EvaluateOrientationOrdering(
+                            direct,
+                            ndotl,
+                            context,
+                            out int sourceComparisons,
+                            out HashSet<string> sourceInversions,
+                            out int bevelComparisons,
+                            out HashSet<string> bevelViolations,
+                            correlationNdotL,
+                            correlationLuma,
+                            directRatios);
+                        stageSummary.SourcePairComparisons += sourceComparisons;
+                        stageSummary.SourcePairInversions +=
+                            sourceInversions.Count;
+                        stageSummary.ConditionalBevelComparisons +=
+                            bevelComparisons;
+                        stageSummary.ConditionalBevelEnvelopeViolations +=
+                            bevelViolations.Count;
+                        if (direct.OrientationDirectProductPixelCount > 0)
+                        {
+                            directProductRmses.Add(
+                                direct.OrientationDirectProductNormalizedRmse);
+                        }
+                        else
+                        {
+                            allStageCasesPresent = false;
+                        }
+
+                        if (!previousSourceInversions.TryGetValue(
+                                context,
+                                out HashSet<string> previousSource))
+                        {
+                            previousSource = new HashSet<string>(
+                                StringComparer.Ordinal);
+                        }
+                        if (!previousBevelViolations.TryGetValue(
+                                context,
+                                out HashSet<string> previousBevel))
+                        {
+                            previousBevel = new HashSet<string>(
+                                StringComparer.Ordinal);
+                        }
+                        stageSummary.IntroducedSourcePairInversions +=
+                            sourceInversions.Count(key =>
+                                !previousSource.Contains(key));
+                        stageSummary.IntroducedConditionalBevelViolations +=
+                            bevelViolations.Count(key =>
+                                !previousBevel.Contains(key));
+                        previousSourceInversions[context] = sourceInversions;
+                        previousBevelViolations[context] = bevelViolations;
+                    }
+                }
+
+                stageSummary.SourceOrientationPearson =
+                    Pearson(correlationNdotL, correlationLuma);
+                stageSummary.SourceOrientationSpearman =
+                    Spearman(correlationNdotL, correlationLuma);
+                stageSummary.MeanDirectToNdotLRatio = directRatios.Count > 0
+                    ? directRatios.Average()
+                    : 0f;
+                stageSummary.MeanDirectProductNormalizedRmse =
+                    directProductRmses.Count > 0
+                        ? directProductRmses.Average()
+                        : 0f;
+                PopulateOrientationStageMaskCorrelations(
+                    stageIndex,
+                    views,
+                    stageSummary);
+                summaryValue.OrientationStages.Add(stageSummary);
+            }
+
+            if (!allStageCasesPresent ||
+                summaryValue.OrientationStages.Count !=
+                    OrientationStages.Length)
+            {
+                return;
+            }
+
+            OrientationStageSummary firstDivergent =
+                summaryValue.OrientationStages.FirstOrDefault(item =>
+                    item.IntroducedSourcePairInversions > 0 ||
+                    item.IntroducedConditionalBevelViolations > 0);
+            if (firstDivergent != null)
+            {
+                summaryValue.OrientationFirstDivergentStage =
+                    firstDivergent.StageName;
+                summaryValue.OrientationFirstDivergentStageCount =
+                    firstDivergent.IntroducedSourcePairInversions +
+                    firstDivergent.IntroducedConditionalBevelViolations;
+            }
+
+            int legacySourceInversions = 0;
+            int legacyBevelViolations = 0;
+            int hlslSourceInversions = 0;
+            int hlslBevelViolations = 0;
+            bool referenceCasesPresent = true;
+            foreach (ViewDefinition view in views)
+            {
+                foreach (BrdfDirectionDefinition direction in brdfDirections)
+                {
+                    CaseResult ndotl = FindOrientationCase(
+                        view.Name,
+                        direction.Name,
+                        "NDOTL_ATTENUATION_STORED");
+                    CaseResult legacy = FindOrientationCase(
+                        view.Name,
+                        direction.Name,
+                        "PBR_LEGACY_ACTUAL");
+                    CaseResult hlsl = FindOrientationCase(
+                        view.Name,
+                        direction.Name,
+                        "PBR_HLSL_STORED");
+                    if (ndotl == null || legacy == null || hlsl == null)
+                    {
+                        referenceCasesPresent = false;
+                        continue;
+                    }
+                    EvaluateOrientationOrdering(
+                        legacy,
+                        ndotl,
+                        view.Name + "|" + direction.Name + "|LEGACY",
+                        out _,
+                        out HashSet<string> legacySources,
+                        out _,
+                        out HashSet<string> legacyBevels,
+                        null,
+                        null,
+                        null);
+                    EvaluateOrientationOrdering(
+                        hlsl,
+                        ndotl,
+                        view.Name + "|" + direction.Name + "|HLSL",
+                        out _,
+                        out HashSet<string> hlslSources,
+                        out _,
+                        out HashSet<string> hlslBevels,
+                        null,
+                        null,
+                        null);
+                    legacySourceInversions += legacySources.Count;
+                    legacyBevelViolations += legacyBevels.Count;
+                    hlslSourceInversions += hlslSources.Count;
+                    hlslBevelViolations += hlslBevels.Count;
+                }
+            }
+            if (!referenceCasesPresent)
+            {
+                return;
+            }
+            summaryValue.OrientationLegacySourcePairInversions =
+                legacySourceInversions;
+            summaryValue.OrientationLegacyConditionalBevelViolations =
+                legacyBevelViolations;
+            summaryValue.OrientationHlslSourcePairInversions =
+                hlslSourceInversions;
+            summaryValue.OrientationHlslConditionalBevelViolations =
+                hlslBevelViolations;
+
+            int baselineSource = 0;
+            int baselineBevel = 0;
+            foreach (ViewDefinition view in views)
+            {
+                foreach (BrdfDirectionDefinition direction in brdfDirections)
+                {
+                    CaseResult ndotl = FindOrientationCase(
+                        view.Name,
+                        direction.Name,
+                        "NDOTL_ATTENUATION_STORED");
+                    CaseResult baseline = FindOrientationCase(
+                        view.Name,
+                        direction.Name,
+                        "DIRECT_FINAL_WITH_OVERALL_TINT");
+                    if (ndotl == null || baseline == null)
+                    {
+                        return;
+                    }
+                    EvaluateOrientationOrdering(
+                        baseline,
+                        ndotl,
+                        view.Name + "|" + direction.Name + "|BASELINE",
+                        out _,
+                        out HashSet<string> sourceErrors,
+                        out _,
+                        out HashSet<string> bevelErrors,
+                        null,
+                        null,
+                        null);
+                    baselineSource += sourceErrors.Count;
+                    baselineBevel += bevelErrors.Count;
+                }
+            }
+            float baselineCombined = baselineSource + baselineBevel;
+
+            foreach (string ablation in OrientationAblations)
+            {
+                OrientationAblationSummary ablationSummary =
+                    new OrientationAblationSummary
+                    {
+                        AblationName = ablation
+                    };
+                bool ablationCasesPresent = true;
+                foreach (ViewDefinition view in views)
+                {
+                    foreach (BrdfDirectionDefinition direction in brdfDirections)
+                    {
+                        CaseResult ndotl = FindOrientationCase(
+                            view.Name,
+                            direction.Name,
+                            "NDOTL_ATTENUATION_STORED");
+                        CaseResult ablated = FindOrientationCase(
+                            view.Name,
+                            direction.Name,
+                            "DIRECT_ABLATE_" + ablation);
+                        if (ndotl == null || ablated == null)
+                        {
+                            ablationCasesPresent = false;
+                            continue;
+                        }
+                        EvaluateOrientationOrdering(
+                            ablated,
+                            ndotl,
+                            view.Name + "|" + direction.Name + "|" + ablation,
+                            out _,
+                            out HashSet<string> sourceErrors,
+                            out _,
+                            out HashSet<string> bevelErrors,
+                            null,
+                            null,
+                            null);
+                        ablationSummary.SourcePairInversions +=
+                            sourceErrors.Count;
+                        ablationSummary.ConditionalBevelViolations +=
+                            bevelErrors.Count;
+                    }
+                }
+                if (!ablationCasesPresent)
+                {
+                    return;
+                }
+                ablationSummary.CombinedError =
+                    ablationSummary.SourcePairInversions +
+                    ablationSummary.ConditionalBevelViolations;
+                ablationSummary.ReductionFromBaseline = baselineCombined > 0f
+                    ? (baselineCombined - ablationSummary.CombinedError) /
+                        baselineCombined
+                    : 0f;
+                summaryValue.OrientationAblations.Add(ablationSummary);
+            }
+
+            OrientationAblationSummary dominant = baselineCombined > 0f
+                ? summaryValue.OrientationAblations
+                    .OrderByDescending(item => item.ReductionFromBaseline)
+                    .ThenBy(item => item.AblationName, StringComparer.Ordinal)
+                    .FirstOrDefault()
+                : null;
+            if (dominant != null)
+            {
+                summaryValue.OrientationDominantAblation =
+                    dominant.AblationName;
+                summaryValue.OrientationDominantAblationReduction =
+                    dominant.ReductionFromBaseline;
+            }
+            summaryValue.OrientationCaptureAvailable = true;
+        }
+
+        private CaseResult FindOrientationCase(
+            string viewName,
+            string directionName,
+            string variant)
+        {
+            return results.FirstOrDefault(item =>
+                item.IsOrientationSweep &&
+                string.Equals(item.ViewName, viewName,
+                    StringComparison.Ordinal) &&
+                string.Equals(item.DirectionName, directionName,
+                    StringComparison.Ordinal) &&
+                string.Equals(item.BrdfVariant, variant,
+                    StringComparison.Ordinal));
+        }
+
+        private void EvaluateOrientationOrdering(
+            CaseResult response,
+            CaseResult ndotl,
+            string context,
+            out int sourceComparisons,
+            out HashSet<string> sourceInversions,
+            out int bevelComparisons,
+            out HashSet<string> bevelViolations,
+            List<float> correlationNdotL,
+            List<float> correlationLuma,
+            List<float> directRatios)
+        {
+            sourceComparisons = 0;
+            sourceInversions = new HashSet<string>(StringComparer.Ordinal);
+            bevelComparisons = 0;
+            bevelViolations = new HashSet<string>(StringComparer.Ordinal);
+
+            List<OrientationSurfaceMean> sourceMeans =
+                BuildOrientationSourceFaceMeans(response, ndotl);
+            for (int a = 0; a < sourceMeans.Count; a++)
+            {
+                OrientationSurfaceMean first = sourceMeans[a];
+                if (correlationNdotL != null && correlationLuma != null)
+                {
+                    correlationNdotL.Add(first.NdotL);
+                    correlationLuma.Add(first.Luma);
+                }
+                if (directRatios != null && first.NdotL > 0.05f)
+                {
+                    directRatios.Add(first.Luma / first.NdotL);
+                }
+                for (int b = a + 1; b < sourceMeans.Count; b++)
+                {
+                    OrientationSurfaceMean second = sourceMeans[b];
+                    float ndotlDelta = first.NdotL - second.NdotL;
+                    if (Mathf.Abs(ndotlDelta) <
+                        OrientationMinimumNdotLSeparation)
+                    {
+                        continue;
+                    }
+                    sourceComparisons++;
+                    float lumaDelta = first.Luma - second.Luma;
+                    if (Mathf.Abs(lumaDelta) <=
+                        OrientationOrderingLumaTolerance)
+                    {
+                        continue;
+                    }
+                    if (Mathf.Sign(ndotlDelta) != Mathf.Sign(lumaDelta))
+                    {
+                        int low = Mathf.Min(
+                            first.ProvenanceIndex,
+                            second.ProvenanceIndex);
+                        int high = Mathf.Max(
+                            first.ProvenanceIndex,
+                            second.ProvenanceIndex);
+                        sourceInversions.Add(
+                            context + "|S|" + low + "|" + high);
+                    }
+                }
+            }
+
+            foreach (BevelParentGeometrySample sample in
+                suspect.BevelParentSamples)
+            {
+                if (!TryGetTriangleValue(
+                        ndotl,
+                        sample.ParentATriangleIndex,
+                        out float parentANdotL) ||
+                    !TryGetTriangleValue(
+                        ndotl,
+                        sample.BevelTriangleIndex,
+                        out float bevelNdotL) ||
+                    !TryGetTriangleValue(
+                        ndotl,
+                        sample.ParentBTriangleIndex,
+                        out float parentBNdotL) ||
+                    !TryGetTriangleLuma(
+                        response,
+                        sample.ParentATriangleIndex,
+                        out float parentALuma) ||
+                    !TryGetTriangleLuma(
+                        response,
+                        sample.BevelTriangleIndex,
+                        out float bevelLuma) ||
+                    !TryGetTriangleLuma(
+                        response,
+                        sample.ParentBTriangleIndex,
+                        out float parentBLuma))
+                {
+                    continue;
+                }
+
+                float minNdotL = Mathf.Min(parentANdotL, parentBNdotL) -
+                    OrientationIntermediateNdotLTolerance;
+                float maxNdotL = Mathf.Max(parentANdotL, parentBNdotL) +
+                    OrientationIntermediateNdotLTolerance;
+                if (bevelNdotL < minNdotL || bevelNdotL > maxNdotL)
+                {
+                    continue;
+                }
+                bevelComparisons++;
+                float minLuma = Mathf.Min(parentALuma, parentBLuma) -
+                    OrientationOrderingLumaTolerance;
+                float maxLuma = Mathf.Max(parentALuma, parentBLuma) +
+                    OrientationOrderingLumaTolerance;
+                if (bevelLuma < minLuma || bevelLuma > maxLuma)
+                {
+                    bevelViolations.Add(
+                        context + "|B|" + sample.LogicalBevelId + "|" +
+                        sample.SampleIndex);
+                }
+            }
+        }
+
+        private List<OrientationSurfaceMean> BuildOrientationSourceFaceMeans(
+            CaseResult response,
+            CaseResult ndotl)
+        {
+            Dictionary<int, OrientationSurfaceAccumulator> accumulators = new();
+            foreach (TriangleLuminanceStatistics responseTriangle in
+                response.TriangleStatistics.Values)
+            {
+                if (responseTriangle.SurfaceClass != SurfaceClass.SourceFace ||
+                    responseTriangle.ProvenanceIndex < 0 ||
+                    !ndotl.TriangleStatistics.TryGetValue(
+                        responseTriangle.TriangleIndex,
+                        out TriangleLuminanceStatistics ndotlTriangle))
+                {
+                    continue;
+                }
+                int weight = Mathf.Max(1, responseTriangle.PixelCount);
+                accumulators.TryGetValue(
+                    responseTriangle.ProvenanceIndex,
+                    out OrientationSurfaceAccumulator accumulator);
+                accumulator.LumaSum += responseTriangle.MeanLuma * weight;
+                accumulator.NdotLSum += ndotlTriangle.MeanLinearRgb.x * weight;
+                accumulator.Weight += weight;
+                accumulators[responseTriangle.ProvenanceIndex] = accumulator;
+            }
+
+            return accumulators
+                .Where(pair => pair.Value.Weight > 0)
+                .Select(pair => new OrientationSurfaceMean
+                {
+                    ProvenanceIndex = pair.Key,
+                    NdotL = pair.Value.NdotLSum / pair.Value.Weight,
+                    Luma = pair.Value.LumaSum / pair.Value.Weight
+                })
+                .OrderBy(item => item.ProvenanceIndex)
+                .ToList();
+        }
+
+        private void PopulateOrientationStageMaskCorrelations(
+            int stageIndex,
+            IReadOnlyList<ViewDefinition> views,
+            OrientationStageSummary stageSummary)
+        {
+            OrientationStageDefinition stage = OrientationStages[stageIndex];
+            List<float> contributions = new();
+            List<float> exposures = new();
+            List<float> crevices = new();
+            List<float> dirts = new();
+            List<float> heights = new();
+            List<float> mottles = new();
+
+            foreach (ViewDefinition view in views)
+            {
+                CaseResult current = FindOrientationCase(
+                    view.Name,
+                    string.Empty,
+                    "ALBEDO_" + stage.Name);
+                CaseResult previous = stageIndex > 0
+                    ? FindOrientationCase(
+                        view.Name,
+                        string.Empty,
+                        "ALBEDO_" + OrientationStages[stageIndex - 1].Name)
+                    : null;
+                CaseResult rawMasks = FindOrientationCase(
+                    view.Name,
+                    string.Empty,
+                    "RAW_VERTEX_MASKS");
+                CaseResult dirtHeight = FindOrientationCase(
+                    view.Name,
+                    string.Empty,
+                    "RAW_DIRT_HEIGHT_NORMALY");
+                CaseResult resolvedC = FindOrientationCase(
+                    view.Name,
+                    string.Empty,
+                    "RESOLVED_MASKS_C");
+                if (current == null || rawMasks == null ||
+                    dirtHeight == null || resolvedC == null)
+                {
+                    continue;
+                }
+
+                foreach (TriangleLuminanceStatistics triangle in
+                    current.TriangleStatistics.Values)
+                {
+                    if (triangle.SurfaceClass != SurfaceClass.SourceFace ||
+                        !rawMasks.TriangleStatistics.TryGetValue(
+                            triangle.TriangleIndex,
+                            out TriangleLuminanceStatistics raw) ||
+                        !dirtHeight.TriangleStatistics.TryGetValue(
+                            triangle.TriangleIndex,
+                            out TriangleLuminanceStatistics dirt) ||
+                        !resolvedC.TriangleStatistics.TryGetValue(
+                            triangle.TriangleIndex,
+                            out TriangleLuminanceStatistics resolved))
+                    {
+                        continue;
+                    }
+                    float previousLuma = OrientationCorrelationEpsilon;
+                    if (previous != null &&
+                        previous.TriangleStatistics.TryGetValue(
+                            triangle.TriangleIndex,
+                            out TriangleLuminanceStatistics previousTriangle))
+                    {
+                        previousLuma = Mathf.Max(
+                            OrientationCorrelationEpsilon,
+                            previousTriangle.MeanLuma);
+                    }
+                    float currentLuma = Mathf.Max(
+                        OrientationCorrelationEpsilon,
+                        triangle.MeanLuma);
+                    float contribution = stageIndex == 0
+                        ? Mathf.Log(currentLuma)
+                        : Mathf.Log(currentLuma / previousLuma);
+                    contributions.Add(contribution);
+                    exposures.Add(raw.MeanLinearRgb.y);
+                    crevices.Add(raw.MeanLinearRgb.z);
+                    dirts.Add(dirt.MeanLinearRgb.x);
+                    heights.Add(dirt.MeanLinearRgb.y);
+                    mottles.Add(resolved.MeanLinearRgb.z);
+                }
+            }
+
+            stageSummary.ExposureCorrelation = Pearson(exposures, contributions);
+            stageSummary.CreviceCorrelation = Pearson(crevices, contributions);
+            stageSummary.DirtCorrelation = Pearson(dirts, contributions);
+            stageSummary.HeightCorrelation = Pearson(heights, contributions);
+            stageSummary.MottleCorrelation = Pearson(mottles, contributions);
+        }
+
+        private static bool TryGetTriangleValue(
+            CaseResult result,
+            int triangleIndex,
+            out float value)
+        {
+            value = 0f;
+            if (result == null ||
+                !result.TriangleStatistics.TryGetValue(
+                    triangleIndex,
+                    out TriangleLuminanceStatistics triangle))
+            {
+                return false;
+            }
+            value = triangle.MeanLinearRgb.x;
+            return true;
+        }
+
+        private static bool TryGetTriangleLuma(
+            CaseResult result,
+            int triangleIndex,
+            out float value)
+        {
+            value = 0f;
+            if (result == null ||
+                !result.TriangleStatistics.TryGetValue(
+                    triangleIndex,
+                    out TriangleLuminanceStatistics triangle))
+            {
+                return false;
+            }
+            value = triangle.MeanLuma;
+            return true;
+        }
+
+        private static float Pearson(
+            IReadOnlyList<float> x,
+            IReadOnlyList<float> y)
+        {
+            if (x == null || y == null || x.Count != y.Count || x.Count < 2)
+            {
+                return 0f;
+            }
+            double meanX = x.Average(value => (double)value);
+            double meanY = y.Average(value => (double)value);
+            double covariance = 0d;
+            double varianceX = 0d;
+            double varianceY = 0d;
+            for (int index = 0; index < x.Count; index++)
+            {
+                double dx = x[index] - meanX;
+                double dy = y[index] - meanY;
+                covariance += dx * dy;
+                varianceX += dx * dx;
+                varianceY += dy * dy;
+            }
+            double denominator = Math.Sqrt(varianceX * varianceY);
+            return denominator <= 1e-20d
+                ? 0f
+                : (float)(covariance / denominator);
+        }
+
+        private static float Spearman(
+            IReadOnlyList<float> x,
+            IReadOnlyList<float> y)
+        {
+            if (x == null || y == null || x.Count != y.Count || x.Count < 2)
+            {
+                return 0f;
+            }
+            List<float> rankX = BuildAverageRanks(x);
+            List<float> rankY = BuildAverageRanks(y);
+            return Pearson(rankX, rankY);
+        }
+
+        private static List<float> BuildAverageRanks(IReadOnlyList<float> values)
+        {
+            List<int> ordered = Enumerable.Range(0, values.Count)
+                .OrderBy(index => values[index])
+                .ThenBy(index => index)
+                .ToList();
+            float[] ranks = new float[values.Count];
+            int cursor = 0;
+            while (cursor < ordered.Count)
+            {
+                int end = cursor + 1;
+                while (end < ordered.Count &&
+                    Mathf.Abs(
+                        values[ordered[end]] -
+                        values[ordered[cursor]]) <= 1e-7f)
+                {
+                    end++;
+                }
+                float averageRank = ((cursor + 1) + end) * 0.5f;
+                for (int index = cursor; index < end; index++)
+                {
+                    ranks[ordered[index]] = averageRank;
+                }
+                cursor = end;
+            }
+            return ranks.ToList();
+        }
+
+        private struct OrientationSurfaceAccumulator
+        {
+            internal float NdotLSum;
+            internal float LumaSum;
+            internal int Weight;
+        }
+
+        private sealed class OrientationSurfaceMean
+        {
+            internal int ProvenanceIndex;
+            internal float NdotL;
+            internal float Luma;
         }
 
         private BrdfDirectionSummary Build5NDirectionSummary(
@@ -3837,6 +5045,179 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ? saturated / (float)included
                 : 0f;
         }
+        private void CaptureOrientationPixelEvidence(
+            RenderCase renderCase,
+            CaseResult result)
+        {
+            if (string.Equals(
+                    renderCase.OrientationKind,
+                    "StaticAlbedo",
+                    StringComparison.Ordinal))
+            {
+                orientationAlbedoPixels[OrientationAlbedoPixelKey(
+                    renderCase.ViewName,
+                    renderCase.OrientationStage)] = new OrientationPixelCapture
+                    {
+                        Pixels = result.LinearPixels,
+                        IdentityFlipRelativeToLighting =
+                            result.IdentityFlipRelativeToLighting,
+                        LightingForegroundPixels =
+                            result.LightingForegroundPixelCount
+                    };
+                return;
+            }
+            if (string.Equals(
+                    renderCase.OrientationKind,
+                    "NdotL",
+                    StringComparison.Ordinal))
+            {
+                orientationNdotLPixels[OrientationNdotLPixelKey(
+                    renderCase.ViewName,
+                    renderCase.DirectionName)] = new OrientationPixelCapture
+                    {
+                        Pixels = result.LinearPixels,
+                        IdentityFlipRelativeToLighting =
+                            result.IdentityFlipRelativeToLighting,
+                        LightingForegroundPixels =
+                            result.LightingForegroundPixelCount
+                    };
+                return;
+            }
+            if (!string.Equals(
+                    renderCase.OrientationKind,
+                    "DirectStage",
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!orientationAlbedoPixels.TryGetValue(
+                    OrientationAlbedoPixelKey(
+                        renderCase.ViewName,
+                        renderCase.OrientationStage),
+                    out OrientationPixelCapture albedoCapture) ||
+                !orientationNdotLPixels.TryGetValue(
+                    OrientationNdotLPixelKey(
+                        renderCase.ViewName,
+                        renderCase.DirectionName),
+                    out OrientationPixelCapture ndotlCapture))
+            {
+                result.ReadbackError = true;
+                result.Error =
+                    "orientation direct-product evidence unavailable: view=" +
+                    renderCase.ViewName + ",direction=" +
+                    renderCase.DirectionName + ",stage=" +
+                    renderCase.OrientationStage;
+                fatalIdentityContractFailure = true;
+                fatalContractReason = result.Error;
+                return;
+            }
+
+            if (albedoCapture.IdentityFlipRelativeToLighting !=
+                    result.IdentityFlipRelativeToLighting ||
+                ndotlCapture.IdentityFlipRelativeToLighting !=
+                    result.IdentityFlipRelativeToLighting ||
+                albedoCapture.LightingForegroundPixels !=
+                    result.LightingForegroundPixelCount ||
+                ndotlCapture.LightingForegroundPixels !=
+                    result.LightingForegroundPixelCount)
+            {
+                result.ReadbackError = true;
+                result.Error =
+                    "orientation direct-product buffer alignment mismatch: view=" +
+                    renderCase.ViewName + ",direction=" +
+                    renderCase.DirectionName + ",stage=" +
+                    renderCase.OrientationStage +
+                    ",directFlip=" + result.IdentityFlipRelativeToLighting +
+                    ",albedoFlip=" +
+                    albedoCapture.IdentityFlipRelativeToLighting +
+                    ",ndotlFlip=" +
+                    ndotlCapture.IdentityFlipRelativeToLighting +
+                    ",directForeground=" +
+                    result.LightingForegroundPixelCount +
+                    ",albedoForeground=" +
+                    albedoCapture.LightingForegroundPixels +
+                    ",ndotlForeground=" +
+                    ndotlCapture.LightingForegroundPixels;
+                fatalIdentityContractFailure = true;
+                fatalContractReason = result.Error;
+                return;
+            }
+
+            Color[] albedoPixels = albedoCapture.Pixels;
+            Color[] ndotlPixels = ndotlCapture.Pixels;
+            int count = Mathf.Min(
+                result.LinearPixels.Length,
+                Mathf.Min(albedoPixels.Length, ndotlPixels.Length));
+            double sumAbsolute = 0d;
+            double sumSquared = 0d;
+            double expectedEnergy = 0d;
+            int channels = 0;
+            int foregroundPixels = 0;
+            for (int index = 0; index < count; index++)
+            {
+                Color observed = result.LinearPixels[index];
+                Color albedo = albedoPixels[index];
+                Color ndotl = ndotlPixels[index];
+                if (observed.a <= 0.0001f ||
+                    albedo.a <= 0.0001f ||
+                    ndotl.a <= 0.0001f)
+                {
+                    continue;
+                }
+                float lightFactor = Mathf.Max(0f, ndotl.r) *
+                    Mathf.Max(0f, ndotl.g) *
+                    Mathf.Max(0f, ndotl.b);
+                Vector3 expected = new Vector3(
+                    albedo.r * lightFactor,
+                    albedo.g * lightFactor,
+                    albedo.b * lightFactor);
+                Vector3 actual = new Vector3(
+                    observed.r,
+                    observed.g,
+                    observed.b);
+                Vector3 delta = actual - expected;
+                sumAbsolute +=
+                    Math.Abs(delta.x) +
+                    Math.Abs(delta.y) +
+                    Math.Abs(delta.z);
+                sumSquared +=
+                    delta.x * delta.x +
+                    delta.y * delta.y +
+                    delta.z * delta.z;
+                expectedEnergy +=
+                    expected.x * expected.x +
+                    expected.y * expected.y +
+                    expected.z * expected.z;
+                channels += 3;
+                foregroundPixels++;
+            }
+            result.OrientationDirectProductPixelCount = foregroundPixels;
+            result.OrientationDirectProductMeanAbsoluteResidual = channels > 0
+                ? (float)(sumAbsolute / channels)
+                : 0f;
+            result.OrientationDirectProductNormalizedRmse =
+                channels > 0 && expectedEnergy > 1e-20d
+                    ? (float)Math.Sqrt(sumSquared / expectedEnergy)
+                    : 0f;
+        }
+
+        private static string OrientationAlbedoPixelKey(
+            string viewName,
+            string stageName)
+        {
+            return (viewName ?? string.Empty) + "\u001f" +
+                (stageName ?? string.Empty);
+        }
+
+        private static string OrientationNdotLPixelKey(
+            string viewName,
+            string directionName)
+        {
+            return (viewName ?? string.Empty) + "\u001f" +
+                (directionName ?? string.Empty);
+        }
+
         private void CalculateTriangleStatistics(
             Subject subject,
             CaseResult result,
@@ -3851,6 +5232,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
 
             Dictionary<int, Vector3> sums = new();
             Dictionary<int, int> counts = new();
+            Dictionary<int, List<float>> lumas = new();
             int pixelCount = Mathf.Min(
                 result.LinearPixels.Length,
                 identityPixels.Length);
@@ -3874,6 +5256,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 counts.TryGetValue(triangleIndex, out int count);
                 sums[triangleIndex] = sum + linearRgb;
                 counts[triangleIndex] = count + 1;
+                if (!lumas.TryGetValue(
+                        triangleIndex,
+                        out List<float> triangleLumas))
+                {
+                    triangleLumas = new List<float>();
+                    lumas[triangleIndex] = triangleLumas;
+                }
+                triangleLumas.Add(Vector3.Dot(
+                    linearRgb,
+                    new Vector3(0.2126f, 0.7152f, 0.0722f)));
             }
 
             Matrix4x4 worldToLocal = subject.CloneLocalToWorld.inverse;
@@ -3903,6 +5295,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     triangle?.LogicalBevelId ?? -1,
                     out int parentFaceA,
                     out int parentFaceB);
+                List<float> triangleLumas = lumas[item.Key];
+                float meanLuma = triangleLumas.Average();
+                double variance = 0d;
+                foreach (float luma in triangleLumas)
+                {
+                    double delta = luma - meanLuma;
+                    variance += delta * delta;
+                }
+                float standardDeviation = triangleLumas.Count > 0
+                    ? (float)Math.Sqrt(variance / triangleLumas.Count)
+                    : 0f;
                 result.TriangleStatistics[item.Key] =
                     new TriangleLuminanceStatistics
                     {
@@ -3911,11 +5314,34 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         LogicalBevelId = triangle?.LogicalBevelId ?? -1,
                         ParentFaceA = parentFaceA,
                         ParentFaceB = parentFaceB,
+                        ProvenanceKind = triangle?.ProvenanceKind ?? -1,
+                        ProvenanceIndex = triangle?.ProvenanceIndex ?? -1,
+                        SurfaceGroup = triangle?.SurfaceGroup ?? -1,
+                        GeometricNormalLocal = triangle?.GeometricNormal.normalized ??
+                            Vector3.up,
+                        AuthoredNormalLocal = triangle?.AuthoredNormal.normalized ??
+                            Vector3.up,
+                        MaskA = triangle?.MaskA ?? Vector4.zero,
+                        MaskB = triangle?.MaskB ?? Vector4.zero,
+                        MaskC = triangle?.MaskC ?? Vector4.zero,
+                        StructuralA = triangle?.StructuralA ?? Vector4.zero,
+                        StructuralB = triangle?.StructuralB ?? Vector4.zero,
+                        StructuralC = triangle?.StructuralC ?? Vector4.zero,
+                        TriangleCondition = triangle == null
+                            ? "Missing"
+                            : triangle.TriangleCondition.ToString(),
+                        TriangleAspectRatio = triangle?.TriangleAspectRatio ?? 0d,
+                        TriangleMinimumAngleDegrees =
+                            triangle?.TriangleMinimumAngleDegrees ?? 0d,
                         PixelCount = item.Value,
                         MeanLinearRgb = meanRgb,
-                        MeanLuma = Vector3.Dot(
-                            meanRgb,
-                            new Vector3(0.2126f, 0.7152f, 0.0722f)),
+                        MeanLuma = meanLuma,
+                        MinLuma = triangleLumas.Min(),
+                        P10Luma = Percentile(triangleLumas, 0.10f),
+                        MedianLuma = Percentile(triangleLumas, 0.50f),
+                        P90Luma = Percentile(triangleLumas, 0.90f),
+                        MaxLuma = triangleLumas.Max(),
+                        StandardDeviationLuma = standardDeviation,
                         StoredNormalLocal = storedNormal,
                         PredictedNdotL = Mathf.Max(
                             0f,
@@ -4061,11 +5487,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     continue;
                 }
 
-                // GM-SURFACE.5P: this is direct evidence for the active defect.
-                // The user-visible failure is precisely that a bevel can escape
-                // the response expected from its two parent surface orientations
-                // under the same light. Preserve darker-than-both/brighter-than-
-                // both classification even when whole-object brightness matches.
+                // GM-SURFACE.5P/5Q: preserve the legacy parent-envelope label as
+                // descriptive evidence only. A bevel being brighter than both or
+                // darker than both parents is NOT automatically an orientation
+                // defect: 5Q counts it as such only when the measured bevel NdotL
+                // is itself intermediate between the measured parent NdotL values.
                 float minimum = Mathf.Min(parentA, parentB);
                 float maximum = Mathf.Max(parentA, parentB);
                 float range = maximum - minimum;
@@ -6414,6 +7840,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 ReleasePendingRenderResources();
             }
             waitingForReadback = false;
+            orientationAlbedoPixels.Clear();
+            orientationNdotLPixels.Clear();
         }
 
         private static void DeferPendingResourceRelease(
@@ -6480,6 +7908,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             internal bool IsTriangleIdentity;
             internal bool IsLambertPreflight;
             internal bool IsLambertNormalCapture;
+            internal bool IsOrientationSweep;
+            internal string OrientationKind = string.Empty;
+            internal string OrientationStage = string.Empty;
+            internal string OrientationAblation = string.Empty;
             internal bool IsBrdfSweep;
             internal bool IsAdaptiveBrdf;
             internal string DirectionName = string.Empty;
@@ -6674,6 +8106,52 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 LightingForegroundPixels = lightingForegroundPixels;
                 IdentityForegroundPixels = identityForegroundPixels;
             }
+        }
+
+        private readonly struct OrientationStageDefinition
+        {
+            internal readonly string Name;
+            internal readonly int AlbedoMode;
+            internal readonly int DirectMode;
+
+            internal OrientationStageDefinition(
+                string name,
+                int albedoMode,
+                int directMode)
+            {
+                Name = name;
+                AlbedoMode = albedoMode;
+                DirectMode = directMode;
+            }
+        }
+
+        internal sealed class OrientationStageSummary
+        {
+            internal string StageName = string.Empty;
+            internal int SourcePairComparisons;
+            internal int SourcePairInversions;
+            internal int IntroducedSourcePairInversions;
+            internal int ConditionalBevelComparisons;
+            internal int ConditionalBevelEnvelopeViolations;
+            internal int IntroducedConditionalBevelViolations;
+            internal float SourceOrientationPearson;
+            internal float SourceOrientationSpearman;
+            internal float MeanDirectToNdotLRatio;
+            internal float MeanDirectProductNormalizedRmse;
+            internal float ExposureCorrelation;
+            internal float CreviceCorrelation;
+            internal float DirtCorrelation;
+            internal float HeightCorrelation;
+            internal float MottleCorrelation;
+        }
+
+        internal sealed class OrientationAblationSummary
+        {
+            internal string AblationName = string.Empty;
+            internal int SourcePairInversions;
+            internal int ConditionalBevelViolations;
+            internal float CombinedError;
+            internal float ReductionFromBaseline;
         }
 
         private readonly struct ViewDefinition

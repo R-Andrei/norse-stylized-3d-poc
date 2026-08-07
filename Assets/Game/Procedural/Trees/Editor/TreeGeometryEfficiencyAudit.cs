@@ -234,7 +234,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 Encoding.UTF8);
             branchWriter.WriteLine(
                 "Tree,Family,Variant,Policy,StableBranchId,BranchOrder," +
-                "SourceSamples,RenderRings,RadialSegments,MinimumRadialSegments,MaximumRadialSegments,AverageRadialSegments,RadialTransitions,MixedResolutionStrips,StitchTriangles,RootLobeAverageRadialSegments,ButtressPersistenceAverageRadialSegments,OrdinaryTrunkAverageRadialSegments,SideVertices,SideTriangles,CapVertices,CapTriangles,SeamDuplicateVertices," +
+                "SourceSamples,RenderRings,RadialSegments,MinimumRadialSegments,MaximumRadialSegments,AverageRadialSegments,RadialTransitions,MixedResolutionStrips,StitchTriangles,RootLobeAverageRadialSegments,GroundContactRadialSegments,GroundContactBoostedRings,GroundContactBoostReleaseDistance,ButtressPersistenceAverageRadialSegments,OrdinaryTrunkAverageRadialSegments,SideVertices,SideTriangles,CapVertices,CapTriangles,SeamDuplicateVertices," +
                 "RootZoneRings,RootZoneIntervals,RootZoneVertices,RootZoneTriangles,RootLobeRings,RootLobeIntervals,RootLobeVertices,RootLobeTriangles,ButtressPersistenceRings,ButtressPersistenceIntervals,ButtressPersistenceVertices,ButtressPersistenceTriangles,OrdinaryTrunkVertices,OrdinaryTrunkTriangles," +
                 "InsertedRings,RootRefinementInsertedRings,TwistRefinementInsertedRings,AdaptiveShapeRefinementInsertedRings,RemovedRings,EfficiencyPolicyRemovedRings,TopologyRepairRemovedRings,AverageSegmentLength,MaximumSegmentLength,AverageTurnDegrees,MaximumTurnDegrees");
             branchWriter.Flush();
@@ -1604,6 +1604,9 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     item.MixedResolutionStripCount.ToString(CultureInfo.InvariantCulture),
                     item.StitchTriangleCount.ToString(CultureInfo.InvariantCulture),
                     F(item.RootLobeAverageRadialSegments),
+                    item.GroundContactRadialSegments.ToString(CultureInfo.InvariantCulture),
+                    item.GroundContactBoostedRingCount.ToString(CultureInfo.InvariantCulture),
+                    F(item.GroundContactBoostReleaseNormalizedDistance),
                     F(item.ButtressPersistenceAverageRadialSegments),
                     F(item.OrdinaryTrunkAverageRadialSegments),
                     item.SideVertexCount.ToString(CultureInfo.InvariantCulture),

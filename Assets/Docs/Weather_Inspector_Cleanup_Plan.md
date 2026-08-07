@@ -2,9 +2,9 @@
 
 ## Status
 
-**Current patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A3-VEGETATION-SIDECAR-CLOSURE`
+**Current patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY`
 
-**Current state:** V1.3A plus the A1 footprint recovery and A2 stateless turnover correction are the accepted runtime baseline. V1.3A3 shared-vegetation closure is implemented and has passed the final static/cross-subsystem audit (`62 / 62`). Unity 6000.5.0f1 compilation and runtime validation remain pending. The serialized mandatory-preset migration remains a later bounded patch.
+**Current state:** V1.3A/A1/A2/A3 are runtime-accepted through the user validation of A3. V1.3A4 per-ray preset authority and presentation grouping is implemented and has passed the available static, scope, compatibility, and protected-contract audits. Unity compilation and runtime validation remain pending because Unity is unavailable in the implementation environment. Destructive serialized Anchor/Controller migration remains separately gated because the supplied archive does not contain authoritative live scene/prefab serialization.
 
 ## Objective
 
@@ -22,6 +22,170 @@ The patch will:
 8. make the LightRay and Cloud Inspectors production authoring surfaces with one telemetry root each;
 9. replace stale Weather documentation with the current agreed architecture;
 10. preserve `_TEST.asset` as an intentional high-strength testing preset that future production orchestration must ignore.
+
+## V1.3A4 — Per-ray preset authority and presentation grouping
+
+### Status
+
+**Patch identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY`
+
+**Approval state:** approved and implemented. This section was the canonical implementation plan and was written before source edits. Unity validation remains pending.
+
+### Objective
+
+Make a LightRay preset resolve per ray rather than globally while preserving the Controller preset as the inherited default. Complete the downstream authority change so every rendered/receiver-facing value comes from the resolved ray descriptor/snapshot rather than the Controller default. Support simultaneous weather, quest, nighttime, storytelling, and other LightRay uses with different presets and source policies.
+
+The authoring contract is:
+
+- the Controller field remains serialized as `activePreset` for compatibility but is presented to users as **Default Preset**;
+- an authored Anchor may assign **Preset Override**; `None` inherits the Controller Default Preset;
+- a procedural/gameplay `WeatherLightRaySpawnRequest` may supply an optional preset override; `null` inherits the Controller Default Preset;
+- every active ray must resolve either an override or the Controller default; no renderer or receiver may silently consult legacy appearance fallbacks after slot resolution;
+- vegetation accent intensity, coverage, and softness remain authored only on `WeatherLightRayPreset` under **Surface Response**; they are not duplicated on Controllers or Anchors;
+- authored `Source Kind` remains request-local policy and is exposed in the Anchor Inspector; preset source metadata is not runtime authority.
+
+### Approved files
+
+Modify:
+
+- `Assets/Docs/Weather_Inspector_Cleanup_Plan.md`
+- `Assets/Docs/Weather_Light_Ray_Architecture.md`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+- `Assets/Docs/Stylized_Vegetation_Architecture.md`
+- `Assets/Docs/Vegetation_Rendering_and_Interaction_Architecture.md`
+- `Assets/Game/Procedural/Weather/WeatherLightRayTypes.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayPreset.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayController.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayAnchor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherLightRayControllerEditor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherLightRayAnchorEditor.cs`
+- `Assets/Game/Procedural/Weather/Editor/WeatherLightRayPresetEditor.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayPopulationRuntime.cs`
+- `Assets/Game/Rendering/Weather/WeatherLightRayRendererFeature.cs`
+- `Assets/Game/Rendering/Weather/WeatherLightRayRenderPass.cs`
+
+No scene, prefab, preset asset, material, renderer asset, `.meta`, layer, tag, package, project-setting, cloud-runtime, cloud-shader, vegetation-HLSL, or vegetation-shader modification is approved. `_TEST.asset` remains present and unchanged.
+
+### Reviewed evidence
+
+- `WeatherLightRayDescriptor` already carries per-zone geometry, beam appearance, atmospheric appearance, surface response, evolution, lifecycle, source policy, and variation state. `RuntimeSlot` already owns per-ray lifecycle/evolution state. This is the correct resolution boundary for per-ray preset application.
+- `WeatherLightRayPreset.ApplyTo` already converts local request state plus preset presentation into a final descriptor. The Controller is the current global caller; the method itself does not require global preset ownership.
+- `WeatherLightRaySpawnRequest` currently has no preset reference. Adding one optional reference is CPU-only and does not affect GPU buffer layouts or Burst/job contracts.
+- `WeatherLightRayAnchor` still contains serialized legacy appearance/evolution fields, but the custom Inspector already treats shared presentation as preset-owned. Those legacy fields remain serialized in A4 because the supplied archive does not contain authoritative live scene/prefab serialization for destructive migration. A4 stops using them as runtime appearance authority without deleting their serialized data.
+- The indexed vegetation sidecar is already one record per URP additional light. Its protected two-`float4` layout can carry different parameters for every LightRay Spot without any HLSL or renderer-buffer-layout change. The current CPU publisher is the remaining global-authority defect because it builds one Controller-preset accent record and assigns it to every LightRay Spot.
+- The atmospheric mask draw is already per ray, but the current render pass accumulates every selected zone into one scalar R16 mask and performs one softening/composite using the first visible zone's parameters. It also filters every zone to the first selected `SourceKind`. These are the two renderer-global assumptions that block correct simultaneous per-ray presets/source policies.
+- The final composite uses shared colour and softening parameters. Screen-space surface influence also consumes per-zone centre/bounds. Therefore batching must be based on resolved final-pass compatibility rather than only preset object identity. Rays with active screen-space surface response require isolated groups unless their complete surface state is identical.
+- Source colour/intensity and presentation direction are currently resolvable by the Controller before snapshots are published. Moving the render-facing numeric source presentation into each snapshot removes the renderer's need to choose or query one source family.
+
+### Invariants
+
+1. **One appearance authority per ray.** A ray resolves exactly one preset: explicit override first, Controller Default Preset second. Missing both is an actionable configuration/spawn error.
+2. **Preset remains appearance-only.** No preset source-family, Weather eligibility, time-of-day, cloud, quest, or gameplay ownership contract is introduced.
+3. **Anchor/request retain local policy.** Source kind/direction, cloud policy, source gate, lifecycle, placement, geometry overrides, seed, and local intensity remain per ray.
+4. **Descriptor/snapshot are downstream authority.** After slot resolution, atmospheric rendering, surface Spots, vegetation publication, and reporting consume resolved per-ray descriptor/snapshot data. They do not ask which Controller preset is active.
+5. **Vegetation authoring stays on the preset.** `Vegetation Accent Intensity`, `Vegetation Accent Coverage`, and `Vegetation Accent Softness` are authored under the preset's Surface Response section only. The protected indexed sidecar remains exactly two `float4`s and `parameters.w = 1` remains independent of intensity.
+6. **Common weather path remains one presentation group.** Multiple rays with compatible final-pass presentation continue through one mask/soften/composite sequence. Additional full-screen sequences occur only for genuinely incompatible simultaneous presentation groups.
+7. **No per-frame managed allocation.** Group storage and draw metadata are preallocated/reused and bounded by LightRay slot capacity. No LINQ, dictionary-based grouping, recent-history cache, or unbounded collection is introduced.
+8. **Source semantics are resolved before rendering.** The render pass consumes resolved colour, intensity, direction, and visibility state. It does not filter the ray set by a global `SourceKind`.
+9. **Existing validated population remains inherited-default behavior.** The current atmospheric automatic producer uses the Controller Default Preset unless a future Weather orchestrator explicitly supplies another preset. Population, cloud qualification, A1 footprint recovery, and A2 stateless turnover calculus are otherwise unchanged.
+10. **Serialized destructive cleanup remains deferred.** A4 may remove the obsolete C# preset `SourceKind` member because it has no production consumer, but it does not raw-edit preset assets or delete legacy serialized Anchor/Controller appearance keys from scenes/prefabs/assets.
+
+### Presentation-group contract
+
+The renderer partitions visible rays by the resolved parameters that must be shared after individual beam-mask drawing. The group signature includes the final atmospheric colour, softening strength/radius/direction, and any active screen-space surface presentation state required by the composite. Per-ray values already consumed during mask drawing—position, area, beam layout, current intensity, lifecycle, seed, beam evolution, camera fade, and local intensity—remain per draw and do not force a new group unless they alter a shared final-pass value.
+
+For the normal automatic-weather case, rays use the same default preset, source presentation, area/layout, and softening contract, so the expected group count remains one. A distinct quest/story preset or incompatible resolved source presentation creates an additional group.
+
+The RenderGraph executes groups sequentially:
+
+```text
+Group A rays -> mask A -> soften A -> composite A -> colour A
+Group B rays -> mask B -> soften B -> composite B -> colour B
+...
+```
+
+Transient mask/softened/destination textures are logical RenderGraph resources with bounded group count. The implementation must not permanently enlarge the atmospheric mask format or sidecar format. Debug views may retain a single combined diagnostic group where required to preserve existing debug semantics; Final Composite must use full production grouping.
+
+### Per-ray preset transition contract
+
+- Controller `TrySetActivePreset` continues to transition the Controller default. Only rays inheriting that default participate. Explicit override rays do not transition because the default changed.
+- Runtime slots retain the resolved target preset and enough local transition state to evaluate the correct previous preset/blend.
+- A new inherited ray spawned while a Controller-default transition is active joins that transition.
+- Changing an Anchor/request override without a dedicated per-ray transition-duration API is immediate in A4. A4 does not invent a new authoring duration control.
+- Existing beam-layout evolution is independent and remains slot-local.
+
+### File-by-file sequence
+
+1. Record this plan and lock the approved scope before code edits.
+2. Extend shared request/descriptor/snapshot contracts for optional preset override, resolved vegetation values, resolved preset telemetry, and render-facing source presentation.
+3. Make preset application populate vegetation values and remove the obsolete runtime preset `SourceKind` member without editing serialized preset assets.
+4. Add Anchor Preset Override and expose Source Kind; stop using legacy Anchor appearance/evolution fields to build active presentation while leaving their serialization intact for the later migration audit.
+5. Resolve preset authority per runtime slot for authored and procedural rays; preserve inherited Controller-default transitions and make override changes immediate.
+6. Build vegetation sidecar records from each ray descriptor rather than Controller-global accent values; keep the A3 GPU sidecar contract unchanged.
+7. Make surface-light and atmospheric source presentation consume resolved snapshot source colour/intensity rather than one renderer-selected source state.
+8. Remove SourceKind-family filtering from the renderer feature/pass and partition Final Composite draws into compatible presentation groups using fixed reusable CPU storage.
+9. Keep the current automatic atmospheric population on inherited Controller Default Preset semantics and update internal terminology only; do not change A1/A2 population calculus.
+10. Update Controller, Anchor, and preset authoring labels/help/status/reporting for Default Preset, Preset Override, resolved preset, source policy, and per-ray vegetation authority.
+11. Reconcile canonical Weather and vegetation current-state documentation while preserving historical records as explicitly historical.
+12. Run final scope/diff audit, symbol/consumer audit, descriptor-constructor audit, sidecar-layout equality check, renderer/shader boundary audit, lexical/delimiter checks, and available C# compilation/static checks. Record Unity validation as pending with exact final Inspector routes verified from final source.
+
+### Risks and safeguards
+
+- **False per-ray support:** fail the patch if any production renderer/surface/vegetation path still derives appearance from Controller `activePreset` after a descriptor/snapshot exists.
+- **Vegetation cross-ray leakage:** sidecar parameters must be derived from the matching slot descriptor for each Spot Light; preserve indexed identity and source direction.
+- **Renderer group explosion:** cost scales with distinct incompatible presentation groups, not ray count. Common identical weather rays must resolve to one group. Group storage is fixed/reused; no memory-backed anti-repeat or general cache is added.
+- **Screen-space surface mismatch:** because surface influence requires per-zone centre/bounds, an active screen-space surface response may not be batched with another ray unless the complete shared composite state is compatible.
+- **Source-family omission:** final production preparation must scan all visible rays and must not discard Sun/Moon/Independent rays because another source kind was encountered first.
+- **Source-colour regression:** preserve the existing source colour/intensity and Sun warmth calculation, but resolve its numeric output before rendering.
+- **Default-transition bleed:** explicit override rays must not interpolate when only the Controller default changes.
+- **Serialized data loss:** do not delete legacy Anchor/Controller serialized appearance fields or raw-edit scenes/prefabs/preset assets in A4.
+- **A1/A2 population regression:** keep footprint projection, candidate randomization, activation identity, lifetime, cloud qualification, and no-history policy unchanged.
+- **A3 sidecar regression:** no HLSL, sidecar-record-layout, stride, URP-ordering, or camera-binding change.
+
+### Acceptance criteria
+
+- Controller Inspector presents `activePreset` as **Default Preset**.
+- Anchor Inspector exposes **Preset Override** and **Source Kind**.
+- Preset Inspector explicitly exposes Surface Response with **Vegetation Accent Intensity**, **Vegetation Accent Coverage**, and **Vegetation Accent Softness**; no preset source-kind authoring is shown.
+- authored and procedural rays resolve override-first/default-second preset authority; missing both fails clearly.
+- two simultaneous rays using different presets retain different descriptor colour/softening/vegetation values.
+- automatic atmospheric rays with no override continue inheriting the Controller default and preserve current population behavior.
+- vegetation sidecar records differ per LightRay Spot when resolved preset accent values differ; the two-`float4` GPU layout is unchanged.
+- setting one preset's vegetation accent intensity to zero keeps sidecar override `w = 1` for that ray while its Weather-specific accent strength is zero.
+- Final Composite renders all visible source kinds and does not select one global source family.
+- compatible weather rays produce one presentation group; incompatible preset/source presentation produces multiple groups.
+- no per-frame managed allocation is introduced by grouping after warm-up/capacity growth.
+- default-preset transitions affect inherited rays only; explicit override rays remain on their override.
+- Renderer Feature/Render Pass do not consult Controller Default Preset for per-ray appearance.
+- cloud producer, cloud shaders, population qualification/footprint/turnover, beam-evolution calculus, surface Spot geometry, vegetation HLSL, and vegetation shader behavior remain unchanged except for receiving the correct per-ray sidecar values.
+- C# source and shaders compile with zero Unity errors; runtime validation confirms simultaneous inherited and override rays, vegetation response, automatic population, and no missing-SRV warning.
+
+### V1.3A4 implementation status
+
+- [x] Complete source/consumer/producer/shared-contract review.
+- [x] Record approved scope, invariants, authoring contract, risks, and acceptance gates before code edits.
+- [x] Shared per-ray contracts implemented.
+- [x] Preset/Anchor authoring implemented.
+- [x] Runtime per-slot preset resolution implemented.
+- [x] Per-ray vegetation sidecar publication implemented.
+- [x] Per-ray source presentation implemented.
+- [x] Presentation-group renderer implemented.
+- [x] Documentation reconciliation completed.
+- [x] Final static/cross-subsystem audit completed: 93/93 available checks passed before packaging.
+- [ ] Unity compilation and runtime validation completed. Unity 6000.5.0f1 is unavailable in the implementation environment; validate the delivered overlay in the live project.
+
+### V1.3A4 implementation audit
+
+- The final source diff is restricted to the 15 approved files. No scene, prefab, preset asset, material, renderer asset, `.meta`, layer, tag, package, or project-setting file changed.
+- The automatic-population implementation is behaviorally unchanged from the accepted A3 baseline except for `ActivePreset` → `DefaultPreset` terminology and forwarding the optional request preset override through the existing cloud-aware spawn helper. A1 footprint recovery and A2 stateless turnover logic are unchanged.
+- The protected vegetation sidecar C# record/stride and the vegetation HLSL/shader consumers are byte-identical to A3. `_TEST.asset`, cloud runtime/cookie generation, LightRay common HLSL, and LightRay mask/scatter/composite shaders are byte-identical to A3.
+- Runtime preset authority is now override-first/default-second per slot. Legacy serialized Anchor/Controller appearance fields remain physically present for deferred migration safety but are not used to construct an active ray descriptor.
+- Vegetation accent intensity/coverage/softness are resolved into each ray descriptor and published independently per LightRay Spot. The sidecar override flag remains `1` even when the ray's vegetation accent intensity resolves to zero.
+- The renderer no longer asks the Controller for a single renderable source family or Controller preset. Resolved source colour/intensity/direction arrive on each snapshot. Final Composite partitions compatible rays into deterministic reusable presentation groups; debug views intentionally retain the previous single combined diagnostic presentation.
+- Group storage is array-backed and reused. No LINQ, dictionary grouping, recent-history cache, or unbounded per-frame collection was introduced. The common compatible-weather case remains one mask/soften/composite sequence.
+- RenderGraph group sequencing explicitly reads the prior group's camera-colour result before publishing the next group's reused mask global, preventing later group mask/softening globals from being reordered ahead of an earlier composite.
+- No material deviation from the approved architecture was required. The only implementation clarification is that active screen-space surface response is conservatively isolated into its own presentation group because its final composite uses per-ray screen bounds/centre state. Current curated LightRay presets have that response disabled, so this does not alter the normal weather-group count.
+- Available static closure result before packaging: 93 checks passed, 0 failed. Unity C# import, shader compilation, and Play Mode behavior remain unverified until live-project validation.
 
 ## V1.3A3 — Vegetation sidecar closure plan
 
@@ -312,7 +476,7 @@ Historical V1.3A stopped at the Controller/Inspector boundary and deliberately l
 
 ### Serialized migration
 
-Legacy Controller and Anchor appearance fields and preset `SourceKind` remain until the later serialized migration audit. This patch does not claim mandatory preset authority is complete.
+At the historical V1.3A boundary, legacy Controller and Anchor appearance fields and preset `SourceKind` remained until the later serialized migration audit. V1.3A4 removes runtime preset `SourceKind` authority and stops using legacy Anchor appearance as runtime authority, while physical serialized-field deletion remains deferred.
 
 ### Source coupling
 

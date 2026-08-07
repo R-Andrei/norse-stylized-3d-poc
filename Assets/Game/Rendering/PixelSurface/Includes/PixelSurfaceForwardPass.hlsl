@@ -5,9 +5,13 @@
 // Generated Mass is failing per-surface directional-light coherence. The target
 // is NOT global darkness, exposure, ambient strength, or specular magnitude.
 // Under the same light, each source face and bevel must respond according to its
-// own orientation; a bevel between two parent orientations must not randomly
-// become darker than both or brighter than both. Do not accept average-luminance
-// or BRDF parity as closure while orientation/order inversions remain.
+// own measured orientation. A bevel outside both parent responses is an orientation
+// defect only when its measured NdotL predicts an intermediate response between
+// those parents. Do not accept average-luminance or BRDF parity as closure while
+// measured orientation/response inversions remain.
+// GM-SURFACE.5Q adds audit-only cumulative albedo/direct checkpoints plus raw
+// mask/scalar outputs. Every executable branch added by 5Q is compiled only
+// under _SURFACE_CAUSALITY_AUDIT; ordinary production variants are unchanged.
 
 #if defined(_SURFACE_CAUSALITY_AUDIT)
             int ResolveSurfaceCausalityMode()
@@ -53,6 +57,13 @@
                 if (ResolveSurfaceCausalityMode() == 20)
                 {
                     return baseSample.rgb * _BaseColor.rgb;
+                }
+                if (ResolveSurfaceCausalityMode() == 40)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        baseSample.rgb * _BaseColor.rgb,
+                        input,
+                        normalize(input.normalWS));
                 }
 #endif
 
@@ -106,6 +117,13 @@
                 if (ResolveSurfaceCausalityMode() == 21)
                 {
                     return baseSample.rgb * _BaseColor.rgb * tonalScale;
+                }
+                if (ResolveSurfaceCausalityMode() == 41)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        baseSample.rgb * _BaseColor.rgb * tonalScale,
+                        input,
+                        normalize(input.normalWS));
                 }
 #endif
 
@@ -196,6 +214,43 @@
                     generatedMassSemanticScale,
                     groundSemanticScale,
                     isGroundSurface);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                int stageAttributionMode = ResolveSurfaceCausalityMode();
+                if (stageAttributionMode == 32)
+                {
+                    return half3(input.color.r, input.color.g, input.color.b);
+                }
+                if (stageAttributionMode == 33)
+                {
+                    float normalY = normalize((float3)input.normalOS).y;
+                    return half3(
+                        saturate((float)input.materialMasks.y),
+                        ResolveGeneratedMassHeight01(input),
+                        normalY * 0.5 + 0.5);
+                }
+                if (stageAttributionMode == 34)
+                {
+                    return half3(exposureMask, creviceMask, baseMask);
+                }
+                if (stageAttributionMode == 35)
+                {
+                    return half3(
+                        dirtDepositMask,
+                        exposureVisual,
+                        creviceVisual);
+                }
+                if (stageAttributionMode == 36)
+                {
+                    return half3(
+                        baseVisual,
+                        dirtDepositVisual,
+                        ResolveGeneratedMassMottleNoise(input));
+                }
+                if (stageAttributionMode == 37)
+                {
+                    return half3(tonalScale, semanticScale, profileContrast);
+                }
+#endif
 
                 half3 albedo =
                     baseSample.rgb *
@@ -206,6 +261,11 @@
                 if (ResolveSurfaceCausalityMode() == 22)
                 {
                     return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 42)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
                 }
 #endif
 
@@ -245,6 +305,11 @@
                 {
                     return albedo;
                 }
+                if (ResolveSurfaceCausalityMode() == 43)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
 #endif
 
                 half3 exposureTintTarget =
@@ -261,6 +326,17 @@
                     albedo,
                     exposureTintTarget,
                     (half)saturate(exposureTintOpacity));
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 25)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 44)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 // Dedicated crevice layer: profile-aware depth/occlusion.
                 // Response 1.0 is intentionally stronger than H2L response 2.0.
@@ -292,6 +368,17 @@
                     albedo,
                     creviceTarget,
                     (half)saturate(creviceOpacity));
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 26)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 45)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 // Dedicated base/contact layer: broader grounding, less deep
                 // than crevice, controlled only by Base Response.
@@ -322,6 +409,17 @@
                     albedo,
                     baseTarget,
                     (half)saturate(baseOpacity));
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 27)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 46)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 // Dedicated dirt/deposit layer. Response 1.0 is calibrated to
                 // land near the previous H2L response 2.0 visual strength, but
@@ -353,6 +451,17 @@
                     albedo,
                     dirtTarget,
                     (half)saturate(dirtOpacity));
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 28)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 47)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 float dampGatherMask =
                     saturate(
@@ -381,6 +490,11 @@
                 if (ResolveSurfaceCausalityMode() == 24)
                 {
                     return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 48)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
                 }
 #endif
 
@@ -412,10 +526,32 @@
                     albedo,
                     _FrostColor.rgb,
                     (half)(frostMask * 0.62));
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 29)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 49)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 float wetGlobalDarken =
                     wetness * saturate(_WetDarkenStrength) * 0.36;
                 albedo *= (half)max(0.0, 1.0 - wetGlobalDarken);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 30)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 50)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 float monolithicRelief =
                     broadValue * 0.028 +
@@ -428,6 +564,17 @@
                     albedo,
                     monolithicTarget,
                     (half)monolithicFlatten);
+#if defined(_SURFACE_CAUSALITY_AUDIT)
+                if (ResolveSurfaceCausalityMode() == 31)
+                {
+                    return albedo;
+                }
+                if (ResolveSurfaceCausalityMode() == 51)
+                {
+                    return ResolveSurfaceCausalityMainDirect(
+                        albedo, input, normalize(input.normalWS));
+                }
+#endif
 
                 return albedo;
             }
@@ -692,8 +839,26 @@
                     return half4(debugColor, 1.0h);
                 }
 
+                if (causalityMode == 55 || causalityMode == 56)
+                {
+                    Light auditMainLight = GetMainLight(
+                        TransformWorldToShadowCoord(input.positionWS));
+                    if (causalityMode == 55)
+                    {
+                        return half4(
+                            saturate(dot(storedNormalWS, auditMainLight.direction)),
+                            auditMainLight.distanceAttenuation,
+                            auditMainLight.shadowAttenuation,
+                            1.0h);
+                    }
+                    return half4(
+                        auditMainLight.direction * 0.5h + 0.5h,
+                        1.0h);
+                }
+
                 half3 albedo = ResolvePixelSurfaceColor(input);
-                if (causalityMode >= 20 && causalityMode <= 24)
+                if ((causalityMode >= 20 && causalityMode <= 37) ||
+                    (causalityMode >= 40 && causalityMode <= 51))
                 {
                     return half4(albedo, 1.0h);
                 }
@@ -709,6 +874,15 @@
                 if (causalityMode == 1)
                 {
                     return half4(albedo, 1.0h);
+                }
+                if (causalityMode == 54)
+                {
+                    return half4(
+                        ResolveSurfaceCausalityMainDirect(
+                            albedo,
+                            input,
+                            storedNormalWS),
+                        1.0h);
                 }
                 if (causalityMode == 5)
                 {
