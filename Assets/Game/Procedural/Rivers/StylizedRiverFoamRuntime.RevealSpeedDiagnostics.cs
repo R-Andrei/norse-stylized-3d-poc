@@ -11,7 +11,7 @@ namespace ProgrammaticStylized3D.Rivers
             topologyCacheDiagnosticRunCount++;
             topologyCacheDiagnosticState = "Running";
             topologyCacheDiagnosticSummary =
-                "Capturing automatic Layer C reveal-speed timing evidence.";
+                "Validating literal cells/s automatic reveal kinematics.";
             topologyCacheDiagnosticReport = string.Empty;
             topologyCacheDiagnosticReportPath = string.Empty;
 
@@ -21,9 +21,10 @@ namespace ProgrammaticStylized3D.Rivers
                 return FinalizeAutomaticBirthRevealSpeedReport(
                     BuildUnavailableAutomaticBirthRevealSpeedReport(
                         "The reveal-speed report requires Play Mode so active " +
-                        "events, pool occupancy, and rejected starts are real."),
+                        "events and captured authoring speeds are real."),
                     false,
-                    "The reveal-speed report is Play Mode only.");
+                    "The reveal-speed report is Play Mode only.",
+                    true);
             }
 
             if (river == null)
@@ -32,55 +33,85 @@ namespace ProgrammaticStylized3D.Rivers
                     BuildUnavailableAutomaticBirthRevealSpeedReport(
                         "No StylizedRiver owner is available."),
                     false,
-                    "No StylizedRiver owner is available.");
+                    "No StylizedRiver owner is available.",
+                    true);
             }
 
-            StringBuilder report = new(16384);
+            StringBuilder report = new(24576);
             report.AppendLine(
                 "RIVER FOAM AUTOMATIC BIRTH REVEAL-SPEED REPORT");
             report.AppendLine(BuildCommonEnvironmentHeader());
             report.AppendLine(
-                "Contract: requested speed = Base Reveal Speed × pattern " +
-                "multiplier × deterministic jitter; resolved duration = " +
-                "max(material step, path distance / requested speed).");
-            report.AppendLine(
-                "Arc/Semi-Arc full packets resolve separate finite timing for the " +
-                "initial full-ring-plus-wake stroke and later recipe contact strokes. " +
-                "Independent maintenance uses one recipe contact stroke, emits no " +
-                "wake arms, and does not change full-packet eligibility.");
+                "D9 contract: headDistanceCells = speedCellsPerSecond × " +
+                "elapsedSeconds, clamped to stroke path length; duration = " +
+                "pathLengthCells / speedCellsPerSecond. No family m/s base, " +
+                "pattern multiplier, speed jitter, or material-tick duration " +
+                "floor participates in reveal timing.");
             report.AppendLine();
 
-            float updateRate = ResolveUpdateRate();
-            float materialStepDuration = 1f / Mathf.Max(1f, updateRate);
-            report.AppendLine("RUNTIME SUMMARY");
-            report.AppendLine($"Material update rate: {updateRate:0.###} Hz");
+            bool passed = true;
+            report.AppendLine("KINEMATICS MATRIX");
+            float[] lengths = { 3f, 8f, 15f, 31f };
+            float[] speeds = { 1f, 2f, 5f, 10f, 100f };
+            float[] rates = { 8f, 12f, 16f };
+            for (int lengthIndex = 0; lengthIndex < lengths.Length; lengthIndex++)
+            {
+                float length = lengths[lengthIndex];
+                for (int speedIndex = 0; speedIndex < speeds.Length; speedIndex++)
+                {
+                    float speed = speeds[speedIndex];
+                    ResolvedAutomaticRevealKinematics kinematics =
+                        ResolveAutomaticRevealKinematics(length, speed);
+                    float expectedDuration = length / speed;
+                    bool durationPass = Mathf.Abs(
+                        kinematics.DurationSeconds - expectedDuration) <= 0.000001f;
+                    passed &= durationPass;
+                    report.AppendLine(
+                        $"  L={length:0.###} cells, v={speed:0.###} cells/s " +
+                        $"=> T={kinematics.DurationSeconds:0.######} s " +
+                        $"[{(durationPass ? "PASS" : "FAIL")}]");
+
+                    for (int rateIndex = 0; rateIndex < rates.Length; rateIndex++)
+                    {
+                        float rate = rates[rateIndex];
+                        float dt = 1f / rate;
+                        float previousHead = 0f;
+                        bool monotonic = true;
+                        bool exactVelocity = true;
+                        int ticks = Mathf.CeilToInt(expectedDuration / dt) + 1;
+                        for (int tick = 1; tick <= ticks; tick++)
+                        {
+                            float elapsed = Mathf.Min(
+                                expectedDuration,
+                                tick * dt);
+                            float head = ResolveAutomaticRevealHeadDistanceCells(
+                                length,
+                                speed,
+                                elapsed);
+                            float expectedHead = Mathf.Min(
+                                length,
+                                speed * elapsed);
+                            monotonic &= head + 0.000001f >= previousHead;
+                            exactVelocity &= Mathf.Abs(head - expectedHead) <=
+                                0.00001f;
+                            previousHead = head;
+                        }
+
+                        bool completion = Mathf.Abs(previousHead - length) <=
+                            0.00001f;
+                        passed &= monotonic && exactVelocity && completion;
+                        report.AppendLine(
+                            $"    {rate:0} Hz: monotonic={monotonic}; " +
+                            $"exactHead={exactVelocity}; completion={completion}");
+                    }
+                }
+            }
+
+            report.AppendLine();
             report.AppendLine(
-                $"Material step duration: {materialStepDuration:0.######} s");
-            report.AppendLine(
-                $"Object contact reinforcement: " +
-                $"{(river.FoamObjectContactReinforcementEnabled ? "enabled" : "disabled")}; " +
-                $"interval={river.FoamObjectContactReinforcementIntervalSeconds:0.###} s");
-            report.AppendLine(
-                $"Automatic event pool: {activeAutomaticFoamSourceEventCount}/" +
-                $"{automaticFoamSourceEvents.Length} active");
-            report.AppendLine(
-                $"Rasterized this material update: " +
-                $"{automaticSourceEventsRasterizedLastUpdate}");
-            report.AppendLine(
-                $"Shore starts/rejected last update: " +
-                $"{automaticShoreBirthSubmittedLastUpdate}/" +
-                $"{automaticShoreBirthRejectedLastUpdate}; total starts=" +
-                $"{automaticShoreBirthSubmittedTotal}");
-            report.AppendLine(
-                $"Object starts/rejected last update: " +
-                $"{automaticObjectBirthSubmittedLastUpdate}/" +
-                $"{automaticObjectBirthRejectedLastUpdate}; total starts=" +
-                $"{automaticObjectBirthSubmittedTotal}");
-            report.AppendLine(
-                $"Free-Water starts/rejected last update: " +
-                $"{automaticFreeWaterBirthSubmittedLastUpdate}/" +
-                $"{automaticFreeWaterBirthRejectedLastUpdate}; total starts=" +
-                $"{automaticFreeWaterBirthSubmittedTotal}");
+                "HARD EXAMPLES: 15 cells / 1 cell/s = 15.000 s; " +
+                "15 cells / 5 cells/s = 3.000 s; " +
+                "15 cells / 100 cells/s = 0.150 s.");
             report.AppendLine();
 
             report.AppendLine("LATEST OBSERVED TIMING BY RECIPE");
@@ -95,14 +126,13 @@ namespace ProgrammaticStylized3D.Rivers
                 AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector,
                 AutomaticFoamSourceEventType.FreeWaterTornFragment
             };
-
             for (int recipeIndex = 0;
                  recipeIndex < recipeOrder.Length;
                  recipeIndex++)
             {
                 AutomaticFoamSourceEventType sourceType =
                     recipeOrder[recipeIndex];
-                AppendAutomaticRevealTiming(
+                passed &= AppendAutomaticRevealTiming(
                     report,
                     sourceType,
                     CountActiveAutomaticSourceEvents(sourceType));
@@ -123,73 +153,43 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 anyActive = true;
-                bool objectContactCycle =
-                    IsAutomaticObjectContactCycle(sourceEvent.Type);
-                float strokePhase = sourceEvent.SideSign;
-                float strokeProgress = Mathf.Clamp01(
-                    sourceEvent.Elapsed /
-                    Mathf.Max(0.0001f, sourceEvent.Duration));
-                if (objectContactCycle)
-                {
-                    ResolveAutomaticSourceDepositionState(
-                        sourceEvent,
-                        sourceEvent.Elapsed,
-                        out strokePhase,
-                        out strokeProgress);
-                }
-                float revealDuration = objectContactCycle
-                    ? ResolveAutomaticObjectContactPhaseDuration(
-                        sourceEvent,
-                        strokePhase)
-                    : sourceEvent.Duration;
-                float revealPath = objectContactCycle
-                    ? ResolveAutomaticObjectContactPhasePathLength(
-                        sourceEvent,
-                        strokePhase)
-                    : sourceEvent.RevealPathDistanceMetres;
-                float actualSpeed = revealPath /
-                    Mathf.Max(0.0001f, revealDuration);
+                ResolveAutomaticSourceDepositionState(
+                    sourceEvent,
+                    sourceEvent.Elapsed,
+                    out float phaseCode,
+                    out float headDistanceCells);
+                float activePathLengthCells =
+                    IsAutomaticObjectContactCycle(sourceEvent.Type)
+                        ? ResolveAutomaticObjectContactPhasePathLengthCells(
+                            sourceEvent,
+                            phaseCode)
+                        : sourceEvent.RevealPathLengthCells;
+                float speed = Mathf.Max(
+                    0.0001f,
+                    sourceEvent.RevealSpeedCellsPerSecond);
+                float expectedPhaseDuration =
+                    activePathLengthCells / speed;
+                float storedPhaseDuration =
+                    IsAutomaticObjectContactCycle(sourceEvent.Type) &&
+                    phaseCode >= 0.5f
+                        ? sourceEvent.ObjectContactStrokeDuration
+                        : sourceEvent.ObjectBuildDuration > 0f
+                            ? sourceEvent.ObjectBuildDuration
+                            : sourceEvent.Duration;
+                bool durationPass = Mathf.Abs(
+                    storedPhaseDuration - expectedPhaseDuration) <= 0.0001f;
+                passed &= durationPass;
                 report.AppendLine(
                     $"Slot {index:00} / Event {sourceEvent.EventId} / " +
                     $"{AutomaticRevealSourceName(sourceEvent.Type)}");
                 report.AppendLine(
-                    $"  elapsed={sourceEvent.Elapsed:0.###} s; " +
-                    $"activeStrokeDuration={revealDuration:0.###} s; " +
-                    $"activePath={revealPath:0.###} m");
-                if (objectContactCycle)
-                {
-                    if (sourceEvent.ObjectContactReinforcementOnly)
-                    {
-                        report.AppendLine(
-                            $"  mode=recipe contact reinforcement; " +
-                            $"strokeProgress={strokeProgress:0.###}; " +
-                            $"eventDuration={sourceEvent.Duration:0.###} s");
-                    }
-                    else
-                    {
-                        report.AppendLine(
-                            $"  mode=full packet burst; " +
-                            $"stroke={(int)strokePhase + 1}/" +
-                            $"{Mathf.Clamp(sourceEvent.ObjectContactStrokeCount, 1, 3)}; " +
-                            $"strokeProgress={strokeProgress:0.###}; " +
-                            $"initialDuration={sourceEvent.ObjectBuildDuration:0.###} s; " +
-                            $"contactDuration={sourceEvent.ObjectContactStrokeDuration:0.###} s; " +
-                            $"totalBurstDuration={sourceEvent.Duration:0.###} s");
-                    }
-                }
-                float activeRawDuration = objectContactCycle &&
-                    strokePhase >= 0.5f
-                        ? sourceEvent.ObjectContactStrokeRawRevealDurationSeconds
-                        : sourceEvent.RawRevealDurationSeconds;
-                bool activeCadenceLimited = objectContactCycle &&
-                    strokePhase >= 0.5f
-                        ? sourceEvent.ObjectContactStrokeRevealCadenceLimited
-                        : sourceEvent.RevealCadenceLimited;
+                    $"  speed={speed:0.###} cells/s; " +
+                    $"phase={(int)phaseCode}; path={activePathLengthCells:0.###} cells; " +
+                    $"head={headDistanceCells:0.###} cells");
                 report.AppendLine(
-                    $"  requested={sourceEvent.FormationSpeedMetresPerSecond:0.###} m/s; " +
-                    $"rawActive={activeRawDuration:0.###} s; " +
-                    $"actualActive={actualSpeed:0.###} m/s; " +
-                    $"cadenceLimited={activeCadenceLimited}");
+                    $"  storedPhaseDuration={storedPhaseDuration:0.######} s; " +
+                    $"expected={expectedPhaseDuration:0.######} s; " +
+                    $"{(durationPass ? "PASS" : "FAIL")}");
             }
 
             if (!anyActive)
@@ -199,11 +199,15 @@ namespace ProgrammaticStylized3D.Rivers
 
             report.AppendLine();
             report.AppendLine(
-                "REPORT VERDICT: PASS — live timing and capacity evidence captured.");
+                passed
+                    ? "REPORT VERDICT: PASS — literal cells/s kinematics validated."
+                    : "REPORT VERDICT: FAIL — one or more literal cells/s invariants failed.");
             return FinalizeAutomaticBirthRevealSpeedReport(
                 report.ToString(),
-                true,
-                "Automatic birth reveal-speed evidence captured.");
+                passed,
+                passed
+                    ? "Automatic reveal-speed cells/s invariants passed."
+                    : "Automatic reveal-speed cells/s invariants failed.");
         }
 
         private int CountActiveAutomaticSourceEvents(
@@ -224,7 +228,7 @@ namespace ProgrammaticStylized3D.Rivers
             return count;
         }
 
-        private void AppendAutomaticRevealTiming(
+        private bool AppendAutomaticRevealTiming(
             StringBuilder report,
             AutomaticFoamSourceEventType sourceType,
             int activeCount)
@@ -240,21 +244,24 @@ namespace ProgrammaticStylized3D.Rivers
                 report.AppendLine(
                     "  No event of this recipe has started during the current " +
                     "automatic-source session.");
-                return;
+                return true;
             }
 
             AutomaticRevealTimingTelemetry timing =
                 automaticRevealTimingByType[telemetryIndex];
+            float expectedDuration = timing.PathLengthCells /
+                Mathf.Max(0.0001f, timing.RequestedSpeedCellsPerSecond);
+            bool pass = Mathf.Abs(
+                timing.DurationSeconds - expectedDuration) <= 0.0001f;
             report.AppendLine(
                 $"  latestEvent={timing.EventId}; " +
-                $"path={timing.PathDistanceMetres:0.###} m");
+                $"path={timing.PathLengthCells:0.###} cells; " +
+                $"speed={timing.RequestedSpeedCellsPerSecond:0.###} cells/s");
             report.AppendLine(
-                $"  requested={timing.RequestedSpeedMetresPerSecond:0.###} m/s; " +
-                $"rawDuration={timing.RawDurationSeconds:0.###} s; " +
-                $"resolvedDuration={timing.ResolvedDurationSeconds:0.###} s");
-            report.AppendLine(
-                $"  actual={timing.ActualSpeedMetresPerSecond:0.###} m/s; " +
-                $"cadenceLimited={timing.CadenceLimited}");
+                $"  duration={timing.DurationSeconds:0.######} s; " +
+                $"expected={expectedDuration:0.######} s; " +
+                $"{(pass ? "PASS" : "FAIL")}");
+            return pass;
         }
 
         private static string AutomaticRevealSourceName(
@@ -296,9 +303,12 @@ namespace ProgrammaticStylized3D.Rivers
         private bool FinalizeAutomaticBirthRevealSpeedReport(
             string report,
             bool passed,
-            string summary)
+            string summary,
+            bool unavailable = false)
         {
-            topologyCacheDiagnosticState = passed ? "Passed" : "Unavailable";
+            topologyCacheDiagnosticState = passed
+                ? "Passed"
+                : unavailable ? "Unavailable" : "Failed";
             topologyCacheDiagnosticSummary = summary ?? string.Empty;
             topologyCacheDiagnosticReport = report ?? string.Empty;
             if (!TryWriteLatestDiagnosticReport(
@@ -329,7 +339,8 @@ namespace ProgrammaticStylized3D.Rivers
             else
             {
                 Debug.LogWarning(
-                    "[River Foam Reveal Speed] UNAVAILABLE — " +
+                    "[River Foam Reveal Speed] " +
+                    (unavailable ? "UNAVAILABLE" : "FAIL") + " — " +
                     topologyCacheDiagnosticReportPath,
                     river != null ? river : this);
             }

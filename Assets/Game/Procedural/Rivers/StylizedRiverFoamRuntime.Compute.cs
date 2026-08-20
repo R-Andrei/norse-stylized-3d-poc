@@ -69,6 +69,9 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetVector(
                 FoamGridDescriptorExtentId,
                 gridDescriptorGpuData.Extent);
+            computeShader.SetInt(
+                "_FoamMaterialContract",
+                river != null ? (int)river.FoamMaterialContract : 0);
         }
 
         private void ConfigureSharedComputeParameters(
@@ -155,11 +158,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetFloat(
                 "_FoamTransportMetricFixedPointScale",
                 TransportMetricFixedPointScale);
-            StylizedRiverFoamTransportScheme transportScheme =
-                river.FoamTransportScheme;
-            computeShader.SetInt(
-                "_FoamTransportScheme",
-                (int)transportScheme);
             computeShader.SetInt(
                 "_FoamBulkTransportIntegerShift",
                 bulkTransportIntegerShift);
@@ -317,6 +315,7 @@ namespace ProgrammaticStylized3D.Rivers
                     "_FoamTransportMetrics",
                     transportMetricsBuffer);
             }
+
         }
 
         private void ConfigureTransportSubstepDiagnostics(
@@ -332,9 +331,6 @@ namespace ProgrammaticStylized3D.Rivers
             computeShader.SetInt("_FoamRangeStart", startX);
             computeShader.SetInt("_FoamRangeCount", countX);
 
-            // Every supported material mode remains one
-            // full-field dispatch per CFL-safe substep. Donor/TVD use face fluxes;
-            // Bulk-Phase TVD adds only scalar phase/offset parameters.
             Dispatch(simulateKernel, countX, fieldHeight);
         }
 

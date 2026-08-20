@@ -821,17 +821,14 @@ namespace ProgrammaticStylized3D.Rivers
             e.FeatherMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
                 ? 1f
                 : headWidthCells;
-            e.RevealPathDistanceMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
-                ? Mathf.Max(1f, lengthCells)
-                : Mathf.Max(dx, lengthCells * dx);
+            e.RevealPathLengthCells = Mathf.Max(1f, lengthCells);
             e.HeadTrailMetres = type == AutomaticFoamSourceEventType.ShoreRibbon
                 ? 1f
                 : headLengthCells * dx;
-            e.FormationSpeedMetresPerSecond = Mathf.Max(dx, lengthCells * dx);
+            e.RevealSpeedCellsPerSecond = Mathf.Max(1f, lengthCells);
             e.ObjectSourceLateralCellSpacingMetres = dy;
             e.ObjectWakeArmLengthMetres = lengthCells * dx;
-            e.ObjectContactPathLengthMetres = lengthCells * dx;
-            e.ObjectContactStrokePathLengthMetres = lengthCells * dx;
+            e.ObjectContactStrokePathLengthCells = lengthCells;
             e.ObjectCentreAcrossMetres = centreLateral;
             e.CentreAcrossNormalized = ResolveSourceAcrossNormalized(
                 centreGlobal, centreLateral);
@@ -1699,13 +1696,10 @@ namespace ProgrammaticStylized3D.Rivers
             bool recipeCompleteReinforcement =
                 CountP7TextOccurrences(
                     computeSource,
-                    "return saturate(frontShape * reinforcementPhase);") == 2 &&
-                computeSource.IndexOf(
-                    "FoamResolveFullObjectContactRing(",
-                    StringComparison.Ordinal) >= 0 &&
-                computeSource.IndexOf(
-                    "ringShape * ringPhase",
-                    StringComparison.Ordinal) >= 0 &&
+                    "bool contactOnlyPhase = sourceEvent.header.y >= 0.5;") == 2 &&
+                CountP7TextOccurrences(
+                    computeSource,
+                    "if (!contactOnlyPhase)") == 2 &&
                 computeSource.IndexOf(
                     "sourceEvent.deposit.w",
                     StringComparison.Ordinal) >= 0;
@@ -1736,10 +1730,13 @@ namespace ProgrammaticStylized3D.Rivers
                     "reinforcementElapsed / contactStrokeDuration",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "ResolveAutomaticObjectContactPhaseDuration",
+                    "ResolveAutomaticObjectContactPhasePathLengthCells",
                     StringComparison.Ordinal) >= 0 &&
                 injectionSource.IndexOf(
-                    "ObjectContactStrokePathLengthMetres",
+                    "ObjectContactStrokePathLengthCells",
+                    StringComparison.Ordinal) >= 0 &&
+                injectionSource.IndexOf(
+                    "DispatchAutomaticObjectRevealSlices",
                     StringComparison.Ordinal) >= 0;
             bool absoluteTargetPreserved =
                 computeSource.IndexOf(
@@ -1839,21 +1836,20 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectCentreGlobalDistance = centreGlobal,
                 Duration = type == AutomaticFoamSourceEventType.ObjectContactArc ||
                     type == AutomaticFoamSourceEventType.ObjectContactSemiArc
-                        ? 1.1f
+                        ? 1.0f
                         : 0.7f,
                 Elapsed = 0.65f,
                 ObjectBuildDuration = 0.7f,
-                ObjectContactStrokeDuration = 0.4f,
-                ObjectContactStrokePathLengthMetres = 1.2f,
-                ObjectContactStrokeRawRevealDurationSeconds = 0.35f,
-                ObjectContactStrokeRevealCadenceLimited = false,
+                ObjectContactStrokeDuration = 0.3f,
+                ObjectContactStrokePathLengthCells = 1.2f,
                 ObjectContactStrokeCount =
                     type == AutomaticFoamSourceEventType.ObjectContactArc ||
                     type == AutomaticFoamSourceEventType.ObjectContactSemiArc
                         ? 2
                         : 1,
                 ObjectContactReinforcementOnly = false,
-                FormationSpeedMetresPerSecond = 0.55f,
+                RevealSpeedCellsPerSecond = 4f,
+                RevealPathLengthCells = 2.8f,
                 HeadTrailMetres = 0.45f,
                 ShoreInsetMetres = 0.05f,
                 WidthMetres = 0.20f,
@@ -1877,7 +1873,6 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectContactOffsetMetres = 0.12f,
                 ObjectSourceLateralCellSpacingMetres = fixedSpacing,
                 ObjectWakeArmLengthMetres = 1.4f,
-                ObjectContactPathLengthMetres = 3.2f,
                 ObjectContactPoint0 = new Vector2(startGlobal, centreLateral),
                 ObjectContactPoint1 = new Vector2(
                     centreGlobal - 0.45f,

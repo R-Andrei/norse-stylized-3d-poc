@@ -17,9 +17,7 @@ namespace ProgrammaticStylized3D.Rivers
             public int Width;
             public int Height;
             public float Interpolation;
-            public StylizedRiverFoamTransportScheme TransportScheme;
-            public StylizedRiverFinalFoamVisibilityMode VisibilityMode;
-            public StylizedRiverFoamPresenceFootprintMode PresenceMode;
+            public StylizedRiverFoamMaterialContract MaterialContract;
             public bool StateHeld;
             public StylizedRiverFoamGridDescriptor GridDescriptor;
             public ushort[] PreviousData;
@@ -83,9 +81,7 @@ namespace ProgrammaticStylized3D.Rivers
                     Width = fieldWidth,
                     Height = fieldHeight,
                     Interpolation = Mathf.Clamp01(simulationInterpolation),
-                    TransportScheme = river.FoamTransportScheme,
-                    VisibilityMode = river.FoamFinalVisibilityMode,
-                    PresenceMode = river.FoamPresenceFootprintMode,
+                    MaterialContract = river.FoamMaterialContract,
                     StateHeld = river.FoamStateHeld,
                     GridDescriptor = gridDescriptor
                 };
@@ -221,6 +217,8 @@ namespace ProgrammaticStylized3D.Rivers
             double totalLifeAmount = 0.0;
             double totalBase = 0.0;
             float interpolation = Mathf.Clamp01(capture.Interpolation);
+            bool coverageLife = capture.MaterialContract ==
+                StylizedRiverFoamMaterialContract.CoverageLife;
 
             for (long cellIndex = 0; cellIndex < totalCells; cellIndex++)
             {
@@ -257,6 +255,11 @@ namespace ProgrammaticStylized3D.Rivers
                 float coverage = legacyPackedState
                     ? materialAmount
                     : storedCoverage;
+                if (coverageLife)
+                {
+                    materialAmount = coverage;
+                    lifeMoment = Mathf.Clamp(lifeMoment, 0f, coverage);
+                }
 
                 if (coverage <= 0f && materialAmount <= 0f)
                 {
@@ -271,8 +274,7 @@ namespace ProgrammaticStylized3D.Rivers
                 }
 
                 float baseVisibility = ResolveDiagnosticBaseVisibility(
-                    coverage,
-                    capture.VisibilityMode);
+                    coverage);
                 int bucket = ResolveCoverageDiagnosticBucket(coverage);
                 cells[bucket]++;
                 if (baseVisibility > 0.0001f)
@@ -306,15 +308,9 @@ namespace ProgrammaticStylized3D.Rivers
                 .AppendLine(" cells");
             report.Append("Committed interpolation alpha: ")
                 .AppendLine(interpolation.ToString("0.000000", culture));
-            report.Append("Material Transport: ")
-                .AppendLine(ResolveTransportDiagnosticLabel(
-                    capture.TransportScheme));
-            report.Append("Final Visibility: ")
-                .AppendLine(ResolveVisibilityDiagnosticLabel(
-                    capture.VisibilityMode));
-            report.Append("Presence Footprint: ")
-                .AppendLine(ResolvePresenceDiagnosticLabel(
-                    capture.PresenceMode));
+            report.Append("Material Contract: ")
+                .AppendLine(ResolveMaterialContractDiagnosticLabel(
+                    capture.MaterialContract));
             report.Append("Foam state held: ")
                 .AppendLine(capture.StateHeld ? "Yes" : "No");
             AppendGridDescriptorDiagnostic(
@@ -337,16 +333,24 @@ namespace ProgrammaticStylized3D.Rivers
                 .AppendLine(" of material cells)");
             report.Append("Integrated Coverage ΣC: ")
                 .AppendLine(totalCoverage.ToString("0.000000", culture));
-            report.Append("Integrated Material Amount Σ(C×P): ")
+            report.Append(coverageLife
+                    ? "Integrated compatibility Material Amount ΣC: "
+                    : "Integrated Material Amount Σ(C×P): ")
                 .AppendLine(totalAmount.ToString("0.000000", culture));
-            report.Append("Integrated Life Amount Σ(C×P×L): ")
+            report.Append(coverageLife
+                    ? "Integrated Life Moment Σ(C×L): "
+                    : "Integrated Life Amount Σ(C×P×L): ")
                 .AppendLine(totalLifeAmount.ToString("0.000000", culture));
-            report.Append("Coverage-weighted Presence Σ(C×P)/ΣC: ")
+            report.Append(coverageLife
+                    ? "Implicit Presence ratio ΣC/ΣC: "
+                    : "Coverage-weighted Presence Σ(C×P)/ΣC: ")
                 .AppendLine(ResolveRatio(
                     totalAmount,
                     totalCoverage,
                     culture));
-            report.Append("Material-weighted Remaining Life Σ(C×P×L)/Σ(C×P): ")
+            report.Append(coverageLife
+                    ? "Coverage-weighted Remaining Life Σ(C×L)/ΣC: "
+                    : "Material-weighted Remaining Life Σ(C×P×L)/Σ(C×P): ")
                 .AppendLine(ResolveRatio(
                     totalLifeAmount,
                     totalAmount,
@@ -377,7 +381,7 @@ namespace ProgrammaticStylized3D.Rivers
                         cells[bucket],
                         culture))
                     .AppendLine(")");
-                report.Append("  ΣC / Σ(C×P) / Σ(C×P×L): ")
+                report.Append("  Σ Coverage / Σ material amount / Σ life moment: ")
                     .Append(coverageSums[bucket].ToString("0.000000", culture))
                     .Append(" / ")
                     .Append(amountSums[bucket].ToString("0.000000", culture))
@@ -385,7 +389,7 @@ namespace ProgrammaticStylized3D.Rivers
                     .AppendLine(lifeAmountSums[bucket].ToString(
                         "0.000000",
                         culture));
-                report.Append("  average C / weighted P / weighted L: ")
+                report.Append("  average Coverage / weighted Presence / weighted Life: ")
                     .Append(ResolveRatio(
                         coverageSums[bucket],
                         cells[bucket],
@@ -408,23 +412,40 @@ namespace ProgrammaticStylized3D.Rivers
 
             report.AppendLine();
             report.AppendLine("[Interpretation Contract]");
-            report.AppendLine(
-                "Coverage C is occupied cell fraction. Presence P is intrinsic " +
-                "strength inside that fraction. Remaining Life L is normalized " +
-                "lifecycle state of the existing material.");
-            report.AppendLine(
-                "Material Amount is C×P. Life Amount is C×P×L. Bright decoded " +
-                "Presence or Remaining Life does not imply high Coverage.");
-            report.AppendLine(
-                "B is only the selected scalar visibility-policy base: " +
-                "Concentration + Lifetime uses RiverWaterFoamSharpenCoverage; " +
-                "Lifecycle-Faithful uses smoothstep(0.02, 0.10, C).");
-            report.AppendLine(
-                "Exact Pattern/life erosion, screen-derivative resolution, " +
-                "surface warp/wake coupling, Presence-footprint selection, and " +
-                "the final pre-Chip production mask are pixel-space operations. " +
-                "Inspect them through Visibility Pipeline Composite: red = " +
-                "meaningful Coverage, green = B, blue = exact pre-Chip mask.");
+            if (coverageLife)
+            {
+                report.AppendLine(
+                    "Coverage + Life stores fractional geometric Coverage C and " +
+                    "the life moment C×L. Presence is implicit 1 wherever C > 0 " +
+                    "and Pattern is not persistent state.");
+                report.AppendLine(
+                    "Packed compatibility Material Amount mirrors Coverage, so " +
+                    "Σ material amount equals ΣC by contract rather than describing " +
+                    "weak or strong Foam.");
+                report.AppendLine(
+                    "Remaining Life is decoded as (C×L)/C and controls alive/dead " +
+                    "lifecycle; it does not directly scale Final Foam opacity.");
+                report.AppendLine(
+                    "Visibility Pipeline Composite: red = literal Coverage, green = " +
+                    "Coverage-based visibility base, blue = exact pre-Chip mask.");
+            }
+            else
+            {
+                report.AppendLine(
+                    "Coverage C is occupied cell fraction. Presence P is intrinsic " +
+                    "strength inside that fraction. Remaining Life L is normalized " +
+                    "lifecycle state of the existing material.");
+                report.AppendLine(
+                    "Material Amount is C×P. Life Amount is C×P×L. Bright decoded " +
+                    "Presence or Remaining Life does not imply high Coverage.");
+                report.AppendLine(
+                    "B is the C × P × L Baseline scalar visibility-policy base and " +
+                    "matches production Lifecycle-Faithful authority exactly: B = " +
+                    "saturate(C).");
+                report.AppendLine(
+                    "Visibility Pipeline Composite: red = committed Coverage, " +
+                    "green = baseline B, blue = exact pre-Chip mask.");
+            }
             report.AppendLine(
                 "For a strict same-state comparison, enable Hold Foam State " +
                 "before capturing this report and the debug screenshots.");
@@ -432,35 +453,9 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private static float ResolveDiagnosticBaseVisibility(
-            float coverage,
-            StylizedRiverFinalFoamVisibilityMode visibilityMode)
+            float coverage)
         {
-            float c = Mathf.Clamp01(coverage);
-            if (visibilityMode ==
-                StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful)
-            {
-                return SmoothStepDiagnostic(0.02f, 0.10f, c);
-            }
-
-            float sharpness = Mathf.Clamp01(MaterialContourSharpness);
-            float low = Mathf.Lerp(0.105f, 0.185f, sharpness);
-            float high = Mathf.Lerp(0.365f, 0.575f, sharpness);
-            float shaped = SmoothStepDiagnostic(low, high, c);
-            float hard = SmoothStepDiagnostic(0.18f, 0.82f, shaped);
-            hard = Mathf.Pow(
-                Mathf.Max(0f, hard),
-                Mathf.Lerp(1.65f, 2.15f, sharpness));
-            return Mathf.Clamp01(hard);
-        }
-
-        private static float SmoothStepDiagnostic(
-            float edge0,
-            float edge1,
-            float value)
-        {
-            float range = Mathf.Max(0.0000001f, edge1 - edge0);
-            float t = Mathf.Clamp01((value - edge0) / range);
-            return t * t * (3f - 2f * t);
+            return Mathf.Clamp01(coverage);
         }
 
         private static int ResolveCoverageDiagnosticBucket(float coverage)
@@ -488,35 +483,12 @@ namespace ProgrammaticStylized3D.Rivers
             return 5;
         }
 
-        private static string ResolveTransportDiagnosticLabel(
-            StylizedRiverFoamTransportScheme scheme)
+        private static string ResolveMaterialContractDiagnosticLabel(
+            StylizedRiverFoamMaterialContract contract)
         {
-            return scheme switch
-            {
-                StylizedRiverFoamTransportScheme.TvdSuperbee =>
-                    "TVD Superbee",
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
-                    "Bulk-Phase Residual TVD",
-                _ => "Donor Cell"
-            };
-        }
-
-        private static string ResolveVisibilityDiagnosticLabel(
-            StylizedRiverFinalFoamVisibilityMode mode)
-        {
-            return mode ==
-                StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
-                ? "Lifecycle-Faithful"
-                : "Concentration + Lifetime";
-        }
-
-        private static string ResolvePresenceDiagnosticLabel(
-            StylizedRiverFoamPresenceFootprintMode mode)
-        {
-            return mode ==
-                StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
-                ? "Presence-Amplitude"
-                : "Coverage-Only";
+            return contract == StylizedRiverFoamMaterialContract.CoverageLife
+                ? "Coverage + Life"
+                : "C × P × L Baseline";
         }
 
         private static string ResolvePercentage(

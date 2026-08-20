@@ -42,6 +42,17 @@ namespace ProgrammaticStylized3D.Rivers
                     "A valid river and Disturbance runtime are required.");
             }
 
+            if (river.FoamMaterialContract ==
+                StylizedRiverFoamMaterialContract.CoverageLife)
+            {
+                return FailCacheDiagnostic(
+                    "Skipped",
+                    "P8 conservative packed transport is a C × P × L " +
+                    "Baseline-only proof of independent Presence/Pattern " +
+                    "moments and is not applicable to the reduced " +
+                    "Coverage + Life semantic subset.");
+            }
+
             System.Diagnostics.Stopwatch stopwatch =
                 System.Diagnostics.Stopwatch.StartNew();
             StringBuilder report = new(65536);

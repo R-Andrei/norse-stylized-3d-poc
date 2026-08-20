@@ -212,6 +212,8 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
         private bool showRegenerationAndCaching;
         private bool showDebugAndDiagnostics;
         private bool showGroundDebug;
+        private bool showRiverCoupledSurfaceContractAudit = true;
+        private string lastRiverCoupledSurfaceContractAuditReport;
         private bool showCurrentRegenerationTiming;
         private bool showRegenerationAccounting;
         private bool showPaintedAccentStrokes = true;
@@ -1302,6 +1304,92 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
             }
 
             EditorGUI.indentLevel--;
+        }
+
+        private void DrawRiverCoupledSurfaceContractAuditControls()
+        {
+            if (!DrawSubsectionFoldout(
+                    ref showRiverCoupledSurfaceContractAudit,
+                    "River-Coupled Surface Contract Audit"))
+            {
+                return;
+            }
+
+            EditorGUI.indentLevel++;
+            if (targets.Length != 1 || target is not GeneratedGround ground)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select one GeneratedGround to run the River-coupled surface contract audit.",
+                    MessageType.Info);
+                EditorGUI.indentLevel--;
+                return;
+            }
+
+            EditorGUILayout.HelpBox(
+                "Read-only diagnostic. It measures the current cached River registry, corridor objects, renderer/material state, MaterialPropertyBlock values, and TexCoord3 semantic stream without refreshing or rebuilding them.",
+                MessageType.None);
+
+            if (GUILayout.Button("Run River-Coupled Surface Contract Audit"))
+            {
+                lastRiverCoupledSurfaceContractAuditReport =
+                    ground.BuildRiverCoupledSurfaceContractAuditReport();
+                EditorGUIUtility.systemCopyBuffer =
+                    lastRiverCoupledSurfaceContractAuditReport;
+                Debug.Log(
+                    lastRiverCoupledSurfaceContractAuditReport,
+                    ground);
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       string.IsNullOrEmpty(
+                           lastRiverCoupledSurfaceContractAuditReport)))
+            {
+                if (GUILayout.Button(
+                        "Copy River-Coupled Surface Contract Audit"))
+                {
+                    EditorGUIUtility.systemCopyBuffer =
+                        lastRiverCoupledSurfaceContractAuditReport;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(
+                    lastRiverCoupledSurfaceContractAuditReport))
+            {
+                string verdict =
+                    ExtractRiverCoupledSurfaceContractAuditVerdict(
+                        lastRiverCoupledSurfaceContractAuditReport);
+                MessageType verdictType =
+                    verdict.Contains(
+                        "CPU/renderer/geometry contract passes")
+                        ? MessageType.Info
+                        : MessageType.Warning;
+                EditorGUILayout.HelpBox(verdict, verdictType);
+                EditorGUILayout.LabelField(
+                    "The Run action also copies and logs the complete report.",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
+
+            EditorGUI.indentLevel--;
+        }
+
+        private static string ExtractRiverCoupledSurfaceContractAuditVerdict(
+            string report)
+        {
+            if (string.IsNullOrEmpty(report))
+            {
+                return "No River-coupled surface contract audit has been run.";
+            }
+
+            const string marker = "FIRST BROKEN AUTHORITY:";
+            int markerIndex = report.LastIndexOf(
+                marker,
+                System.StringComparison.Ordinal);
+            if (markerIndex < 0)
+            {
+                return "Audit completed, but no categorical verdict marker was found in the report.";
+            }
+
+            return report.Substring(markerIndex).Trim();
         }
 
         private void DrawCurrentRegenerationTimingControls()
@@ -6327,6 +6415,7 @@ namespace ProgrammaticStylized3D.Geometry.Ground.Editor
 
             EditorGUI.indentLevel++;
             DrawGroundDebugControls();
+            DrawRiverCoupledSurfaceContractAuditControls();
             DrawCurrentRegenerationTimingControls();
             DrawSurfaceDiagnosticsControls();
             DrawPaintedAccentPlacementDebugControls();

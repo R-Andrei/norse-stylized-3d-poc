@@ -263,11 +263,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
             SerializedProperty controls,
             string propertyName)
         {
-            if (propertyName == "leanDirection")
-            {
-                return GetFloatRangeMaximum(controls, "leanAmount") > 0f;
-            }
-
             if (propertyName == "signedPathSpiralTurns")
             {
                 return GetFloatRangeMaximum(

@@ -249,6 +249,8 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
+            SynchronizeMaterialContract();
+
 #if UNITY_EDITOR
             AdvanceCellSpawnerContractAuditPlayMode(true);
             AdvanceShoreRibbonBehaviorAuditPlayMode(true);
@@ -676,6 +678,33 @@ namespace ProgrammaticStylized3D.Rivers
             }
         }
 
+        private void SynchronizeMaterialContract()
+        {
+            StylizedRiverFoamMaterialContract requested =
+                river != null
+                    ? river.FoamMaterialContract
+                    : StylizedRiverFoamMaterialContract
+                        .CoveragePresenceLifeBaseline;
+
+            if (!materialContractInitialized)
+            {
+                activeMaterialContract = requested;
+                materialContractInitialized = true;
+                return;
+            }
+
+            if (activeMaterialContract == requested)
+            {
+                return;
+            }
+
+            activeMaterialContract = requested;
+            bulkTransportPhaseCells = 0f;
+            previousBulkTransportPhaseCells = 0f;
+            bulkTransportIntegerShift = 0;
+            ClearFoam();
+        }
+
         public void ClearFoam()
         {
             pendingIsolatedLifeProbe = false;
@@ -695,6 +724,9 @@ namespace ProgrammaticStylized3D.Rivers
             lastUsedTransportSubsteps = 1;
             transportSafetyLimitExceeded = false;
             transportSafetyStatus = "CFL transport ready";
+            bulkTransportPhaseCells = 0f;
+            previousBulkTransportPhaseCells = 0f;
+            bulkTransportIntegerShift = 0;
             transportMetricsAccumulator = 0f;
             ResetTransportMetricValues();
             transportMetricsAvailable = false;

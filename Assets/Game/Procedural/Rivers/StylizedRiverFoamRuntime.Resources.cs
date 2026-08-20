@@ -1473,6 +1473,9 @@ namespace ProgrammaticStylized3D.Rivers
             resetTransportMetricsKernel = -1;
             remapPersistentStateKernel = -1;
             simulateKernel = -1;
+            materialContractInitialized = false;
+            activeMaterialContract =
+                StylizedRiverFoamMaterialContract.CoveragePresenceLifeBaseline;
             bulkTransportPhaseCells = 0f;
             previousBulkTransportPhaseCells = 0f;
             bulkTransportIntegerShift = 0;

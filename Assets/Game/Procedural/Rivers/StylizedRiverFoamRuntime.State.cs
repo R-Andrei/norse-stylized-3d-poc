@@ -41,12 +41,9 @@ namespace ProgrammaticStylized3D.Rivers
             public bool HasValue;
             public int EventId;
             public AutomaticFoamSourceEventType Type;
-            public float PathDistanceMetres;
-            public float RequestedSpeedMetresPerSecond;
-            public float RawDurationSeconds;
-            public float ResolvedDurationSeconds;
-            public float ActualSpeedMetresPerSecond;
-            public bool CadenceLimited;
+            public float PathLengthCells;
+            public float RequestedSpeedCellsPerSecond;
+            public float DurationSeconds;
         }
 
         private struct AutomaticFoamPacketReservation
@@ -77,15 +74,12 @@ namespace ProgrammaticStylized3D.Rivers
             public float Elapsed;
             public float ObjectBuildDuration;
             public float ObjectContactStrokeDuration;
-            public float ObjectContactStrokePathLengthMetres;
-            public float ObjectContactStrokeRawRevealDurationSeconds;
-            public bool ObjectContactStrokeRevealCadenceLimited;
+            public float ObjectContactStrokePathLengthCells;
             public int ObjectContactStrokeCount;
             public bool ObjectContactReinforcementOnly;
-            public float FormationSpeedMetresPerSecond;
-            public float RevealPathDistanceMetres;
-            public float RawRevealDurationSeconds;
-            public bool RevealCadenceLimited;
+            public float RevealSpeedCellsPerSecond;
+            public float RevealPathLengthCells;
+            // Packet-envelope padding only. Reveal timing never consumes this value.
             public float HeadTrailMetres;
             public float ShoreInsetMetres;
             public float WidthMetres;
@@ -111,7 +105,6 @@ namespace ProgrammaticStylized3D.Rivers
             public float ObjectContactOffsetMetres;
             public float ObjectSourceLateralCellSpacingMetres;
             public float ObjectWakeArmLengthMetres;
-            public float ObjectContactPathLengthMetres;
             public Vector2 ObjectContactPoint0;
             public Vector2 ObjectContactPoint1;
             public Vector2 ObjectContactPoint2;
@@ -140,17 +133,17 @@ namespace ProgrammaticStylized3D.Rivers
         {
             // x = source type, y = side sign except Object Arc/Semi-Arc
             // finite stroke phase (0 = complete packet, 1/2 = contact-only
-            // reinforcement), z = per-stroke reveal progress, w = shape seed.
+            // reinforcement), z = current head distance in Foam cells,
+            // w = shape seed.
             public Vector4 Header;
             // x/y = start/end storage global except Object Arc/Semi-Arc
             // contact point 0; z = centre storage global; w = flow direction
             // except Object Arc/Semi-Arc contact point 1.x.
             public Vector4 Distance;
-            // x = fixed zero shore-start offset for D8 Shore/Inward except Object Arc/Semi-Arc contact point 1.y;
-            // y = width cells for D8 Shore/Inward and Object
-            // Arc/Semi-Arc straight wake-arm length metres; z = inward reach cells for D8 Inward Wash or
-            // Arc/Semi-Arc normalized material-step duration; w = head width cells for D8 Shore/Inward
-            // except Object Arc/Semi-Arc contact point 2.x.
+            // x = shore-start offset cells for Shore/Inward except Object Arc/Semi-Arc contact point 1.y;
+            // y = width cells for Shore/Inward and Object Arc/Semi-Arc wake length cells;
+            // z = inward reach cells for Inward Wash or Object Arc/Semi-Arc contact width cells;
+            // w = head width cells for Shore/Inward except Object Arc/Semi-Arc contact point 2.x.
             public Vector4 Shore;
             // x = authored intrinsic Presence, y = authored normalized
             // Remaining Life, z = pattern seed, w = pattern feature size.
@@ -160,23 +153,24 @@ namespace ProgrammaticStylized3D.Rivers
             // Arc/Semi-Arc contact point 2.y / point 3.x; w = curvature,
             // selected Semi-Arc side, or fragment rotation.
             public Vector4 Variation;
-            // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
-            // contact point 3.y / point 4.x; z = source path length metres;
-            // w = reserved legacy source-fill blend except Object Arc/Semi-Arc
+            // x/y = captured reveal speed cells/s / head length cells except
+            // Object Arc/Semi-Arc contact point 3.y / point 4.x; z = source
+            // reveal path length in cells; w = reserved legacy source-fill
+            // blend except Object Arc/Semi-Arc
             // positive-half first-segment split. P13A no longer lets it reinterpret
             // Initial Presence as geometric probability.
             public Vector4 Kinematics;
             // x = object/free-water centre lateral metres; y/z = object half extents
             // except Object Arc/Semi-Arc contact point 4.y / front split;
             // w = Fleck contact offset, Free-Water shape parameter, or Object
-            // Arc/Semi-Arc source-local lateral cell spacing metres.
+            // Arc/Semi-Arc wake width cells.
             public Vector4 ObjectData;
-            // x = previous deposition side/phase, y = previous deposition
-            // progress, z = previous deposition state valid (0 for the first
-            // source tick, 1 afterward), w reserved. Current phase/progress
-            // remain Header.y/z. Positive newly revealed coverage gates
-            // nonpersistent source families; Object Arc/Semi-Arc use their
-            // finite object burst uses phase changes to reset one-shot permission.
+            // x = previous deposition side/phase, y = previous head distance
+            // in Foam cells, z = previous deposition state valid (0 for the
+            // first source tick, 1 afterward), w = Object Arc/Semi-Arc authored
+            // contact span cells. Current phase/head distance remain Header.y/z.
+            // Positive newly revealed coverage gates nonpersistent source families;
+            // Object Arc/Semi-Arc phase changes reset one-shot permission.
             public Vector4 Deposit;
         }
 

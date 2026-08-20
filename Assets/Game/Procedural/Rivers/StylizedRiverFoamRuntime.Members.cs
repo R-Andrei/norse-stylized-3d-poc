@@ -552,6 +552,9 @@ namespace ProgrammaticStylized3D.Rivers
         private int resetTransportMetricsKernel = -1;
         private int remapPersistentStateKernel = -1;
         private int simulateKernel = -1;
+        private StylizedRiverFoamMaterialContract activeMaterialContract =
+            StylizedRiverFoamMaterialContract.CoveragePresenceLifeBaseline;
+        private bool materialContractInitialized;
         private float bulkTransportPhaseCells;
         private float previousBulkTransportPhaseCells;
         private int bulkTransportIntegerShift;

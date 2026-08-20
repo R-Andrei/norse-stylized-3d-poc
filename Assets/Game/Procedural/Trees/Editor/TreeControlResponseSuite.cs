@@ -165,7 +165,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             AssemblyReloadEvents.beforeAssemblyReload += AbortForReload;
             EditorApplication.quitting += AbortForQuit;
             Debug.Log(
-                "[TREE-CONTROLS.4] Incremental 42-control response suite started. " +
+                "[TREE-CONTROLS.4] Incremental 40-control response suite started. " +
                 "Representatives=" + representatives.Count +
                 ". Output: " + reportPath);
             return true;
@@ -1169,9 +1169,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     SetFloat(controls, "trunkDrift", 0f);
                     SetFloat(controls, "trunkRoughness", 0f);
                     break;
-                case "leanDirection":
-                    SetFloat(controls, "leanAmount", 0.25f);
-                    break;
                 case "pathSpiralRadius":
                     SetFloat(controls, "signedPathSpiralTurns", 3f);
                     break;
@@ -1282,8 +1279,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             {
                 return sampleIndex == 0 ? -3f : sampleIndex == 1 ? 0f : 3f;
             }
-            if (property == "leanDirection" ||
-                property == "directionalBiasAngle")
+            if (property == "directionalBiasAngle")
             {
                 return sampleIndex == 0 ? 0f : sampleIndex == 1 ? 120f : 240f;
             }

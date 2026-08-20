@@ -1565,3 +1565,93 @@ The roadmap now replaces the three independent transport/visibility/presence sel
 3. **C2 — Life-Only Binary Cellular Contract:** add `Life Only` as a second Material Contract option after a focused transport audit. The target contract is binary Foam-cell material with Remaining Life as the sole persistent existence/lifecycle authority; render-side Chipping/Strands/erosion remain visual breakup rather than persistent density/occupancy state.
 
 C1 and C2 are intentionally separate regression boundaries. Historical P12/P13 entries describing Donor Cell, TVD Superbee, Concentration + Lifetime, Coverage-Only, and Presence-Amplitude remain historical evidence and are not rewritten as if those experiments never existed.
+
+## RIVER-FOAM-MATERIAL-C1 — Baseline Contract Consolidation
+
+C1 is implemented in source and awaits Unity 6000.5.0f1 compile/import and Play Mode parity validation.
+
+The three independent material experiment selectors are consolidated into:
+
+```text
+Material Contract
+  C × P × L Baseline
+```
+
+The sole C1 option hard-wires the already accepted production combination: Bulk-Phase Residual TVD transport, Lifecycle-Faithful final visibility, and Coverage-Only Presence footprint. Rejected selector branches and Presence-Amplitude-only authoring are removed only where dependency review proved them exclusive. Superbee and donor/upwind mechanics remain because Bulk-Phase Residual TVD uses them.
+
+C1 deliberately leaves persistent Coverage/Presence/Remaining-Life/Pattern packing and fractional transport unchanged. The next material-contract architecture step remains `RIVER-FOAM-MATERIAL-C2 — Life-Only Binary Cellular Contract`, which requires a focused discrete-transport audit before implementation.
+
+
+## RIVER-FOAM-MATERIAL-C2 — Life-Only Binary Cellular Contract
+
+C2 is implemented in source and awaits Unity 6000.5.0f1 compile/import, Play Mode behavior, and profiling validation.
+
+`Material Contract` now exposes:
+
+```text
+C × P × L Baseline
+Life Only
+```
+
+The baseline remains default and preserves the validated C1 behavior. Life Only stores only Remaining Life as material authority: every live cell is a complete Foam cell, movement is whole-cell only, convergence merges with maximum Remaining Life, and death is the lifecycle transition to empty. Persistent Coverage, Presence, Material Amount, and Material Pattern do not participate in Life Only. Fragmentation/Chipping/Strands remain render-side.
+
+Life-Only movement uses one dedicated destination-gather compute dispatch per existing CFL substep and the same canonical velocity field, including Object slowdown/routing and Shore lateral/downstream suppression. It introduces no claim buffer, no second resolve dispatch, and no additional persistent material texture. The existing ARGBHalf allocation remains while both material contracts are selectable.
+
+Validation must prove: baseline parity, binary one-cell birth/movement under Life Only, no fractional ballooning, max-Life collision behavior, lifecycle death, contract-switch clear, canonical velocity response, and GPU cost relative to C1 before any performance conclusion or default change.
+
+## RIVER-FOAM-MATERIAL-C3 — Coverage + Life Geometric Occupancy Contract
+
+**Current source state:** implemented; Unity validation pending.
+
+C2 `Life Only` is rejected. Live comparison showed that its binary positive-Life occupancy, whole-cell transport, and point-sampled Final state visibly exposed complete simulation cells. The correct simplification target is not “one live cell always renders completely”; it is “Coverage describes geometry, not material strength.”
+
+`Material Contract` now targets:
+
+```text
+C × P × L Baseline
+Coverage + Life
+```
+
+The baseline remains serialized value/default `0` and is unchanged. Coverage + Life uses fractional geometric Coverage plus Remaining Life:
+
+```text
+R = Coverage
+G = Coverage × Remaining Life
+B = 0
+A = Coverage
+```
+
+Presence is implicit unit material under C3 and Material Pattern is render-derived. Both contracts use the existing Bulk-Phase Residual TVD simulation path, restoring subcell Coverage movement and temporal/phase-aware rendering instead of C2 whole-cell jumps. Existing birth geometry, no-refresh overlap behavior, lifecycle topology, canonical velocity, Shore suppression, object routing/slowdown, Chipping, Strands, and surface coupling remain architectural invariants.
+
+C3 adds no GPU resource or dispatch. It removes the C2-only whole-cell simulation kernel and transport-step state, but no performance claim is accepted until Unity profiling. Required validation is: clean compile/import, fractional Material Coverage, visually non-blocky Final Foam, continuous lifecycle without opacity fading, no birth refresh over occupied Coverage, Shore/object velocity parity, contract-switch clear, and C × P × L baseline parity.
+
+## RIVER-FOAM-MATERIAL-C3A — Coverage + Life Transported Visual Pattern Repair
+
+**Current source state:** implemented; Unity validation pending.
+
+C3 live diagnostics confirmed that its stationary rectangular Final-Foam gaps were not missing persistent material: Material Coverage remained present and Remaining Life remained positive through the same regions. The C3-only fixed quantized River-coordinate Pattern override is therefore rejected.
+
+Coverage + Life remains a two-authority material model—Coverage plus Remaining Life—but now carries Pattern as visual-only transported metadata:
+
+```text
+R = Coverage
+G = Coverage × Remaining Life
+B = Coverage × Visual Pattern
+A = Coverage
+```
+
+The visual Pattern is generated at birth from the existing deterministic source Pattern evaluation, transported/interpolated with the same packed state, and consumed by the existing Chipping/Strands/final-pattern logic. It is not Presence, material strength, occupancy authority, or lifecycle authority.
+
+`C × P × L Baseline` behavior is unchanged. C3A adds no resource, kernel, dispatch, pass, readback, or per-frame rebuild. Coverage + Life source birth now executes the existing deterministic Material Pattern evaluation used by the baseline for valid source samples; Final rendering adds no new sampling pass. Required validation is clean import/compile, removal of the reproducible stationary Final-only rectangular holes under Coverage + Life, retained fractional Coverage/Life behavior, and baseline parity.
+
+
+
+## RIVER-FOAM-SPAWN-D9 — Unified Stroke/Head Reveal Kinematics
+
+**Current source state:** implemented; Unity validation pending.
+
+D9 replaces the incomplete metric-to-cell reveal migration with one automatic-source kinematics contract shared by Shore Ribbon, Inward Wash, Object Arc, Object Semi-Arc, Object Fleck, Lace, Cross-Lace, and Broken Filament/Torn. A recipe's visible `Reveal Speed (Cells/s)` is now the sole runtime reveal-speed authority. For a path of `L` cells at `v` cells/s, logical completion is exactly `L/v`; therefore 15 cells take 15 s at 1 cell/s, 3 s at 5 cells/s, and 0.15 s at 100 cells/s.
+
+The event stores current/previous head distance in cells. GPU recipe evaluators use one shared reveal-window contract and cumulative current-minus-previous permission so high-speed updates catch up every crossed region instead of slowing the source head to one cell or one recipe-specific progress step per material tick. Bent recipes use a shared deterministic seven-point/six-segment arc-length approximation. Initial Object contact and wake components run concurrently at the same cells/s; later contact-only strokes retain the same speed. High-speed Object phase transitions are split into bounded source-raster slices so no stroke boundary is skipped.
+
+Legacy family metre-speed values and pattern speed multipliers are retained only for serialized compatibility and are not production timing inputs. D9 adds no persistent GPU resource, kernel, full-field process, material-contract change, transport/lifecycle change, Ground change, or final-render change. Runtime acceptance requires clean import, literal cells/s diagnostic PASS across all eight recipes, same completed recipe geometry at low/high speeds, no Shore backtracking/cadence holes, Object concurrent-head timing, P7/Shore regression passes, and representative profiling.

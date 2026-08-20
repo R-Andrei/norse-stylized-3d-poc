@@ -523,6 +523,8 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static readonly int FoamEnabledId =
             Shader.PropertyToID("_FoamEnabled");
+        private static readonly int FoamMaterialContractId =
+            Shader.PropertyToID("_FoamMaterialContract");
         private static readonly int FoamPreviousId =
             Shader.PropertyToID("_FoamPrevious");
         private static readonly int FoamCurrentId =
@@ -601,8 +603,6 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamChipMaximumViewScale");
         private static readonly int FoamChipEdgeWidthPixelsId =
             Shader.PropertyToID("_FoamChipEdgeWidthPixels");
-        private static readonly int FoamChipSoftEdgeStartId =
-            Shader.PropertyToID("_FoamChipSoftEdgeStart");
         private static readonly int FoamChipInteriorAccessId =
             Shader.PropertyToID("_FoamChipInteriorAccess");
         private static readonly int FoamChipFieldSpeedId =
@@ -643,10 +643,6 @@ namespace ProgrammaticStylized3D.Rivers
             Shader.PropertyToID("_FoamStrandReach");
         private static readonly int FoamSharpnessId =
             Shader.PropertyToID("_FoamSharpness");
-        private static readonly int FoamFinalVisibilityModeId =
-            Shader.PropertyToID("_FoamFinalVisibilityMode");
-        private static readonly int FoamPresenceFootprintModeId =
-            Shader.PropertyToID("_FoamPresenceFootprintMode");
         private static readonly int FoamDebugViewId =
             Shader.PropertyToID("_FoamDebugView");
     }

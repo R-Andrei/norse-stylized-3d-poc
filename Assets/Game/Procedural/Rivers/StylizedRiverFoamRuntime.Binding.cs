@@ -29,6 +29,9 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetVector(
                 FoamGridDescriptorExtentId,
                 gridDescriptorGpuData.Extent);
+            propertyBlock.SetFloat(
+                FoamMaterialContractId,
+                river != null ? (float)river.FoamMaterialContract : 0f);
         }
 
         private bool BindTopologyTransitionHold()
@@ -129,9 +132,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamChipEdgeWidthPixelsId,
                 river != null ? river.FoamChipEdgeWidthPixels : 4f);
             propertyBlock.SetFloat(
-                FoamChipSoftEdgeStartId,
-                river != null ? river.FoamChipSoftEdgeStart : 0.06f);
-            propertyBlock.SetFloat(
                 FoamChipInteriorAccessId,
                 river != null ? river.FoamChipInteriorAccess : 0f);
             propertyBlock.SetFloat(
@@ -191,16 +191,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
-            propertyBlock.SetFloat(
-                FoamFinalVisibilityModeId,
-                river != null
-                    ? (float)river.FoamFinalVisibilityMode
-                    : 0f);
-            propertyBlock.SetFloat(
-                FoamPresenceFootprintModeId,
-                river != null
-                    ? (float)river.FoamPresenceFootprintMode
-                    : 0f);
             propertyBlock.SetFloat(
                 FoamDebugViewId,
                 river != null ? (float)river.FoamDebugView : 0f);
@@ -313,9 +303,6 @@ namespace ProgrammaticStylized3D.Rivers
                 FoamChipEdgeWidthPixelsId,
                 river.FoamChipEdgeWidthPixels);
             propertyBlock.SetFloat(
-                FoamChipSoftEdgeStartId,
-                river.FoamChipSoftEdgeStart);
-            propertyBlock.SetFloat(
                 FoamChipInteriorAccessId,
                 river.FoamChipInteriorAccess);
             propertyBlock.SetFloat(
@@ -375,12 +362,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(
                 FoamSharpnessId,
                 MaterialContourSharpness);
-            propertyBlock.SetFloat(
-                FoamFinalVisibilityModeId,
-                (float)river.FoamFinalVisibilityMode);
-            propertyBlock.SetFloat(
-                FoamPresenceFootprintModeId,
-                (float)river.FoamPresenceFootprintMode);
             propertyBlock.SetFloat(FoamDebugViewId, (float)river.FoamDebugView);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }
@@ -447,7 +428,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamChipStableScreenRadiusPixelsId, 2f);
             propertyBlock.SetFloat(FoamChipMaximumViewScaleId, 1.75f);
             propertyBlock.SetFloat(FoamChipEdgeWidthPixelsId, 4f);
-            propertyBlock.SetFloat(FoamChipSoftEdgeStartId, 0.06f);
             propertyBlock.SetFloat(FoamChipInteriorAccessId, 0f);
             propertyBlock.SetFloat(FoamChipFieldSpeedId, 0f);
             propertyBlock.SetFloat(FoamChipFormationTimeId, 2.5f);
@@ -468,8 +448,6 @@ namespace ProgrammaticStylized3D.Rivers
             propertyBlock.SetFloat(FoamStrandDensityId, 0.5f);
             propertyBlock.SetFloat(FoamStrandReachId, 0.55f);
             propertyBlock.SetFloat(FoamSharpnessId, 1f);
-            propertyBlock.SetFloat(FoamFinalVisibilityModeId, 0f);
-            propertyBlock.SetFloat(FoamPresenceFootprintModeId, 0f);
             propertyBlock.SetFloat(FoamDebugViewId, 0f);
             surfaceRenderer.SetPropertyBlock(propertyBlock);
         }

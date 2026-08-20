@@ -54,9 +54,6 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField]
         private TreeFloatOverride trunkLeanStrength;
 
-        [SerializeField]
-        private TreeFloatOverride trunkLeanDirectionDegrees;
-
         [FormerlySerializedAs("trunkTwistDegrees")]
         [InspectorName("Trunk Twist Degrees")]
         [SerializeField]
@@ -251,7 +248,6 @@ namespace ProgrammaticStylized3D.Trees
         public TreeFloatOverride TrunkBendCount => trunkBendCount;
         public TreeFloatOverride TrunkDirectionalDrift => trunkDirectionalDrift;
         public TreeFloatOverride TrunkLeanStrength => trunkLeanStrength;
-        public TreeFloatOverride TrunkLeanDirectionDegrees => trunkLeanDirectionDegrees;
         public TreeFloatOverride TrunkTwistDegrees => trunkSurfaceTorsionDegrees;
         public TreeFloatOverride TrunkSurfaceTorsionDegrees => trunkSurfaceTorsionDegrees;
         public TreeIntOverride RootButtressCount => rootButtressCount;
@@ -328,7 +324,6 @@ namespace ProgrammaticStylized3D.Trees
                     trunkBendCount.IsSet ||
                     trunkDirectionalDrift.IsSet ||
                     trunkLeanStrength.IsSet ||
-                    trunkLeanDirectionDegrees.IsSet ||
                     trunkSurfaceTorsionDegrees.IsSet ||
                     rootButtressCount.IsSet ||
                     rootButtressStrength.IsSet ||

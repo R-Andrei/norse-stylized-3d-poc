@@ -6,63 +6,82 @@ namespace ProgrammaticStylized3D.Rivers
 {
     public sealed partial class StylizedRiverFoamRuntime
     {
-        private readonly struct ResolvedAutomaticRevealTiming
+        private const int AutomaticRevealPathSegmentCount = 6;
+
+        private readonly struct ResolvedAutomaticRevealKinematics
         {
-            public ResolvedAutomaticRevealTiming(
-                float pathDistanceMetres,
-                float requestedSpeedMetresPerSecond,
-                float rawDurationSeconds,
-                float resolvedDurationSeconds,
-                bool cadenceLimited)
+            public ResolvedAutomaticRevealKinematics(
+                float pathLengthCells,
+                float speedCellsPerSecond)
             {
-                PathDistanceMetres = pathDistanceMetres;
-                RequestedSpeedMetresPerSecond =
-                    requestedSpeedMetresPerSecond;
-                RawDurationSeconds = rawDurationSeconds;
-                ResolvedDurationSeconds = resolvedDurationSeconds;
-                ActualSpeedMetresPerSecond = pathDistanceMetres /
-                    Mathf.Max(0.0001f, resolvedDurationSeconds);
-                CadenceLimited = cadenceLimited;
+                PathLengthCells = Mathf.Max(0.0001f, pathLengthCells);
+                SpeedCellsPerSecond = Mathf.Max(0.0001f, speedCellsPerSecond);
+                DurationSeconds = PathLengthCells / SpeedCellsPerSecond;
             }
 
-            public float PathDistanceMetres { get; }
-            public float RequestedSpeedMetresPerSecond { get; }
-            public float RawDurationSeconds { get; }
-            public float ResolvedDurationSeconds { get; }
-            public float ActualSpeedMetresPerSecond { get; }
-            public bool CadenceLimited { get; }
+            public float PathLengthCells { get; }
+            public float SpeedCellsPerSecond { get; }
+            public float DurationSeconds { get; }
         }
 
-        private ResolvedAutomaticRevealTiming ResolveAutomaticRevealTiming(
-            float pathDistanceMetres,
-            float baseSpeedMetresPerSecond,
-            float patternSpeedMultiplier,
-            float deterministicSpeedJitter)
+        private static ResolvedAutomaticRevealKinematics
+            ResolveAutomaticRevealKinematics(
+                float pathLengthCells,
+                float speedCellsPerSecond)
         {
-            float resolvedPathDistance = Mathf.Max(0.0001f, pathDistanceMetres);
-            float requestedSpeed = Mathf.Max(
-                0.0001f,
-                baseSpeedMetresPerSecond *
-                Mathf.Clamp(patternSpeedMultiplier, 0.10f, 3.00f) *
-                Mathf.Max(0.0001f, deterministicSpeedJitter));
-            float rawDuration = resolvedPathDistance / requestedSpeed;
-            float materialStepDuration =
-                1f / Mathf.Max(1f, ResolveUpdateRate());
-            float resolvedDuration = Mathf.Max(
-                materialStepDuration,
-                rawDuration);
-            return new ResolvedAutomaticRevealTiming(
-                resolvedPathDistance,
-                requestedSpeed,
-                rawDuration,
-                resolvedDuration,
-                rawDuration < materialStepDuration);
+            return new ResolvedAutomaticRevealKinematics(
+                pathLengthCells,
+                speedCellsPerSecond);
+        }
+
+        private static float ResolveAutomaticRevealHeadDistanceCells(
+            float pathLengthCells,
+            float speedCellsPerSecond,
+            float elapsedSeconds)
+        {
+            return Mathf.Clamp(
+                Mathf.Max(0f, speedCellsPerSecond) *
+                    Mathf.Max(0f, elapsedSeconds),
+                0f,
+                Mathf.Max(0f, pathLengthCells));
+        }
+
+        private float ResolveAutomaticRevealSpeedCellsPerSecond(
+            AutomaticFoamSourceEventType sourceType)
+        {
+            if (river == null)
+            {
+                return 0.01f;
+            }
+
+            return Mathf.Max(
+                0.01f,
+                sourceType switch
+                {
+                    AutomaticFoamSourceEventType.ShoreRibbon =>
+                        river.FoamShoreRibbonRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.InwardWash =>
+                        river.FoamInwardWashRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.ObjectContactArc =>
+                        river.FoamObjectArcRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.ObjectContactSemiArc =>
+                        river.FoamObjectSemiArcRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.ObjectContactFleck =>
+                        river.FoamObjectFleckRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.FreeWaterLaceConnector =>
+                        river.FoamFreeWaterLaceRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector =>
+                        river.FoamFreeWaterCrossLaceRevealSpeedCellsPerSecond,
+                    AutomaticFoamSourceEventType.FreeWaterTornFragment =>
+                        river.FoamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond,
+                    _ => 0.01f
+                });
         }
 
         private void RecordAutomaticRevealTiming(
             int eventId,
             AutomaticFoamSourceEventType sourceType,
-            ResolvedAutomaticRevealTiming timing)
+            ResolvedAutomaticRevealKinematics kinematics)
         {
             int telemetryIndex = (int)sourceType;
             if (telemetryIndex <= 0 ||
@@ -77,15 +96,298 @@ namespace ProgrammaticStylized3D.Rivers
                     HasValue = true,
                     EventId = eventId,
                     Type = sourceType,
-                    PathDistanceMetres = timing.PathDistanceMetres,
-                    RequestedSpeedMetresPerSecond =
-                        timing.RequestedSpeedMetresPerSecond,
-                    RawDurationSeconds = timing.RawDurationSeconds,
-                    ResolvedDurationSeconds = timing.ResolvedDurationSeconds,
-                    ActualSpeedMetresPerSecond =
-                        timing.ActualSpeedMetresPerSecond,
-                    CadenceLimited = timing.CadenceLimited
+                    PathLengthCells = kinematics.PathLengthCells,
+                    RequestedSpeedCellsPerSecond =
+                        kinematics.SpeedCellsPerSecond,
+                    DurationSeconds = kinematics.DurationSeconds
                 };
+        }
+
+        private static Vector2 ResolveAutomaticBentRibbonPathPointCells(
+            float t,
+            float lengthCells,
+            float bendCells,
+            float shapeSeed)
+        {
+            float clampedT = Mathf.Clamp01(t);
+            float axis = Mathf.Lerp(
+                -0.5f * lengthCells,
+                0.5f * lengthCells,
+                clampedT);
+            float bend = bendCells * Mathf.Sin(clampedT * Mathf.PI) +
+                0.25f * bendCells *
+                    Mathf.Sin(clampedT * Mathf.PI * 2f + shapeSeed);
+            return new Vector2(axis, bend);
+        }
+
+        private static float ResolveAutomaticBentRibbonPathLengthCells(
+            float lengthCells,
+            float bendCells,
+            float shapeSeed)
+        {
+            Vector2 previous = ResolveAutomaticBentRibbonPathPointCells(
+                0f,
+                lengthCells,
+                bendCells,
+                shapeSeed);
+            float total = 0f;
+            for (int segmentIndex = 1;
+                 segmentIndex <= AutomaticRevealPathSegmentCount;
+                 segmentIndex++)
+            {
+                float t = segmentIndex /
+                    (float)AutomaticRevealPathSegmentCount;
+                Vector2 current = ResolveAutomaticBentRibbonPathPointCells(
+                    t,
+                    lengthCells,
+                    bendCells,
+                    shapeSeed);
+                total += Vector2.Distance(previous, current);
+                previous = current;
+            }
+
+            return Mathf.Max(0.0001f, total);
+        }
+
+        private static Vector2 ResolveAutomaticInwardWashPathPointCells(
+            float t,
+            float alongLengthCells,
+            float inwardReachCells,
+            float bendCells)
+        {
+            float clampedT = Mathf.Clamp01(t);
+            float halfAlong = alongLengthCells * 0.5f;
+            return new Vector2(
+                Mathf.Lerp(-halfAlong, halfAlong, clampedT) +
+                    bendCells * clampedT * (1f - clampedT),
+                inwardReachCells * clampedT);
+        }
+
+        private static float ResolveAutomaticInwardWashPathLengthCells(
+            float alongLengthCells,
+            float inwardReachCells,
+            float bendCells)
+        {
+            Vector2 previous = ResolveAutomaticInwardWashPathPointCells(
+                0f,
+                alongLengthCells,
+                inwardReachCells,
+                bendCells);
+            float total = 0f;
+            for (int segmentIndex = 1;
+                 segmentIndex <= AutomaticRevealPathSegmentCount;
+                 segmentIndex++)
+            {
+                float t = segmentIndex /
+                    (float)AutomaticRevealPathSegmentCount;
+                Vector2 current = ResolveAutomaticInwardWashPathPointCells(
+                    t,
+                    alongLengthCells,
+                    inwardReachCells,
+                    bendCells);
+                total += Vector2.Distance(previous, current);
+                previous = current;
+            }
+
+            return Mathf.Max(0.0001f, total);
+        }
+
+        private static float ResolveAutomaticObjectContactPathLengthCells(
+            ResolvedAutomaticObjectContactProfile profile,
+            float longitudinalCellSpacingMetres,
+            float lateralCellSpacingMetres,
+            float contactSpanCells,
+            bool positiveHalfOnly,
+            bool negativeHalfOnly)
+        {
+            float dx = Mathf.Max(0.005f, longitudinalCellSpacingMetres);
+            float dy = Mathf.Max(0.005f, lateralCellSpacingMetres);
+            Vector2 scaleToCells = new Vector2(1f / dx, 1f / dy);
+            Vector2 p0 = Vector2.Scale(profile.Point0, scaleToCells);
+            Vector2 p1 = Vector2.Scale(profile.Point1, scaleToCells);
+            Vector2 p2 = Vector2.Scale(profile.Point2, scaleToCells);
+            Vector2 p3 = Vector2.Scale(profile.Point3, scaleToCells);
+            Vector2 p4 = Vector2.Scale(profile.Point4, scaleToCells);
+            float totalPathCells = Mathf.Max(
+                0.001f,
+                Vector2.Distance(p0, p1) +
+                Vector2.Distance(p1, p2) +
+                Vector2.Distance(p2, p3) +
+                Vector2.Distance(p3, p4));
+            float centrePath = 0.5f * totalPathCells;
+            float span = Mathf.Min(
+                Mathf.Max(1f, contactSpanCells),
+                totalPathCells);
+            float lower = Mathf.Max(0f, centrePath - 0.5f * span);
+            float upper = Mathf.Min(
+                totalPathCells,
+                centrePath + 0.5f * span);
+            if (positiveHalfOnly)
+            {
+                lower = Mathf.Max(lower, centrePath);
+            }
+            if (negativeHalfOnly)
+            {
+                upper = Mathf.Min(upper, centrePath);
+            }
+
+            return Mathf.Max(0.001f, upper - lower);
+        }
+
+        private struct AutomaticSourceCellGeometry
+        {
+            public float BodyLengthCells;
+            public float BodyWidthCells;
+            public float HeadLengthCells;
+            public float HeadWidthCells;
+            public float BendAmplitudeCells;
+            public float ContactSpanCells;
+            public float ContactWidthCells;
+            public float WakeLengthCells;
+            public float WakeWidthCells;
+            public float OffsetCells;
+        }
+
+        private AutomaticSourceCellGeometry ResolveAutomaticObjectCellGeometry(
+            AutomaticObjectSourceRecipe recipe,
+            float sourceKey)
+        {
+            float lengthHash = Hash01(sourceKey + 61.17f);
+            float widthHash = Hash01(sourceKey + 67.31f);
+            float wakeLengthHash = Hash01(sourceKey + 71.53f);
+            float wakeWidthHash = Hash01(sourceKey + 79.07f);
+            AutomaticSourceCellGeometry geometry = default;
+            if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
+            {
+                geometry.BodyLengthCells = Mathf.Lerp(
+                    river.FoamObjectFleckLengthMinCells,
+                    river.FoamObjectFleckLengthMaxCells,
+                    lengthHash);
+                geometry.BodyWidthCells = Mathf.Lerp(
+                    river.FoamObjectFleckWidthMinCells,
+                    river.FoamObjectFleckWidthMaxCells,
+                    widthHash);
+                geometry.HeadLengthCells =
+                    river.FoamObjectFleckHeadLengthCells;
+                geometry.HeadWidthCells =
+                    river.FoamObjectFleckHeadWidthCells;
+                geometry.OffsetCells = Mathf.Lerp(
+                    river.FoamObjectFleckOffsetMinCells,
+                    river.FoamObjectFleckOffsetMaxCells,
+                    Hash01(sourceKey + 83.29f));
+                return geometry;
+            }
+
+            bool semiArc = recipe ==
+                AutomaticObjectSourceRecipe.ContactSemiArc;
+            geometry.ContactSpanCells = Mathf.Lerp(
+                semiArc
+                    ? river.FoamObjectSemiArcContactSpanMinCells
+                    : river.FoamObjectArcContactSpanMinCells,
+                semiArc
+                    ? river.FoamObjectSemiArcContactSpanMaxCells
+                    : river.FoamObjectArcContactSpanMaxCells,
+                lengthHash);
+            geometry.ContactWidthCells = Mathf.Lerp(
+                semiArc
+                    ? river.FoamObjectSemiArcContactWidthMinCells
+                    : river.FoamObjectArcContactWidthMinCells,
+                semiArc
+                    ? river.FoamObjectSemiArcContactWidthMaxCells
+                    : river.FoamObjectArcContactWidthMaxCells,
+                widthHash);
+            geometry.WakeLengthCells = Mathf.Lerp(
+                semiArc
+                    ? river.FoamObjectSemiArcWakeLengthMinCells
+                    : river.FoamObjectArcWakeLengthMinCells,
+                semiArc
+                    ? river.FoamObjectSemiArcWakeLengthMaxCells
+                    : river.FoamObjectArcWakeLengthMaxCells,
+                wakeLengthHash);
+            geometry.WakeWidthCells = Mathf.Lerp(
+                semiArc
+                    ? river.FoamObjectSemiArcWakeWidthMinCells
+                    : river.FoamObjectArcWakeWidthMinCells,
+                semiArc
+                    ? river.FoamObjectSemiArcWakeWidthMaxCells
+                    : river.FoamObjectArcWakeWidthMaxCells,
+                wakeWidthHash);
+            geometry.HeadLengthCells = semiArc
+                ? river.FoamObjectSemiArcHeadLengthCells
+                : river.FoamObjectArcHeadLengthCells;
+            geometry.HeadWidthCells = semiArc
+                ? river.FoamObjectSemiArcHeadWidthCells
+                : river.FoamObjectArcHeadWidthCells;
+            return geometry;
+        }
+
+        private AutomaticSourceCellGeometry ResolveAutomaticFreeWaterCellGeometry(
+            AutomaticFreeWaterSourceRecipe recipe,
+            float sourceKey)
+        {
+            float lengthHash = Hash01(sourceKey + 101.13f);
+            float widthHash = Hash01(sourceKey + 103.37f);
+            float bendHash = Hash01(sourceKey + 107.71f);
+            AutomaticSourceCellGeometry geometry = default;
+            if (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector)
+            {
+                geometry.BodyLengthCells = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceLengthMinCells,
+                    river.FoamFreeWaterCrossLaceLengthMaxCells,
+                    lengthHash);
+                geometry.BodyWidthCells = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceWidthMinCells,
+                    river.FoamFreeWaterCrossLaceWidthMaxCells,
+                    widthHash);
+                geometry.HeadLengthCells =
+                    river.FoamFreeWaterCrossLaceHeadLengthCells;
+                geometry.HeadWidthCells =
+                    river.FoamFreeWaterCrossLaceHeadWidthCells;
+                geometry.BendAmplitudeCells = Mathf.Lerp(
+                    river.FoamFreeWaterCrossLaceBendMinCells,
+                    river.FoamFreeWaterCrossLaceBendMaxCells,
+                    bendHash);
+                return geometry;
+            }
+
+            if (recipe == AutomaticFreeWaterSourceRecipe.TornFragment)
+            {
+                geometry.BodyLengthCells = Mathf.Lerp(
+                    river.FoamFreeWaterBrokenFilamentLengthMinCells,
+                    river.FoamFreeWaterBrokenFilamentLengthMaxCells,
+                    lengthHash);
+                geometry.BodyWidthCells = Mathf.Lerp(
+                    river.FoamFreeWaterBrokenFilamentWidthMinCells,
+                    river.FoamFreeWaterBrokenFilamentWidthMaxCells,
+                    widthHash);
+                geometry.HeadLengthCells =
+                    river.FoamFreeWaterBrokenFilamentHeadLengthCells;
+                geometry.HeadWidthCells =
+                    river.FoamFreeWaterBrokenFilamentHeadWidthCells;
+                geometry.BendAmplitudeCells = Mathf.Lerp(
+                    river.FoamFreeWaterBrokenFilamentBendMinCells,
+                    river.FoamFreeWaterBrokenFilamentBendMaxCells,
+                    bendHash);
+                return geometry;
+            }
+
+            geometry.BodyLengthCells = Mathf.Lerp(
+                river.FoamFreeWaterLaceLengthMinCells,
+                river.FoamFreeWaterLaceLengthMaxCells,
+                lengthHash);
+            geometry.BodyWidthCells = Mathf.Lerp(
+                river.FoamFreeWaterLaceWidthMinCells,
+                river.FoamFreeWaterLaceWidthMaxCells,
+                widthHash);
+            geometry.HeadLengthCells =
+                river.FoamFreeWaterLaceHeadLengthCells;
+            geometry.HeadWidthCells =
+                river.FoamFreeWaterLaceHeadWidthCells;
+            geometry.BendAmplitudeCells = Mathf.Lerp(
+                river.FoamFreeWaterLaceBendMinCells,
+                river.FoamFreeWaterLaceBendMaxCells,
+                bendHash);
+            return geometry;
         }
 
         private enum AutomaticShoreSourceRecipe
@@ -100,22 +402,17 @@ namespace ProgrammaticStylized3D.Rivers
                 bool enabled,
                 float activity,
                 float patchSize,
-                float formationSpeedMetresPerSecond,
                 StylizedRiverFoamShorePattern pattern)
             {
                 Enabled = enabled;
                 Activity = Mathf.Clamp01(activity);
                 PatchSize = Mathf.Clamp01(patchSize);
-                FormationSpeedMetresPerSecond = Mathf.Max(
-                    0.01f,
-                    formationSpeedMetresPerSecond);
                 Pattern = pattern;
             }
 
             public bool Enabled { get; }
             public float Activity { get; }
             public float PatchSize { get; }
-            public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamShorePattern Pattern { get; }
 
             public float SlotSpacingMetres =>
@@ -137,20 +434,17 @@ namespace ProgrammaticStylized3D.Rivers
                 bool enabled,
                 float coverage,
                 float activity,
-                float formationSpeedMetresPerSecond,
                 StylizedRiverFoamObjectPattern pattern)
             {
                 Enabled = enabled;
                 Coverage = Mathf.Clamp01(coverage);
                 Activity = Mathf.Clamp01(activity);
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond);
                 Pattern = pattern;
             }
 
             public bool Enabled { get; }
             public float Coverage { get; }
             public float Activity { get; }
-            public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamObjectPattern Pattern { get; }
 
             public float EventsPerSecond =>
@@ -238,20 +532,17 @@ namespace ProgrammaticStylized3D.Rivers
                 bool enabled,
                 float coverage,
                 float activity,
-                float formationSpeedMetresPerSecond,
                 StylizedRiverFoamFreeWaterPattern pattern)
             {
                 Enabled = enabled;
                 Coverage = Mathf.Clamp01(coverage);
                 Activity = Mathf.Clamp01(activity);
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, formationSpeedMetresPerSecond);
                 Pattern = pattern;
             }
 
             public bool Enabled { get; }
             public float Coverage { get; }
             public float Activity { get; }
-            public float FormationSpeedMetresPerSecond { get; }
             public StylizedRiverFoamFreeWaterPattern Pattern { get; }
 
             public float SlotSpacingMetres =>
@@ -597,8 +888,10 @@ namespace ProgrammaticStylized3D.Rivers
                     1,
                     Mathf.RoundToInt(
                         river.FoamShoreRibbonLengthMaxCells)));
-            float ribbonDuration = ribbonLength /
-                Mathf.Max(0.01f, river.FoamShoreRibbonRevealSpeedCellsPerSecond);
+            float ribbonDuration = ResolveAutomaticRevealKinematics(
+                ribbonLength,
+                ResolveAutomaticRevealSpeedCellsPerSecond(
+                    AutomaticFoamSourceEventType.ShoreRibbon)).DurationSeconds;
             float inwardAlong = 0.5f * (
                 Mathf.Max(
                     1,
@@ -611,10 +904,17 @@ namespace ProgrammaticStylized3D.Rivers
             float inwardReach = 0.5f * (
                 Mathf.Max(0f, river.FoamInwardWashReachMinCells) +
                 Mathf.Max(0f, river.FoamInwardWashReachMaxCells));
-            float inwardDuration = Mathf.Sqrt(
-                    inwardAlong * inwardAlong +
-                    inwardReach * inwardReach) /
-                Mathf.Max(0.01f, river.FoamInwardWashRevealSpeedCellsPerSecond);
+            float inwardBend = 0.5f * (
+                Mathf.Max(0f, river.FoamInwardWashBendAmplitudeMinCells) +
+                Mathf.Max(0f, river.FoamInwardWashBendAmplitudeMaxCells));
+            float inwardPathLength = ResolveAutomaticInwardWashPathLengthCells(
+                inwardAlong,
+                inwardReach,
+                inwardBend);
+            float inwardDuration = ResolveAutomaticRevealKinematics(
+                inwardPathLength,
+                ResolveAutomaticRevealSpeedCellsPerSecond(
+                    AutomaticFoamSourceEventType.InwardWash)).DurationSeconds;
 
             float referenceDuration;
             switch (profile.Pattern)
@@ -714,7 +1014,6 @@ namespace ProgrammaticStylized3D.Rivers
                 true,
                 activity,
                 river.FoamShoreFoamPatchSize,
-                river.FoamShoreFoamFormationSpeedMetresPerSecond,
                 river.FoamShoreFoamPattern);
             inactiveStatus = string.Empty;
             return profile.Enabled;
@@ -1083,7 +1382,6 @@ namespace ProgrammaticStylized3D.Rivers
                 true,
                 coverage,
                 activity,
-                river.FoamObjectFoamFormationSpeedMetresPerSecond,
                 river.FoamObjectFoamPattern);
             inactiveStatus = string.Empty;
             return profile.Enabled;
@@ -1705,18 +2003,27 @@ namespace ProgrammaticStylized3D.Rivers
             float remainingLife;
             float breakupScale = 0f;
             float breakupStrength = 0f;
-            float patternFormationSpeedMultiplier;
             float lopsidedness = 0f;
             float objectWakeArmLengthMetres = 0f;
             float objectSourceLateralCellSpacingMetres = 0f;
             float objectAlongHalfLengthMetres = 0f;
             float objectAcrossHalfWidthMetres = 0f;
-            float sourcePathDistance;
-            float objectContactPathLengthMetres = 0f;
-            float objectContactStrokePathLengthMetres = 0f;
             ResolvedAutomaticObjectContactProfile resolvedContactProfile = default;
             float startGlobalDistance;
             float endGlobalDistance;
+            float domainLength = Mathf.Max(
+                0.01f,
+                river.Domain.GlobalDistanceMaximum -
+                river.Domain.GlobalDistanceMinimum);
+            float longitudinalCellSpacing = gridDescriptor.IsCreated
+                ? Mathf.Max(0.005f, gridDescriptor.ResolvedDxMetres)
+                : domainLength / Mathf.Max(1, fieldWidth);
+            float lateralCellSpacing = gridDescriptor.IsCreated
+                ? Mathf.Max(0.005f, gridDescriptor.ResolvedDyMetres)
+                : Mathf.Max(
+                    0.01f,
+                    source.SurfaceHalfWidth * 2f /
+                    Mathf.Max(1, fieldHeight));
 
             if (recipe == AutomaticObjectSourceRecipe.ContactFleck)
             {
@@ -1741,8 +2048,6 @@ namespace ProgrammaticStylized3D.Rivers
                     eventScale);
                 breakupScale = 0f;
                 breakupStrength = 0f;
-                patternFormationSpeedMultiplier =
-                    river.FoamObjectContactFleckFormationSpeedMultiplier;
                 amount = Mathf.Lerp(
                     river.FoamObjectContactFleckInitialPresenceMin,
                     river.FoamObjectContactFleckInitialPresenceMax,
@@ -1769,8 +2074,6 @@ namespace ProgrammaticStylized3D.Rivers
                     source.GlobalDistance + flowDirection * halfLength,
                     river.Domain.GlobalDistanceMinimum,
                     river.Domain.GlobalDistanceMaximum);
-                sourcePathDistance = Mathf.Abs(
-                    endGlobalDistance - startGlobalDistance);
             }
             else
             {
@@ -1799,10 +2102,6 @@ namespace ProgrammaticStylized3D.Rivers
                         ? river.FoamObjectContactSemiArcInitialLifeMax
                         : river.FoamObjectContactArcInitialLifeMax,
                     Hash01(seed + 10.3f));
-                patternFormationSpeedMultiplier = semiArc
-                    ? river.FoamObjectContactSemiArcFormationSpeedMultiplier
-                    : river.FoamObjectContactArcFormationSpeedMultiplier;
-
                 if (semiArc)
                 {
                     // Semi-Arc selects exactly one physical front half and
@@ -1812,16 +2111,7 @@ namespace ProgrammaticStylized3D.Rivers
                     lopsidedness = Hash01(seed + 13.9f) < 0.5f ? -1f : 1f;
                 }
 
-                float domainLength = Mathf.Max(
-                    0.01f,
-                    river.Domain.GlobalDistanceMaximum -
-                    river.Domain.GlobalDistanceMinimum);
-                float longitudinalCellSpacing = domainLength /
-                    Mathf.Max(1, fieldWidth);
-                float crossRiverCellSpacing = Mathf.Max(
-                    0.01f,
-                    source.SurfaceHalfWidth * 2f / Mathf.Max(1, fieldHeight));
-                objectSourceLateralCellSpacingMetres = crossRiverCellSpacing;
+                objectSourceLateralCellSpacingMetres = lateralCellSpacing;
                 float alongContactOffsetMetres = semiArc
                     ? river.FoamObjectContactSemiArcAlongFlowContactOffsetMetres
                     : river.FoamObjectContactArcAlongFlowContactOffsetMetres;
@@ -1855,25 +2145,6 @@ namespace ProgrammaticStylized3D.Rivers
                 float positiveArmLength = semiArc && lopsidedness < 0f
                     ? 0f
                     : dominantArmLength;
-                float selectedFrontLength = semiArc
-                    ? (lopsidedness < 0f
-                        ? resolvedContactProfile.NegativeHalfLength
-                        : resolvedContactProfile.PositiveHalfLength)
-                    : resolvedContactProfile.FrontPathLength;
-                objectContactStrokePathLengthMetres = Mathf.Max(
-                    0.001f,
-                    selectedFrontLength);
-                float fullContactRingPathLengthMetres = Mathf.Max(
-                    0.001f,
-                    resolvedContactProfile.FrontPathLength * 2f);
-                objectContactPathLengthMetres = Mathf.Max(
-                    0.001f,
-                    fullContactRingPathLengthMetres +
-                    negativeArmLength +
-                    positiveArmLength);
-                sourcePathDistance = contactOnlyReinforcement
-                    ? objectContactStrokePathLengthMetres
-                    : objectContactPathLengthMetres;
                 float dispatchNegativeArmLength = contactOnlyReinforcement
                     ? 0f
                     : negativeArmLength;
@@ -1970,51 +2241,70 @@ namespace ProgrammaticStylized3D.Rivers
                     maximumAbsoluteY);
             }
 
-            float minimumAcceptedPathDistance = contactOnlyReinforcement
-                ? 0.001f
-                : 0.05f;
-            if (sourcePathDistance <= minimumAcceptedPathDistance)
+            AutomaticFoamSourceEventType sourceType = recipe switch
             {
-                foamCompositionRejectedCount++;
-                return false;
-            }
-
-            float revealSpeedJitter = Mathf.Lerp(
-                0.90f,
-                1.10f,
-                Hash01(seed + 12.5f));
-            ResolvedAutomaticRevealTiming revealTiming =
-                ResolveAutomaticRevealTiming(
-                    sourcePathDistance,
-                    profile.FormationSpeedMetresPerSecond,
-                    patternFormationSpeedMultiplier,
-                    revealSpeedJitter);
-            ResolvedAutomaticRevealTiming contactStrokeRevealTiming =
-                recipe == AutomaticObjectSourceRecipe.ContactFleck
-                    ? revealTiming
-                    : ResolveAutomaticRevealTiming(
-                        objectContactStrokePathLengthMetres,
-                        profile.FormationSpeedMetresPerSecond,
-                        patternFormationSpeedMultiplier,
-                        revealSpeedJitter);
-            float formationSpeed =
-                revealTiming.RequestedSpeedMetresPerSecond;
+                AutomaticObjectSourceRecipe.ContactFleck =>
+                    AutomaticFoamSourceEventType.ObjectContactFleck,
+                AutomaticObjectSourceRecipe.ContactSemiArc =>
+                    AutomaticFoamSourceEventType.ObjectContactSemiArc,
+                _ => AutomaticFoamSourceEventType.ObjectContactArc
+            };
+            AutomaticSourceCellGeometry cellGeometry =
+                ResolveAutomaticObjectCellGeometry(recipe, sourceKey);
+            float revealSpeedCellsPerSecond =
+                ResolveAutomaticRevealSpeedCellsPerSecond(sourceType);
             bool contactCycle = recipe != AutomaticObjectSourceRecipe.ContactFleck;
-            float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            float contactStrokePathLengthCells = 0f;
+            if (contactCycle)
+            {
+                bool selectedPositive = lopsidedness >= 0f;
+                contactStrokePathLengthCells =
+                    ResolveAutomaticObjectContactPathLengthCells(
+                        resolvedContactProfile,
+                        longitudinalCellSpacing,
+                        lateralCellSpacing,
+                        cellGeometry.ContactSpanCells,
+                        recipe == AutomaticObjectSourceRecipe.ContactSemiArc &&
+                            selectedPositive,
+                        recipe == AutomaticObjectSourceRecipe.ContactSemiArc &&
+                            !selectedPositive);
+            }
+            float initialPathLengthCells = contactCycle
+                ? (contactOnlyReinforcement
+                    ? contactStrokePathLengthCells
+                    : Mathf.Max(
+                        contactStrokePathLengthCells,
+                        cellGeometry.WakeLengthCells))
+                : Mathf.Max(0.0001f, cellGeometry.BodyLengthCells);
+            ResolvedAutomaticRevealKinematics revealKinematics =
+                ResolveAutomaticRevealKinematics(
+                    initialPathLengthCells,
+                    revealSpeedCellsPerSecond);
+            ResolvedAutomaticRevealKinematics contactStrokeKinematics =
+                contactCycle
+                    ? ResolveAutomaticRevealKinematics(
+                        contactStrokePathLengthCells,
+                        revealSpeedCellsPerSecond)
+                    : revealKinematics;
             float feather = contactCycle
                 ? 0f
                 : Mathf.Clamp(
                     Mathf.Max(width * 0.65f, source.SurfaceHalfWidth * 0.010f),
                     0.020f,
                     0.110f);
-            float headTrailMetres = Mathf.Clamp(
-                Mathf.Max(feather * 1.35f, formationSpeed * materialStepDuration * 1.50f),
-                AutomaticObjectSourceMinimumHeadTrailMetres,
-                Mathf.Min(
-                    AutomaticObjectSourceMaximumHeadTrailMetres,
+            float representativeCellSpacing = Mathf.Sqrt(
+                longitudinalCellSpacing * lateralCellSpacing);
+            float headTrailMetres = contactCycle
+                ? Mathf.Clamp(
+                    cellGeometry.HeadLengthCells * representativeCellSpacing,
+                    AutomaticObjectSourceMinimumHeadTrailMetres,
+                    AutomaticObjectSourceMaximumHeadTrailMetres)
+                : Mathf.Clamp(
                     Mathf.Max(
-                        AutomaticObjectSourceMinimumHeadTrailMetres,
-                        sourcePathDistance * 0.30f)));
+                        feather * 1.35f,
+                        cellGeometry.HeadLengthCells * representativeCellSpacing),
+                    AutomaticObjectSourceMinimumHeadTrailMetres,
+                    AutomaticObjectSourceMaximumHeadTrailMetres);
 
             return BeginAutomaticObjectFoamSourceEvent(
                 recipe,
@@ -2022,8 +2312,9 @@ namespace ProgrammaticStylized3D.Rivers
                 startGlobalDistance,
                 endGlobalDistance,
                 source.GlobalDistance,
-                revealTiming,
-                contactStrokeRevealTiming,
+                revealKinematics,
+                contactStrokeKinematics,
+                cellGeometry,
                 headTrailMetres,
                 offset,
                 width,
@@ -2038,8 +2329,6 @@ namespace ProgrammaticStylized3D.Rivers
                 objectAcrossHalfWidthMetres,
                 objectSourceLateralCellSpacingMetres,
                 objectWakeArmLengthMetres,
-                objectContactPathLengthMetres,
-                objectContactStrokePathLengthMetres,
                 resolvedContactProfile,
                 contactOnlyReinforcement);
         }
@@ -2050,8 +2339,9 @@ namespace ProgrammaticStylized3D.Rivers
             float startGlobalDistance,
             float endGlobalDistance,
             float objectCentreGlobalDistance,
-            ResolvedAutomaticRevealTiming revealTiming,
-            ResolvedAutomaticRevealTiming contactStrokeRevealTiming,
+            ResolvedAutomaticRevealKinematics revealKinematics,
+            ResolvedAutomaticRevealKinematics contactStrokeKinematics,
+            AutomaticSourceCellGeometry cellGeometry,
             float headTrailMetres,
             float contactOffsetMetres,
             float widthMetres,
@@ -2066,8 +2356,6 @@ namespace ProgrammaticStylized3D.Rivers
             float objectAcrossHalfWidthMetres,
             float objectSourceLateralCellSpacingMetres,
             float objectWakeArmLengthMetres,
-            float objectContactPathLengthMetres,
-            float objectContactStrokePathLengthMetres,
             ResolvedAutomaticObjectContactProfile contactProfile,
             bool contactOnlyReinforcement)
         {
@@ -2103,10 +2391,9 @@ namespace ProgrammaticStylized3D.Rivers
             bool contactCycle =
                 sourceType == AutomaticFoamSourceEventType.ObjectContactArc ||
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
-            float resolvedBuildDuration =
-                revealTiming.ResolvedDurationSeconds;
+            float resolvedBuildDuration = revealKinematics.DurationSeconds;
             float resolvedContactStrokeDuration = contactCycle
-                ? contactStrokeRevealTiming.ResolvedDurationSeconds
+                ? contactStrokeKinematics.DurationSeconds
                 : resolvedBuildDuration;
             int objectContactStrokeCount = contactCycle && river != null &&
                 !contactOnlyReinforcement
@@ -2133,21 +2420,13 @@ namespace ProgrammaticStylized3D.Rivers
                 Elapsed = 0f,
                 ObjectBuildDuration = resolvedBuildDuration,
                 ObjectContactStrokeDuration = resolvedContactStrokeDuration,
-                ObjectContactStrokePathLengthMetres = contactCycle
-                    ? Mathf.Max(0.001f, objectContactStrokePathLengthMetres)
+                ObjectContactStrokePathLengthCells = contactCycle
+                    ? contactStrokeKinematics.PathLengthCells
                     : 0f,
-                ObjectContactStrokeRawRevealDurationSeconds = contactCycle
-                    ? contactStrokeRevealTiming.RawDurationSeconds
-                    : 0f,
-                ObjectContactStrokeRevealCadenceLimited = contactCycle &&
-                    contactStrokeRevealTiming.CadenceLimited,
                 ObjectContactStrokeCount = objectContactStrokeCount,
                 ObjectContactReinforcementOnly = contactOnlyReinforcement,
-                FormationSpeedMetresPerSecond =
-                    revealTiming.RequestedSpeedMetresPerSecond,
-                RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
-                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
-                RevealCadenceLimited = revealTiming.CadenceLimited,
+                RevealSpeedCellsPerSecond = revealKinematics.SpeedCellsPerSecond,
+                RevealPathLengthCells = revealKinematics.PathLengthCells,
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     AutomaticObjectSourceMinimumHeadTrailMetres,
@@ -2197,9 +2476,6 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectWakeArmLengthMetres = contactCycle
                     ? Mathf.Max(0.05f, objectWakeArmLengthMetres)
                     : 0f,
-                ObjectContactPathLengthMetres = contactCycle
-                    ? Mathf.Max(0.001f, objectContactPathLengthMetres)
-                    : 0f,
                 ObjectContactPoint0 = contactCycle
                     ? contactProfile.Point0
                     : Vector2.zero,
@@ -2238,55 +2514,21 @@ namespace ProgrammaticStylized3D.Rivers
                         0.05f,
                         objectAcrossHalfWidthMetres +
                         objectSourceLateralCellSpacingMetres * 2f)
-                    : 0f
+                    : 0f,
+                BodyLengthCells = cellGeometry.BodyLengthCells,
+                BodyWidthCells = cellGeometry.BodyWidthCells,
+                HeadLengthCells = cellGeometry.HeadLengthCells,
+                HeadWidthCells = cellGeometry.HeadWidthCells,
+                BendAmplitudeCells = cellGeometry.BendAmplitudeCells,
+                ContactSpanCells = cellGeometry.ContactSpanCells,
+                ContactWidthCells = cellGeometry.ContactWidthCells,
+                WakeLengthCells = cellGeometry.WakeLengthCells,
+                WakeWidthCells = cellGeometry.WakeWidthCells
             };
 
-            float objectLengthHash = Hash01(sourceKey + 61.17f);
-            float objectWidthHash = Hash01(sourceKey + 67.31f);
-            float objectWakeLengthHash = Hash01(sourceKey + 71.53f);
-            float objectWakeWidthHash = Hash01(sourceKey + 79.07f);
             if (sourceType == AutomaticFoamSourceEventType.ObjectContactFleck)
             {
-                candidateEvent.BodyLengthCells = Mathf.Lerp(
-                    river.FoamObjectFleckLengthMinCells,
-                    river.FoamObjectFleckLengthMaxCells,
-                    objectLengthHash);
-                candidateEvent.BodyWidthCells = Mathf.Lerp(
-                    river.FoamObjectFleckWidthMinCells,
-                    river.FoamObjectFleckWidthMaxCells,
-                    objectWidthHash);
-                candidateEvent.HeadLengthCells = river.FoamObjectFleckHeadLengthCells;
-                candidateEvent.HeadWidthCells = river.FoamObjectFleckHeadWidthCells;
-                candidateEvent.ShoreInsetMetres = Mathf.Lerp(
-                    river.FoamObjectFleckOffsetMinCells,
-                    river.FoamObjectFleckOffsetMaxCells,
-                    Hash01(sourceKey + 83.29f));
-            }
-            else
-            {
-                bool semiArcCells = sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
-                candidateEvent.ContactSpanCells = Mathf.Lerp(
-                    semiArcCells ? river.FoamObjectSemiArcContactSpanMinCells : river.FoamObjectArcContactSpanMinCells,
-                    semiArcCells ? river.FoamObjectSemiArcContactSpanMaxCells : river.FoamObjectArcContactSpanMaxCells,
-                    objectLengthHash);
-                candidateEvent.ContactWidthCells = Mathf.Lerp(
-                    semiArcCells ? river.FoamObjectSemiArcContactWidthMinCells : river.FoamObjectArcContactWidthMinCells,
-                    semiArcCells ? river.FoamObjectSemiArcContactWidthMaxCells : river.FoamObjectArcContactWidthMaxCells,
-                    objectWidthHash);
-                candidateEvent.WakeLengthCells = Mathf.Lerp(
-                    semiArcCells ? river.FoamObjectSemiArcWakeLengthMinCells : river.FoamObjectArcWakeLengthMinCells,
-                    semiArcCells ? river.FoamObjectSemiArcWakeLengthMaxCells : river.FoamObjectArcWakeLengthMaxCells,
-                    objectWakeLengthHash);
-                candidateEvent.WakeWidthCells = Mathf.Lerp(
-                    semiArcCells ? river.FoamObjectSemiArcWakeWidthMinCells : river.FoamObjectArcWakeWidthMinCells,
-                    semiArcCells ? river.FoamObjectSemiArcWakeWidthMaxCells : river.FoamObjectArcWakeWidthMaxCells,
-                    objectWakeWidthHash);
-                candidateEvent.HeadLengthCells = semiArcCells
-                    ? river.FoamObjectSemiArcHeadLengthCells
-                    : river.FoamObjectArcHeadLengthCells;
-                candidateEvent.HeadWidthCells = semiArcCells
-                    ? river.FoamObjectSemiArcHeadWidthCells
-                    : river.FoamObjectArcHeadWidthCells;
+                candidateEvent.ShoreInsetMetres = cellGeometry.OffsetCells;
             }
 
             if (!TryReserveAutomaticFoamPacket(candidateEvent))
@@ -2301,7 +2543,7 @@ namespace ProgrammaticStylized3D.Rivers
             RecordAutomaticRevealTiming(
                 eventId,
                 sourceType,
-                revealTiming);
+                revealKinematics);
             activeAutomaticFoamSourceEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
@@ -2535,7 +2777,6 @@ namespace ProgrammaticStylized3D.Rivers
                 true,
                 coverage,
                 activity,
-                river.FoamFreeWaterFoamFormationSpeedMetresPerSecond,
                 river.FoamFreeWaterFoamPattern);
             inactiveStatus = string.Empty;
             return profile.Enabled;
@@ -2721,7 +2962,6 @@ namespace ProgrammaticStylized3D.Rivers
             float breakupScale;
             float breakupStrength;
             float curvature;
-            float patternFormationSpeedMultiplier;
 
             if (recipe == AutomaticFreeWaterSourceRecipe.TornFragment)
             {
@@ -2739,8 +2979,6 @@ namespace ProgrammaticStylized3D.Rivers
                     eventScale);
                 breakupScale = 0f;
                 breakupStrength = 0f;
-                patternFormationSpeedMultiplier =
-                    river.FoamFreeWaterFragmentFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
                 amount = Mathf.Lerp(
                     river.FoamFreeWaterFragmentInitialPresenceMin,
@@ -2763,8 +3001,6 @@ namespace ProgrammaticStylized3D.Rivers
                     eventScale);
                 breakupScale = 0f;
                 breakupStrength = 0f;
-                patternFormationSpeedMultiplier =
-                    river.FoamFreeWaterCrossLaceFormationSpeedMultiplier;
                 curvature = Mathf.Lerp(-1.0f, 1.0f, Hash01(seed + 11.7f));
                 amount = Mathf.Lerp(
                     river.FoamFreeWaterCrossLaceInitialPresenceMin,
@@ -2787,8 +3023,6 @@ namespace ProgrammaticStylized3D.Rivers
                     eventScale);
                 breakupScale = 0f;
                 breakupStrength = 0f;
-                patternFormationSpeedMultiplier =
-                    river.FoamFreeWaterLaceFormationSpeedMultiplier;
                 float side = Hash01(seed + 11.7f) < 0.5f ? -1f : 1f;
                 curvature = side * Mathf.Lerp(
                     river.FoamFreeWaterLaceCurvatureMin,
@@ -2874,23 +3108,46 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            ResolvedAutomaticRevealTiming revealTiming =
-                ResolveAutomaticRevealTiming(
-                    formationDistance,
-                    profile.FormationSpeedMetresPerSecond,
-                    patternFormationSpeedMultiplier,
-                    Mathf.Lerp(0.90f, 1.10f, Hash01(seed + 13.5f)));
-            float formationSpeed =
-                revealTiming.RequestedSpeedMetresPerSecond;
-            float materialStepDuration = 1f / Mathf.Max(1f, ResolveUpdateRate());
+            AutomaticFoamSourceEventType sourceType = recipe ==
+                AutomaticFreeWaterSourceRecipe.TornFragment
+                    ? AutomaticFoamSourceEventType.FreeWaterTornFragment
+                    : (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector
+                        ? AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector
+                        : AutomaticFoamSourceEventType.FreeWaterLaceConnector);
+            AutomaticSourceCellGeometry cellGeometry =
+                ResolveAutomaticFreeWaterCellGeometry(recipe, sourceKey);
+            float shapeSeed =
+                sourceKey + AutomaticFreeWaterBirthShapeSeedSalt;
+            float pathLengthCells = ResolveAutomaticBentRibbonPathLengthCells(
+                cellGeometry.BodyLengthCells,
+                cellGeometry.BendAmplitudeCells,
+                shapeSeed);
+            float revealSpeedCellsPerSecond =
+                ResolveAutomaticRevealSpeedCellsPerSecond(sourceType);
+            ResolvedAutomaticRevealKinematics revealKinematics =
+                ResolveAutomaticRevealKinematics(
+                    pathLengthCells,
+                    revealSpeedCellsPerSecond);
+            float longitudinalCellSpacing = gridDescriptor.IsCreated
+                ? Mathf.Max(0.005f, gridDescriptor.ResolvedDxMetres)
+                : Mathf.Max(0.005f, fieldLength / Mathf.Max(1, fieldWidth));
+            float lateralCellSpacing = gridDescriptor.IsCreated
+                ? Mathf.Max(0.005f, gridDescriptor.ResolvedDyMetres)
+                : Mathf.Max(0.005f, width * 2f);
+            float representativeCellSpacing = Mathf.Sqrt(
+                longitudinalCellSpacing * lateralCellSpacing);
             float headTrailMetres = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
                 ? 0f
                 : Mathf.Clamp(
-                    Mathf.Max(width * 4.0f, formationSpeed * materialStepDuration * 1.50f),
+                    Mathf.Max(
+                        width * 4.0f,
+                        cellGeometry.HeadLengthCells * representativeCellSpacing),
                     AutomaticFreeWaterSourceMinimumHeadTrailMetres,
                     Mathf.Min(
                         AutomaticFreeWaterSourceMaximumHeadTrailMetres,
-                        Mathf.Max(AutomaticFreeWaterSourceMinimumHeadTrailMetres, formationDistance * 0.22f)));
+                        Mathf.Max(
+                            AutomaticFreeWaterSourceMinimumHeadTrailMetres,
+                            formationDistance * 0.22f)));
             float lateralPadding = recipe == AutomaticFreeWaterSourceRecipe.TornFragment
                 ? width * 2.8f + feather * 2f
                 : (recipe == AutomaticFreeWaterSourceRecipe.CrossLaceConnector
@@ -2903,7 +3160,8 @@ namespace ProgrammaticStylized3D.Rivers
                 endGlobalDistance,
                 acrossNormalized,
                 centreAcrossMetres,
-                revealTiming,
+                revealKinematics,
+                cellGeometry,
                 headTrailMetres,
                 width,
                 feather,
@@ -2952,7 +3210,8 @@ namespace ProgrammaticStylized3D.Rivers
             float endGlobalDistance,
             float centreAcrossNormalized,
             float centreAcrossMetres,
-            ResolvedAutomaticRevealTiming revealTiming,
+            ResolvedAutomaticRevealKinematics revealKinematics,
+            AutomaticSourceCellGeometry cellGeometry,
             float headTrailMetres,
             float widthMetres,
             float featherMetres,
@@ -2998,13 +3257,11 @@ namespace ProgrammaticStylized3D.Rivers
                 SideSign = 0f,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
-                Duration = revealTiming.ResolvedDurationSeconds,
+                Duration = revealKinematics.DurationSeconds,
                 Elapsed = 0f,
-                FormationSpeedMetresPerSecond =
-                    revealTiming.RequestedSpeedMetresPerSecond,
-                RevealPathDistanceMetres = revealTiming.PathDistanceMetres,
-                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
-                RevealCadenceLimited = revealTiming.CadenceLimited,
+                RevealSpeedCellsPerSecond =
+                    revealKinematics.SpeedCellsPerSecond,
+                RevealPathLengthCells = revealKinematics.PathLengthCells,
                 HeadTrailMetres = Mathf.Clamp(
                     headTrailMetres,
                     0f,
@@ -3032,36 +3289,13 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectAcrossHalfWidthMetres = halfWidth,
                 ObjectContactOffsetMetres = objectContactOffsetMetres,
                 CentreAcrossNormalized = Mathf.Clamp(centreAcrossNormalized, -1f, 1f),
-                LateralPaddingMetres = Mathf.Max(widthMetres * 2f, lateralPaddingMetres)
+                LateralPaddingMetres = Mathf.Max(widthMetres * 2f, lateralPaddingMetres),
+                BodyLengthCells = cellGeometry.BodyLengthCells,
+                BodyWidthCells = cellGeometry.BodyWidthCells,
+                HeadLengthCells = cellGeometry.HeadLengthCells,
+                HeadWidthCells = cellGeometry.HeadWidthCells,
+                BendAmplitudeCells = cellGeometry.BendAmplitudeCells
             };
-
-            float freeLengthHash = Hash01(sourceKey + 101.13f);
-            float freeWidthHash = Hash01(sourceKey + 103.37f);
-            float freeBendHash = Hash01(sourceKey + 107.71f);
-            if (sourceType == AutomaticFoamSourceEventType.FreeWaterCrossLaceConnector)
-            {
-                candidateEvent.BodyLengthCells = Mathf.Lerp(river.FoamFreeWaterCrossLaceLengthMinCells, river.FoamFreeWaterCrossLaceLengthMaxCells, freeLengthHash);
-                candidateEvent.BodyWidthCells = Mathf.Lerp(river.FoamFreeWaterCrossLaceWidthMinCells, river.FoamFreeWaterCrossLaceWidthMaxCells, freeWidthHash);
-                candidateEvent.HeadLengthCells = river.FoamFreeWaterCrossLaceHeadLengthCells;
-                candidateEvent.HeadWidthCells = river.FoamFreeWaterCrossLaceHeadWidthCells;
-                candidateEvent.BendAmplitudeCells = Mathf.Lerp(river.FoamFreeWaterCrossLaceBendMinCells, river.FoamFreeWaterCrossLaceBendMaxCells, freeBendHash);
-            }
-            else if (sourceType == AutomaticFoamSourceEventType.FreeWaterTornFragment)
-            {
-                candidateEvent.BodyLengthCells = Mathf.Lerp(river.FoamFreeWaterBrokenFilamentLengthMinCells, river.FoamFreeWaterBrokenFilamentLengthMaxCells, freeLengthHash);
-                candidateEvent.BodyWidthCells = Mathf.Lerp(river.FoamFreeWaterBrokenFilamentWidthMinCells, river.FoamFreeWaterBrokenFilamentWidthMaxCells, freeWidthHash);
-                candidateEvent.HeadLengthCells = river.FoamFreeWaterBrokenFilamentHeadLengthCells;
-                candidateEvent.HeadWidthCells = river.FoamFreeWaterBrokenFilamentHeadWidthCells;
-                candidateEvent.BendAmplitudeCells = Mathf.Lerp(river.FoamFreeWaterBrokenFilamentBendMinCells, river.FoamFreeWaterBrokenFilamentBendMaxCells, freeBendHash);
-            }
-            else
-            {
-                candidateEvent.BodyLengthCells = Mathf.Lerp(river.FoamFreeWaterLaceLengthMinCells, river.FoamFreeWaterLaceLengthMaxCells, freeLengthHash);
-                candidateEvent.BodyWidthCells = Mathf.Lerp(river.FoamFreeWaterLaceWidthMinCells, river.FoamFreeWaterLaceWidthMaxCells, freeWidthHash);
-                candidateEvent.HeadLengthCells = river.FoamFreeWaterLaceHeadLengthCells;
-                candidateEvent.HeadWidthCells = river.FoamFreeWaterLaceHeadWidthCells;
-                candidateEvent.BendAmplitudeCells = Mathf.Lerp(river.FoamFreeWaterLaceBendMinCells, river.FoamFreeWaterLaceBendMaxCells, freeBendHash);
-            }
 
             if (!TryReserveAutomaticFoamPacket(candidateEvent))
             {
@@ -3075,7 +3309,7 @@ namespace ProgrammaticStylized3D.Rivers
             RecordAutomaticRevealTiming(
                 eventId,
                 sourceType,
-                revealTiming);
+                revealKinematics);
             activeAutomaticFoamSourceEventCount++;
             foamCompositionStartedCount++;
             latestFoamCompositionEventId = eventId;
@@ -3381,9 +3615,11 @@ namespace ProgrammaticStylized3D.Rivers
             float headWidthCells = isInwardWash
                 ? river.FoamInwardWashHeadWidthCells
                 : 1f;
-            float revealSpeedCells = isInwardWash
-                ? river.FoamInwardWashRevealSpeedCellsPerSecond
-                : river.FoamShoreRibbonRevealSpeedCellsPerSecond;
+            AutomaticFoamSourceEventType sourceType = isInwardWash
+                ? AutomaticFoamSourceEventType.InwardWash
+                : AutomaticFoamSourceEventType.ShoreRibbon;
+            float revealSpeedCells =
+                ResolveAutomaticRevealSpeedCellsPerSecond(sourceType);
 
             widthCells = Mathf.Max(1f, widthCells);
             headLengthCells = Mathf.Max(1f, headLengthCells);
@@ -3432,27 +3668,15 @@ namespace ProgrammaticStylized3D.Rivers
             }
 
             float pathCells = isInwardWash
-                ? Mathf.Sqrt(
-                    resolvedAlongCells * resolvedAlongCells +
-                    reachCells * reachCells)
-                : resolvedAlongCells;
-            float materialStepDuration =
-                1f / Mathf.Max(1f, ResolveUpdateRate());
-            float rawDuration =
-                pathCells / Mathf.Max(0.01f, revealSpeedCells);
-            float resolvedDuration = Mathf.Max(
-                materialStepDuration,
-                rawDuration);
-            float representativeMetricSpeed = revealSpeedCells *
-                Mathf.Sqrt(longitudinalCellSpacing * lateralCellSpacing);
-            ResolvedAutomaticRevealTiming revealTiming =
-                new ResolvedAutomaticRevealTiming(
-                    pathCells * Mathf.Sqrt(
-                        longitudinalCellSpacing * lateralCellSpacing),
-                    representativeMetricSpeed,
-                    rawDuration,
-                    resolvedDuration,
-                    rawDuration < materialStepDuration);
+                ? ResolveAutomaticInwardWashPathLengthCells(
+                    resolvedAlongCells,
+                    reachCells,
+                    bendCells)
+                : Mathf.Max(1f, resolvedAlongCells);
+            ResolvedAutomaticRevealKinematics revealKinematics =
+                ResolveAutomaticRevealKinematics(
+                    pathCells,
+                    revealSpeedCells);
 
             float materialHash = Hash01(seed + 12.1f);
             float amount = isInwardWash
@@ -3480,13 +3704,12 @@ namespace ProgrammaticStylized3D.Rivers
                     sideSign,
                     startGlobalDistance,
                     endGlobalDistance,
-                    revealTiming,
+                    revealKinematics,
                     headLengthCells,
                     headWidthCells,
                     0f,
                     widthCells,
                     reachCells,
-                    revealSpeedCells,
                     pathCells,
                     amount,
                     remainingLife,
@@ -3497,7 +3720,7 @@ namespace ProgrammaticStylized3D.Rivers
                 return false;
             }
 
-            eventDuration = resolvedDuration;
+            eventDuration = revealKinematics.DurationSeconds;
             return true;
         }
 
@@ -3507,13 +3730,12 @@ namespace ProgrammaticStylized3D.Rivers
             float sideSign,
             float startGlobalDistance,
             float endGlobalDistance,
-            ResolvedAutomaticRevealTiming revealTiming,
+            ResolvedAutomaticRevealKinematics revealKinematics,
             float headLengthCells,
             float headWidthCells,
             float shoreOffsetCells,
             float widthCells,
             float inwardReachCells,
-            float revealSpeedCellsPerSecond,
             float pathLengthCells,
             float amount,
             float remainingLife,
@@ -3551,12 +3773,10 @@ namespace ProgrammaticStylized3D.Rivers
                 ShoreScheduleSlotId = shoreScheduleSlotId,
                 StartGlobalDistance = startGlobalDistance,
                 EndGlobalDistance = endGlobalDistance,
-                Duration = revealTiming.ResolvedDurationSeconds,
+                Duration = revealKinematics.DurationSeconds,
                 Elapsed = 0f,
-                FormationSpeedMetresPerSecond = Mathf.Max(0.01f, revealSpeedCellsPerSecond),
-                RevealPathDistanceMetres = Mathf.Max(1f, pathLengthCells),
-                RawRevealDurationSeconds = revealTiming.RawDurationSeconds,
-                RevealCadenceLimited = revealTiming.CadenceLimited,
+                RevealSpeedCellsPerSecond = revealKinematics.SpeedCellsPerSecond,
+                RevealPathLengthCells = revealKinematics.PathLengthCells,
                 HeadTrailMetres = Mathf.Max(1f, headLengthCells),
                 ShoreInsetMetres = Mathf.Max(0f, shoreOffsetCells),
                 WidthMetres = Mathf.Max(1f, widthCells),
@@ -3581,19 +3801,11 @@ namespace ProgrammaticStylized3D.Rivers
                 BodyLengthCells = sourceType ==
                     AutomaticFoamSourceEventType.ShoreRibbon
                         ? Mathf.Max(1f, pathLengthCells)
-                        : 0f,
-                BodyWidthCells = sourceType ==
-                    AutomaticFoamSourceEventType.ShoreRibbon
-                        ? 1f
-                        : 0f,
-                HeadLengthCells = sourceType ==
-                    AutomaticFoamSourceEventType.ShoreRibbon
-                        ? 1f
-                        : 0f,
-                HeadWidthCells = sourceType ==
-                    AutomaticFoamSourceEventType.ShoreRibbon
-                        ? 1f
-                        : 0f
+                        : Mathf.Max(1f, pathLengthCells),
+                BodyWidthCells = Mathf.Max(1f, widthCells),
+                HeadLengthCells = Mathf.Max(1f, headLengthCells),
+                HeadWidthCells = Mathf.Max(1f, headWidthCells),
+                BendAmplitudeCells = bendAmplitudeCells
             };
 
             if (!TryReserveAutomaticFoamPacket(candidateEvent))
@@ -3608,7 +3820,7 @@ namespace ProgrammaticStylized3D.Rivers
             latestFoamCompositionProgress = 0f;
             activeAutomaticFoamSourceEventCount++;
             activeAutomaticShoreSourceEventCount++;
-            RecordAutomaticRevealTiming(eventId, sourceType, revealTiming);
+            RecordAutomaticRevealTiming(eventId, sourceType, revealKinematics);
             createdEventId = eventId;
             return true;
         }

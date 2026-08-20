@@ -123,8 +123,8 @@ float FoamEvaluateIntrinsicShapeMask(
     FoamMaterialState material,
     float validFluid)
 {
-    // Layer D remains diagnostic-only. Use transported material amount so the
-    // diagnostic reflects both geometric Coverage and intrinsic Presence.
+    // Layer D remains diagnostic-only. Baseline resolves C×P; Coverage +
+    // Life resolves C because decoded Presence is implicit unit material.
     return saturate(material.coverage * material.presence * validFluid);
 }
 
@@ -208,18 +208,19 @@ FoamMaterialState FoamSampleMaterialStateForDomainUV(
     float2 domainUV,
     float validFluid)
 {
-    // Bulk-phase transport keeps the persistent field compact while its
-    // subcell downstream position remains scalar state. Layer D samples that
-    // logical position so diagnostic/temporal film stays aligned with Layer C.
+    float4 packed = 0.0.xxxx;
+    // Both material contracts use Bulk-Phase Residual TVD. Sample the logical
+    // subcell downstream position so Layer D remains aligned with Layer C.
     float2 materialDomainUV = domainUV;
     materialDomainUV.x -= _FoamBulkTransportPhaseCells /
         max(1.0, (float)_FoamDimensions.x);
     float2 materialPixel = FoamUVToTexelCoordinate(
         materialDomainUV,
         _FoamDimensions);
-    float4 packed = FoamClipPackedToValidFluid(
+    packed = FoamClipPackedToValidFluid(
         SampleStateBilinear(materialPixel),
         validFluid);
+
     return FoamDecodeMaterialState(packed);
 }
 
@@ -280,8 +281,11 @@ float FoamResolveVisualFilmSourceAtDomainUV(float2 domainUV)
         FoamResolveVisualFilmInfluenceAtDomainUV(domainUV);
 
     float materialAmount = material.coverage * material.presence;
-    float materialBody = smoothstep(0.035, 0.36, materialAmount) *
-        smoothstep(0.015, 0.070, material.remainingLife);
+    float materialBody = FoamMaterialContractUsesCoverageLife()
+        ? smoothstep(0.035, 0.36, material.coverage) *
+            (material.remainingLife > FoamMaterialStateEpsilon ? 1.0 : 0.0)
+        : smoothstep(0.035, 0.36, materialAmount) *
+            smoothstep(0.015, 0.070, material.remainingLife);
 
     // Layer D Film Source is material-derived. Layer B support/contact fields
     // may bias or suppress visible film around existing material, but they must
@@ -1160,15 +1164,78 @@ float FoamEvaluateBoundedRibbonCoverage4x4(
     return coverage / 16.0;
 }
 
-int FoamResolveShoreRibbonHeadCellIndex(
-    float progress,
-    int totalCellCount)
+struct FoamRevealWindow
 {
-    return clamp(
-        (int)floor(
-            saturate(progress) * (float)totalCellCount + 0.00001),
-        0,
-        totalCellCount - 1);
+    float strokeLengthCells;
+    float headDistanceCells;
+    float tailDistanceCells;
+};
+
+FoamRevealWindow FoamResolveRevealWindow(
+    float currentHeadDistanceCells,
+    float headLengthCells,
+    float strokeLengthCells)
+{
+    FoamRevealWindow window;
+    window.strokeLengthCells = max(0.0001, strokeLengthCells);
+    window.headDistanceCells = clamp(
+        currentHeadDistanceCells,
+        0.0,
+        window.strokeLengthCells);
+    window.tailDistanceCells = max(
+        0.0,
+        window.headDistanceCells - max(1.0, headLengthCells));
+    return window;
+}
+
+float FoamDistanceToArcClippedSegment(
+    float2 query,
+    float2 segmentStart,
+    float2 segmentEnd,
+    float segmentArcStart,
+    float lowerArc,
+    float upperArc,
+    float segmentTStart,
+    float segmentTEnd,
+    out float nearestT)
+{
+    float2 segment = segmentEnd - segmentStart;
+    float segmentLength = length(segment);
+    if (segmentLength <= 0.000001)
+    {
+        nearestT = segmentTStart;
+        return 100000.0;
+    }
+
+    float localLower = clamp(
+        lowerArc - segmentArcStart,
+        0.0,
+        segmentLength);
+    float localUpper = clamp(
+        upperArc - segmentArcStart,
+        0.0,
+        segmentLength);
+    if (localUpper <= localLower + 0.000001)
+    {
+        nearestT = segmentTStart;
+        return 100000.0;
+    }
+
+    float lowerFraction = localLower / segmentLength;
+    float upperFraction = localUpper / segmentLength;
+    float2 clippedStart = segmentStart + segment * lowerFraction;
+    float2 clippedEnd = segmentStart + segment * upperFraction;
+    float2 clippedSegment = clippedEnd - clippedStart;
+    float clippedLengthSquared = max(
+        0.000001,
+        dot(clippedSegment, clippedSegment));
+    float clippedT = saturate(
+        dot(query - clippedStart, clippedSegment) /
+        clippedLengthSquared);
+    float2 nearestPoint = clippedStart + clippedSegment * clippedT;
+    float sourceFraction = lerp(lowerFraction, upperFraction, clippedT);
+    nearestT = lerp(segmentTStart, segmentTEnd, sourceFraction);
+    return distance(query, nearestPoint);
 }
 
 float FoamAutomaticSourceGlobalDistanceAtColumn(int x)
@@ -1252,23 +1319,30 @@ void FoamEvaluatePersistentShoreRibbonHead(
     FoamMetricRow metric,
     float shoreMetres,
     float2 physicalCellSpacing,
-    out float birthShape,
+    out float cumulativeShape,
     out float headShape)
 {
-    birthShape = 0.0;
+    cumulativeShape = 0.0;
     headShape = 0.0;
 
     int totalCellCount = max(
         1,
         (int)floor(max(1.0, sourceEvent.kinematics.z) + 0.5));
-    int currentHeadCell = FoamResolveShoreRibbonHeadCellIndex(
+    FoamRevealWindow reveal = FoamResolveRevealWindow(
         sourceEvent.header.z,
+        1.0,
+        (float)totalCellCount);
+    float headDistanceCells = reveal.headDistanceCells;
+    int completedCellCount = clamp(
+        (int)floor(headDistanceCells + 0.00001),
+        0,
         totalCellCount);
-    int previousHeadCell = sourceEvent.deposit.z > 0.5
-        ? FoamResolveShoreRibbonHeadCellIndex(
-            sourceEvent.deposit.y,
-            totalCellCount)
-        : -1;
+    int currentHeadCell = clamp(
+        (int)floor(min(
+            headDistanceCells,
+            (float)totalCellCount - 0.00001)),
+        0,
+        totalCellCount - 1);
 
     float pathLengthMetres = abs(
         sourceEvent.distance.y - sourceEvent.distance.x);
@@ -1313,11 +1387,8 @@ void FoamEvaluatePersistentShoreRibbonHead(
         return;
     }
 
-    bool currentHead = candidateCell == currentHeadCell;
-    bool skippedCatchUp = candidateCell > previousHeadCell &&
-        candidateCell < currentHeadCell;
-    headShape = currentHead ? 1.0 : 0.0;
-    birthShape = currentHead || skippedCatchUp ? 1.0 : 0.0;
+    cumulativeShape = candidateCell < completedCellCount ? 1.0 : 0.0;
+    headShape = candidateCell == currentHeadCell ? 1.0 : 0.0;
 }
 
 float FoamEvaluateInwardWashSource(
@@ -1326,7 +1397,8 @@ float FoamEvaluateInwardWashSource(
     float lateralMetres,
     float shoreMetres,
     float2 physicalCellSpacing,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float dx = max(0.005, physicalCellSpacing.x);
     float dy = max(0.005, physicalCellSpacing.y);
@@ -1340,45 +1412,92 @@ float FoamEvaluateInwardWashSource(
         : shoreMetres - lateralMetres;
     float inwardCells = inwardMetres / dy;
 
-    float progress = saturate(sourceEvent.header.z);
-    float pathLengthCells = max(1.0, sourceEvent.kinematics.z);
+    float pathLengthCells = max(0.0001, sourceEvent.kinematics.z);
     float headLengthCells = max(1.0, sourceEvent.kinematics.y);
-    float headFraction = saturate(headLengthCells / pathLengthCells);
-    float headS = progress;
-    float tailS = max(0.0, headS - headFraction);
-
+    FoamRevealWindow reveal = FoamResolveRevealWindow(
+        sourceEvent.header.z,
+        headLengthCells,
+        pathLengthCells);
     float halfAlong = totalAlongCells * 0.5;
     float reachCells = max(0.0, sourceEvent.shore.z);
     float baseOffsetCells = max(0.0, sourceEvent.shore.x);
     float bendCells = sourceEvent.variation.w;
     float bodyWidthCells = max(1.0, sourceEvent.shore.y);
     float headWidthCells = max(1.0, sourceEvent.shore.w);
-    bool movingHeadInterval = headLengthCells < pathLengthCells - 0.0001;
-    float activeWidth = movingHeadInterval ? headWidthCells : bodyWidthCells;
-
-    // Keep the complete ribbon inside the river. The authored path begins at
-    // the shoreline, so centring width on it loses half the source to the
-    // valid-fluid clip. Offset the centreline inward by half the active width.
+    bool movingHeadInterval =
+        headLengthCells < pathLengthCells - 0.0001;
+    float activeWidth = movingHeadInterval
+        ? headWidthCells
+        : bodyWidthCells;
     float inwardCentreOffset = activeWidth * 0.5;
-    float2 startPoint = float2(
-        lerp(-halfAlong, halfAlong, tailS) +
-            bendCells * tailS * (1.0 - tailS),
-        baseOffsetCells + reachCells * tailS + inwardCentreOffset);
-    float2 endPoint = float2(
-        lerp(-halfAlong, halfAlong, headS) +
-            bendCells * headS * (1.0 - headS),
-        baseOffsetCells + reachCells * headS + inwardCentreOffset);
-
     float2 cellCentre = float2(signedAlongCells, inwardCells);
-    float coverage = FoamEvaluateBoundedRibbonCoverage4x4(
-        cellCentre,
-        startPoint,
-        endPoint,
-        activeWidth,
-        activeWidth);
+
+    float cumulativeCoverage = 0.0;
+    float headCoverage = 0.0;
+    [unroll]
+    for (int sampleY = 0; sampleY < 4; sampleY++)
+    {
+        [unroll]
+        for (int sampleX = 0; sampleX < 4; sampleX++)
+        {
+            float2 q = cellCentre +
+                (float2(sampleX, sampleY) + 0.5) / 4.0 - 0.5;
+            float minimumCumulativeDistance = 100000.0;
+            float minimumHeadDistance = 100000.0;
+            float2 previous = float2(
+                -halfAlong,
+                baseOffsetCells + inwardCentreOffset);
+            float previousT = 0.0;
+            float arcStart = 0.0;
+            [unroll]
+            for (int pathIndex = 1; pathIndex <= 6; pathIndex++)
+            {
+                float t = (float)pathIndex / 6.0;
+                float2 current = float2(
+                    lerp(-halfAlong, halfAlong, t) +
+                        bendCells * t * (1.0 - t),
+                    baseOffsetCells + reachCells * t +
+                        inwardCentreOffset);
+                float ignoredT;
+                minimumCumulativeDistance = min(
+                    minimumCumulativeDistance,
+                    FoamDistanceToArcClippedSegment(
+                        q,
+                        previous,
+                        current,
+                        arcStart,
+                        0.0,
+                        reveal.headDistanceCells,
+                        previousT,
+                        t,
+                        ignoredT));
+                minimumHeadDistance = min(
+                    minimumHeadDistance,
+                    FoamDistanceToArcClippedSegment(
+                        q,
+                        previous,
+                        current,
+                        arcStart,
+                        reveal.tailDistanceCells,
+                        reveal.headDistanceCells,
+                        previousT,
+                        t,
+                        ignoredT));
+                arcStart += distance(previous, current);
+                previous = current;
+                previousT = t;
+            }
+
+            cumulativeCoverage +=
+                minimumCumulativeDistance <= 0.5 * activeWidth ? 1.0 : 0.0;
+            headCoverage +=
+                minimumHeadDistance <= 0.5 * activeWidth ? 1.0 : 0.0;
+        }
+    }
 
     coverageMultiplier = 1.0;
-    return coverage;
+    headShape = headCoverage / 16.0;
+    return cumulativeCoverage / 16.0;
 }
 
 
@@ -1817,13 +1936,15 @@ float FoamEvaluateObjectContactCoverage4x4(
     float2 point4Cells,
     float contactSpanCells,
     float contactWidthCells,
-    float progress,
+    float headDistanceCells,
     float headLengthCells,
     float headWidthCells,
     bool positiveHalfOnly,
-    bool negativeHalfOnly)
+    bool negativeHalfOnly,
+    out float headCoverage)
 {
-    float coverage = 0.0;
+    float cumulativeCoverage = 0.0;
+    headCoverage = 0.0;
     float authoredSpan = max(1.0, contactSpanCells);
     bool fullBodyInterval = max(1.0, headLengthCells) >= authoredSpan - 0.0001;
     float activeWidth = fullBodyInterval
@@ -1842,47 +1963,49 @@ float FoamEvaluateObjectContactCoverage4x4(
     float upper = min(totalPathCells, centrePath + 0.5 * span);
     if (positiveHalfOnly) lower = max(lower, centrePath);
     if (negativeHalfOnly) upper = min(upper, centrePath);
-    float revealedUpper = lerp(lower, upper, saturate(progress));
-    float revealedLower = max(lower, revealedUpper - max(1.0, headLengthCells));
+    float activePathLength = max(0.0001, upper - lower);
+    FoamRevealWindow reveal = FoamResolveRevealWindow(
+        headDistanceCells,
+        headLengthCells,
+        activePathLength);
+    float cumulativeUpper = lower + reveal.headDistanceCells;
+    float headLower = lower + reveal.tailDistanceCells;
+    float headUpper = cumulativeUpper;
+
     [unroll]
     for (int sampleY = 0; sampleY < 4; sampleY++)
     {
         [unroll]
         for (int sampleX = 0; sampleX < 4; sampleX++)
         {
-            float2 samplePoint = cellCentre + (float2(sampleX, sampleY) + 0.5) / 4.0 - 0.5;
-            float d;
-            if (fullBodyInterval)
-            {
-                float pathCells;
-                float ignoredTotalPathCells;
-                d = FoamDistanceToObjectProfileCells(
-                    samplePoint,
-                    point0Cells,
-                    point1Cells,
-                    point2Cells,
-                    point3Cells,
-                    point4Cells,
-                    pathCells,
-                    ignoredTotalPathCells);
-                coverage += (d <= halfWidth && pathCells >= revealedLower && pathCells <= revealedUpper) ? 1.0 : 0.0;
-            }
-            else
-            {
-                d = FoamDistanceToFlatClippedObjectProfileCells(
-                    samplePoint,
-                    point0Cells,
-                    point1Cells,
-                    point2Cells,
-                    point3Cells,
-                    point4Cells,
-                    revealedLower,
-                    revealedUpper);
-                coverage += d <= halfWidth ? 1.0 : 0.0;
-            }
+            float2 samplePoint = cellCentre +
+                (float2(sampleX, sampleY) + 0.5) / 4.0 - 0.5;
+            float cumulativeDistance = FoamDistanceToFlatClippedObjectProfileCells(
+                samplePoint,
+                point0Cells,
+                point1Cells,
+                point2Cells,
+                point3Cells,
+                point4Cells,
+                lower,
+                cumulativeUpper);
+            float activeHeadDistance = FoamDistanceToFlatClippedObjectProfileCells(
+                samplePoint,
+                point0Cells,
+                point1Cells,
+                point2Cells,
+                point3Cells,
+                point4Cells,
+                headLower,
+                headUpper);
+            cumulativeCoverage += cumulativeDistance <= halfWidth ? 1.0 : 0.0;
+            headCoverage += activeHeadDistance <= halfWidth ? 1.0 : 0.0;
         }
     }
-    return coverage / 16.0;
+
+    cumulativeCoverage /= 16.0;
+    headCoverage /= 16.0;
+    return cumulativeCoverage;
 }
 
 float FoamEvaluateBentRibbonCoverage4x4(
@@ -1892,67 +2015,112 @@ float FoamEvaluateBentRibbonCoverage4x4(
     float headLengthCells,
     float headWidthCells,
     float bendCells,
-    float progress,
+    float headDistanceCells,
+    float pathLengthCells,
     float directionSign,
     bool crossRiver,
     bool broken,
-    float seed)
+    float seed,
+    out float headCoverage)
 {
-    float headT = saturate(progress);
-    float tailT = max(0.0, headT - max(1.0, headLengthCells) / max(1.0, lengthCells));
-    float coverage = 0.0;
+    FoamRevealWindow reveal = FoamResolveRevealWindow(
+        headDistanceCells,
+        headLengthCells,
+        pathLengthCells);
+    bool fullBodyInterval = max(1.0, headLengthCells) >=
+        max(0.0001, pathLengthCells) - 0.0001;
+    float activeWidth = fullBodyInterval
+        ? max(1.0, widthCells)
+        : max(1.0, headWidthCells);
+    float cumulativeCoverage = 0.0;
+    headCoverage = 0.0;
+
     [unroll]
     for (int sampleY = 0; sampleY < 4; sampleY++)
     {
         [unroll]
         for (int sampleX = 0; sampleX < 4; sampleX++)
         {
-            float2 q = cellCentre + (float2(sampleX, sampleY) + 0.5) / 4.0 - 0.5;
-            float minimumDistance = 100000.0;
-            float nearestT = tailT;
-            float2 previous = 0.0;
-            float previousT = tailT;
+            float2 q = cellCentre +
+                (float2(sampleX, sampleY) + 0.5) / 4.0 - 0.5;
+            float minimumCumulativeDistance = 100000.0;
+            float minimumHeadDistance = 100000.0;
+            float nearestCumulativeT = 0.0;
+            float nearestHeadT = 0.0;
+            float previousT = 0.0;
+            float previousAxis = -0.5 * lengthCells * directionSign;
+            float previousBend = 0.25 * bendCells * sin(seed);
+            float2 previous = crossRiver
+                ? float2(previousBend, previousAxis)
+                : float2(previousAxis, previousBend);
+            float arcStart = 0.0;
+
             [unroll]
-            for (int pathIndex = 0; pathIndex < 7; pathIndex++)
+            for (int pathIndex = 1; pathIndex <= 6; pathIndex++)
             {
-                float u = (float)pathIndex / 6.0;
-                float t = lerp(tailT, headT, u);
-                float axis = lerp(-0.5 * lengthCells, 0.5 * lengthCells, t) * directionSign;
-                float bend = bendCells * sin(t * 3.14159265) + 0.25 * bendCells * sin(t * 6.2831853 + seed);
-                float2 current = crossRiver ? float2(bend, axis) : float2(axis, bend);
-                if (pathIndex > 0)
+                float t = (float)pathIndex / 6.0;
+                float axis = lerp(-0.5 * lengthCells, 0.5 * lengthCells, t) *
+                    directionSign;
+                float bend = bendCells * sin(t * 3.14159265) +
+                    0.25 * bendCells * sin(t * 6.2831853 + seed);
+                float2 current = crossRiver
+                    ? float2(bend, axis)
+                    : float2(axis, bend);
+                float nearestT;
+                float cumulativeDistance = FoamDistanceToArcClippedSegment(
+                    q,
+                    previous,
+                    current,
+                    arcStart,
+                    0.0,
+                    reveal.headDistanceCells,
+                    previousT,
+                    t,
+                    nearestT);
+                if (cumulativeDistance < minimumCumulativeDistance)
                 {
-                    float2 segment = current - previous;
-                    float lengthSquared = max(0.000001, dot(segment, segment));
-                    float rawSegmentT = dot(q - previous, segment) / lengthSquared;
-                    if (rawSegmentT >= 0.0 && rawSegmentT <= 1.0)
-                    {
-                        float2 nearestPoint = previous + segment * rawSegmentT;
-                        float d = distance(q, nearestPoint);
-                        if (d < minimumDistance)
-                        {
-                            minimumDistance = d;
-                            nearestT = lerp(previousT, t, rawSegmentT);
-                        }
-                    }
+                    minimumCumulativeDistance = cumulativeDistance;
+                    nearestCumulativeT = nearestT;
                 }
+                float activeHeadDistance = FoamDistanceToArcClippedSegment(
+                    q,
+                    previous,
+                    current,
+                    arcStart,
+                    reveal.tailDistanceCells,
+                    reveal.headDistanceCells,
+                    previousT,
+                    t,
+                    nearestT);
+                if (activeHeadDistance < minimumHeadDistance)
+                {
+                    minimumHeadDistance = activeHeadDistance;
+                    nearestHeadT = nearestT;
+                }
+                arcStart += distance(previous, current);
                 previous = current;
                 previousT = t;
             }
-            bool fullBodyInterval = max(1.0, headLengthCells) >= max(1.0, lengthCells) - 0.0001;
-            float activeWidth = fullBodyInterval
-                ? max(1.0, widthCells)
-                : max(1.0, headWidthCells);
-            bool keep = minimumDistance <= 0.5 * activeWidth;
+
+            bool cumulativeKeep =
+                minimumCumulativeDistance <= 0.5 * activeWidth;
+            bool headKeep = minimumHeadDistance <= 0.5 * activeWidth;
             if (broken)
             {
-                float gate = FoamHash11(floor(nearestT * 7.0) + seed * 0.17);
-                keep = keep && gate > 0.28;
+                float cumulativeGate = FoamHash11(
+                    floor(nearestCumulativeT * 7.0) + seed * 0.17);
+                float headGate = FoamHash11(
+                    floor(nearestHeadT * 7.0) + seed * 0.17);
+                cumulativeKeep = cumulativeKeep && cumulativeGate > 0.28;
+                headKeep = headKeep && headGate > 0.28;
             }
-            coverage += keep ? 1.0 : 0.0;
+            cumulativeCoverage += cumulativeKeep ? 1.0 : 0.0;
+            headCoverage += headKeep ? 1.0 : 0.0;
         }
     }
-    return coverage / 16.0;
+
+    headCoverage /= 16.0;
+    return cumulativeCoverage / 16.0;
 }
 
 float FoamEvaluateObjectContactArcSource(
@@ -1961,42 +2129,99 @@ float FoamEvaluateObjectContactArcSource(
     float lateralMetres,
     float2 physicalCellSpacing,
     int2 coordinate,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float2 localPositionCells = float2(
         (globalDistance - sourceEvent.distance.z) / max(0.005, physicalCellSpacing.x),
         (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
     float2 p0; float2 p1; float2 p2; float2 p3; float2 p4;
     float frontSplit; float negativeSplit; float positiveSplit;
-    FoamUnpackObjectContactProfile(sourceEvent, p0, p1, p2, p3, p4, frontSplit, negativeSplit, positiveSplit);
-    float2 scaleToCells = 1.0 / max(float2(0.005, 0.005), physicalCellSpacing);
-    p0 *= scaleToCells; p1 *= scaleToCells; p2 *= scaleToCells; p3 *= scaleToCells; p4 *= scaleToCells;
-    float progress = saturate(sourceEvent.header.z);
+    FoamUnpackObjectContactProfile(
+        sourceEvent,
+        p0, p1, p2, p3, p4,
+        frontSplit, negativeSplit, positiveSplit);
+    float2 scaleToCells = 1.0 /
+        max(float2(0.005, 0.005), physicalCellSpacing);
+    p0 *= scaleToCells; p1 *= scaleToCells; p2 *= scaleToCells;
+    p3 *= scaleToCells; p4 *= scaleToCells;
+    float headDistanceCells = max(0.0, sourceEvent.header.z);
+    float contactHeadShape = 0.0;
     float contact = FoamEvaluateObjectContactCoverage4x4(
         localPositionCells, p0, p1, p2, p3, p4,
         max(1.0, sourceEvent.deposit.w), max(1.0, sourceEvent.shore.z),
-        progress, max(1.0, sourceEvent.kinematics.z),
-        max(1.0, sourceEvent.material.w), false, false);
-    float wakeLength = max(1.0, sourceEvent.shore.y);
-    float wakeWidth = max(1.0, sourceEvent.objectData.w);
-    bool fullWakeInterval = max(1.0, sourceEvent.kinematics.z) >= wakeLength - 0.0001;
-    float activeWakeWidth = fullWakeInterval
-        ? wakeWidth
-        : max(1.0, sourceEvent.material.w);
-    float wakeHead = wakeLength * progress;
-    float wakeTail = max(0.0, wakeHead - max(1.0, sourceEvent.kinematics.z));
-    float2 negativeStart = p0 + float2(wakeTail, 0.0);
-    float2 negativeTip = p0 + float2(wakeHead, 0.0);
-    float2 positiveStart = p4 + float2(wakeTail, 0.0);
-    float2 positiveTip = p4 + float2(wakeHead, 0.0);
-    float negativeArm = FoamEvaluateBoundedRibbonCoverage4x4(
-        localPositionCells, negativeStart, negativeTip, activeWakeWidth, activeWakeWidth);
-    float positiveArm = FoamEvaluateBoundedRibbonCoverage4x4(
-        localPositionCells, positiveStart, positiveTip, activeWakeWidth, activeWakeWidth);
+        headDistanceCells, max(1.0, sourceEvent.kinematics.z),
+        max(1.0, sourceEvent.material.w), false, false,
+        contactHeadShape);
+
+    bool contactOnlyPhase = sourceEvent.header.y >= 0.5;
+    float negativeArm = 0.0;
+    float positiveArm = 0.0;
+    float negativeHeadShape = 0.0;
+    float positiveHeadShape = 0.0;
+    if (!contactOnlyPhase)
+    {
+        float wakeLength = max(1.0, sourceEvent.shore.y);
+        float wakeWidth = max(1.0, sourceEvent.objectData.w);
+        float headLengthCells = max(1.0, sourceEvent.kinematics.z);
+        bool fullWakeInterval =
+            headLengthCells >= wakeLength - 0.0001;
+        float activeWakeWidth = fullWakeInterval
+            ? wakeWidth
+            : max(1.0, sourceEvent.material.w);
+        FoamRevealWindow wakeReveal = FoamResolveRevealWindow(
+            headDistanceCells,
+            headLengthCells,
+            wakeLength);
+        float2 negativeCumulativeTip =
+            p0 + float2(wakeReveal.headDistanceCells, 0.0);
+        float2 positiveCumulativeTip =
+            p4 + float2(wakeReveal.headDistanceCells, 0.0);
+        negativeArm = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            p0,
+            negativeCumulativeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+        positiveArm = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            p4,
+            positiveCumulativeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+        negativeHeadShape = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            p0 + float2(wakeReveal.tailDistanceCells, 0.0),
+            negativeCumulativeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+        positiveHeadShape = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            p4 + float2(wakeReveal.tailDistanceCells, 0.0),
+            positiveCumulativeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+    }
+
     coverageMultiplier = 1.0;
-    if (_FoamSourceEventDebugComponentMode == 1) return contact;
-    if (_FoamSourceEventDebugComponentMode == 2) return negativeArm;
-    if (_FoamSourceEventDebugComponentMode == 3) return positiveArm;
+    headShape = saturate(max(
+        contactHeadShape,
+        max(negativeHeadShape, positiveHeadShape)));
+    if (_FoamSourceEventDebugComponentMode == 1)
+    {
+        headShape = contactHeadShape;
+        return contact;
+    }
+    if (_FoamSourceEventDebugComponentMode == 2)
+    {
+        headShape = negativeHeadShape;
+        return negativeArm;
+    }
+    if (_FoamSourceEventDebugComponentMode == 3)
+    {
+        headShape = positiveHeadShape;
+        return positiveArm;
+    }
     return saturate(max(contact, max(negativeArm, positiveArm)));
 }
 
@@ -2006,40 +2231,83 @@ float FoamEvaluateObjectContactSemiArcSource(
     float lateralMetres,
     float2 physicalCellSpacing,
     int2 coordinate,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float2 localPositionCells = float2(
         (globalDistance - sourceEvent.distance.z) / max(0.005, physicalCellSpacing.x),
         (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
     float2 p0; float2 p1; float2 p2; float2 p3; float2 p4;
     float frontSplit; float negativeSplit; float positiveSplit;
-    FoamUnpackObjectContactProfile(sourceEvent, p0, p1, p2, p3, p4, frontSplit, negativeSplit, positiveSplit);
-    float2 scaleToCells = 1.0 / max(float2(0.005, 0.005), physicalCellSpacing);
-    p0 *= scaleToCells; p1 *= scaleToCells; p2 *= scaleToCells; p3 *= scaleToCells; p4 *= scaleToCells;
+    FoamUnpackObjectContactProfile(
+        sourceEvent,
+        p0, p1, p2, p3, p4,
+        frontSplit, negativeSplit, positiveSplit);
+    float2 scaleToCells = 1.0 /
+        max(float2(0.005, 0.005), physicalCellSpacing);
+    p0 *= scaleToCells; p1 *= scaleToCells; p2 *= scaleToCells;
+    p3 *= scaleToCells; p4 *= scaleToCells;
     bool selectedPositive = sourceEvent.variation.w >= 0.0;
+    float headDistanceCells = max(0.0, sourceEvent.header.z);
+    float contactHeadShape = 0.0;
     float contact = FoamEvaluateObjectContactCoverage4x4(
         localPositionCells, p0, p1, p2, p3, p4,
         max(1.0, sourceEvent.deposit.w), max(1.0, sourceEvent.shore.z),
-        saturate(sourceEvent.header.z), max(1.0, sourceEvent.kinematics.z),
-        max(1.0, sourceEvent.material.w), selectedPositive, !selectedPositive);
-    float wakeLength = max(1.0, sourceEvent.shore.y);
-    float wakeWidth = max(1.0, sourceEvent.objectData.w);
-    bool fullWakeInterval = max(1.0, sourceEvent.kinematics.z) >= wakeLength - 0.0001;
-    float activeWakeWidth = fullWakeInterval
-        ? wakeWidth
-        : max(1.0, sourceEvent.material.w);
-    float2 shoulder = selectedPositive ? p4 : p0;
-    float wakeHead = wakeLength * saturate(sourceEvent.header.z);
-    float wakeTail = max(0.0, wakeHead - max(1.0, sourceEvent.kinematics.z));
-    float arm = FoamEvaluateBoundedRibbonCoverage4x4(
-        localPositionCells, shoulder + float2(wakeTail, 0.0), shoulder + float2(wakeHead, 0.0),
-        activeWakeWidth, activeWakeWidth);
+        headDistanceCells, max(1.0, sourceEvent.kinematics.z),
+        max(1.0, sourceEvent.material.w), selectedPositive, !selectedPositive,
+        contactHeadShape);
+
+    bool contactOnlyPhase = sourceEvent.header.y >= 0.5;
+    float arm = 0.0;
+    float armHeadShape = 0.0;
+    if (!contactOnlyPhase)
+    {
+        float wakeLength = max(1.0, sourceEvent.shore.y);
+        float wakeWidth = max(1.0, sourceEvent.objectData.w);
+        float headLengthCells = max(1.0, sourceEvent.kinematics.z);
+        bool fullWakeInterval =
+            headLengthCells >= wakeLength - 0.0001;
+        float activeWakeWidth = fullWakeInterval
+            ? wakeWidth
+            : max(1.0, sourceEvent.material.w);
+        float2 shoulder = selectedPositive ? p4 : p0;
+        FoamRevealWindow wakeReveal = FoamResolveRevealWindow(
+            headDistanceCells,
+            headLengthCells,
+            wakeLength);
+        float2 wakeTip = shoulder +
+            float2(wakeReveal.headDistanceCells, 0.0);
+        arm = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            shoulder,
+            wakeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+        armHeadShape = FoamEvaluateBoundedRibbonCoverage4x4(
+            localPositionCells,
+            shoulder + float2(wakeReveal.tailDistanceCells, 0.0),
+            wakeTip,
+            activeWakeWidth,
+            activeWakeWidth);
+    }
+
     coverageMultiplier = 1.0;
-    if (_FoamSourceEventDebugComponentMode == 1) return contact;
+    headShape = saturate(max(contactHeadShape, armHeadShape));
+    if (_FoamSourceEventDebugComponentMode == 1)
+    {
+        headShape = contactHeadShape;
+        return contact;
+    }
     if (_FoamSourceEventDebugComponentMode == 2)
+    {
+        headShape = selectedPositive ? 0.0 : armHeadShape;
         return selectedPositive ? 0.0 : arm;
+    }
     if (_FoamSourceEventDebugComponentMode == 3)
+    {
+        headShape = selectedPositive ? armHeadShape : 0.0;
         return selectedPositive ? arm : 0.0;
+    }
     return saturate(max(contact, arm));
 }
 
@@ -2049,60 +2317,97 @@ float FoamEvaluateObjectContactFleckSource(
     float lateralMetres,
     float2 physicalCellSpacing,
     int2 coordinate,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 localCells = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection / max(0.005, physicalCellSpacing.x),
-        (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
+        (globalDistance - sourceEvent.distance.z) * flowDirection /
+            max(0.005, physicalCellSpacing.x),
+        (lateralMetres - sourceEvent.objectData.x) /
+            max(0.005, physicalCellSpacing.y));
     float4 contactField = FoamLoadObjectContactField(coordinate);
     float2 normalMetric = contactField.gb;
-    if (length(normalMetric) <= 0.001) normalMetric = float2(-flowDirection, 0.0);
-    else normalMetric = normalize(normalMetric);
-    float2 normalCells = normalize(float2(normalMetric.x / max(0.005, physicalCellSpacing.x), normalMetric.y / max(0.005, physicalCellSpacing.y)));
+    if (length(normalMetric) <= 0.001)
+        normalMetric = float2(-flowDirection, 0.0);
+    else
+        normalMetric = normalize(normalMetric);
+    float2 normalCells = normalize(float2(
+        normalMetric.x / max(0.005, physicalCellSpacing.x),
+        normalMetric.y / max(0.005, physicalCellSpacing.y)));
     float2 tangentCells = float2(-normalCells.y, normalCells.x);
     float centreOffset = max(0.0, sourceEvent.objectData.w);
     float2 centre = normalCells * centreOffset;
     float bodyLength = max(1.0, sourceEvent.objectData.y);
-    float headLength = min(bodyLength, max(1.0, sourceEvent.kinematics.y));
-    float progress = saturate(sourceEvent.header.z);
-    float revealedEnd = bodyLength * progress;
+    float headLength = min(
+        bodyLength,
+        max(1.0, sourceEvent.kinematics.y));
+    FoamRevealWindow reveal = FoamResolveRevealWindow(
+        sourceEvent.header.z,
+        headLength,
+        max(0.0001, sourceEvent.kinematics.z));
+    float revealedEnd = min(bodyLength, reveal.headDistanceCells);
     if (revealedEnd <= 0.0001)
     {
         coverageMultiplier = saturate(contactField.r * contactField.a);
+        headShape = 0.0;
         return 0.0;
     }
-    float revealedStart = max(0.0, revealedEnd - headLength);
     float bodyStart = -0.5 * bodyLength;
-    float2 startPoint = centre + tangentCells * (bodyStart + revealedStart);
-    float2 endPoint = centre + tangentCells * (bodyStart + revealedEnd);
-    bool fullBodyInterval = headLength >= bodyLength - 0.0001;
-    float activeWidth = fullBodyInterval
+    float activeWidth = headLength >= bodyLength - 0.0001
         ? max(1.0, sourceEvent.shore.y)
         : max(1.0, sourceEvent.shore.w);
-    float shape = FoamEvaluateBoundedRibbonCoverage4x4(
-        localCells, startPoint, endPoint, activeWidth, activeWidth);
+    float2 cumulativeStart = centre + tangentCells * bodyStart;
+    float2 cumulativeEnd = centre +
+        tangentCells * (bodyStart + revealedEnd);
+    float2 headStart = centre + tangentCells *
+        (bodyStart + min(bodyLength, reveal.tailDistanceCells));
+    float cumulativeShape = FoamEvaluateBoundedRibbonCoverage4x4(
+        localCells,
+        cumulativeStart,
+        cumulativeEnd,
+        activeWidth,
+        activeWidth);
+    headShape = FoamEvaluateBoundedRibbonCoverage4x4(
+        localCells,
+        headStart,
+        cumulativeEnd,
+        activeWidth,
+        activeWidth);
     coverageMultiplier = saturate(contactField.r * contactField.a);
-    return shape * coverageMultiplier;
+    headShape *= coverageMultiplier;
+    return cumulativeShape * coverageMultiplier;
 }
-
 
 float FoamEvaluateFreeWaterLaceConnectorSource(
     FoamSourceEventData sourceEvent,
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 cellCentre = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection / max(0.005, physicalCellSpacing.x),
-        (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
+        (globalDistance - sourceEvent.distance.z) * flowDirection /
+            max(0.005, physicalCellSpacing.x),
+        (lateralMetres - sourceEvent.objectData.x) /
+            max(0.005, physicalCellSpacing.y));
     coverageMultiplier = 1.0;
     return FoamEvaluateBentRibbonCoverage4x4(
-        cellCentre, max(1.0, sourceEvent.objectData.y), max(1.0, sourceEvent.shore.y),
-        max(1.0, sourceEvent.kinematics.y), max(1.0, sourceEvent.shore.w),
-        sourceEvent.objectData.z, saturate(sourceEvent.header.z), 1.0, false, false, sourceEvent.header.w);
+        cellCentre,
+        max(1.0, sourceEvent.objectData.y),
+        max(1.0, sourceEvent.shore.y),
+        max(1.0, sourceEvent.kinematics.y),
+        max(1.0, sourceEvent.shore.w),
+        sourceEvent.objectData.z,
+        sourceEvent.header.z,
+        max(0.0001, sourceEvent.kinematics.z),
+        1.0,
+        false,
+        false,
+        sourceEvent.header.w,
+        headShape);
 }
 
 float FoamEvaluateFreeWaterCrossLaceConnectorSource(
@@ -2110,17 +2415,30 @@ float FoamEvaluateFreeWaterCrossLaceConnectorSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 cellCentre = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection / max(0.005, physicalCellSpacing.x),
-        (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
+        (globalDistance - sourceEvent.distance.z) * flowDirection /
+            max(0.005, physicalCellSpacing.x),
+        (lateralMetres - sourceEvent.objectData.x) /
+            max(0.005, physicalCellSpacing.y));
     coverageMultiplier = 1.0;
     return FoamEvaluateBentRibbonCoverage4x4(
-        cellCentre, max(1.0, sourceEvent.objectData.y), max(1.0, sourceEvent.shore.y),
-        max(1.0, sourceEvent.kinematics.y), max(1.0, sourceEvent.shore.w),
-        sourceEvent.objectData.z, saturate(sourceEvent.header.z), sourceEvent.objectData.w >= 0.0 ? 1.0 : -1.0, true, false, sourceEvent.header.w);
+        cellCentre,
+        max(1.0, sourceEvent.objectData.y),
+        max(1.0, sourceEvent.shore.y),
+        max(1.0, sourceEvent.kinematics.y),
+        max(1.0, sourceEvent.shore.w),
+        sourceEvent.objectData.z,
+        sourceEvent.header.z,
+        max(0.0001, sourceEvent.kinematics.z),
+        sourceEvent.objectData.w >= 0.0 ? 1.0 : -1.0,
+        true,
+        false,
+        sourceEvent.header.w,
+        headShape);
 }
 
 float FoamEvaluateFreeWaterTornFragmentSource(
@@ -2128,17 +2446,134 @@ float FoamEvaluateFreeWaterTornFragmentSource(
     float globalDistance,
     float lateralMetres,
     float2 physicalCellSpacing,
-    out float coverageMultiplier)
+    out float coverageMultiplier,
+    out float headShape)
 {
     float flowDirection = sourceEvent.distance.w >= 0.0 ? 1.0 : -1.0;
     float2 cellCentre = float2(
-        (globalDistance - sourceEvent.distance.z) * flowDirection / max(0.005, physicalCellSpacing.x),
-        (lateralMetres - sourceEvent.objectData.x) / max(0.005, physicalCellSpacing.y));
+        (globalDistance - sourceEvent.distance.z) * flowDirection /
+            max(0.005, physicalCellSpacing.x),
+        (lateralMetres - sourceEvent.objectData.x) /
+            max(0.005, physicalCellSpacing.y));
     coverageMultiplier = 1.0;
     return FoamEvaluateBentRibbonCoverage4x4(
-        cellCentre, max(1.0, sourceEvent.objectData.y), max(1.0, sourceEvent.shore.y),
-        max(1.0, sourceEvent.kinematics.y), max(1.0, sourceEvent.shore.w),
-        sourceEvent.objectData.z, saturate(sourceEvent.header.z), 1.0, false, true, sourceEvent.header.w);
+        cellCentre,
+        max(1.0, sourceEvent.objectData.y),
+        max(1.0, sourceEvent.shore.y),
+        max(1.0, sourceEvent.kinematics.y),
+        max(1.0, sourceEvent.shore.w),
+        sourceEvent.objectData.z,
+        sourceEvent.header.z,
+        max(0.0001, sourceEvent.kinematics.z),
+        1.0,
+        false,
+        true,
+        sourceEvent.header.w,
+        headShape);
+}
+
+
+void FoamEvaluateAutomaticSourceShapes(
+    FoamSourceEventData sourceEvent,
+    int2 coordinate,
+    FoamMetricRow metric,
+    float globalDistance,
+    float lateralMetres,
+    float shoreMetres,
+    float2 physicalCellSpacing,
+    out float cumulativeShape,
+    out float headShape,
+    out float coverageMultiplier)
+{
+    float sourceType = sourceEvent.header.x;
+    cumulativeShape = 0.0;
+    headShape = 0.0;
+    coverageMultiplier = 1.0;
+    if (sourceType < 1.5)
+    {
+        FoamEvaluatePersistentShoreRibbonHead(
+            sourceEvent,
+            coordinate,
+            metric,
+            shoreMetres,
+            physicalCellSpacing,
+            cumulativeShape,
+            headShape);
+    }
+    else if (sourceType < 2.5)
+    {
+        cumulativeShape = FoamEvaluateInwardWashSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            coverageMultiplier,
+            headShape);
+    }
+    else if (sourceType < 3.5)
+    {
+        cumulativeShape = FoamEvaluateObjectContactArcSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            coverageMultiplier,
+            headShape);
+    }
+    else if (sourceType < 4.5)
+    {
+        cumulativeShape = FoamEvaluateObjectContactFleckSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            coverageMultiplier,
+            headShape);
+    }
+    else if (sourceType < 5.5)
+    {
+        cumulativeShape = FoamEvaluateObjectContactSemiArcSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coordinate,
+            coverageMultiplier,
+            headShape);
+    }
+    else if (sourceType < 6.5)
+    {
+        cumulativeShape = FoamEvaluateFreeWaterLaceConnectorSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coverageMultiplier,
+            headShape);
+    }
+    else if (sourceType < 7.5)
+    {
+        cumulativeShape = FoamEvaluateFreeWaterTornFragmentSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coverageMultiplier,
+            headShape);
+    }
+    else
+    {
+        cumulativeShape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
+            sourceEvent,
+            globalDistance,
+            lateralMetres,
+            physicalCellSpacing,
+            coverageMultiplier,
+            headShape);
+    }
 }
 
 struct FoamAutomaticSourceRasterSample
@@ -2217,198 +2652,67 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
 
     float currentCoverageMultiplier = 1.0;
     float currentShape = 0.0;
-    if (sourceType < 1.5)
-    {
-        float headShape = 0.0;
-        FoamEvaluatePersistentShoreRibbonHead(
-            sourceEvent,
-            coordinate,
-            metric,
-            shoreMetres,
-            physicalCellSpacing,
-            currentShape,
-            headShape);
-        result.debugCoverage = saturate(headShape * validFluid);
-    }
-    else if (sourceType < 2.5)
-    {
-        currentShape = FoamEvaluateInwardWashSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            shoreMetres,
-            physicalCellSpacing,
-            currentCoverageMultiplier);
-    }
-    else if (sourceType < 3.5)
-    {
-        currentShape = FoamEvaluateObjectContactArcSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            coordinate,
-            currentCoverageMultiplier);
-    }
-    else if (sourceType < 4.5)
-    {
-        currentShape = FoamEvaluateObjectContactFleckSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            coordinate,
-            currentCoverageMultiplier);
-    }
-    else if (sourceType < 5.5)
-    {
-        currentShape = FoamEvaluateObjectContactSemiArcSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            coordinate,
-            currentCoverageMultiplier);
-    }
-    else if (sourceType < 6.5)
-    {
-        currentShape = FoamEvaluateFreeWaterLaceConnectorSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            currentCoverageMultiplier);
-    }
-    else if (sourceType < 7.5)
-    {
-        currentShape = FoamEvaluateFreeWaterTornFragmentSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            currentCoverageMultiplier);
-    }
-    else
-    {
-        currentShape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
-            sourceEvent,
-            globalDistance,
-            lateralMetres,
-            physicalCellSpacing,
-            currentCoverageMultiplier);
-    }
+    float currentHeadShape = 0.0;
+    FoamEvaluateAutomaticSourceShapes(
+        sourceEvent,
+        coordinate,
+        metric,
+        globalDistance,
+        lateralMetres,
+        shoreMetres,
+        physicalCellSpacing,
+        currentShape,
+        currentHeadShape,
+        currentCoverageMultiplier);
 
+    result.debugCoverage = saturate(
+        currentHeadShape *
+        max(0.0, currentCoverageMultiplier) *
+        validFluid);
     float currentContribution = saturate(currentShape) *
         max(0.0, currentCoverageMultiplier);
+
+    FoamSourceEventData previousSourceEvent = sourceEvent;
+    previousSourceEvent.header.y = sourceEvent.deposit.x;
+    previousSourceEvent.header.z = sourceEvent.deposit.y;
+    float previousContribution = 0.0;
+    bool depositionPhaseChanged = abs(
+        sourceEvent.header.y - sourceEvent.deposit.x) > 0.0001;
+    if (sourceEvent.deposit.z > 0.5 && !depositionPhaseChanged)
+    {
+        float previousCoverageMultiplier = 1.0;
+        float previousShape = 0.0;
+        float ignoredPreviousHeadShape = 0.0;
+        FoamEvaluateAutomaticSourceShapes(
+            previousSourceEvent,
+            coordinate,
+            metric,
+            globalDistance,
+            lateralMetres,
+            shoreMetres,
+            physicalCellSpacing,
+            previousShape,
+            ignoredPreviousHeadShape,
+            previousCoverageMultiplier);
+        previousContribution = saturate(previousShape) *
+            max(0.0, previousCoverageMultiplier);
+    }
+
+    float newlyRevealedPermission = sourceEvent.deposit.z > 0.5 &&
+            !depositionPhaseChanged
+        ? max(0.0, currentContribution - previousContribution)
+        : currentContribution;
+    if (newlyRevealedPermission <= FoamMaterialStateEpsilon)
+    {
+        return result;
+    }
+
+    // All automatic sources share the same reveal permission contract:
+    // cumulative current geometry minus cumulative previous geometry. This
+    // makes reveal cadence-independent: a head that crosses many cells in one
+    // material tick authorizes every newly crossed path section. The complete
+    // current geometric target is written once permission is positive.
     float birthContribution = currentContribution;
-    if (sourceType < 1.5)
-    {
-        // Shore Ribbon birth attempts from the current one-cell head every
-        // material tick and covers delayed catch-up cells independently. The
-        // source never becomes a cumulative revealed body; existing full cells
-        // reject the repeated attempt through FoamMergeBornMaterial.
-        if (currentContribution <= FoamMaterialStateEpsilon)
-        {
-            return result;
-        }
-    }
-    else
-    {
-        FoamSourceEventData previousSourceEvent = sourceEvent;
-        previousSourceEvent.header.y = sourceEvent.deposit.x;
-        previousSourceEvent.header.z = sourceEvent.deposit.y;
-        float previousContribution = 0.0;
-        bool depositionPhaseChanged = abs(
-            sourceEvent.header.y - sourceEvent.deposit.x) > 0.0001;
-        if (sourceEvent.deposit.z > 0.5 && !depositionPhaseChanged)
-        {
-            float previousCoverageMultiplier = 1.0;
-            float previousShape = 0.0;
-            if (sourceType < 2.5)
-            {
-                previousShape = FoamEvaluateInwardWashSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    shoreMetres,
-                    physicalCellSpacing,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 3.5)
-            {
-                previousShape = FoamEvaluateObjectContactArcSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    coordinate,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 4.5)
-            {
-                previousShape = FoamEvaluateObjectContactFleckSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    coordinate,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 5.5)
-            {
-                previousShape = FoamEvaluateObjectContactSemiArcSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    coordinate,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 6.5)
-            {
-                previousShape = FoamEvaluateFreeWaterLaceConnectorSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    previousCoverageMultiplier);
-            }
-            else if (sourceType < 7.5)
-            {
-                previousShape = FoamEvaluateFreeWaterTornFragmentSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    previousCoverageMultiplier);
-            }
-            else
-            {
-                previousShape = FoamEvaluateFreeWaterCrossLaceConnectorSource(
-                    previousSourceEvent,
-                    globalDistance,
-                    lateralMetres,
-                    physicalCellSpacing,
-                    previousCoverageMultiplier);
-            }
-
-            previousContribution = saturate(previousShape) *
-                max(0.0, previousCoverageMultiplier);
-        }
-
-        float newlyRevealedPermission = sourceEvent.deposit.z > 0.5
-            ? max(0.0, currentContribution - previousContribution)
-            : currentContribution;
-        if (newlyRevealedPermission <= FoamMaterialStateEpsilon)
-        {
-            return result;
-        }
-
-        // Current-minus-previous is permission only. Once the moving reveal
-        // interval reaches a cell, write the complete current geometric target
-        // rather than a cadence-dependent derivative amount.
-        birthContribution = currentContribution;
-    }
 
     // P13A makes Initial Presence and Initial Life authoritative material
     // properties. Source shape, family/subcell shaping, reveal progression and
@@ -2416,7 +2720,9 @@ FoamAutomaticSourceRasterSample EvaluateFoamAutomaticSourceRasterSample(
     // fill blend remains in the GPU record for binary compatibility but is no
     // longer allowed to reinterpret Initial Presence as spatial probability.
     float injectedCoverage = saturate(birthContribution * validFluid);
-    float authoredPresence = saturate(sourceEvent.material.x);
+    float authoredPresence = FoamMaterialContractUsesCoverageLife()
+        ? 1.0
+        : saturate(sourceEvent.material.x);
     float authoredLife = saturate(sourceEvent.material.y);
     if (injectedCoverage <= FoamMaterialStateEpsilon ||
         authoredPresence <= 0.0 ||
@@ -3335,6 +3641,19 @@ void ResetTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     _FoamTopologyMetrics.Store(dispatchId.x * 4u, resetValue);
 }
 
+FoamMaterialState FoamSampleMetricMaterialState(float2 uv)
+{
+    float4 packed = 0.0.xxxx;
+    packed = SampleStateAtUV(uv);
+    return FoamDecodeMaterialState(packed);
+}
+
+float FoamMetricMaterialAmountAtUV(float2 uv)
+{
+    FoamMaterialState material = FoamSampleMetricMaterialState(uv);
+    return saturate(material.coverage * material.presence);
+}
+
 [numthreads(8, 8, 1)]
 void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
 {
@@ -3371,8 +3690,7 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
         return;
     }
 
-    FoamMaterialState visibleMaterial = FoamDecodeMaterialState(
-        SampleStateAtUV(uv));
+    FoamMaterialState visibleMaterial = FoamSampleMetricMaterialState(uv);
     float materialAmount =
         visibleMaterial.coverage * visibleMaterial.presence;
     bool visible = materialAmount >= _FoamPresenceMetricThreshold;
@@ -3390,10 +3708,10 @@ void MeasureTopologyMetrics(uint3 dispatchId : SV_DispatchThreadID)
     float2 texel = 1.0 /
         max(float2(2.0, 2.0), (float2)_FoamTopologyDimensions);
     bool perimeter = visible && (
-        SampleStateAtUV(saturate(uv + float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv - float2(texel.x, 0.0))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv + float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold ||
-        SampleStateAtUV(saturate(uv - float2(0.0, texel.y))).x < _FoamPresenceMetricThreshold);
+        FoamMetricMaterialAmountAtUV(saturate(uv + float2(texel.x, 0.0))) < _FoamPresenceMetricThreshold ||
+        FoamMetricMaterialAmountAtUV(saturate(uv - float2(texel.x, 0.0))) < _FoamPresenceMetricThreshold ||
+        FoamMetricMaterialAmountAtUV(saturate(uv + float2(0.0, texel.y))) < _FoamPresenceMetricThreshold ||
+        FoamMetricMaterialAmountAtUV(saturate(uv - float2(0.0, texel.y))) < _FoamPresenceMetricThreshold);
 
     uint originalValue;
     _FoamTopologyMetrics.InterlockedAdd(FoamMetricValidFluidOffset, 1u, originalValue);

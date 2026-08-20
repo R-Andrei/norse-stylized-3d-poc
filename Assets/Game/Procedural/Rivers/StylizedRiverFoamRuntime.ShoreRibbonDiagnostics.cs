@@ -294,7 +294,7 @@ namespace ProgrammaticStylized3D.Rivers
                 elapsed = Mathf.Min(duration, elapsed + delta);
                 int currentCount = ResolveShoreRibbonAuditRevealedCellCount(
                     elapsed,
-                    duration,
+                    test.SpeedCellsPerSecond,
                     test.LengthCells);
                 if (currentCount > previousCount)
                 {
@@ -308,23 +308,18 @@ namespace ProgrammaticStylized3D.Rivers
 
         private static int ResolveShoreRibbonAuditRevealedCellCount(
             float elapsed,
-            float duration,
+            float speedCellsPerSecond,
             int totalCellCount)
         {
-            if (elapsed <= 0.000001f)
-            {
-                return 0;
-            }
-
             int resolvedTotalCellCount = Mathf.Max(1, totalCellCount);
-            float progress = Mathf.Clamp01(
-                elapsed / Mathf.Max(0.0001f, duration));
-            int headCell = Mathf.Clamp(
-                Mathf.FloorToInt(
-                    progress * resolvedTotalCellCount + 0.00001f),
+            float headDistanceCells = ResolveAutomaticRevealHeadDistanceCells(
+                resolvedTotalCellCount,
+                speedCellsPerSecond,
+                elapsed);
+            return Mathf.Clamp(
+                Mathf.FloorToInt(headDistanceCells + 0.00001f),
                 0,
-                resolvedTotalCellCount - 1);
-            return headCell + 1;
+                resolvedTotalCellCount);
         }
 
         public void CancelShoreRibbonBehaviorSuite()
@@ -582,12 +577,9 @@ namespace ProgrammaticStylized3D.Rivers
             shoreRibbonAuditEvent.ShoreInsetMetres = 0f;
             shoreRibbonAuditEvent.SourceAmount = 1f;
             shoreRibbonAuditEvent.RemainingLife = 1f;
-            shoreRibbonAuditEvent.FormationSpeedMetresPerSecond =
-                test.SpeedCellsPerSecond *
-                Mathf.Max(0.01f, gridDescriptor.ResolvedDxMetres);
-            // The D8 Shore ABI retains a legacy metre-named member, but this
-            // value is authoritative path cells in the production packer.
-            shoreRibbonAuditEvent.RevealPathDistanceMetres =
+            shoreRibbonAuditEvent.RevealSpeedCellsPerSecond =
+                test.SpeedCellsPerSecond;
+            shoreRibbonAuditEvent.RevealPathLengthCells =
                 test.LengthCells;
             shoreRibbonAuditEvent.Duration =
                 test.LengthCells /
@@ -674,7 +666,7 @@ namespace ProgrammaticStylized3D.Rivers
             float previousElapsed = shoreRibbonAuditElapsed;
             int previousCount = ResolveShoreRibbonAuditRevealedCellCount(
                 previousElapsed,
-                shoreRibbonAuditEvent.Duration,
+                test.SpeedCellsPerSecond,
                 test.LengthCells);
             float sourceDelta = shoreRibbonAuditMaterialStepDuration;
             if (test.DelayedTick && shoreRibbonAuditTickIndex == 8)
@@ -688,7 +680,7 @@ namespace ProgrammaticStylized3D.Rivers
             shoreRibbonAuditEvent.Elapsed = shoreRibbonAuditElapsed;
             int currentCount = ResolveShoreRibbonAuditRevealedCellCount(
                 shoreRibbonAuditElapsed,
-                shoreRibbonAuditEvent.Duration,
+                test.SpeedCellsPerSecond,
                 test.LengthCells);
             shoreRibbonAuditTickIndex++;
 

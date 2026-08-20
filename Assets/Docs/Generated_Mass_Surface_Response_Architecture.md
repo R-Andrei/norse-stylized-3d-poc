@@ -1428,7 +1428,7 @@ Final 5P audit result: exactly ten approved files differ from the post-5O baseli
 - Plan recorded before implementation.
 - Stage E implementation authored within the approved six-file scope.
 - Final offline source/scope/symbol/mode/production-variant audit passed (`71 / 71`); final changed-file-only archive extraction/integrity audit passed.
-- Unity 6000.5.0f1 compilation/runtime validation pending.
+- Unity 6000.5.0f1 runtime evidence completed on 2026-08-07: 3,677/3,677 counted cases, 3,681 total render/readback passes, all 3,468 Stage E orientation cases, zero completeness failure, valid identity/alignment/Lambert contracts, and complete renderer-state restoration.
 
 ### Objective
 
@@ -1551,4 +1551,732 @@ The successful result may be `no single dominant stage`; the test is still valid
 - Audit-only shader branches must compile only under `_SURFACE_CAUSALITY_AUDIT`; production Generated Mass rendering must be byte/behavior equivalent outside that keyword.
 - Existing H3 identity maps are reused for the same three views. Any added view is out of scope unless the plan is updated first.
 - Legacy Shader Graph internals are not instrumented. Legacy is therefore captured as the actual same-mesh behavioral reference, while exact stage attribution is performed inside the HLSL path.
-- Unity compilation/GPU execution is authoritative and remains pending after packaging. Static validation must prove case-family counts, mode uniqueness, no unresolved symbols, no production-material edits, and no executable change outside the audit keyword in the shared forward include.
+- Unity compilation/GPU execution completed successfully for the submitted 5Q evidence run. The resulting Stage E ownership record is preserved by GM-SURFACE.5R and is now the authoritative causal basis for the production material-response correction.
+
+## GM-SURFACE.5R — Orientation-coherent material response baseline
+
+Status: **implemented; static audit passed; user visual acceptance recorded 2026-08-09**.
+
+### Why this patch exists
+
+GM-SURFACE.5Q completed the full surface-orientation causality matrix instead of relying on whole-object averages. The run completed 3,677 counted cases, including all 3,468 Stage E orientation cases, with no completeness failure. Its controlled Lambert preflight matched the captured interpolated GPU normal field to approximately `1e-7` normalized RMSE, and every cumulative direct-light checkpoint matched the independently captured product of pre-light albedo, `NdotL`, distance attenuation, and shadow attenuation with normalized RMSE `0`.
+
+Those results prove that the fundamental direct-light equation and published light direction are coherent. The active visual defect is introduced **before** that multiplication, by material-value authorities that encode geometry/upwardness/height or topology-sensitive tonal variation into pre-light albedo.
+
+### Permanent problem record
+
+The defect to preserve across sessions is:
+
+> Under one incident light, individual Generated Mass source faces and ordinary bevel faces can render in a bright/dark ordering that contradicts their measured orientation to the light. The legacy material is accepted because its visible face ordering tracks orientation coherently. Global darkness, average PBR residual, specular/F0, and whole-rock exposure are not defect definitions.
+
+5Q isolated the material chain using 1,514 source-face orientation comparisons and 1,364 conditional bevel comparisons across the deterministic direction/view sweep:
+
+| Cumulative stage | Source inversions | Newly introduced source inversions | Conditional bevel violations | Newly introduced bevel violations | Interpretation |
+| --- | ---: | ---: | ---: | ---: | --- |
+| BASE | 0 | 0 | 64 | 64* | Constant-base direct response follows source-face `NdotL` exactly. |
+| TONAL | 0 | 0 | 189 | 130 | Major bevel-only failure family. |
+| EXPOSURE_SCALE | 28 | 28 | 216 | 39 | First real source-face orientation inversions. |
+| MOTTLE | 27 | 0 | 205 | 1 | Minor contributor. |
+| EXPOSURE_TINT | 27 | 0 | 205 | 0 | No additional ordering damage in the tested state. |
+| CREVICE | 65 | 38 | 191 | 23 | Largest newly introduced source-face batch. |
+| BASE_LAYER | 80 | 15 | 191 | 11 | Significant additional source-face damage. |
+| DIRT | 80 | 0 | 186 | 2 | Not a primary owner. |
+| WET/FROST/final closure | 80 | 0 | 186 | 0 | No further source-face inversion growth in the tested state. |
+
+`*` The 64 BASE bevel count is a known classifier floor, not proof that constant base colour is wrong. The Stage E conditional bevel gate permits a wider parent-interval tolerance in `NdotL` than in luminance. Because constant-base luminance is proportional to `NdotL`, this can classify small, tolerance-allowed normal differences as luminance-envelope escapes. Production decisions therefore use **introduced stage errors**, direct-product identity, and the raw orientation rows instead of treating `firstDivergentStage=BASE` literally.
+
+The source-face result is not affected by that classifier issue: BASE and TONAL have zero source-face inversions, while EXPOSURE, CREVICE, and BASE add 28, 38, and 15 respectively.
+
+### Correlation evidence
+
+The first source-face failure stage, `EXPOSURE_SCALE`, had exposure correlation `0.9957553` and height correlation `0.9000925`. The `CREVICE` stage had crevice correlation `-0.9678729` and height correlation `0.9795084`. `BASE_LAYER` retained very strong exposure/crevice/height correlations while increasing the inversion count to 80.
+
+This establishes that the problematic value response is strongly tied to the generated semantic fields rather than to random light-vector error.
+
+### Ablation evidence
+
+The final pre-light state contained 80 source-face inversions and 186 conditional bevel violations, for a combined count of 266. Disabling **all pre-light value authorities** produced:
+
+- source-face inversions: `0`;
+- conditional bevel violations: `64` (the constant-base classifier floor);
+- combined count: `64`;
+- reduction from baseline: `0.7593985` (`75.93985%`).
+
+Removing specular produced no reduction: `80` source inversions, `186` bevel violations, combined `266`. Wet, frost, monolithic response, and overall tint likewise produced no reduction in the tested state. The 5O F0/normal trial therefore remains rejected as a root-cause fix for the orientation defect.
+
+Individual one-layer ablations are not interpreted as simple additive ownership because the layers interact nonlinearly: removing one wrong layer can expose or cease to cancel another wrong layer. The cumulative stage introduction counts are the authoritative evidence for where incoherence first appears.
+
+### Architectural conclusion
+
+Generated Mass semantic masks describe **material state**, not incident illumination.
+
+The following rule is now permanent:
+
+1. Exposure/upwardness/height may influence tint, weathering eligibility, roughness, accumulation, or other material identity, but must not brighten direct-light albedo strongly enough to override real `NdotL` ordering.
+2. Crevice and base/contact masks may describe occlusion/material identity, but must not pre-darken direct-light albedo toward fixed dark targets. If stronger grounding is needed later, it belongs in a separately validated indirect/AO contract, not as fake direct-light loss.
+3. Generated bevel tonal breakup must be independent of generated triangulation and interpolated source-face tonal authority. The bevel may retain topology-independent world-position pixel-cell variation.
+4. Direct-light `NdotL`, attenuation, PBR light-vector math, geometry, and mask-generation ownership remain unchanged until evidence says otherwise.
+
+### 5R production changes
+
+The shared forward path now applies the rule above:
+
+- Generated Mass exposure semantic luminance scale is fixed to `1.0`. Ground semantic scaling is unchanged. The separate value-preserving Generated Mass exposure tint path remains available.
+- Generated Mass crevice no longer lerps albedo toward a dark neutral target. The mask can only blend toward `PS3D_ApplyValuePreservingTint(...)` using the existing crevice tint control.
+- Generated Mass base/contact no longer lerps albedo toward a dark neutral target. The mask can only blend toward the existing value-preserving base tint.
+- Convex Generated Mass bevels are identified from the packed `ConvexBoundary` structural contribution. On those bevels, interpolated vertex-R tonal authority, broad tonal variation, and cell-warp authority are suppressed. Shared world-position pixel-cell variation remains.
+- The cold-grey material baseline matches the legacy pixel amplitudes: Pixel Variation `0.057`, Vertex Variation `0.09`, Profile Pixel Contrast `1.0`; HLSL-only Broad Variation and Cell Warp are `0` for this baseline.
+- F0 remains `0.04` and the retained 5O cold-grey generated-normal bypass remains in place for this trial. Neither is claimed as the 5R causal fix.
+
+### Cross-profile and ground impact
+
+The exposure/crevice/base semantic contract is shared by Generated Mass stone profiles, so the shader-side removal of fake pre-light luminance authority applies to all Generated Mass profiles using this forward path. It is intentionally not limited to ColdGreyStone because 5R is an architecture correction: material-semantic masks must not masquerade as direct illumination.
+
+Ground rendering remains on its existing semantic-scale path and does not use the Generated Mass crevice/base tint-only branch as a substitute for its ground response.
+
+Only the cold-grey serialized material receives the legacy tonal-baseline value changes in this patch. Other Generated Mass stone materials keep their existing material values and require later profile-specific visual review if 5R is accepted.
+
+### Acceptance and rollback criteria
+
+5R is accepted only if same-scene visual comparison shows that:
+
+- source-face brightness ordering again follows surface orientation relative to the same light;
+- bevel segments no longer show unexplained bright/dark ordering that contradicts their orientation;
+- the old-material/new-material comparison materially converges in orientation behavior, irrespective of any remaining global luminance difference.
+
+If those criteria fail, do not tune specular, exposure, or global brightness as a substitute. Preserve the 5Q evidence and continue from the remaining pre-light/PBR differential. A failed 5R visual trial would mean another value authority or later PBR/indirect closure remains active; it would not invalidate the proven direct `NdotL`/attenuation product.
+
+### Validation status
+
+- Source implementation: complete.
+- Canonical evidence/problem documentation: complete.
+- Static scope/shared-shader/material-diff audit: passed (`39 / 39`).
+- Unity 6000.5.0f1 compilation: user-applied session completed without a reported compile error; independent model-side reproduction was unavailable.
+- Same-scene visual orientation comparison: user accepted on 2026-08-09.
+
+## GM-SURFACE.5S — low-light directional form readability
+
+Status: **implemented in source; static audit passed `58 / 58`; Unity compile/visual/performance validation pending**.
+
+### Separation from 5R
+
+5R is accepted for the former orientation-incoherence defect. 5S does not reopen that diagnosis. The new failure mode occurs when genuine direct illumination becomes weak enough that the remaining indirect response provides insufficient plane-to-plane contrast, even though the direct-light equation and pre-light material semantics remain correct.
+
+The permanent 5R rule remains unchanged: Generated Mass exposure/upwardness/height, crevice, base/contact, dirt, and structural/bevel identity are material descriptors. They do not decide which surface is illuminated. Low-light readability belongs to the illumination/indirect-light layer and must derive from an actual light direction plus the resolved fragment normal.
+
+### Architecture
+
+The pre-5S production baseline constructed baked GI from `SampleSH(normalWS)` and supplied that value directly to URP PBR. 5S retains that source but now applies one bounded Generated-Mass-only directional multiplier before PBR:
+
+```text
+mainLight = GetMainLight()
+sourceLuma = dot(mainLight.color, (0.2126, 0.7152, 0.0722))
+sourceGate = saturate(sourceLuma)
+facing = clamp(dot(normalWS, mainLight.direction), -1, 1)
+wrap = saturate(_DiffuseWrap)
+wrappedFacing = lerp(facing, max(facing, 0), wrap)
+targetScale = 1 + 0.40 * wrappedFacing
+formWeight = saturate(_ShadowAmbientStrength) * sourceGate
+shapedBakedGI = bakedGI * lerp(1, targetScale, formWeight)
+```
+
+The bare main-light query is intentional. Current official URP source returns base main-light direction/color and unit shadow attenuation from that overload; position-aware overloads apply shadow/cookie attenuation. Therefore the form cue can preserve Sun-direction information while the real PBR direct term continues to respond to Weather's local cloud cookie. The supplied code-only archive does not include the project's installed package source, so exact Unity 6000.5.0f1 package-source parity remains a runtime-environment verification item.
+
+5S deliberately does not multiply by main-light shadow attenuation or sample the cookie, because doing so would suppress the cue under the exact cloud-shadow condition that requires it. The bare main-light culling eligibility term is not consumed by the approved formula; if Generated Mass is intentionally excluded from the authoritative Sun culling mask, that edge case must be evaluated explicitly rather than changing the lighting contract implicitly.
+
+Ground keeps raw `SampleSH(normalWS)`. Generated Mass receives the shaped value through one centralized baked-GI resolver used by production `BuildInputData`. Audit ambient/PBR mirror paths use the same resolver so actual-scene diagnostic output cannot silently diverge from production, while direct-only diagnostic modes remain unchanged.
+
+### Control and serialization contract
+
+No new shader property is introduced. Existing serialized controls are activated and relabeled only at the shader UI level:
+
+- `_ShadowAmbientStrength` → **Low-Light Form Strength**;
+- `_DiffuseWrap` → **Low-Light Form Wrap**.
+
+Property names, defaults, CBUFFER ordering, and all material YAML remain unchanged. Existing stone profiles therefore activate their already-authored values without migration.
+
+Generated Mass owns the authoring location for strength. The component publishes an object-level **Low-Light Form Strength** override through its existing renderer `MaterialPropertyBlock` path to `_ShadowAmbientStrength`, so one mass keeps the same 5S strength across compatible stone materials and profile swaps. The current default authored value is `0.42`, matching the prior effective ColdGrey baseline. This patch does not add an object-level Wrap control; `_DiffuseWrap` remains material-owned. Source implementation is complete; Unity compile and scene validation remain pending.
+
+With an eligible white main light and current ColdGrey-aligned default values (`Strength 0.42`, `Wrap 0.12`), the approximate indirect multipliers are `1.168` facing, `1.0` perpendicular, and `0.852` opposite. Strength zero is exact 5R parity.
+
+### Invariants
+
+- no world-up/`normal.y`, height, exposure, crevice, base/contact, dirt, feature type, or bevel identity may choose the bright side;
+- no emissive or minimum-light floor is added;
+- no direct-light, normal-generation, material-semantic, geometry, Weather, or ground-response equation is modified;
+- real nearby/strong lights remain the actual direct-light authority;
+- if baked GI is zero, 5S contributes zero light;
+- no extra texture/cookie/shadow sample, pass, varying, buffer, draw, dispatch, CPU update, or allocation is permitted.
+
+### Cross-subsystem impact
+
+The forward include is shared by the Generated Mass and Ground contracts inside the same Pixel Surface shader. The change must therefore gate the new GI shaping explicitly to Generated Mass. Ground behavior must remain algebraically identical. The five HLSL stone profiles share the Generated Mass shader contract and will all begin consuming their existing strength/wrap values; that cross-profile activation is intentional and requires visual review. Weather remains a producer of the Sun cookie only and receives no code or serialized-state change. The 5Q diagnostics remain editor-only and preserve their direct-light ownership contract; controlled neutral cases already zero both activated controls.
+
+### Performance contract
+
+The feature adds fixed per-fragment ALU only: a base main-light struct fetch/access, two dot products, clamps/max/lerps, scalar arithmetic, and one RGB GI multiply. No additional texture or shadow lookup is added. Runtime complexity remains O(P) for P covered fragments and O(1) persistent storage. Because active-gameplay GPU work is the highest-priority cost category, analytical cost is not acceptance evidence; same-scene GPU profiling remains mandatory before final acceptance.
+
+### Validation and rollback
+
+Static implementation audit passed `58 / 58`: exact five-file scope, shader/preprocessor balance, approved helper formula, Ground gating, direct-only diagnostic parity, 5R invariant markers, unchanged material bytes, unchanged property names/defaults/CBUFFER declarations, and all five stone-profile serialized strength/wrap values were verified. Unity shader compilation, visual behavior, exact installed-package API provenance, and GPU timing remain pending.
+
+5S is visually acceptable only when weak/cloud-shadowed stone remains dark while major planes remain readable, rotating the main light rotates the cue, strong real lights remain dominant, Ground is unchanged, and strength zero restores 5R. If the effect is absent because baked GI is effectively zero, do not restore semantic fake-light fields; re-evaluate the illumination-layer design. If the locally installed URP source contradicts the assumed bare-main-light semantics, stop and revise the implementation plan rather than silently substituting another lighting source.
+
+## GM-SURFACE.5S2 — extended low-light form strength
+
+### Evidence
+
+Scene validation of 5S1 shows a visible difference between strength `0` and `1`, proving that the object-level authoring and directional GI path are functioning. The remaining failure is amplitude: under very uniform weak illumination, maximum strength `1` still leaves major planes with insufficient perceptual separation.
+
+### Response extension
+
+5S2 keeps the existing 5S response shape and extends only its usable strength domain:
+
+```text
+strength = clamp(_ShadowAmbientStrength, 0, 2)
+formWeight = strength * sourceGate
+shapedBakedGI = bakedGI * lerp(1, targetScale, formWeight)
+```
+
+All other terms are unchanged. Therefore every value in `0..1` produces exactly the same result as 5S1, while values above `1` continue the same signed directional modulation instead of being discarded by `saturate`.
+
+The existing target is bounded by `wrappedFacing in [-1, 1]` and the fixed `0.40` coefficient, giving `targetScale in [0.60, 1.40]`. With `strength <= 2` and `sourceGate <= 1`, the final GI multiplier is bounded by:
+
+```text
+minimum = 1 + 2 * (0.60 - 1) = 0.20
+maximum = 1 + 2 * (1.40 - 1) = 1.80
+```
+
+The approved range therefore cannot invert the sign of baked GI and does not require an artificial brightness floor.
+
+### Low-light adaptation decision
+
+5S2 does not add a second position-aware main-light evaluation to compute a cloud/shadow darkness gate. In URP, position-aware main-light queries perform shadow attenuation and the full position-aware overload can apply `_LIGHT_COOKIES`; the existing PBR evaluation already performs that lighting work. Duplicating it solely for the helper would add per-fragment cost in the highest-priority runtime category.
+
+The current architecture instead relies on relative weighting: 5S modifies only indirect GI, so strong genuine direct light naturally dominates it while weak direct light exposes more of the shaped indirect contribution. This preserves the desired low-light emphasis without another shadow/cookie lookup.
+
+### Authoring contract
+
+Generated Mass remains the authority for **Low-Light Form Strength** and publishes the value through its existing renderer property block. The object range is now `0..2`, default remains `0.42`, and compatible material/profile changes cannot silently replace the chosen object strength. `Low-Light Form Wrap` remains material-owned and unchanged.
+
+The ShaderLab range for the existing `_ShadowAmbientStrength` property is widened to `0..2` for contract consistency only. The property name, default, CBUFFER layout, and material serialization are unchanged.
+
+### Performance and rollback
+
+Relative to 5S1, 5S2 adds no new texture, cookie, shadow, buffer, pass, draw, dispatch, CPU update, allocation, or generated-data work. The existing scalar strength clamp is simply widened. If maximum strength `2.0` remains visually insufficient, the next step must redesign the bounded response curve or introduce a separately approved readability layer; do not raise the current signed strength blindly beyond the mathematically safe domain and do not reintroduce semantic-mask fake illumination.
+
+### 5S2 implementation status
+
+Source implementation is complete. Offline static/cross-subsystem audit passed `35 / 35`, including exact six-file scope, material byte identity, unchanged custom editor/Weather/diagnostic C#, unchanged main-light and `SampleSH` call counts, unchanged Ground baked-GI resolver gate, exact `0..1` algebraic parity, and verified `0.20..1.80` maximum-strength multiplier bounds. Unity compilation and same-scene visual validation remain pending.
+
+## GM-SURFACE.5S3 — Sun-orthogonal face separation
+
+Status: **implemented and statically valid, but visually rejected by user validation on 2026-08-11; superseded by GM-SURFACE.5S4**.
+
+### Evidence and problem split
+
+5S2 user validation proves the object-level strength path and the primary Sun-facing GI response are active. At high Strength, the shader can now produce more contrast than desired between already-dark and already-bright regions. The remaining visible failure is that multiple neighboring planes can still share nearly the same low-light value.
+
+This follows directly from the current one-dimensional primary input. A response that depends only on `dot(normal, mainLight.direction)` cannot distinguish two faces with equal projection onto the main-light axis. A nonlinear remap can enlarge a small difference but cannot split an exact degeneracy, and further Strength increases only enlarge the existing extremes.
+
+### Two-axis indirect readability model
+
+5S3 retains the existing wrapped Sun-facing term `p` and adds one secondary coordinate derived from the stable mesh geometric face normal. Let:
+
+```text
+L = normalized main-light direction
+V = -GetViewForwardDir()
+axisRaw = V - L * dot(V, L)
+axis = normalize(axisRaw) when safely nonzero, otherwise 0
+azimuth = clamp(dot(geometricFaceNormal, axis), -1, 1)
+headroom = 1 - abs(p)
+S = clamp(Low-Light Form Strength, 0, 2)
+F = clamp(Low-Light Face Separation, 0, 1)
+primary = S * p
+separation = 0.50 * F * headroom * azimuth
+combined = primary + separation
+GI multiplier = 1 + 0.40 * sourceGate * combined
+```
+
+`V` is a constant view orientation axis rather than a per-pixel position-to-camera vector, so the secondary cue does not create a perspective gradient across one flat face. When the view axis becomes nearly parallel to the Sun axis, the orthogonal projection is degenerate and the secondary term resolves to zero rather than inventing an arbitrary fallback direction.
+
+The primary term continues to use the resolved fragment normal exactly as 5S2 did. The secondary term uses the stored mesh geometric normal so whole-rock procedural normal perturbation cannot turn the face-separation cue into intra-face texture. Final mesh emission already writes the same resolved face normal to all three vertices of one emitted triangle, so no new face ID, mesh stream, or geometry-generation change is required.
+
+### Bounded-response proof
+
+For `S in [0,2]`, `F in [0,1]`, `p in [-1,1]`, and `azimuth in [-1,1]`:
+
+```text
+|separation| <= 0.50 * (1 - |p|)
+```
+
+At maximum positive primary response:
+
+```text
+combined <= 2p + 0.50(1-p) = 0.50 + 1.50p <= 2
+```
+
+and symmetrically the minimum is at least `-2`. Therefore with `sourceGate in [0,1]` the final multiplier remains within the already-approved 5S2 envelope `0.20..1.80`.
+
+This is the central 5S3 contract: the new control creates more distinct face values **inside the existing maximum contrast envelope** instead of increasing that envelope.
+
+### Authoring and serialization
+
+Generated Mass owns both low-light authoring values at object level. Existing **Low-Light Form Strength** remains `0..2`. New **Low-Light Face Separation** is `0..1`, default `0`, and is published through the existing renderer property block to one new hidden shader scalar. Materials remain fallback storage only and are not the authoring authority for the new control.
+
+No custom Inspector restructuring is part of 5S3. The current custom Inspector's generic non-excluded-property fallback is sufficient to expose the serialized control temporarily. A comprehensive Generated Mass Inspector redesign is separate future work and should reorganize the full surface rather than incrementally patching one lighting subsection.
+
+### Lighting invariants
+
+- Real direct lighting remains governed by URP main-light/additional-light equations and Weather shadow/cookie state.
+- The camera-relative axis affects only the low-light baked-GI readability helper; it is not fed into direct-light `NdotL`.
+- Semantic masks, world-up, height, crevice/base, dirt, feature type, bevel identity, and random per-face values remain prohibited as illumination authorities.
+- Face Separation `0` is exact 5S2 parity.
+- Both low-light controls at `0` recover the 5R baked-GI baseline.
+- Ground remains outside the Generated Mass low-light helper.
+- No new light/shadow/cookie lookup, SH sample, texture sample, pass, draw, buffer, varying, mesh channel, CPU-per-frame update, allocation, or generated storage is introduced.
+
+### Camera tradeoff
+
+The secondary cue intentionally depends on view rotation. Rotating the camera can change which otherwise-Sun-degenerate face receives the positive or negative tie-break. Camera translation does not change the axis. This is an accepted stylized readability tradeoff for 5S3; if later camera behavior makes the ordering objectionable, Face Separation `0` is the exact rollback and the secondary-axis design can be reconsidered independently.
+
+### Validation state
+
+Source implementation is complete. The offline static/cross-subsystem audit passes `40 / 40`: exact six-file scope, object-level property publication, hidden shader property/default, all four pass-local CBUFFER insertions relative to their preexisting layouts, stable geometric-normal transport, unchanged main-light and SH-sample counts, unchanged direct-only diagnostic helper, numerical 5S2 parity at Face Separation `0`, the `0.20..1.80` global multiplier bound, unchanged material bytes, and unchanged mesh-output/custom-Inspector source were verified. Unity 6000.5.0f1 compilation, same-scene comparison at multiple Strength/Face Separation combinations, camera-rotation stability, and GPU profiling remain runtime validation gates.
+
+## GM-SURFACE.5S4 — generation-time adjacency-aware face-tone palette
+
+Status: **implemented in source; offline static/cross-subsystem audit passed `58 / 58`; Unity compile/visual validation pending**.
+
+### Why 5S3 is superseded
+
+User comparison at Face Separation `0` versus `1` shows that the 5S3 camera-axis term produces almost no useful distinction on already-bright faces. On darker visible faces it behaves mostly as a small common brightness increase rather than a reliable face-to-face separator. The object-level property publication is proven active; the failure belongs to the runtime directional tie-breaker itself.
+
+The remaining artistic goal is explicitly stylized: increase the frequency with which neighboring low-poly faces occupy distinct low-light values without increasing the already-sufficient maximum bright-versus-dark envelope. A single light-direction projection or secondary view-direction projection cannot guarantee that local neighboring faces receive different scalar values. 5S4 therefore moves face identity to deterministic mesh generation where actual topology and adjacency are available.
+
+### Logical-face compilation
+
+After final triangle emission and before material-mask inheritance, 5S4 reconstructs logical planar face groups from the final mesh. Two triangles belong to the same logical group when they share a quantized geometric edge and their final flat render normals are near-equal. This merges triangulation of one planar polygon while keeping actual changes in face orientation separate. It does not modify positions, indices, normals, tangents, provenance, structural-feature data, or existing material masks.
+
+The compiler then builds the logical-face adjacency graph from shared boundary edges. Each group records total geometric triangle area for later zero-mean centering and whether its existing structural contribution marks it as a `ConvexBoundary` transition. All graph data is temporary generation-time state.
+
+Convex transition/bevel groups are not allowed to become independent stylized tone authorities because doing so could recreate the former parent–bevel–parent ordering failure. For palette assignment, non-convex faces connected through one convex transition are treated as effective neighbours. After non-convex palette assignment, each convex transition derives its raw tone from the average of adjacent non-convex parent/neighbor tones; with two parents this guarantees an intermediate tone. Recentring and uniform scaling preserve that envelope relation.
+
+### Palette assignment
+
+The fixed base palette is:
+
+```text
+-1.0, -0.5, 0.0, +0.5, +1.0
+```
+
+Non-convex groups are processed deterministically in a high-connectivity-first order. Their effective-neighbour graph contains both direct non-convex adjacency and non-convex neighbors bridged through a convex transition. For every non-convex group, candidate palette values are scored by the minimum absolute tonal distance to already assigned effective neighbors. The candidate maximizing that minimum distance is chosen; deterministic Surface Seed hashing breaks equal-score ties. Convex transitions are resolved afterward from neighboring non-convex tones. This makes broad-face adjacency distinction the optimization target rather than random per-face variation while preserving bevel tonal bridging.
+
+After assignment, the area-weighted mean tone of the complete rock is subtracted from every group. If recentering produces any absolute value above `1`, all tones are uniformly scaled down until the largest magnitude is `1`. Subtracting one shared mean and applying one shared positive scale preserve every nonzero pairwise difference while making the final field approximately zero-mean and bounded.
+
+This is not a promise that every face in the entire rock has a globally unique grayscale identity. The contract is local readability: touching logical faces should preferentially differ and the generator should not systematically brighten or darken the rock as a whole.
+
+### Packed channel contract
+
+For Generated Mass, the existing secondary UV vector now has this active contract:
+
+```text
+UV2.x = reserved concave-crease strength
+UV2.y = dirt-deposit / mineral-stain mask
+UV2.z = generated convex edge-wear strength
+UV2.w = signed generation-time logical-face tone in [-1,+1]
+```
+
+`UV2.w = 0` remains a neutral backward-compatible value for pre-5S4/generated meshes. The former reservation of this component for future concave-crease localization is retired. Future concave work must use the remaining approved contracts or request a new packing decision; it must not overwrite face tone silently.
+The production-generation contract version is incremented in the same patch so ordinary Generated Mass synchronization treats pre-5S4 generated meshes as stale and rebuilds them with the compiled face-tone field.
+
+Ground owns a separate UV2 semantic contract and may continue using its own `UV2.w` as standing-water potential. The shared shader must read signed face tone only inside the Generated Mass low-light branch.
+
+### Runtime response
+
+The existing object-level Low-Light Face Separation scalar `F` remains in `0..1`. Let `T` be the signed generated face tone from `UV2.w`, `sourceGate` the existing main-light source-colour gate, and `primaryScale` the existing 5S2 Sun-facing indirect-GI multiplier. The replacement response is:
+
+```text
+T = clamp(UV2.w, -1, +1)
+F = saturate(Low-Light Face Separation)
+faceToneScale = 0.16 * sourceGate * F * T
+finalScale = clamp(primaryScale + faceToneScale, 0.20, 1.80)
+shapedBakedGI = bakedGI * finalScale
+```
+
+At `F = 0`, `faceToneScale = 0` exactly and the shader is algebraically 5S2. At `F = 1`, the generated layer can move a face by at most `±0.16` indirect-GI multiplier, while the final clamp prevents the layer from expanding the already-approved 5S2 `0.20..1.80` global envelope. It therefore increases the number of distinguishable faces rather than extending maximum contrast.
+
+The generated tone is applied only to baked/indirect GI. Strong direct or nearby real light continues to dominate naturally through URP PBR. No local darkness query is added.
+
+### Performance and memory
+
+Generation-time complexity is linear-to-near-linear in final triangle/edge/group counts using temporary edge maps, group adjacency sets, and sorting over the small logical-face set. This work runs only when the mass mesh is generated or regenerated and introduces no per-frame CPU work. Temporary graph allocations are discarded after compilation.
+
+Persistent memory does not increase because the final signed scalar occupies an already-uploaded `UV2.w` component. The shader removes 5S3's view-forward access, Sun-orthogonal vector rejection, reciprocal-square-root normalization, geometric-normal dot, and headroom ALU. Runtime replacement is one interpolated scalar decode plus scalar multiply/add/clamp. Main-light query count, SH sample count, texture sampling, draw/pass count, buffers, and mesh-stream count remain unchanged.
+
+### Invariants
+
+- no material/profile chooses the face tone; generation topology and Surface Seed own it;
+- no semantic exposure, crevice/base, dirt, height, world-up, bevel identity, or generated feature mask determines whether a face is bright or dark;
+- coplanar triangles in one logical group carry exactly the same tone;
+- convex transition/bevel tones remain inside the tonal envelope of their adjacent non-convex parents/neighbors when those neighbors exist;
+- final tone is finite and inside `[-1,+1]`;
+- the area-weighted mean is approximately zero;
+- material-mask inheritance and logical-bevel reconciliation preserve the face-tone component exactly;
+- direct lighting, Weather shadows/cookies, mesh normals, geometry, and 5R material semantics remain unchanged;
+- Ground retains its own UV2 meaning and does not execute the Generated Mass face-tone branch;
+- Face Separation `0` is exact 5S2 rollback.
+
+### Validation gates
+
+Offline static/cross-subsystem validation passes `58 / 58`, covering deterministic synthetic adjacency/transition cases, face-group/channel contracts, signed range, weighted-mean centering, mask-inheritance preservation, exact source scope, unchanged material bytes, unchanged direct-only diagnostic math, Ground isolation, main-light/SH call counts, and syntax/preprocessor balance. Unity remains authoritative for compilation and visual tuning.
+
+## GM-SURFACE.6A — structural material-response baseline
+
+### Purpose and boundary
+
+GM-SURFACE.6A is the first production consumer of the packed structural semantic stream for artistic material response. It activates `ConvexBoundary` and `CornerChipCap` independently while preserving the unfinished whole-rock normal system as a separate concern. No structural normal, geometry, mask-generation, lighting-direction, or Weather behavior is changed by this update.
+
+### Existing semantic inputs
+
+The packed structural vector already carries at most two contribution slots:
+
+```text
+(primaryType, primaryStrength, secondaryType, secondaryStrength)
+```
+
+6A resolves the strongest matching contribution for each supported semantic type. `ConvexBoundary` and `CornerChipCap` use their normalized packed strengths directly. Ordinary source faces with neither contribution receive zero structural response.
+
+### Convex material response
+
+The existing object-authored edge response strength becomes the master **Convex Surface Response**. Existing edge softness controls the character of the response. The historical UV2 edge-wear albedo lift/tint function remains outside production and its brightness/tint strengths remain zero.
+
+For semantic convex weight `C`, response strength `R`, and softness `S`:
+
+```text
+convexResponse = C * saturate(R)
+convexBreakupReduction = convexResponse * lerp(0.15, 0.35, saturate(S))
+convexSmoothnessBoost = convexResponse * lerp(0.03, 0.08, saturate(S))
+```
+
+The breakup term reduces only the existing `pixelVariation * _PixelVariation` contribution. It does not restore vertex-R, broad, or warp tonal authority on generated bevels; all GM-SURFACE.5R bevel restrictions remain intact.
+
+### Corner-chip material response
+
+6A adds one Generated-Mass-owned **Chip Interior Response**, range `0..1`, default `0.60`. For semantic chip weight `K` and authored response `I`:
+
+```text
+chipResponse = K * saturate(I)
+chipBreakupIncrease = chipResponse * 0.35
+chipSmoothnessReduction = chipResponse * 0.10
+```
+
+The chip cap remains lit by its existing faceted geometric/resolved normal. The new module alters only material breakup amplitude and smoothness.
+
+### Combined response
+
+The existing pixel-noise sample is evaluated exactly once as before. Only its amplitude is scaled:
+
+```text
+structuralPixelVariationScale = clamp(
+    1 - convexBreakupReduction + chipBreakupIncrease,
+    0.65,
+    1.35)
+```
+
+PBR smoothness becomes:
+
+```text
+smoothness = saturate(
+    ResolveProfileSmoothness()
+    + convexSmoothnessBoost
+    - chipSmoothnessReduction)
+```
+
+This gives the two semantic modules intentionally different material character without fixed albedo value authority. Convex transitions tend cleaner/smoother; chip interiors tend rougher/more broken. Direct lighting, indirect-light readability, face-tone palette, and normal construction remain separate layers.
+
+### Authoring and legacy quarantine
+
+`Convex Surface Response` and `Softness` remain object-owned existing controls. `Chip Interior Response` is a new object-owned control with default `0.60`. The comprehensive Generated Mass Inspector redesign remains deferred; 6A performs only the minimum local presentation needed to expose these active controls and removes obsolete Brightness Lift/Tint authoring from the normal active surface without deleting its serialized legacy fields.
+
+The old UV2.z bevel albedo lift/tint helper remains historical/dead production code. Publishing a nonzero convex response strength for 6A must not reactivate that helper. Legacy bevel brightness-lift and tint-strength property-block values remain hard zero.
+
+### Performance and validation contract
+
+6A performs fixed work against the already-interpolated two-slot structural vector. No feature loop is introduced, so cost is independent of total rock bevel/chip count. No additional texture/noise evaluation, varying, mesh stream, light query, SH sample, buffer, pass, draw, dispatch, per-frame C# update, allocation, or persistent generated data is added.
+
+Runtime acceptance originally required independent toggling of convex and chip response, unchanged ordinary source faces, no reappearance of bright/dark inserted bevel bands, unchanged normals, and target-GPU profiling. The source implementation passed its offline static/cross-subsystem audit (`68 / 68`), but Unity visual validation subsequently found no observable `0`→`1` response for either module. The 6A fixed coefficients are therefore visually rejected and superseded by GM-SURFACE.6A.1; the semantic architecture itself remains retained.
+
+
+## GM-SURFACE.6A.1 — structural response visibility correction
+
+### Supersession of 6A fixed coefficients
+
+Unity visual validation of the original 6A coefficients found no visible difference between master response values `0` and `1` for either convex transitions or chip interiors. The semantic architecture remains valid, but the material response was too weak to function as useful art direction or as a decisive plumbing test. GM-SURFACE.6A.1 supersedes only the 6A fixed response coefficients and authoring surface; semantic production/packing, geometry, normals, lighting, and legacy bevel-response quarantine remain unchanged.
+
+### Object authoring
+
+The existing `Convex Surface Response` and `Chip Interior Response` controls remain the semantic/intensity gates in `0..1`.
+
+Four object-owned profile controls define the full-response material behavior and are published through the existing Generated Mass renderer property block:
+
+```text
+Convex Variation Multiplier = 0.10   range 0..2
+Convex Smoothness Offset    = +0.20  range -0.40..+0.40
+Chip Variation Multiplier   = 2.00   range 0..3
+Chip Smoothness Offset      = -0.20  range -0.40..+0.40
+```
+
+A variation multiplier of `1` is neutral for tonal breakup. A smoothness offset of `0` is neutral for PBR smoothness. This lets variation and smoothness be tested independently without adding diagnostic shader modes.
+
+The former edge-wear `Softness` value is retained for recipe/diagnostic compatibility but no longer defines the 6A.1 production structural material response.
+
+### Tonal-variation response
+
+The existing base tonal offset is constructed exactly once from the current pixel, vertex, and broad terms after the existing 5R bevel restrictions:
+
+```text
+baseTonalOffset = (
+    pixelVariation * PixelVariation
+  + bevelIndependentVertexVariation * PixelVertexVariation
+  + bevelIndependentBroadVariation * PixelBroadVariation
+) * pixelProfileContrast
+```
+
+For resolved structural responses `C` and `K` and authored full-response multipliers `Cv` and `Kv`:
+
+```text
+variationScale = clamp(
+    1
+  + C * (clamp(Cv, 0, 2) - 1)
+  + K * (clamp(Kv, 0, 3) - 1),
+    0,
+    3)
+
+tonalOffset = baseTonalOffset * variationScale
+```
+
+Default full convex response therefore retains only `0.10x` of the tonal breakup that remains after 5R restrictions. Default full chip response applies `2.00x` of the complete existing tonal breakup. Ordinary faces receive `variationScale = 1` because both semantic responses are zero.
+
+This does not restore suppressed vertex/broad tonal authority to convex bevels. Those terms are still zeroed before the structural multiplier; 6A.1 only scales the tonal offset that legitimately remains for that fragment.
+
+### Smoothness response
+
+PBR smoothness uses authored signed offsets directly:
+
+```text
+smoothness = saturate(
+    ResolveProfileSmoothness()
+  + C * clamp(ConvexSmoothnessOffset, -0.40, +0.40)
+  + K * clamp(ChipSmoothnessOffset, -0.40, +0.40))
+```
+
+The default convex offset is `+0.20`; the default chip offset is `-0.20`. The master semantic response still gates each offset, so setting the corresponding master to `0` is exact structural-response rollback.
+
+### Invariants
+
+- no geometry, topology, mesh normal, whole-rock normal, or structural-normal change;
+- no new semantic generation or mesh stream;
+- no fixed albedo lift/darkening, tint, emission, rim-light, or fake illumination;
+- the historical UV2.z bevel brightness/tint helper remains production-dead and its object-published brightness/tint strengths remain zero;
+- ordinary source faces with no structural semantic remain algebraically unchanged;
+- variation and smoothness can be independently neutralized with multiplier `1` and offset `0` respectively;
+- Ground, Weather, low-light face-tone separation, direct-light equations, and 5Q direct-only diagnostic math remain unchanged;
+- runtime remains fixed-cost scalar ALU against the existing interpolated structural vector with no new sample, varying, stream, loop, buffer, pass, draw, dispatch, allocation, or per-frame C# work.
+
+### Failure interpretation
+
+The 6A.1 defaults are intentionally strong enough to be visually diagnostic. If `Convex Surface Response = 1` with `Convex Variation Multiplier = 0.10` and `Convex Smoothness Offset = +0.20`, or `Chip Interior Response = 1` with `Chip Variation Multiplier = 2.00` and `Chip Smoothness Offset = -0.20`, still produces no visible change in Unity, the next investigation must target semantic-stream/shader-path plumbing rather than increasing the response magnitude again.
+
+Source implementation is complete and the offline static/cross-subsystem audit passes `106 / 106`. Unity 6000.5.0f1 compilation, visual module-independence testing, and target-GPU timing remain authoritative pending runtime gates.
+
+## GM-SURFACE.6A.2 — structural semantic transport diagnostics
+
+### Trigger
+
+Unity validation of GM-SURFACE.6A.1 found literally zero visible response across the full convex/chip master, variation-multiplier, and smoothness-offset ranges, including after regeneration. This satisfies the explicit 6A.1 failure boundary: material-response magnitude is no longer the active question. The next step is to prove each transport boundary on the actual live render mesh and active forward shader.
+
+### Diagnostic scope
+
+6A.2 is diagnostic-only. It does not alter structural semantic generation, final mesh packing, geometry, normals, lighting, tonal variation, smoothness response coefficients, low-light face tones, material assets, Ground, or Weather.
+
+The patch extends two existing diagnostic surfaces:
+
+1. **Live Render Mesh Audit** reads the final Unity mesh UV channel 4 and the renderer's current global `MaterialPropertyBlock`.
+2. **Surface Debug** gains two Generated-Mass-only values that bypass normal/material/PBR shading and display structural data directly from the forward fragment input.
+
+No new shader property, CBUFFER field, varying, mesh stream, texture, buffer, pass, draw, allocation, or per-frame C# update is introduced.
+
+### Live render-mesh structural audit
+
+The final render mesh is inspected with `Mesh.GetUVs(4, ...)`, matching the production `SetUVs(4, SurfaceFeatures)` / `TEXCOORD4` contract.
+
+The audit reports:
+
+- structural UV4 element count and missing/partial/non-finite/invalid state;
+- primary and secondary encoded type histograms for codes `0..6`;
+- non-zero `ConvexBoundary` vertex and triangle counts;
+- non-zero `CornerChipCap` vertex and triangle counts;
+- minimum/maximum non-zero strength for each expected semantic;
+- current renderer property-block values for Convex Surface Response, Chip Interior Response, both variation multipliers, and both smoothness offsets.
+
+An all-zero structural channel remains a legal packed vector shape, so it is not rejected merely for being zero. The audit instead surfaces **NO NON-ZERO CONVEX/CHIP SEMANTICS** explicitly because that condition makes every 6A/6A.1 structural response mathematically inert.
+
+### Forward diagnostic views
+
+Two temporary values reuse the existing Generated Mass `_MaskDebugMode` path:
+
+- `29 — Structural Semantics`
+- `30 — Structural Resolved Response`
+
+Values `27` and `28` are already occupied by shared Ground debug identities, so 6A.2 does not reuse them.
+
+`Structural Semantics` resolves the raw packed structural vector only:
+
+```text
+convexRaw = max(primary-is-1 * primaryStrength,
+                secondary-is-1 * secondaryStrength)
+chipRaw   = max(primary-is-3 * primaryStrength,
+                secondary-is-3 * secondaryStrength)
+```
+
+`Structural Resolved Response` uses the same semantic strengths after the existing master gates:
+
+```text
+convexResolved = convexRaw * ConvexSurfaceResponse
+chipResolved   = chipRaw   * ChipInteriorResponse
+```
+
+Diagnostic colour encoding is:
+
+```text
+ConvexBoundary = yellow  (1.00, 0.85, 0.05)
+CornerChipCap  = cyan    (0.05, 1.00, 1.00)
+neither        = black
+```
+
+Overlap saturates additively. The raw mode ignores all six 6A.1 response controls. The resolved mode depends only on the two master response controls and deliberately ignores variation multipliers and smoothness offsets.
+
+The forward fragment returns the diagnostic colour before whole-rock normal construction, material tonal response, PBR, and fog. When neither structural diagnostic mode is active, the helper returns a negative sentinel and the existing 6A.1 production path continues unchanged.
+
+### Decision tree
+
+1. Live mesh audit reports zero convex and zero chip semantics → investigate generator/provenance/final packing.
+2. Live mesh audit reports non-zero semantics but Structural Semantics renders black → investigate TEXCOORD4 attribute/varying transport or active shader variant.
+3. Structural Semantics renders expected colours but Structural Resolved Response stays black with masters at `1` → investigate renderer property-block/master-uniform transport.
+4. Both diagnostic views work and resolved colours track the master controls → semantic/master plumbing is proven; investigate later material-response application only.
+
+### Status
+
+Source implementation is present and the offline exact-scope/static/cross-subsystem audit passes `97 / 97`. Unity 6000.5.0f1 compilation and live diagnostic validation remain pending authoritative gates because Unity is unavailable in this environment.
+
+## GM-SURFACE.6A.3 — structural material response semantic-membership correction
+
+### Trigger
+
+The 6A.2 live render-mesh audit proved that the user's audited test mass contains substantial `ConvexBoundary` coverage (`342` vertices / `114` triangles), while its packed convex strengths are only approximately `0.099..0.130`. The renderer property block simultaneously contains non-zero structural authoring values. Therefore the CPU-side producer, final mesh channel, and property publication are present for convex response, but the 6A/6A.1 resolver was multiplying the authored master response by an unrelated small packed feature strength.
+
+The same audit reports zero `CornerChipCap` vertices/triangles on that specific mesh. That mesh therefore cannot validate chip material response regardless of chip response settings.
+
+### Corrected material-response contract
+
+`ConvexBoundary` and `CornerChipCap` are classification inputs for the 6A material module. Their packed normalized strengths remain transport data, but they are no longer a second hidden artistic intensity for variation/smoothness response.
+
+For each semantic type:
+
+```text
+membership(type) = 1 when either packed slot matches type
+                   and its packed strength is > 0.0001
+                 = 0 otherwise
+
+convexResponse = GeneratedMassSurface *
+                 membership(ConvexBoundary) *
+                 ConvexSurfaceResponse
+
+chipResponse = GeneratedMassSurface *
+               membership(CornerChipCap) *
+               ChipInteriorResponse
+```
+
+The existing 6A.1 variation multipliers and smoothness offsets remain unchanged. The master controls now own the full artistic response magnitude once the corresponding semantic is present.
+
+### Diagnostic contract
+
+The raw **Structural Semantics** debug mode remains strength-based. It continues to visualize the actual packed semantic strength and therefore remains useful for transport/provenance diagnosis.
+
+The **Structural Resolved Response** debug mode uses the corrected production resolver. A present semantic at master response `1` therefore resolves to full diagnostic intensity rather than being attenuated by packed strength.
+
+The live Render Mesh Audit additionally reports whether a non-zero convex/chip master response cannot affect the audited mesh because that mesh contains zero vertices of the corresponding semantic type. This is a warning condition, not a geometry-format failure.
+
+### Invariants
+
+- Packed semantic values, type codes, strengths, generation, priority resolution, final packing, UV4 upload, and shader transport are unchanged.
+- Geometry and all normal systems are unchanged.
+- Structural profile defaults/ranges are unchanged.
+- Materials, Ground, Weather, low-light face-tone response, and the historical bevel albedo-lift/tint quarantine are unchanged.
+- Runtime cost remains fixed scalar ALU; no new sampling, buffers, streams, loops, passes, draws, allocations, or per-frame CPU work are introduced.
+
+### Status
+
+Source implementation is present. Offline static/cross-subsystem validation is recorded in the canonical implementation checklist. Unity 6000.5.0f1 compilation and live visual validation remain authoritative pending gates.
+
+
+## GM-SURFACE.6A.4 — absolute structural variation strength
+
+### Trigger
+
+Post-6A.3 Unity validation proves the ConvexBoundary membership/material path is active, but a `Convex Surface Response` comparison using variation value `1.0` and smoothness offset `+0.10` remains barely visible. Under the 6A.1 multiplier contract, variation `1.0` is algebraically neutral. More importantly, 5R intentionally removes vertex and broad tonal breakup on convex generated transitions before the structural multiplier is applied, so the multiplier model depends on whatever small tonal residue survives earlier restrictions rather than expressing a stable structural material property.
+
+### Authoring contract
+
+6A.4 supersedes the multiplier interpretation with directly authored **absolute zero-mean variation strength** while preserving the existing numeric serialized values, ranges, and default initializers through field migration:
+
+```text
+Convex Variation Strength = range 0..2
+Chip Variation Strength   = range 0..3
+```
+
+One authored strength unit equals `0.10` signed tonal amplitude before the existing global Pixel Effect Strength. Therefore the maximum authored convex range contributes approximately `±0.20`; the maximum chip range contributes approximately `±0.30`. Zero disables that module's structural tonal term exactly.
+
+The master responses remain unchanged:
+
+```text
+convexResponse = GeneratedMassSurface * membership(ConvexBoundary) * ConvexSurfaceResponse
+chipResponse   = GeneratedMassSurface * membership(CornerChipCap)  * ChipInteriorResponse
+```
+
+Smoothness offsets and their ranges/equation remain unchanged.
+
+### Runtime contract
+
+The accepted 5R/6A.3 base tonal construction remains unchanged. 6A.4 adds an independent structural term from the already-computed `pixelVariation`:
+
+```text
+convexAmplitude = convexResponse * clamp(ConvexVariationStrength, 0, 2) * 0.10
+chipAmplitude   = chipResponse   * clamp(ChipVariationStrength,   0, 3) * 0.10
+structuralAmplitude = max(convexAmplitude, chipAmplitude)
+
+structuralTonalOffset = pixelVariation * structuralAmplitude
+finalTonalOffset      = baseTonalOffset + structuralTonalOffset
+```
+
+Using `max` prevents primary/secondary semantic overlap near boundaries from stacking the two material amplitudes beyond the larger authored response. The structural term is intentionally not multiplied by the pre-existing pixel/vertex/broad variation amplitudes or by the bevel-independent broad/vertex suppression. It still passes through the existing final Pixel Effect Strength exactly once.
+
+The term is zero-mean because it uses the signed pixel-cell variation already evaluated for the ordinary material. It adds no constant albedo lift, darkening, tint, emission, or lighting-direction cue.
+
+### Serialization and shader contract
+
+The serialized fields migrate from the former multiplier names with `FormerlySerializedAs`, retaining their stored numbers rather than silently resetting authored objects. Hidden shader/property-block names move from `...VariationMultiplier` to `...VariationStrength`; no material asset becomes authoring authority because Generated Mass republishes these hidden values through its renderer property block.
+
+The live Render Mesh Audit reports the new strength property-block values. Raw/resolved structural semantic diagnostic modes are otherwise unchanged.
+
+### Performance and invariants
+
+- Reuses the existing `pixelVariation` value; no additional noise/hash/texture sample is evaluated.
+- No new varying, vertex stream, buffer, loop, pass, draw, allocation, light query, or per-frame CPU work.
+- Geometry, semantic generation/packing, whole-rock normals, structural normals, direct lighting, low-light face-tone response, Ground, Weather, and material assets remain unchanged.
+- Historical UV2 bevel albedo lift/tint response remains production-dead and its brightness/tint strengths remain hard-zero.
+
+### Status
+
+Source implementation is present. Offline exact-scope/static/cross-subsystem validation is recorded in the canonical implementation checklist. Unity 6000.5.0f1 compilation and the one-comparison visual validation remain authoritative pending gates.

@@ -9,6 +9,11 @@ float RiverWaterFoamHash21(float2 p)
     return frac((p3.x + p3.y) * p3.z);
 }
 
+bool RiverWaterFoamUsesCoverageLife(float materialContract)
+{
+    return materialContract > 0.5;
+}
+
 float RiverWaterFoamValueNoise(float2 p)
 {
     float2 i = floor(p);
@@ -69,9 +74,6 @@ struct RiverWaterFoamSelectionDiagnostics
 RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     float preChipSoftVisibility,
     float preChipMask,
-    float preChipRenderedMask,
-    float presenceFootprintMode,
-    float softEdgeStart,
     float edgeWidthPixels)
 {
     RiverWaterFoamChipEligibility result;
@@ -81,66 +83,28 @@ RiverWaterFoamChipEligibility RiverWaterFoamResolveChipEligibility(
     result.estimatedInwardPixels = 0.0;
 
     float widthPixels = max(0.0, edgeWidthPixels);
-
-    [branch]
-    if (presenceFootprintMode <= 0.5)
-    {
-        // Protected compatibility path: exact accepted Coverage-Only arithmetic.
-        if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
-        {
-            return result;
-        }
-
-        float edgeSource = saturate(preChipSoftVisibility);
-        float edgeGradientPerPixel = max(
-            fwidth(edgeSource),
-            0.001);
-        float estimatedInwardPixels = max(
-            0.0,
-            edgeSource - 0.06) / edgeGradientPerPixel;
-        float edgeMembership = 1.0 - smoothstep(
-            widthPixels - 0.5,
-            widthPixels + 0.5,
-            estimatedInwardPixels);
-        edgeMembership = saturate(edgeMembership);
-
-        result.edgeBand = result.visibleSupport * edgeMembership;
-        result.interiorRegion = result.visibleSupport * (1.0 - edgeMembership);
-        result.estimatedInwardPixels = estimatedInwardPixels;
-        return result;
-    }
-
-    // Presence-Amplitude uses the accepted pre-hardened soft coordinate,
-    // while exact rendered support is binary: every positive no-Chip
-    // rendered pixel counts as Foam regardless of amplitude.
-    float supportGate = preChipRenderedMask > 0.0 ? 1.0 : 0.0;
-    result.visibleSupport = supportGate;
-    result.interiorRegion = supportGate;
-
-    if (widthPixels <= 0.0001 || supportGate <= 0.5)
+    if (widthPixels <= 0.0001 || result.visibleSupport <= 0.0001)
     {
         return result;
     }
 
+    // C × P × L Baseline retains the accepted Coverage-Only soft-edge
+    // coordinate exactly. 0.06 is the established exterior contour origin.
     float edgeSource = saturate(preChipSoftVisibility);
-    float resolvedSoftEdgeStart = clamp(
-        softEdgeStart,
-        0.0,
-        0.25);
     float edgeGradientPerPixel = max(
         fwidth(edgeSource),
         0.001);
     float estimatedInwardPixels = max(
         0.0,
-        edgeSource - resolvedSoftEdgeStart) / edgeGradientPerPixel;
+        edgeSource - 0.06) / edgeGradientPerPixel;
     float edgeMembership = 1.0 - smoothstep(
         widthPixels - 0.5,
         widthPixels + 0.5,
         estimatedInwardPixels);
     edgeMembership = saturate(edgeMembership);
 
-    result.edgeBand = supportGate * edgeMembership;
-    result.interiorRegion = supportGate * (1.0 - edgeMembership);
+    result.edgeBand = result.visibleSupport * edgeMembership;
+    result.interiorRegion = result.visibleSupport * (1.0 - edgeMembership);
     result.estimatedInwardPixels = estimatedInwardPixels;
     return result;
 }
@@ -439,9 +403,6 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     float lateralMetres,
     float preChipSoftVisibility,
     float preChipMask,
-    float preChipRenderedMask,
-    float presenceFootprintMode,
-    float softEdgeStart,
     float evaluateChipSelection,
     float evaluateChipCandidates,
     float evaluateCandidatesOutsideMaterial,
@@ -490,15 +451,9 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
         RiverWaterFoamResolveChipEligibility(
             preChipSoftVisibility,
             preChipMask,
-            preChipRenderedMask,
-            presenceFootprintMode,
-            softEdgeStart,
             chipEdgeWidthPixels);
     float activation = saturate(chipActivation);
-    float interiorAccess = saturate(chipInteriorAccess);
-    float effectiveInteriorAccess = presenceFootprintMode > 0.5
-        ? 0.0
-        : interiorAccess;
+    float effectiveInteriorAccess = saturate(chipInteriorAccess);
     float chipInteriorCandidates = 0.0;
     float productionPermissionEnabled =
         (max(0.0, chipEdgeWidthPixels) > 0.0001 ||
@@ -858,56 +813,23 @@ RiverWaterFoamEvaluateSelectionDiagnostics(
     [branch]
     if (evaluateChipSelection > 0.5)
     {
-        [branch]
-        if (presenceFootprintMode > 0.5)
-        {
-            // Presence-Amplitude uses the original continuous analytical
-            // Candidate and soft Eligibility fields. Interior Access remains
-            // disabled.
-            result.chipEdgeEligibility = saturate(
-                chipEligibility.edgeBand);
-            result.chipInteriorEligibility = 0.0;
-            result.chipProductionSelection = saturate(
-                result.chipCandidateField * chipEligibility.edgeBand);
-        }
-        else
-        {
-            // Protected compatibility path: exact accepted Coverage-Only arithmetic.
-            float edgeSelection = saturate(
-                result.chipCandidateField * chipEligibility.edgeBand);
-            float interiorSelection = saturate(
-                chipInteriorCandidates * chipEligibility.interiorRegion);
+        // C × P × L Baseline retains the accepted Coverage-Only arithmetic.
+        float edgeSelection = saturate(
+            result.chipCandidateField * chipEligibility.edgeBand);
+        float interiorSelection = saturate(
+            chipInteriorCandidates * chipEligibility.interiorRegion);
 
-            result.chipEdgeEligibility = saturate(
-                chipEligibility.edgeBand);
-            result.chipInteriorEligibility = saturate(
-                chipEligibility.interiorRegion * effectiveInteriorAccess);
-            result.chipProductionSelection = saturate(max(
-                edgeSelection,
-                interiorSelection));
-        }
+        result.chipEdgeEligibility = saturate(
+            chipEligibility.edgeBand);
+        result.chipInteriorEligibility = saturate(
+            chipEligibility.interiorRegion * effectiveInteriorAccess);
+        result.chipProductionSelection = saturate(max(
+            edgeSelection,
+            interiorSelection));
     }
 
 
     return result;
-}
-
-float RiverWaterFoamSharpenCoverage(
-    float presence,
-    float sharpness)
-{
-    float s = saturate(sharpness);
-    float low = lerp(0.105, 0.185, s);
-    float high = lerp(0.365, 0.575, s);
-    float shaped = smoothstep(low, high, presence);
-
-    // The visual contract is now deliberately closer to ink/paint coverage
-    // than translucent smoke: the surviving body should stay readable and
-    // foam-coloured. Softness belongs mostly to a narrow edge fringe, not the
-    // whole patch.
-    float hard = smoothstep(0.18, 0.82, shaped);
-    hard = pow(max(0.0, hard), lerp(1.65, 2.15, s));
-    return saturate(hard);
 }
 
 float RiverWaterFoamResolveMeaningfulCoverageFootprint(
@@ -915,7 +837,8 @@ float RiverWaterFoamResolveMeaningfulCoverageFootprint(
 {
     // Lifecycle-Faithful requires meaningful geometric Coverage, but it does
     // not require dense local concentration before living material remains
-    // visible. Intrinsic Presence is applied later as a single amplitude.
+    // visible. C × P × L Baseline intentionally does not use intrinsic Presence
+    // as Final Foam amplitude.
     return saturate(coverage);
 }
 
@@ -1072,9 +995,9 @@ float RiverWaterFoamPatternedMask(
     float edgeExposure = 1.0 - smoothstep(0.38, 0.76, coverage);
     float weakInterior = 1.0 - smoothstep(0.54, 0.88, coverage);
 
-    // In Concentration + Lifetime, Remaining Life raises the erosion threshold so older
-    // material loses weak edge/fringe pieces first. The fragments that survive
-    // still render as opaque foam rather than fading into blue/teal water.
+    // C × P × L Baseline is Lifecycle-Faithful: the caller passes a binary
+    // living/dead lifecycle authority here, so ordinary age does not fade or
+    // erode surviving material before explicit Layer C death.
     float erosionDrive = pattern + (morph - 0.5) * 0.16;
     erosionDrive += (1.0 - edgeExposure) * 0.18;
     erosionDrive += baseMask * 0.22;
@@ -1240,43 +1163,6 @@ float RiverWaterFoamResolveStructuralStrandKeep(
     return max(keep, exactCore);
 }
 
-float RiverWaterFoamResolvePreChipRenderedMask(
-    float hardenedShape,
-    float coherentSoftVisibility,
-    float strandSoftVisibility,
-    float2 strandPattern,
-    float strandResolution,
-    float strandStrength,
-    float strandDensity,
-    float strandReach)
-{
-    float shape = saturate(hardenedShape);
-    float coherentSoftShape = saturate(coherentSoftVisibility);
-    if (shape <= 0.0001)
-    {
-        return shape;
-    }
-    if (coherentSoftShape <= 0.0001)
-    {
-        return 0.0;
-    }
-
-    float strandSoftShape = saturate(strandSoftVisibility);
-    float exactCore = step(0.999, coherentSoftShape);
-    float resolvedStrandStrength =
-        saturate(strandStrength) * saturate(strandResolution);
-    float strandAA = max(fwidth(strandSoftShape), 0.001);
-    float strandKeep = RiverWaterFoamResolveStructuralStrandKeep(
-        strandSoftShape,
-        strandPattern.x,
-        resolvedStrandStrength,
-        strandDensity,
-        strandReach,
-        strandAA,
-        exactCore);
-    return saturate(shape * strandKeep);
-}
-
 float RiverWaterFoamApplyChipAndStrands(
     float hardenedShape,
     float coherentSoftVisibility,
@@ -1294,9 +1180,9 @@ float RiverWaterFoamApplyChipAndStrands(
     float productionChip = saturate(productionChipSelection);
     productionChipRemovedMask = 0.0;
 
-    // Accepted soft-mask reconstruction is the sole Chipping application.
-    // Coverage-Only and Presence-Amplitude both modify the pre-hardened soft signal,
-    // reharden the result, and apply structural Strands afterward.
+    // Accepted C × P × L Baseline soft-mask reconstruction is the sole
+    // Chipping application: modify the pre-hardened soft signal, reharden the
+    // result, then apply structural Strands.
     float strandSoftShape = saturate(strandSoftVisibility);
     float strand = saturate(strandStrength);
 
@@ -1636,13 +1522,74 @@ float4 RiverWaterFoamSampleInterpolatedState(
         saturate(interpolation));
 }
 
+float4 RiverWaterFoamSamplePointState(
+    TEXTURE2D_PARAM(foamTexture, foamSampler),
+    float2 foamUV,
+    float4 texelSize)
+{
+    bool valid = all(foamUV >= 0.0.xx) && all(foamUV <= 1.0.xx);
+    if (!valid)
+    {
+        return 0.0.xxxx;
+    }
+
+    int2 dimensions = max(
+        int2(1, 1),
+        int2(round(texelSize.zw)));
+    int2 coordinate = clamp(
+        int2(floor(saturate(foamUV) * (float2)dimensions)),
+        int2(0, 0),
+        dimensions - int2(1, 1));
+    return foamTexture.Load(int3(coordinate, 0));
+}
+
+float4 RiverWaterFoamSampleContractState(
+    TEXTURE2D_PARAM(previousFoam, previousFoamSampler),
+    TEXTURE2D_PARAM(currentFoam, currentFoamSampler),
+    float2 foamUV,
+    float interpolation,
+    float2 previousPhaseOffsetUV,
+    float2 currentPhaseOffsetUV,
+    float materialContract,
+    float4 stateTexelSize)
+{
+    return RiverWaterFoamSampleInterpolatedState(
+        TEXTURE2D_ARGS(previousFoam, previousFoamSampler),
+        TEXTURE2D_ARGS(currentFoam, currentFoamSampler),
+        foamUV,
+        interpolation,
+        previousPhaseOffsetUV,
+        currentPhaseOffsetUV);
+}
+
 void RiverWaterFoamDecodeMaterialState(
     float4 state,
+    float materialContract,
     out float coverage,
     out float presence,
     out float remainingLife,
     out float materialPattern)
 {
+    if (RiverWaterFoamUsesCoverageLife(materialContract))
+    {
+        float storedCoverage = saturate(state.w);
+        if (storedCoverage <= 0.00000001 && state.x > 0.0)
+        {
+            storedCoverage = saturate(state.x);
+        }
+        float lifeMoment = clamp(state.y, 0.0, storedCoverage);
+        float patternMoment = clamp(state.z, 0.0, storedCoverage);
+        coverage = storedCoverage;
+        presence = coverage > 0.0001 ? 1.0 : 0.0;
+        remainingLife = coverage > 0.0001
+            ? saturate(lifeMoment / max(coverage, 0.00000001))
+            : 0.0;
+        materialPattern = coverage > 0.0001
+            ? saturate(patternMoment / max(coverage, 0.00000001))
+            : 0.0;
+        return;
+    }
+
     float materialAmount = saturate(state.x);
     float storedCoverage = saturate(state.w);
     bool legacyPackedState =
@@ -1664,12 +1611,28 @@ void RiverWaterFoamDecodeMaterialState(
         : 0.0;
 }
 
+void RiverWaterFoamDecodeMaterialState(
+    float4 state,
+    out float coverage,
+    out float presence,
+    out float remainingLife,
+    out float materialPattern)
+{
+    RiverWaterFoamDecodeMaterialState(
+        state,
+        0.0,
+        coverage,
+        presence,
+        remainingLife,
+        materialPattern);
+}
+
 float RiverWaterFoamResolveStateMask(
     float4 state,
+    float materialContract,
     float storedGlobalDistance,
     float lateralMetres,
     float sharpness,
-    float finalVisibilityMode,
     float strandStrength,
     float strandScale,
     float strandReach,
@@ -1686,39 +1649,22 @@ float RiverWaterFoamResolveStateMask(
 {
     RiverWaterFoamDecodeMaterialState(
         state,
+        materialContract,
         coverage,
         presence,
         remainingLife,
         materialPattern);
 
-    float baseMask;
-    float patternedCoverage;
-    float lifecyclePatternLife = remainingLife;
-    [branch]
-    if (finalVisibilityMode > 0.5)
-    {
-        // Lifecycle-Faithful uses Coverage only to establish a meaningful
-        // material footprint. Ordinary patterned erosion cannot counterfeit
-        // early death; explicit Layer C aging remains the lifetime authority.
-        float lifecycleFootprint =
-            RiverWaterFoamResolveMeaningfulCoverageFootprint(coverage);
-        baseMask = lifecycleFootprint;
-        patternedCoverage = lifecycleFootprint;
-        lifecyclePatternLife = remainingLife > 0.0 ? 1.0 : 0.0;
-    }
-    else
-    {
-        // Concentration + Lifetime intentionally lets diffuse local Coverage
-        // and Remaining Life both reduce the visible result.
-        baseMask = RiverWaterFoamSharpenCoverage(coverage, sharpness);
-        patternedCoverage = coverage;
-    }
+    // Both contracts use literal geometric Coverage as the material footprint.
+    float lifecycleFootprint =
+        RiverWaterFoamResolveMeaningfulCoverageFootprint(coverage);
+    float baseMask = lifecycleFootprint;
+    float patternedCoverage = lifecycleFootprint;
+    float lifecyclePatternLife = remainingLife > 0.0 ? 1.0 : 0.0;
 
     // Resolve Coverage, lifecycle, Pattern, and the structural soft signals
-    // without applying intrinsic Presence here. RiverWaterEvaluateFoam carries
-    // this Coverage/Life shape and its exact Presence-weighted counterpart
-    // through the same wake/warp coupling, then selects the requested footprint
-    // once after the complete shape has been resolved.
+    // without applying intrinsic Presence. Under C × P × L Baseline, Presence
+    // remains transported Layer C state but does not scale Final Foam.
     float resolvedShape = RiverWaterFoamPatternedMask(
         baseMask,
         patternedCoverage,
@@ -1769,9 +1715,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float interpolation,
     float2 previousPhaseOffsetUV,
     float2 currentPhaseOffsetUV,
+    float materialContract,
+    float4 stateTexelSize,
     float sharpness,
-    float finalVisibilityMode,
-    float presenceFootprintMode,
     float strandStrength,
     float strandScale,
     float strandReach,
@@ -1850,7 +1796,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float2 foamUV = fieldUV;
 
     float blend = saturate(interpolation);
-    float4 storedState = RiverWaterFoamSampleInterpolatedState(
+    float4 storedState = RiverWaterFoamSampleContractState(
         TEXTURE2D_ARGS(
             previousFoam,
             previousFoamSampler),
@@ -1860,7 +1806,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         foamUV,
         blend,
         previousPhaseOffsetUV,
-        currentPhaseOffsetUV);
+        currentPhaseOffsetUV,
+        materialContract,
+        stateTexelSize);
 
     // Material Pattern participates directly in every procedural Strand phase.
     // Measure its screen-space variation once outside wake/lee branches so the
@@ -1872,6 +1820,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float previewMaterialPattern;
     RiverWaterFoamDecodeMaterialState(
         storedState,
+        materialContract,
         previewCoverage,
         previewPresence,
         previewRemainingLife,
@@ -1891,10 +1840,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float storedStrandResolution;
     float storedMask = RiverWaterFoamResolveStateMask(
         storedState,
+        materialContract,
         storedGlobalDistance,
         storedLateralMetres,
         sharpness,
-        finalVisibilityMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1940,7 +1889,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float2 visualFoamUV = saturate(visualFoamUVRaw);
 
     float4 visualState = visualFoamSampleValid
-        ? RiverWaterFoamSampleInterpolatedState(
+        ? RiverWaterFoamSampleContractState(
             TEXTURE2D_ARGS(
                 previousFoam,
                 previousFoamSampler),
@@ -1950,7 +1899,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             visualFoamUV,
             blend,
             previousPhaseOffsetUV,
-            currentPhaseOffsetUV)
+            currentPhaseOffsetUV,
+            materialContract,
+            stateTexelSize)
         : 0.0.xxxx;
 
     float visualSoftVisibility;
@@ -1963,10 +1914,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float visualStrandResolution;
     float visualMask = RiverWaterFoamResolveStateMask(
         visualState,
+        materialContract,
         storedGlobalDistance - warpMetres.x,
         storedLateralMetres - warpMetres.y,
         sharpness,
-        finalVisibilityMode,
         strandStrength,
         strandScale,
         strandReach,
@@ -1985,10 +1936,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     float coupledMask = lerp(
         storedMask,
         visualMask,
-        surfaceCoupling);
-    float coupledPresenceMask = lerp(
-        storedMask * storedPresence,
-        visualMask * visualPresence,
         surfaceCoupling);
     float coupledSoftVisibility = lerp(
         storedSoftVisibility,
@@ -2049,7 +1996,7 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             gridContract,
             gridLongitudinal);
         float4 leadState = leadSampleValid
-            ? RiverWaterFoamSampleInterpolatedState(
+            ? RiverWaterFoamSampleContractState(
                 TEXTURE2D_ARGS(
                     previousFoam,
                     previousFoamSampler),
@@ -2059,10 +2006,12 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
                 saturate(leadFoamUVRaw),
                 blend,
                 previousPhaseOffsetUV,
-                currentPhaseOffsetUV)
+                currentPhaseOffsetUV,
+                materialContract,
+                stateTexelSize)
             : 0.0.xxxx;
         float4 trailState = trailSampleValid
-            ? RiverWaterFoamSampleInterpolatedState(
+            ? RiverWaterFoamSampleContractState(
                 TEXTURE2D_ARGS(
                     previousFoam,
                     previousFoamSampler),
@@ -2072,7 +2021,9 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
                 saturate(trailFoamUVRaw),
                 blend,
                 previousPhaseOffsetUV,
-                currentPhaseOffsetUV)
+                currentPhaseOffsetUV,
+                materialContract,
+                stateTexelSize)
             : 0.0.xxxx;
 
         float leadSoftVisibility;
@@ -2085,10 +2036,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float leadStrandResolution;
         float leadMask = RiverWaterFoamResolveStateMask(
             leadState,
+            materialContract,
             storedGlobalDistance - warpMetres.x - stretchDirection.x * stretchMetres,
             storedLateralMetres - warpMetres.y - stretchDirection.y * stretchMetres,
             sharpness,
-            finalVisibilityMode,
             strandStrength,
             strandScale,
             strandReach,
@@ -2112,10 +2063,10 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float trailStrandResolution;
         float trailMask = RiverWaterFoamResolveStateMask(
             trailState,
+            materialContract,
             storedGlobalDistance - warpMetres.x + stretchDirection.x * stretchMetres,
             storedLateralMetres - warpMetres.y + stretchDirection.y * stretchMetres,
             sharpness,
-            finalVisibilityMode,
             strandStrength,
             strandScale,
             strandReach,
@@ -2139,11 +2090,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         float stretchedMask = max(
             coupledMask,
             max(leadMask, trailMask) * stretchScale);
-        float stretchedPresenceMask = max(
-            coupledPresenceMask,
-            max(
-                leadMask * leadPresence,
-                trailMask * trailPresence) * stretchScale);
         float stretchedSoftVisibility = max(
             coupledSoftVisibility,
             max(leadSoftVisibility, trailSoftVisibility) * stretchScale);
@@ -2183,10 +2129,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
             coupledMask,
             stretchedMask,
             stretchWeight);
-        coupledPresenceMask = lerp(
-            coupledPresenceMask,
-            stretchedPresenceMask,
-            stretchWeight);
         coupledSoftVisibility = lerp(
             coupledSoftVisibility,
             stretchedSoftVisibility,
@@ -2222,7 +2164,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         surfaceBreak,
         surfaceBreakWeight);
     coupledMask *= surfaceBreakMultiplier;
-    coupledPresenceMask *= surfaceBreakMultiplier;
     coupledSoftVisibility *= surfaceBreakMultiplier;
     coupledStrandSoftVisibility *= surfaceBreakMultiplier;
 
@@ -2235,9 +2176,6 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
     coupledMask = max(
         coupledMask,
         storedMask * storedRetention);
-    coupledPresenceMask = max(
-        coupledPresenceMask,
-        storedMask * storedPresence * storedRetention);
     float retainedStoredSoft =
         storedSoftVisibility * storedRetention;
     coupledSoftVisibility = max(
@@ -2260,19 +2198,13 @@ RiverWaterFoamResult RiverWaterEvaluateFoam(
         storedStrandResolution,
         storedOwnsRetainedStrand);
     coupledMask *= liquidFactor;
-    coupledPresenceMask *= liquidFactor;
     coupledSoftVisibility *= liquidFactor;
     coupledStrandSoftVisibility *= liquidFactor;
 
-    // Coverage-Only uses the complete resolved Coverage/Life shape. In
-    // Presence-Amplitude, every contributing state carries its exact decoded
-    // intrinsic Presence through identical, Presence-independent coupling
-    // weights. Uniform Presence therefore remains exactly proportional through
-    // the full resolved mask while the accepted soft Chipping geometry stays
-    // unscaled.
-    result.mask = saturate(presenceFootprintMode > 0.5
-        ? coupledPresenceMask
-        : coupledMask);
+    // C × P × L Baseline uses the complete resolved Coverage/Life shape.
+    // Intrinsic Presence remains transported Layer C state but does not scale
+    // Final Foam under the retained Coverage-Only rendering contract.
+    result.mask = saturate(coupledMask);
     result.softVisibility = saturate(coupledSoftVisibility);
     result.strandSoftVisibility = saturate(
         coupledStrandSoftVisibility);

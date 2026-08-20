@@ -1356,3 +1356,323 @@ Reject GR-O3A if the three expensive Ground passes still occur, work merely move
 - **Deferred:** Full Candidate 2 River stage decomposition. GR-O3A does not require it because it does not interrupt or externally schedule individual River stages.
 - **Deferred:** Full edit-mode/Undo/disable/removal Candidate 3 transaction coordinator until GR-O3A evidence demonstrates whether broader scheduling work remains valuable.
 
+
+# EDITOR-RELOAD-DIAG-R1 — Domain-reload wall-time and PixelSurface repair instrumentation
+
+**Status:** Gate 1 review complete; Gate 2 plan recorded before implementation. Unity validation pending.
+
+## Objective
+
+Measure the current multi-minute script/domain-reload stall without changing Ground, River, Foam, cache, material, library-generation, or runtime behavior. The diagnostic must separate script compilation, assembly reload, post-reload editor callback gaps, and automatic PixelSurface detail-library repair work so the first dominant authority can be identified before any optimization is selected.
+
+## Current evidence
+
+- User telemetry shows one Ground accounting batch with `63252.492 ms` wall time but only `37.713 ms` of measured passes, and one River accounting batch with `42056.849 ms` wall time but only `43.467 ms` of measured passes. The final Ground/River regeneration events complete roughly forty-one seconds before their delayed accounting-completion callbacks are serviced. This falsifies “Ground/River measured regeneration work consumed the whole wall delay” for that capture.
+- Historical Foam startup telemetry includes an Exact topology-cache hit with approximately `91 s` total wall time but only tens of milliseconds in named startup phases. A separate capture spent approximately `4.69 s` inside `RefreshInitialTopologySources`; those are distinct costs and must remain distinct.
+- `StylizedSurfaceDetailLibraryBuilder.Initialize()` schedules `RepairAllLibraries()` after every domain load and subscribes the same repair scheduling to `EditorApplication.projectChanged`.
+- `RepairAllLibraries()` scans all `StylizedSurfaceDetailLibrary` assets, calls `NeedsRebuild()`, and may call `Rebuild()`.
+- `NeedsRebuild()` calculates a full content signature. `CalculateSignature()` walks every library entry and calls `AssetDatabase.GetAssetDependencyHash(...)` for every referenced source texture.
+- `Rebuild()` may normalize source importers, generate texture arrays, replace generated sub-assets, save the library, call `AssetDatabase.ImportAsset(..., ForceUpdate)`, and notify all material profiles using the library.
+- The existing Ground/River orchestration accounting intentionally measures regeneration passes, not arbitrary editor/AssetDatabase work occurring between delayed callbacks. Therefore a separate editor-reload timeline is required.
+
+## Approved files
+
+Modify:
+
+- `Assets/Docs/Ground_River_Regeneration_Orchestration_Manual.md`
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+
+Create:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/EditorReloadDiagnostics.cs`
+
+No other files are approved for R1.
+
+## Invariants
+
+- Diagnostic-only. Do not suppress, reorder, defer, coalesce, skip, or add any existing regeneration, cache, library repair, import, or runtime operation.
+- No scene, prefab, material, profile, cache asset, generated array, layer, tag, serialized default, or runtime resource is changed by the diagnostic itself.
+- Automatic PixelSurface repair retains its existing schedule and rebuild decisions.
+- Ground/River orchestration, River Foam topology-cache policy, D9 spawning behavior, C3A material behavior, disturbances, and player/runtime code remain untouched.
+- Idle editor cost must be effectively zero: no permanent per-frame polling. Update sampling is active only for a bounded diagnostic capture.
+- Diagnostic state is editor-session-only. It must not serialize into project assets.
+- One report must distinguish compilation, pre-reload delay, assembly reload, post-reload callback gaps, PixelSurface repair scans, signature checks, rebuild stages, and AssetDatabase import/save work where observable.
+
+## Implementation sequence
+
+1. Add an editor-only reload profiler that persists a small capture timeline across assembly reload with `SessionState`, subscribes to compilation/reload events, records a bounded number of post-reload editor updates/delay callbacks, exposes an arm-next-reload action, exposes a forced-recompile capture action, and copies/logs one consolidated report after the capture settles.
+2. Instrument `StylizedSurfaceDetailLibraryBuilder` without changing decisions: record schedule reason/coalescing, repair invocation start/end, `FindAssets`, per-library load, `NeedsRebuild`, signature calculation, rebuild/no-rebuild result, importer normalization, validation, array construction/application, sub-asset replacement, save/import, refreshed-library load, material notification, and total rebuild time.
+3. Keep normal operation silent. Detailed stage capture executes only while R1 capture is armed; the builder performs the same calls regardless of capture state.
+4. Gate 4: compare the final diff against the three-file scope, re-read the complete review surface, run delimiter/preprocessor/static symbol checks, confirm no Ground/River/Foam/cache behavior edits, and package changed files only.
+
+## Controlled reproduction contract
+
+R1 provides two editor actions:
+
+- **Arm Next Reload Timeline Capture** — records the next naturally triggered script/domain reload, which is the preferred representative measurement when reproducing the user's normal code-edit workflow.
+- **Force Script Recompile + Capture** — requests a clean script compilation to guarantee one diagnostic reload when a natural source change is inconvenient. This intentionally forces compilation and is therefore a diagnostic reproduction path, not a compile-performance baseline.
+
+The consolidated report must include enough timestamps to distinguish time before `beforeAssemblyReload`, `beforeAssemblyReload` to post-reload initialization/`afterAssemblyReload`, time until the first editor update/delay callback, PixelSurface repair work, and any residual unaccounted wall gap.
+
+## Acceptance criteria
+
+- No project/runtime behavior changes when capture is idle.
+- One armed reload yields exactly one consolidated report rather than continuous Console output.
+- Report includes compilation start/finish where Unity publishes those events, assembly reload boundaries, post-reload callback/update timing, and PixelSurface repair invocation count.
+- For each automatic detail library checked during the capture, report includes path/name, stale/current result, signature/decision elapsed time, and rebuild elapsed time when rebuilding occurs.
+- A rebuild report decomposes importer normalization, validation, array build/apply, signature/finalization, save, forced import, reload, and material notification sufficiently to identify a dominant substage.
+- Existing automatic repair still repairs stale libraries and leaves current libraries untouched exactly as before.
+- No recurring update callback remains registered after capture completion.
+
+## Risks and mitigations
+
+- **Instrumentation overhead can distort small timings.** Mitigation: use `Stopwatch`/UTC timestamps and simple in-memory/session strings only while capture is armed; no texture reads, asset scans, or extra signatures are performed solely for diagnostics.
+- **A forced clean recompilation is slower than ordinary incremental compilation.** Mitigation: label trigger mode in the report and provide the natural “arm next reload” action as the preferred workflow measurement.
+- **Static state is destroyed by assembly reload.** Mitigation: persist only minimal capture state/timeline through `SessionState`; project assets remain untouched.
+- **Project-changed repair may schedule another repair.** Mitigation: record every schedule request, whether it was coalesced, and every repair invocation during the same capture rather than assuming one run.
+- **Diagnostic callbacks could remain active.** Mitigation: bounded update sampling and explicit unsubscribe/finalization paths.
+
+## Validation
+
+Pending Unity 6000.5.0f1 validation:
+
+1. Import/compile with no errors or new warnings attributable to R1.
+2. Run one natural armed reload capture after a representative River/code edit and provide the complete consolidated report.
+3. If a natural edit is inconvenient, run the forced-recompile capture once and provide the complete report, clearly retaining its `CleanBuildCache` trigger label.
+4. Confirm ordinary editor operation after report completion has no recurring diagnostic Console output or persistent update activity.
+
+
+## EDITOR-RELOAD-DIAG-R1 implementation and Gate 4 audit record
+
+**Source status:** implemented within the approved three-file diagnostic scope. **Unity 6000.5.0f1 validation:** pending; no Unity executable/compiler is available in the working environment.
+
+### Implemented behavior
+
+- Added one editor-session-only reload timeline profiler. It records compilation start/finish and per-assembly compiler-message counts, `beforeAssemblyReload`, post-reload initialization/`afterAssemblyReload` when published, the first diagnostic delay callback, a bounded post-reload Editor-update sample, and one final consolidated report.
+- Capture state that must survive the domain boundary is stored only in `SessionState`. The event timeline is accumulated in memory and persisted once at `beforeAssemblyReload`, avoiding per-event SessionState string writes during expensive post-reload work.
+- Added **Arm Next Reload Timeline Capture** for the representative natural code-edit workflow, **Force Script Recompile + Capture** for a guaranteed `CleanBuildCache` diagnostic reproduction, and **Copy Last Reload Timeline Report**. The forced action is explicitly labeled non-representative for compilation performance.
+- The automatic PixelSurface detail-library repair records schedule reason/coalescing and each `RepairAllLibraries` invocation. During an armed capture it times library discovery/loading, rebuild decisions, signature calculation, individual dependency-hash reads, rebuild phases, changed-importer reimports, asset save, forced import, refreshed-library load, and material-profile notification.
+- Existing builder decisions and project-mutating calls are not duplicated. Instrumentation observes the existing calls in place.
+- High-frequency `NeedsRebuild`, `CalculateSignature`, and dependency-hash instrumentation is guarded by one cached capture-active boolean so normal Inspector/status checks do not allocate diagnostic strings or invoke timers after capture completion.
+- Post-reload update sampling unsubscribes on report finalization and is hard-bounded even when the expected PixelSurface repair is not observed.
+
+### Static audit
+
+`42/42 PASS`:
+
+- exact changed scope is the approved document, existing PixelSurface builder, and new editor-only profiler;
+- existing builder counts for `FindAssets`, `LoadAssetAtPath`, `GetAssetDependencyHash`, `SaveAndReimport`, `SaveAssetIfDirty`, `ImportAsset`, `AddObjectToAsset`, generated-subasset destruction, signature calculation, and automatic rebuild calls are unchanged;
+- the profiler contains no runtime initialization hook and no project AssetDatabase save/import/create/delete/move operation;
+- Ground generation, River generation, Foam topology cache/resources, D9 birth-event implementation, Foam compute, and C3A final-render include are byte-identical to the pre-R1 source;
+- C# delimiter checks pass for both modified/new source files;
+- no scene, prefab, material, profile, cache asset, layer, tag, serialized default, shader, compute, or runtime source is changed.
+
+### API verification
+
+The implementation uses Unity-supported Editor APIs for assembly reload events and script compilation. Unity's current 6000.0 scripting reference documents `AssemblyReloadEvents.beforeAssemblyReload` / `afterAssemblyReload`, and documents `CompilationPipeline.RequestScriptCompilation(RequestScriptCompilationOptions.CleanBuildCache)` as the force-recompile path when no tracked source change is available.
+
+## EDITOR-RELOAD-DIAG-R1 FIX1 — C# compile correction
+
+**Status:** Gate 1 re-review complete after failed Unity import; corrective plan recorded before C# edits.
+
+### Observed failure
+
+Unity 6000.5.0f1 rejected the initial R1 builder instrumentation. The first reported errors are at the two diagnostic-only interpolated strings in `NotifyMaterialsUsingLibrary(...)`: the null fallback string literal was written with backslash-escaped quotes inside the interpolation expression. In C# interpolation expressions, the nested string literal must use ordinary quotes. The downstream brace/modifier errors are parser cascade errors after those two malformed expressions.
+
+### Corrective scope and invariants
+
+- Keep the already-approved R1 three-file scope unchanged.
+- Correct only the malformed diagnostic string expressions unless additional compile/syntax evidence identifies another R1 defect.
+- Do not change PixelSurface repair decisions, scheduling, rebuild behavior, Ground/River/Foam behavior, runtime code, assets, or diagnostic semantics.
+- Search both R1 C# files for the same malformed escaped-quote pattern and other suspicious interpolation/string syntax.
+- Re-run delimiter and preprocessor checks, plus an interpolation-aware lexical syntax scan that fails on invalid escape/string state rather than relying only on delimiter counts.
+- Compare the final C# diff against the failed R1 package and confirm that executable differences are limited to compile correction.
+- Unity import remains the final compiler authority; do not describe FIX1 as validated until the corrected package imports cleanly.
+
+### Acceptance criteria
+
+- The two malformed interpolation expressions compile as valid C#.
+- No remaining R1 C# source contains the same escaped-quote-in-interpolation defect.
+- Both R1 C# files pass the strengthened static syntax scan, delimiter balance, preprocessor balance, and stale malformed-pattern search.
+- R1 behavior and the original diagnostic scope are otherwise byte-for-byte/semantically unchanged.
+- Unity imports with no C# errors attributable to R1.
+
+### FIX1 implementation and Gate 4 static audit
+
+**Source status:** the two malformed diagnostic interpolations are corrected. **Unity compiler validation remains pending.**
+
+The failed R1 package and FIX1 were compared directly. The only executable-source differences are the two null-fallback interpolation corrections in `NotifyMaterialsUsingLibrary(...)`; `EditorReloadDiagnostics.cs` is byte-identical to the failed R1 package. No diagnostic behavior, PixelSurface repair decision, scheduling, rebuild operation, or protected subsystem was otherwise changed.
+
+Strengthened static validation: `33/33 PASS`. In addition to the previous scope/invariant checks, FIX1 uses an interpolation-aware C# lexical scanner that reproduces the original failed-package parser break at the two Unity-reported locations and reports zero errors on the corrected R1 files. The same scanner reports zero errors across all ten PixelSurface Editor C# files and all `284` C# files under the current game source tree. Both R1 C# files also pass preprocessor balance.
+
+The original R1 `42/42 PASS` static audit is **superseded as compile-safety evidence**: it verified scope, symbols, and delimiter counts but did not lex interpolation expressions and therefore failed to detect the malformed C# that Unity rejected. Its unaffected scope/invariant results remain historical evidence only; FIX1 `33/33 PASS` plus Unity import is the current validation authority.
+
+The audit reconfirms unchanged counts for the existing builder calls to asset discovery/loading, dependency hashing, importer reimport, asset save/import, generated-subasset replacement/destruction, signature calculation, and automatic rebuild. Ground generation, River generation, Foam topology cache/resources, D9 birth-event code, Foam compute, and C3A final-render code remain byte-identical to the pre-R1 source.
+
+Unity-supported assembly reload and compilation APIs used by the unchanged profiler were rechecked against the current Unity 6 scripting reference.
+
+### Pending Unity validation
+
+- [ ] R1 imports with no C# errors or new warnings.
+- [ ] One natural armed code-edit reload produces one complete copied report.
+- [ ] The report identifies compilation/reload/post-reload gaps and every PixelSurface repair invocation without continuous logging.
+- [ ] If a PixelSurface library is current, the report shows `needsRebuild=False` and no rebuild mutation.
+- [ ] If a PixelSurface library is stale, the existing rebuild still succeeds and the report decomposes the existing work rather than changing it.
+- [ ] After finalization, ordinary Editor updates produce no recurring R1 output.
+
+
+## EDITOR-RELOAD-DIAG-R1 FIX2 — Unity 6 compilation-callback correction
+
+**Status:** Gate 1 re-review complete after Unity 6000.5.0f1 obsolete-API warnings; Gate 2 corrective plan recorded before executable edits.
+
+### Observed Unity warning
+
+Unity 6000.5.0f1 reports `CompilationPipeline.assemblyCompilationStarted` as obsolete and recommends `compilationStarted`, `compilationFinished`, or `assemblyCompilationFinished`. The warning also states that compilation callbacks run asynchronously to the actual compilation and should not be treated as authoritative compilation-duration measurements.
+
+### Objective
+
+Remove the obsolete assembly-start hook and make R1's compilation evidence semantically accurate without changing the diagnostic's reload-boundary, PixelSurface-repair, controlled-recompile, or report-finalization behavior.
+
+### Approved FIX2 files
+
+Modify:
+
+- `Assets/Docs/Ground_River_Regeneration_Orchestration_Manual.md`
+- `Assets/Game/Rendering/PixelSurface/Editor/EditorReloadDiagnostics.cs`
+
+Reviewed but intentionally unchanged:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+
+No other files are approved for FIX2.
+
+### Invariants and non-goals
+
+- Remove every R1 subscription/reference to obsolete `CompilationPipeline.assemblyCompilationStarted`.
+- Retain `CompilationPipeline.compilationStarted` and `CompilationPipeline.compilationFinished` only as coarse event-order markers; do not describe their timestamp difference as actual compiler execution time.
+- Retain `CompilationPipeline.assemblyCompilationFinished` only for per-assembly identity plus compiler error/warning counts; do not infer per-assembly compile duration.
+- Retain `AssemblyReloadEvents.beforeAssemblyReload` / `afterAssemblyReload` as reload-boundary markers.
+- Retain the existing `CleanBuildCache` forced-recompile action and label it non-representative for normal incremental compile performance.
+- Do not alter PixelSurface repair scheduling, decisions, rebuilding, AssetDatabase operations, Ground, River, Foam, D9 spawning, C3A rendering, runtime behavior, or serialized assets.
+
+### Implementation sequence
+
+1. Remove the obsolete assembly-compilation-start subscribe/unsubscribe statements and delete the now-unused start handler.
+2. Rename compilation timeline text where necessary so the report explicitly identifies these as Unity compilation **event notifications**, not authoritative duration probes.
+3. Keep per-assembly finished-message counting intact.
+4. Gate 4: compare against FIX1, scan the complete game C# tree with the interpolation-aware lexer, check preprocessor balance, search for obsolete R1 assembly-start references, search R1 for compiler-obsolete diagnostics where statically detectable, confirm the PixelSurface builder is byte-identical to FIX1, and package only the two FIX2-changed files.
+
+### Acceptance criteria
+
+- Unity produces no `CS0618` warning attributable to R1's use of `CompilationPipeline.assemblyCompilationStarted`.
+- No R1 source reference to `assemblyCompilationStarted` remains.
+- Compilation start/finish notifications remain in the consolidated timeline but are explicitly non-authoritative timing markers.
+- Per-assembly compiler error/warning counts remain available through `assemblyCompilationFinished`.
+- The R1 controlled capture, reload boundaries, PixelSurface instrumentation, bounded post-reload sampling, clipboard report, and failure-finalization behavior remain otherwise unchanged.
+- Unity 6000.5.0f1 import remains the final compiler/warning authority.
+
+### FIX2 implementation and Gate 4 static audit
+
+**Source status:** implemented within the two-file FIX2 corrective scope. **Unity 6000.5.0f1 warning validation:** pending final import.
+
+Implementation differences versus FIX1 are intentionally limited to `EditorReloadDiagnostics.cs`: the obsolete `assemblyCompilationStarted` subscription pair and `OnAssemblyCompilationStarted(...)` handler are removed; compilation-level start/finish messages are relabeled as event notifications rather than authoritative duration boundaries; `assemblyCompilationFinished` remains solely for assembly identity and compiler-message counts; the consolidated report includes the same timing caveat. `StylizedSurfaceDetailLibraryBuilder.cs` is byte-identical to FIX1.
+
+Static validation after implementation:
+
+- interpolation-aware lexical scan: `284/284` current game C# files report zero lexical/string/interpolation/delimiter errors;
+- preprocessor balance: `284/284` current game C# files report zero unmatched conditional directives;
+- repository search reports zero remaining `assemblyCompilationStarted` references under the current game source;
+- R1 profiler compilation-pipeline references are limited to `compilationStarted`, `compilationFinished`, `assemblyCompilationFinished`, and `RequestScriptCompilation`;
+- the PixelSurface builder SHA-256 matches FIX1 exactly (`a91ef84ad7407da83777a392823db1a2777f93cf646ad4818366b621a618e00c`);
+- the FIX2 executable diff against FIX1 contains only the obsolete-hook removal and diagnostic wording/caveat changes described above.
+
+Unity's official current scripting reference documents `compilationStarted`, `compilationFinished`, and `assemblyCompilationFinished` as compilation-pipeline events, and documents `RequestScriptCompilation(RequestScriptCompilationOptions.CleanBuildCache)` as a supported forced-recompile path. The user-observed Unity 6000.5.0f1 warning is the authority for treating these event timestamps as asynchronous notification markers rather than compiler-duration measurements.
+
+#### Pending Unity validation
+
+- [ ] R1 FIX2 imports with no C# errors and no `CS0618` warnings attributable to the reload diagnostic.
+- [ ] Forced capture produces one consolidated report with compilation event markers, reload boundaries, PixelSurface repair timings, and no obsolete assembly-start event output.
+- [ ] After capture finalization, no recurring R1 diagnostic output remains.
+
+## EDITOR-RELOAD-DIAG-R1 FIX3 — delayed-work and Play Mode observation correction
+
+**Status:** Gate 1 review complete from the user-provided R1 FIX2 capture; Gate 2 plan recorded before executable edits.
+
+### Observed FIX2 evidence
+
+Capture `db372ddb` completed in `65.533 s`. It recorded one PixelSurface repair schedule but zero `RepairAllLibraries` invocations and no R1 diagnostic `delayCall` callback. R1 finalized only because the bounded `120`-update ceiling was reached `3.403 s` after `afterAssemblyReload`. Therefore FIX2 stopped observing before the delayed work it was intended to measure.
+
+The same capture spent `56.622 s` between arm/request and `beforeAssemblyReload` under the deliberately non-representative `CleanBuildCache` stress action. That result is useful as a full-rebuild stress measurement, but it is not evidence for ordinary incremental River-code compilation performance.
+
+### Objective
+
+Keep R1 alive until the post-reload delayed-work boundary has actually been serviced, include Play Mode transitions in the same capture, and make a natural incremental code-change/reload followed by Play Mode the primary reproduction path. Preserve the clean-build action only as an explicitly secondary stress test.
+
+### Approved FIX3 files
+
+Modify:
+
+- `Assets/Docs/Ground_River_Regeneration_Orchestration_Manual.md`
+- `Assets/Game/Rendering/PixelSurface/Editor/EditorReloadDiagnostics.cs`
+
+Reviewed but intentionally unchanged:
+
+- `Assets/Game/Rendering/PixelSurface/Editor/StylizedSurfaceDetailLibraryBuilder.cs`
+
+No other files are approved for FIX3.
+
+### Invariants and non-goals
+
+- Do not alter PixelSurface repair scheduling, repair decisions, rebuild behavior, AssetDatabase operations, Ground, River, Foam, D9 spawning, C3A rendering, runtime behavior, or serialized assets.
+- Remove update-count-based successful finalization. Editor update count is not a valid proxy for delayed-work completion.
+- Successful post-reload finalization requires the R1 diagnostic `delayCall` to have executed.
+- Track actual queued PixelSurface repair work across scheduling/defer/start boundaries so a capture does not finalize while a repair `delayCall` remains pending.
+- Natural capture requires `EnteredPlayMode` before successful finalization so one report spans incremental compilation/reload through the user's slow Start-Game transition.
+- Record all four `PlayModeStateChange` values when observed.
+- Preserve compilation callbacks as notification-order markers only, never compiler-duration measurements.
+- Keep the clean-build capture as a secondary stress test that does not require Play Mode.
+- Use a wall-clock safety timeout after `afterAssemblyReload`; timeout finalization must explicitly report unmet readiness conditions rather than pretending the capture reached a quiet successful state.
+- Observation heartbeats/editor-update-gap telemetry must not reset the meaningful-work quiet timer.
+
+### Implementation sequence
+
+1. Add persisted R1 state for Play requirement/EnteredPlayMode, latest `afterAssemblyReload` wall time, and pending PixelSurface delayed repairs.
+2. Subscribe once to `EditorApplication.playModeStateChanged` and record `ExitingEditMode`, `EnteredPlayMode`, `ExitingPlayMode`, and `EnteredEditMode` during active capture.
+3. Replace the natural arm action with an explicit incremental-reload-plus-Play capture mode. Retain the clean-build capture as a clearly labeled stress action.
+4. Replace the 120-update termination with readiness checks: reload boundary seen, diagnostic `delayCall` serviced, current-domain PixelSurface schedule serviced when one was observed, no queued PixelSurface repair remains, Play entered when required, and a short meaningful-work quiet window.
+5. Add a `180 s` post-reload wall-clock safety timeout and sparse observation telemetry for long editor-update gaps/heartbeats without mutating the meaningful-work quiet timestamp.
+6. Extend the consolidated report with Play requirement/EnteredPlayMode, diagnostic-delayCall state, pending PixelSurface repairs, and timeout/readiness evidence.
+7. Gate 4: compare against FIX2, run the interpolation-aware scan and preprocessor balance over the complete game C# tree, search for obsolete callback use and removed update-count finalization, verify only the approved profiler/document changed, verify the PixelSurface builder remains byte-identical to FIX2, inspect the packaged bytes, and leave Unity import/runtime capture pending.
+
+### Acceptance criteria
+
+- R1 cannot successfully finalize merely because many Editor updates occurred.
+- A normal natural capture remains active until its post-reload diagnostic `delayCall` has executed, observed PixelSurface delayed repair work has been serviced, Play Mode has been entered, and meaningful diagnostic activity reaches the quiet window.
+- A queued/deferred PixelSurface repair prevents successful finalization until the queued work starts and clears.
+- If readiness never arrives, the report survives for up to `180 s` after the latest `afterAssemblyReload` and then finalizes explicitly as a safety timeout with the unmet conditions visible.
+- The timeline records Play Mode state changes and any multi-second gaps between post-reload Editor updates.
+- Clean-build remains available but is labeled as a stress test and does not require Play Mode.
+- No PixelSurface repair behavior or gameplay/runtime subsystem changes.
+- Unity 6000.5.0f1 import and one natural incremental-reload-plus-Play capture remain the final validation authority.
+
+### FIX3 implementation and Gate 4 static audit
+
+**Source status:** implemented within the approved two-file FIX3 scope. **Unity 6000.5.0f1 import and live capture validation remain pending.**
+
+Implementation replaces the FIX2 update-count cutoff with readiness-based completion. A successful natural capture now requires: a completed assembly reload boundary, the diagnostic `delayCall` to have been serviced in the final domain, any PixelSurface delayed repair scheduled in that domain to have started and no queued repair to remain, `EnteredPlayMode` for the natural incremental workflow, and a `0.75 s` meaningful-work quiet window. The capture uses a `180 s` wall-clock safety timeout after the latest `afterAssemblyReload`; timeout reports readiness state rather than claiming successful settling.
+
+PixelSurface schedule instrumentation now tracks queued delayed repairs without altering the builder: a newly scheduled repair increments the diagnostic pending count, an already-scheduled request establishes at least one pending repair when necessary, and `RepairAllLibraries` start consumes one pending item. The pending count is cleared at `beforeAssemblyReload` because callbacks queued in the outgoing domain cannot execute afterward. The PixelSurface builder itself is byte-identical to FIX2/FIX1.
+
+The natural action is now explicitly an incremental-reload-plus-Play capture. The existing clean-build action remains available as a clearly labeled stress test and does not require Play Mode. All observed `PlayModeStateChange` values are recorded. Post-reload update counts are retained only as observational telemetry; sparse heartbeats and editor-update-gap records do not reset the meaningful-work quiet timer.
+
+Static validation: `34/34 PASS` before this audit record was appended. The checks prove exact changed scope versus FIX2; zero strengthened lexical/string/interpolation/delimiter errors across all `286` current C# files; balanced conditional-compilation directives across all `286`; zero `MaximumPostReloadUpdates`, `MinimumPostReloadUpdates`, or `assemblyCompilationStarted` references; natural/clean capture mode separation; Play Mode subscription/readiness; diagnostic-delayCall readiness; pending-repair accounting; `180 s` timeout; non-activity observation telemetry; report readiness fields; no AssetDatabase mutation calls in the profiler; byte-identical PixelSurface builder SHA-256 `a91ef84ad7407da83777a392823db1a2777f93cf646ad4818366b621a618e00c`; and byte-identical protected Ground, River, Foam runtime/cache, D9 birth-event, Foam compute, and C3A render sources relative to FIX2.
+
+Official Unity 6 documentation was rechecked for the APIs relied on by FIX3: `EditorApplication.delayCall` is a one-shot callback after Inspector updates; `EditorApplication.playModeStateChanged`/`PlayModeStateChange` provide Editor Play Mode transition notifications; and `RequestScriptCompilationOptions.CleanBuildCache` explicitly performs a full script rebuild while the default request path recompiles only changed/affected scripts. Compilation callback timestamps remain notification markers only per the Unity 6000.5 warning already observed in FIX2.
+
+#### Pending Unity validation
+
+- [ ] FIX3 imports with no C# errors and no new warnings attributable to R1.
+- [ ] One natural incremental code-edit capture records compilation/reload, services the diagnostic delay callback, observes the automatic PixelSurface repair path, records `ExitingEditMode` and `EnteredPlayMode`, and produces one consolidated report only after readiness/quiet or explicit safety timeout.
+- [ ] The natural capture does not finalize in Edit Mode merely because Editor updates are frequent.
+- [ ] If PixelSurface repair is deferred/rescheduled, the report retains a nonzero pending count until the subsequent invocation begins.
+- [ ] After finalization, ordinary Editor operation produces no recurring R1 update/heartbeat output.

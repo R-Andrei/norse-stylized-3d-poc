@@ -2,11 +2,11 @@
 
 ## Status
 
-**Architecture identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY`
+**Architecture identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A5-AUTHORITY-CLOSURE`
 
-**Current state:** V1.3A/A1/A2/A3 are runtime-accepted. V1.3A4 extends the validated system from one Controller-wide appearance preset to resolved per-ray preset authority, per-ray vegetation response, and compatible atmospheric presentation groups. Unity 6000.5.0f1 compilation and runtime validation of A4 remain required in the live project.
+**Current state:** V1.3A/A1/A2/A3/A4 are runtime-accepted. V1.3A5 is the authority-closure overlay: it deletes the source-level Anchor/Controller appearance, evolution, and migration fallbacks that A4 no longer consumes, preserves the validated per-ray preset/renderer/vegetation contracts, and replaces the last global preset-transition getter side effect with explicit tick-time cleanup. Unity 6000.5.0f1 compilation and runtime validation of A5 remain required in the live project.
 
-A4 is deliberately **not** the destructive serialized migration. Legacy Controller/Anchor fallback fields remain serialized until the actual live scene/prefab state can be audited safely. A4 stops using those fields as runtime appearance authority.
+A5 does not raw-edit scenes, prefabs, preset assets, or materials. Historical values stored in the deleted source fields are no longer runtime authority and are intentionally not preserved as permanent dead serialization.
 
 ---
 
@@ -215,9 +215,9 @@ If future gameplay requires authored cross-fades between explicit overrides, slo
 
 ### 4.4 No legacy runtime fallback
 
-A4 no longer constructs production appearance from the Anchor's old serialized appearance/evolution values.
+A4 stopped constructing production appearance from legacy Anchor/Controller appearance and evolution values. A5 removes those obsolete serialized source fields, migration/version helpers, fallback-only Controller properties, and misleading Anchor layout convenience properties.
 
-Those fields remain serialized only because the available archive does not contain authoritative live scene/prefab serialization for destructive migration. Their later deletion requires the separate read-only migration audit and explicit serialized-asset scope approval.
+The retained Anchor serialization is request-local only: binding/preset override, source/cloud/gate policy, lifecycle, placement/geometry, spacing override, variation seed, and local intensity. Every active ray still resolves a preset before production presentation becomes active.
 
 ---
 
@@ -515,22 +515,13 @@ The Cloud Inspector retains production authoring, cookie preview, receiver audit
 
 ---
 
-## 13. Serialized migration boundary
+## 13. Authority-closure boundary
 
-A4 intentionally does **not** delete legacy serialized Anchor/Controller fallback fields from source/assets where doing so could silently discard saved live-project data.
+A5 removes the obsolete source-level serialized Anchor/Controller appearance, evolution, and migration fields because A4 runtime validation established that they no longer construct active presentation. No scene, prefab, material, or preset asset is raw-edited by A5.
 
-The remaining destructive cleanup requires a separate read-only audit of the actual live project:
+The supplied archive still does not expose authoritative live scene/prefab serialization, so A5 does not claim recoverability of historical values that may have existed only in those now-ignored fields. The accepted closure policy is to stop carrying permanent dead serialization solely for archival recovery.
 
-1. enumerate every LightRay Controller and authored Anchor in current scenes/prefabs;
-2. record legacy serialized values and resolved preset assignments;
-3. identify values that materially differ from the intended preset;
-4. identify exact scene/prefab/asset files requiring migration;
-5. obtain explicit approval for those serialized asset changes;
-6. migrate required values;
-7. remove the dead serialized fallback/migration fields and branches;
-8. update final documentation and freeze the cleaned authority contract.
-
-Archive 48 does not contain the complete `.meta`, scene, and prefab state required to perform that audit safely.
+The runtime invariant after A5 is strict: every active authored/procedural ray resolves one Preset Override or the Controller Default Preset; missing both is an actionable configuration/spawn failure.
 
 ---
 
@@ -560,22 +551,19 @@ It preserves:
 
 ---
 
-## 15. A4 validation contract
+## 15. A5 validation contract
 
 Unity 6000.5.0f1 validation must establish all of the following:
 
 1. C# and shader import/compilation complete with zero errors.
-2. Several inherited-default atmospheric rays that share one presentation report one presentation group in FinalComposite.
-3. An authored ray with a different Preset Override can coexist with inherited weather rays and reports a separate group only when its resolved final-pass presentation is incompatible.
-4. Rays with different Source Kind values can render simultaneously; no first-source-family filter suppresses the others.
-5. Vegetation underneath simultaneous rays follows each ray's preset-specific intensity/coverage/softness.
-6. The two-`float4` vegetation sidecar and D3D12 fallback binding remain intact; no `_VegetationAdditionalLightAccentData` missing-SRV warning returns.
-7. Setting a preset's Vegetation Accent Intensity to zero suppresses the Weather-specific vegetation edge accent without re-entering ordinary punctual-light edge-accent behavior for that Spot.
-8. Controller Default Preset changes through the runtime transition API affect inherited rays but not explicit override rays.
-9. Automatic population retains A1 footprint behavior, A2 randomized turnover, cloud qualification, lifetimes, and transition spawn-pausing behavior.
-10. Surface Spots retain correct colour/intensity and lifecycle for mixed-preset/mixed-source rays.
-11. `_TEST.asset` remains unchanged.
-12. No scene/prefab/material/preset asset serialization is modified by A4.
+2. Existing inherited automatic atmospheric rays spawn, turn over, and preserve A1/A2 cloud/population behavior.
+3. An authored ray with a different Preset Override and Source Kind can coexist with inherited weather rays; presentation-group behavior remains as accepted in A4.
+4. Vegetation underneath simultaneous rays continues to use each ray's descriptor-specific intensity/coverage/softness with no missing-SRV warning.
+5. Controller Default Preset transitions through the runtime API still affect inherited rays but not explicit override rays, including rays joining an in-progress default transition.
+6. After a completed default transition, the Controller carries no stale global previous-preset bookkeeping while per-slot transition completion remains independent.
+7. The Anchor Inspector exposes only the retained request-local authoring fields and runtime telemetry; no deleted appearance/evolution field reappears.
+8. The comprehensive report contains per-ray preset blend and vegetation values and no redundant Controller-global vegetation summary.
+9. No scene/prefab/material/preset asset serialization is modified by A5; `_TEST.asset` remains unchanged.
 
 ---
 
@@ -621,13 +609,19 @@ Unity 6000.5.0f1 validation must establish all of the following:
 - vegetation accent values resolve per ray and reuse the existing indexed sidecar;
 - legacy serialized fallback data remains intact pending the separate live-project migration audit.
 
+### V1.3A5 — authority closure
+
+- deletes obsolete Anchor/Controller presentation, evolution, and migration serialization that A4 no longer consumes;
+- retains only request-local Anchor serialization and per-ray preset resolution;
+- removes misleading Anchor layout convenience properties based on unresolved local spacing;
+- removes Controller-global fallback presentation properties and redundant vegetation summary telemetry;
+- moves Controller-default transition expiry from the removed global blend getter into explicit tick-time cleanup;
+- preserves A4 renderer grouping, source resolution, population, cloud, surface Spot, and indexed vegetation contracts.
+
 ---
 
 ## 17. Next work items
 
-1. Compile and runtime-validate V1.3A4 against the validation contract above.
-2. Obtain authoritative live scene/prefab serialization for the read-only migration audit.
-3. Migrate any meaningful legacy Anchor/Controller fallback values with explicit serialized-asset approval.
-4. Delete the now-unused legacy serialized fallback/migration fields only after that audit.
-5. Perform final repository-wide Weather/LightRay closure audit and documentation freeze.
-6. Design future Weather orchestration separately; it may choose atmospheric eligibility/presets at runtime and must ignore `_TEST.asset` for production automatic selection.
+1. Compile and runtime-validate V1.3A5 against the validation contract above.
+2. After validation, freeze the Weather/LightRay cleanup as closed.
+3. Design future Weather orchestration separately; it may choose atmospheric eligibility/presets at runtime and must ignore `_TEST.asset` for production automatic selection.

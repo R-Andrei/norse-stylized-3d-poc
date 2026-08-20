@@ -4,6 +4,56 @@ using UnityEngine;
 
 namespace ProgrammaticStylized3D.Trees.Editor
 {
+    [InitializeOnLoad]
+    internal static class TreeGalleryRecipeAuthoringSelection
+    {
+        private static ProceduralTreeInstance lastSelectedInstance;
+
+        static TreeGalleryRecipeAuthoringSelection()
+        {
+            Selection.selectionChanged += RefreshSelection;
+            RefreshSelection();
+        }
+
+        internal static ProceduralTreeInstance LastSelectedInstance =>
+            lastSelectedInstance;
+
+        private static void RefreshSelection()
+        {
+            GameObject selected = Selection.activeGameObject;
+            if (selected == null)
+            {
+                return;
+            }
+
+            ProceduralTreeInstance instance =
+                selected.GetComponentInParent<ProceduralTreeInstance>();
+            if (instance == null)
+            {
+                TreeRecipeSpawner spawner =
+                    selected.GetComponentInParent<TreeRecipeSpawner>();
+                instance = spawner != null
+                    ? spawner.GeneratedInstance
+                    : null;
+            }
+
+            if (instance == null)
+            {
+                return;
+            }
+
+            TreeReferenceGallery gallery =
+                instance.GetComponentInParent<TreeReferenceGallery>();
+            TreeReferenceSpecimen specimen =
+                instance.GetComponentInParent<TreeReferenceSpecimen>();
+            if (gallery != null &&
+                specimen != null &&
+                specimen.Role == TreeReferenceRole.ProceduralComparison)
+            {
+                lastSelectedInstance = instance;
+            }
+        }
+    }
     [CustomEditor(typeof(TreeReferenceGallery))]
     public sealed class TreeReferenceGalleryEditor : UnityEditor.Editor
     {
@@ -142,7 +192,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
             DrawCompleteGalleryLayout();
             DrawRendering();
             EditorGUI.BeginChangeCheck();
-            DrawGeneratedTreeLibrary();
+            DrawGeneratedTreeLibrary(gallery);
             bool previewSettingsChanged = EditorGUI.EndChangeCheck();
             serializedObject.ApplyModifiedProperties();
             if (previewSettingsChanged)
@@ -376,7 +426,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 MessageType.None);
         }
 
-        private void DrawGeneratedTreeLibrary()
+        private void DrawGeneratedTreeLibrary(TreeReferenceGallery gallery)
         {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(
@@ -400,6 +450,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "independently editable. The old family and calibration assets " +
                 "do not provide behavioral values to this path.",
                 MessageType.Info);
+
+            DrawRecipeAuthoring(gallery);
 
             EditorGUILayout.PropertyField(
                 showGeneratedStructuralPreviews,
@@ -433,6 +485,122 @@ namespace ProgrammaticStylized3D.Trees.Editor
             EditorGUILayout.HelpBox(
                 "Default preview scope is Selected Tree. Select a PROC_*_SLOT to compare one generated skeleton against its imported reference without drawing all twenty graphs at once.",
                 MessageType.Info);
+        }
+
+        private static void DrawRecipeAuthoring(
+            TreeReferenceGallery gallery)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Recipe Authoring",
+                EditorStyles.boldLabel);
+
+            ProceduralTreeInstance sourceInstance =
+                TreeGalleryRecipeAuthoringSelection.LastSelectedInstance;
+            if (sourceInstance == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Select a generated procedural gallery tree, tune its Exact Controls, then select this gallery again to recenter its mapped source recipe.",
+                    MessageType.None);
+                return;
+            }
+
+            bool resolved =
+                TreeCuratedGalleryUtility.TryResolveRecipeAuthoringTarget(
+                    gallery,
+                    sourceInstance,
+                    out TreeReferenceSpecimen specimen,
+                    out TreeGenerationRecipe recipe,
+                    out string consumerSummary,
+                    out bool instanceRecipeMatches,
+                    out string failure);
+            if (!resolved)
+            {
+                EditorGUILayout.HelpBox(failure, MessageType.Warning);
+                return;
+            }
+
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.TextField(
+                    "Last Selected Instance",
+                    specimen.Family + " " + specimen.SourceVariantIndex);
+                EditorGUILayout.ObjectField(
+                    "Mapped Source Recipe",
+                    recipe,
+                    typeof(TreeGenerationRecipe),
+                    false);
+            }
+            EditorGUILayout.LabelField(
+                "Mapped Gallery Slots",
+                consumerSummary,
+                EditorStyles.wordWrappedLabel);
+
+            if (!instanceRecipeMatches)
+            {
+                EditorGUILayout.HelpBox(
+                    "The instance currently references a different Source Recipe. Recenter will intentionally write to the recipe mapped by this gallery slot because that is what the next curated rebuild will use.",
+                    MessageType.Warning);
+            }
+
+            using (new EditorGUI.DisabledScope(
+                       TreeCuratedGalleryGenerationCoordinator.IsRunning))
+            {
+                if (GUILayout.Button(
+                        "Recenter Source Recipe From Last Selected Instance"))
+                {
+                    string mismatchNote = instanceRecipeMatches
+                        ? string.Empty
+                        : "\n\nThe instance currently references " +
+                          (sourceInstance.Recipe != null
+                              ? sourceInstance.Recipe.RecipeDisplayName
+                              : "no recipe") +
+                          ", but this gallery slot maps to " +
+                          recipe.RecipeDisplayName + ".";
+                    string message =
+                        "Use " + specimen.Family + " " +
+                        specimen.SourceVariantIndex +
+                        " exact controls to recenter " +
+                        recipe.RecipeDisplayName + "?\n\n" +
+                        "Mapped gallery slots: " + consumerSummary + "\n\n" +
+                        "Existing recipe range widths will be preserved. " +
+                        "The gallery will not rebuild automatically." +
+                        mismatchNote;
+                    if (!EditorUtility.DisplayDialog(
+                            "Recenter " + recipe.RecipeDisplayName + "?",
+                            message,
+                            "Recenter Recipe",
+                            "Cancel"))
+                    {
+                        return;
+                    }
+
+                    Undo.RecordObject(
+                        recipe,
+                        "Recenter Curated Tree Recipe From Gallery Instance");
+                    TreeRecipeRecenterResult result =
+                        recipe.ControlRanges.RecenterFromResolvedControls(
+                            sourceInstance.ExactControls);
+                    if (!result.Passed)
+                    {
+                        Debug.LogError(
+                            "[TREE-GALLERY.1] Recipe recenter failed.\n" +
+                            result.Report,
+                            recipe);
+                        return;
+                    }
+
+                    EditorUtility.SetDirty(recipe);
+                    AssetDatabase.SaveAssetIfDirty(recipe);
+                    Debug.Log(
+                        "[TREE-GALLERY.1] Recentered " +
+                        recipe.RecipeDisplayName + " from " +
+                        specimen.Family + " " +
+                        specimen.SourceVariantIndex + ".\n" +
+                        result.Report,
+                        recipe);
+                }
+            }
         }
 
         private static void DrawActions(TreeReferenceGallery gallery)

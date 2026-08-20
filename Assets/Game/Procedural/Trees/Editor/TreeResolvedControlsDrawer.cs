@@ -128,11 +128,6 @@ namespace ProgrammaticStylized3D.Trees.Editor
             SerializedProperty controls,
             string propertyName)
         {
-            if (propertyName == "leanDirection")
-            {
-                return GetFloat(controls, "leanAmount") > 0f;
-            }
-
             if (propertyName == "signedPathSpiralTurns")
             {
                 return GetFloat(controls, "pathSpiralRadius") > 0f;

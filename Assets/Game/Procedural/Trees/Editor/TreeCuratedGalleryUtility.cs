@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -53,6 +54,127 @@ namespace ProgrammaticStylized3D.Trees.Editor
             }
 
             return true;
+        }
+
+
+        internal static bool TryResolveRecipeAuthoringTarget(
+            TreeReferenceGallery gallery,
+            ProceduralTreeInstance instance,
+            out TreeReferenceSpecimen specimen,
+            out TreeGenerationRecipe recipe,
+            out string consumerSummary,
+            out bool instanceRecipeMatches,
+            out string failure)
+        {
+            specimen = null;
+            recipe = null;
+            consumerSummary = string.Empty;
+            instanceRecipeMatches = false;
+            failure = string.Empty;
+            if (gallery == null || instance == null)
+            {
+                failure = "Gallery or source tree instance is null.";
+                return false;
+            }
+
+            TreeReferenceGallery owningGallery =
+                instance.GetComponentInParent<TreeReferenceGallery>();
+            if (owningGallery != gallery)
+            {
+                failure =
+                    "The last selected generated tree does not belong to this Tree Reference Gallery.";
+                return false;
+            }
+
+            specimen = instance.GetComponentInParent<TreeReferenceSpecimen>();
+            if (specimen == null ||
+                specimen.Role != TreeReferenceRole.ProceduralComparison)
+            {
+                failure =
+                    "The source tree is not under a procedural comparison slot.";
+                return false;
+            }
+
+            TreeRecipeSpawner spawner =
+                specimen.GetComponent<TreeRecipeSpawner>();
+            if (spawner == null || spawner.GeneratedInstance != instance)
+            {
+                failure =
+                    "The source tree is not the generated child owned by its curated gallery slot.";
+                return false;
+            }
+
+            if (!instance.HasExactControls || instance.ExactControls == null)
+            {
+                failure =
+                    "The source tree has no initialized exact controls to recenter from.";
+                return false;
+            }
+
+            TreeRecipeCatalog catalog = gallery.RecipeCatalog;
+            if (catalog == null)
+            {
+                failure =
+                    "The gallery has no Recipe Catalog assigned. Recenter does not auto-assign or modify gallery bindings.";
+                return false;
+            }
+
+            string recipeIdentity =
+                TreeCuratedGalleryAssignment.ResolveRecipeStableIdentity(
+                    specimen.Family,
+                    specimen.SourceVariantIndex);
+            if (!catalog.TryFindByStableIdentity(
+                    recipeIdentity,
+                    out recipe) ||
+                recipe == null)
+            {
+                failure =
+                    "The curated gallery assignment resolves to a recipe that is missing from the assigned catalog: " +
+                    recipeIdentity;
+                return false;
+            }
+
+            if (recipe.ControlRanges == null)
+            {
+                failure =
+                    "The mapped recipe has no control ranges.";
+                return false;
+            }
+
+            instanceRecipeMatches = instance.Recipe == recipe;
+            consumerSummary = BuildRecipeConsumerSummary(recipe.StableIdentity);
+            return true;
+        }
+
+        private static string BuildRecipeConsumerSummary(
+            string recipeStableIdentity)
+        {
+            var consumers = new List<string>();
+            Array families = Enum.GetValues(typeof(TreeFamily));
+            for (int familyIndex = 0;
+                familyIndex < families.Length;
+                familyIndex++)
+            {
+                var family = (TreeFamily)families.GetValue(familyIndex);
+                for (int variant = 1; variant <= 5; variant++)
+                {
+                    string mappedIdentity =
+                        TreeCuratedGalleryAssignment.ResolveRecipeStableIdentity(
+                            family,
+                            variant);
+                    if (string.Equals(
+                            mappedIdentity,
+                            recipeStableIdentity,
+                            StringComparison.Ordinal))
+                    {
+                        consumers.Add(family + " " + variant);
+                    }
+                }
+            }
+
+            return consumers.Count == 0
+                ? "none"
+                : string.Join(", ", consumers);
         }
 
         internal static bool TryConfigureSpawner(

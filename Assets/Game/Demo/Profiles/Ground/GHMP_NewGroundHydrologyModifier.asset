@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundHydrologyModifierProfile
   displayName: New Ground Hydrology Modifier
   wetTintColor: {r: 0.22, g: 0.25, b: 0.24, a: 1}
-  wetTintStrength: 0.284
-  wetDarkening: 0.564
-  pixelPatternSoftening: 0.501
-  smoothnessBoost: 0.623
+  wetTintStrength: 0.3
+  wetDarkening: 0.45
+  pixelPatternSoftening: 0.5
+  smoothnessBoost: 0.6
   specularBoost: 0.2
   snowMeltInfluence: 0.85
   frostMeltInfluence: 0.75

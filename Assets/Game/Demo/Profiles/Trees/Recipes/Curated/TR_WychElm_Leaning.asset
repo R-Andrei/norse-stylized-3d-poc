@@ -28,112 +28,109 @@ MonoBehaviour:
   - asymmetrical
   barkMaterial: {fileID: 2100000, guid: f1583a2be9a492046a96ee3a8ea5deea, type: 2}
   controlRanges:
-    schemaVersion: 1
+    schemaVersion: 2
     height:
-      minimum: 9
-      maximum: 15
+      minimum: 8
+      maximum: 14
     trunkBaseRadius:
-      minimum: 0.55
-      maximum: 0.95
+      minimum: 0.7
+      maximum: 1.0999999
     trunkTaper:
-      minimum: 0.58
-      maximum: 0.78
+      minimum: 0.788
+      maximum: 0.98800004
     bendAmount:
-      minimum: 0.26
-      maximum: 0.48
+      minimum: 0.551
+      maximum: 0.771
     leanAmount:
-      minimum: 0.18
-      maximum: 0.32
+      minimum: 0.46000004
+      maximum: 0.6
     leanDirection:
       minimum: 0
       maximum: 0
     pathSpiralRadius:
-      minimum: 0.1
-      maximum: 0.2
+      minimum: 0.0989992
+      maximum: 0.1989992
     signedPathSpiralTurns:
-      minimum: 0.85
-      maximum: 1.25
+      minimum: 0.8137128
+      maximum: 1.2137127
     axialTwist:
-      minimum: 300
-      maximum: 460
+      minimum: 276.4472
+      maximum: 436.4472
     rootCount:
-      minimum: 5
-      maximum: 6
+      minimum: 6
+      maximum: 7
     rootReach:
-      minimum: 0.78
-      maximum: 1.05
+      minimum: 1.176
+      maximum: 1.446
     rootThickness:
-      minimum: 0.38
-      maximum: 0.52
+      minimum: 1.0020001
+      maximum: 1.142
     rootHeight:
-      minimum: 0.2
-      maximum: 0.28
+      minimum: 0.23429054
+      maximum: 0.31429052
+    buttressTransition:
+      minimum: 1
+      maximum: 1
     primaryBranchCount:
-      minimum: 9
-      maximum: 14
-    branchStartHeight:
-      minimum: 0.18
-      maximum: 0.3
-    branchEndHeight:
-      minimum: 0.8
-      maximum: 0.94
-    branchSymmetry:
-      minimum: 0.28
-      maximum: 0.55
-    branchLength:
-      minimum: 0.34
-      maximum: 0.52
-    branchThickness:
-      minimum: 0.38
-      maximum: 0.55
-    branchElevation:
       minimum: 10
-      maximum: 32
+      maximum: 15
+    branchStartHeight:
+      minimum: 0.2245366
+      maximum: 0.3445366
+    branchEndHeight:
+      minimum: 0.84735984
+      maximum: 0.9873598
+    branchSymmetry:
+      minimum: 0.26713806
+      maximum: 0.53713804
+    branchLength:
+      minimum: 0.28054523
+      maximum: 0.46054518
+    branchThickness:
+      minimum: 0.31321308
+      maximum: 0.4832131
+    branchElevation:
+      minimum: 10.755302
+      maximum: 32.755302
     branchCurvature:
-      minimum: 0.24
-      maximum: 0.44
+      minimum: 0.30780128
+      maximum: 0.5078013
     maximumBranchOrder:
       minimum: 3
       maximum: 3
     secondaryDensity:
-      minimum: 2.5
-      maximum: 4
+      minimum: 2.625483
+      maximum: 4.125483
     tertiaryDensity:
-      minimum: 1
-      maximum: 2
+      minimum: 1.1174377
+      maximum: 2.1174378
     childScale:
-      minimum: 0.4
-      maximum: 0.52
+      minimum: 0.42404342
+      maximum: 0.54404336
     missingBranchChance:
-      minimum: 0.03
-      maximum: 0.08
+      minimum: 0.011049412
+      maximum: 0.06104941
     deadBranchChance:
-      minimum: 0.02
-      maximum: 0.06
+      minimum: 0.03815005
+      maximum: 0.07815005
     brokenBranchChance:
-      minimum: 0.02
-      maximum: 0.06
+      minimum: 0.014072169
+      maximum: 0.054072168
     barkTint:
       minimum: {r: 1, g: 1, b: 1, a: 1}
       maximum: {r: 1, g: 1, b: 1, a: 1}
     bendFrequency:
-      minimum: 1.2
-      maximum: 2.2
+      minimum: 0.7865381
+      maximum: 1.7865381
     trunkDrift:
-      minimum: 0.05
-      maximum: 0.13
+      minimum: 0.068717755
+      maximum: 0.14871776
     trunkRoughness:
-      minimum: 0.04
-      maximum: 0.12
-    ridgeCount:
-      minimum: 5
-      maximum: 8
-    ridgeDepth:
-      minimum: 0.12
-      maximum: 0.24
+      minimum: 0.039309204
+      maximum: 0.1193092
     directionalBias:
-      minimum: 0.3
-      maximum: 0.55
+      minimum: 0.35094467
+      maximum: 0.60094464
     directionalBiasAngle:
       minimum: 0
       maximum: 0
@@ -141,20 +138,20 @@ MonoBehaviour:
       minimum: 0
       maximum: 0
     branchArch:
-      minimum: 0.08
-      maximum: 0.28
+      minimum: 0.10586708
+      maximum: 0.30586708
     lateSag:
-      minimum: 0.02
-      maximum: 0.12
+      minimum: 0.04151824
+      maximum: 0.14151824
     tipUpturn:
-      minimum: 0.06
-      maximum: 0.18
+      minimum: 0.09049916
+      maximum: 0.21049917
     sideSweep:
-      minimum: 0.1
-      maximum: 0.28
+      minimum: 0.049280062
+      maximum: 0.22928007
     forkChance:
-      minimum: 0.14
-      maximum: 0.35
+      minimum: 0.11662408
+      maximum: 0.32662407
   familyProfile: {fileID: 0}
   referenceCalibration: {fileID: 0}
   paletteOverride: {fileID: 0}
@@ -258,18 +255,6 @@ MonoBehaviour:
         minimum: 0
         maximum: 0
     trunkSurfaceTorsionDegrees:
-      mode: 0
-      exactValue: 0
-      range:
-        minimum: 0
-        maximum: 0
-    trunkTwistRidgeCount:
-      mode: 0
-      exactValue: 0
-      range:
-        minimum: 0
-        maximum: 0
-    trunkTwistRidgeDepth:
       mode: 0
       exactValue: 0
       range:

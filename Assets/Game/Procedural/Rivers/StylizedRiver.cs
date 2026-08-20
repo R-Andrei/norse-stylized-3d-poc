@@ -11,6 +11,7 @@ using UnityEditor;
 using ProgrammaticStylized3D.Geometry;
 using ProgrammaticStylized3D.Geometry.Ground;
 
+
 namespace ProgrammaticStylized3D.Rivers
 {
     public enum StylizedRiverQuality
@@ -98,31 +99,13 @@ namespace ProgrammaticStylized3D.Rivers
         TornFragments = 2
     }
 
-    public enum StylizedRiverFinalFoamVisibilityMode
+    public enum StylizedRiverFoamMaterialContract
     {
-        [InspectorName("Concentration + Lifetime")]
-        ConcentrationAndLifetime = 0,
-        [InspectorName("Lifecycle-Faithful")]
-        LifecycleFaithful = 1
-    }
+        [InspectorName("C × P × L Baseline")]
+        CoveragePresenceLifeBaseline = 0,
 
-    public enum StylizedRiverFoamPresenceFootprintMode
-    {
-        [InspectorName("Coverage-Only")]
-        Current = 0,
-        [InspectorName("Presence-Amplitude")]
-        PresenceAmplitude = 1
-    }
-
-
-    public enum StylizedRiverFoamTransportScheme
-    {
-        [InspectorName("Donor Cell")]
-        DonorCell = 0,
-        [InspectorName("TVD Superbee")]
-        TvdSuperbee = 1,
-        [InspectorName("Bulk-Phase Residual TVD")]
-        BulkPhaseResidualTvd = 2
+        [InspectorName("Coverage + Life")]
+        CoverageLife = 1
     }
 
     public enum StylizedRiverFoamBirthShapeMode
@@ -437,9 +420,6 @@ namespace ProgrammaticStylized3D.Rivers
         private const float MaximumFoamChipMaximumViewScale = 2.5f;
         private const float DefaultFoamChipMaximumViewScale = 1.75f;
         private const float DefaultFoamChipEdgeWidthPixels = 4f;
-        private const float MinimumFoamChipSoftEdgeStart = 0f;
-        private const float MaximumFoamChipSoftEdgeStart = 0.25f;
-        private const float DefaultFoamChipSoftEdgeStart = 0.06f;
         private const float DefaultFoamChipInteriorAccess = 0f;
         private const float MinimumFoamChipFieldSpeed = 0f;
         private const float MaximumFoamChipFieldSpeed = 12f;
@@ -1011,10 +991,10 @@ namespace ProgrammaticStylized3D.Rivers
             foamFixedMetricCellSize =
                 StylizedRiverFoamFixedMetricCellSize.QualityDefault;
 
-        [Tooltip("Selects how Layer C transports the coherent packed material state. Donor Cell is the conservative first-order baseline. TVD Superbee reconstructs bounded Coverage at faces. Bulk-Phase Residual TVD removes the shared downstream speed from scalar advection, advances it as a global subcell phase, and transports only local residual and lateral motion in the existing single dispatch. It allocates no additional full-field texture and adds no material dispatch. All schemes move Coverage, Presence, Remaining Life, and Pattern together. Bulk-Phase Residual TVD is the accepted production baseline and serialized default; Donor Cell and TVD Superbee remain available for rollback and comparison.")]
+        [Tooltip("Selects the persistent Foam material contract. C × P × L Baseline preserves the accepted fractional Coverage/Presence/Life/Pattern state. Coverage + Life keeps fractional geometric Coverage plus Remaining Life, with implicit unit Presence and render-derived Pattern.")]
         [SerializeField]
-        private StylizedRiverFoamTransportScheme foamTransportScheme =
-            StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
+        private StylizedRiverFoamMaterialContract foamMaterialContract =
+            StylizedRiverFoamMaterialContract.CoveragePresenceLifeBaseline;
 
         [Tooltip("Persistent prepared-topology cache associated with this authored river. Exact caches load directly. Stale-compatible caches may be used for one Play session without replacement; missing or incompatible caches require explicit Edit Mode preparation and are never generated or saved automatically during Play.")]
         [SerializeField]
@@ -1107,7 +1087,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamShoreFoamPatchSize = 0.35f;
 
-        [Tooltip("Base reveal speed in metres per second for automatic Shore Foam source paths. This controls one event's progressive source-head advance and is independent of Activity and later Foam transport.")]
+        [Tooltip("Legacy serialized pre-D9 metre-speed value. Retained for data compatibility only; automatic reveal timing now uses each recipe's Reveal Speed (Cells/s).")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1127,7 +1107,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamInwardWashPatternWeight = 0.12f;
 
-        [Tooltip("Reveal Speed multiplier for Shore Ribbon events. One uses the Shore Foam Base Reveal Speed.")]
+        [Tooltip("Legacy serialized pre-D9 speed multiplier. Retained for data compatibility only; Shore Ribbon reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamShoreRibbonFormationSpeedMultiplier = 1.00f;
 
@@ -1161,7 +1141,7 @@ namespace ProgrammaticStylized3D.Rivers
 
 
 
-        [Tooltip("Reveal Speed multiplier for Inward Wash events. One uses the Shore Foam Base Reveal Speed.")]
+        [Tooltip("Legacy serialized pre-D9 speed multiplier. Retained for data compatibility only; Inward Wash reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamInwardWashFormationSpeedMultiplier = 1.00f;
 
@@ -1243,7 +1223,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private int foamObjectContactStrokeCount =
             DefaultObjectContactStrokeCount;
 
-        [Tooltip("Base reveal speed in metres per second for each finite Object Arc, Semi-Arc, and Fleck stroke. Per-pattern Reveal Speed multipliers remain available. This does not change later Layer C transport.")]
+        [Tooltip("Legacy serialized pre-D9 Object metre-speed value. Retained for data compatibility only; each Object recipe now uses its literal Reveal Speed (Cells/s).")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1263,7 +1243,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamObjectContactSemiArcPatternWeight = 0.35f;
 
-        [Tooltip("Reveal Speed multiplier for each Object Contact Arc stroke. Stroke one traverses the upstream contact bridge and two straight downstream wake arms; later finite strokes traverse only the immediate contact bridge.")]
+        [Tooltip("Legacy serialized pre-D9 Arc speed multiplier. Retained for data compatibility only; Arc reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactArcFormationSpeedMultiplier = 1.00f;
 
@@ -1319,7 +1299,7 @@ namespace ProgrammaticStylized3D.Rivers
 
 
 
-        [Tooltip("Reveal Speed multiplier for each Object Contact Semi-Arc stroke. Stroke one traverses the selected upstream contact half and one straight downstream wake arm; later finite strokes traverse only that contact half.")]
+        [Tooltip("Legacy serialized pre-D9 Semi-Arc speed multiplier. Retained for data compatibility only; Semi-Arc reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactSemiArcFormationSpeedMultiplier = 1.00f;
 
@@ -1375,7 +1355,7 @@ namespace ProgrammaticStylized3D.Rivers
 
 
 
-        [Tooltip("Reveal Speed multiplier for Object Contact Fleck reveal.")]
+        [Tooltip("Legacy serialized pre-D9 Fleck speed multiplier. Retained for data compatibility only; Fleck reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamObjectContactFleckFormationSpeedMultiplier = 1.00f;
 
@@ -1437,7 +1417,7 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamFreeWaterMinimumPacketGapMetres =
             DefaultFreeWaterFoamPacketGapMetres;
 
-        [Tooltip("Base reveal speed in metres per second for Free Water Foam. Per-pattern Reveal Speed multipliers control Lace, Cross-Lace, and Torn Fragment source progression.")]
+        [Tooltip("Legacy serialized pre-D9 Free-Water metre-speed value. Retained for data compatibility only; each Free-Water recipe now uses its literal Reveal Speed (Cells/s).")]
         [Range(
             MinimumShoreFoamFormationSpeedMetresPerSecond,
             MaximumShoreFoamFormationSpeedMetresPerSecond)]
@@ -1461,7 +1441,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterTornFragmentPatternWeight = 0.25f;
 
-        [Tooltip("Reveal Speed multiplier for Free Water Lace Connector source-head progression.")]
+        [Tooltip("Legacy serialized pre-D9 Lace speed multiplier. Retained for data compatibility only; Lace reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterLaceFormationSpeedMultiplier = 1.00f;
 
@@ -1507,7 +1487,7 @@ namespace ProgrammaticStylized3D.Rivers
         [Range(0f, 1f)]
         [SerializeField] private float foamFreeWaterLaceCurvatureMax = 1.00f;
 
-        [Tooltip("Reveal Speed multiplier for Free Water Cross-Lace Connector source-head progression.")]
+        [Tooltip("Legacy serialized pre-D9 Cross-Lace speed multiplier. Retained for data compatibility only; Cross-Lace reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterCrossLaceFormationSpeedMultiplier = 1.00f;
 
@@ -1545,7 +1525,7 @@ namespace ProgrammaticStylized3D.Rivers
 
 
 
-        [Tooltip("Reveal Speed multiplier for the complete Free Water Torn Fragment local sweep.")]
+        [Tooltip("Legacy serialized pre-D9 Torn speed multiplier. Retained for data compatibility only; Broken Filament reveal uses its literal Reveal Speed (Cells/s).")]
         [Range(0.10f, 3.00f)]
         [SerializeField] private float foamFreeWaterFragmentFormationSpeedMultiplier = 1.00f;
 
@@ -1582,9 +1562,9 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField] private float foamFreeWaterFragmentInitialLifeMax = 0.65f;
 
 
-        // D8.2 staged cell-authoritative source geometry. These values are serialized and
-        // Inspector-visible in D8.2, but legacy metric controls remain runtime-authoritative
-        // until the matching recipe is converted to the shared D8.3 raster contract.
+        // D9 cell-authoritative source geometry and literal cells/s reveal controls. These values are serialized and
+        // Inspector-visible. Legacy metric speed fields remain serialized only for compatibility and have no runtime
+        // reveal-timing authority.
         [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMinCells = 15f;
         [Min(1f)] [SerializeField] private float foamShoreRibbonLengthMaxCells = 47f;
         [Min(0.01f)] [SerializeField] private float foamShoreRibbonRevealSpeedCellsPerSecond = 8f;
@@ -1695,17 +1675,6 @@ namespace ProgrammaticStylized3D.Rivers
         [SerializeField]
         private float foamFullSupportedAgingAt =
             DefaultFoamFullSupportedAgingAt;
-
-        [Tooltip("Selects how Final Foam converts transported Coverage and Remaining Life into a visible shape. Concentration + Lifetime deliberately lets diffuse Coverage and Remaining Life both reduce visibility. Lifecycle-Faithful uses meaningful Coverage as the footprint and leaves ordinary lifetime authority to explicit Layer C aging, so numerical dilution cannot counterfeit early death. This is render-only and does not change stored material or lifecycle.")]
-        [SerializeField]
-        private StylizedRiverFinalFoamVisibilityMode foamFinalVisibilityMode =
-            StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
-
-        [Tooltip("Selects whether decoded intrinsic Presence scales Final Foam. Coverage-Only resolves the shape from Coverage, Life, Pattern, Chipping, and Strands without using Presence as visual amplitude. Presence-Amplitude carries exact Presence through identical Presence-independent shape and surface-coupling weights, so uniform 0.75 produces 75% of the equivalent Presence 1.00 resolved mask before other explicit global rendering controls. This is render-only and may be switched during Play Mode.")]
-        [SerializeField]
-        private StylizedRiverFoamPresenceFootprintMode
-            foamPresenceFootprintMode =
-                StylizedRiverFoamPresenceFootprintMode.Current;
 
         [Tooltip("Aging-rate multiplier at full Negative Aging Pressure. Values above one consume Remaining Life faster. Negative pressure also suppresses positive support preservation before this multiplier is applied, so hostile overlap kills rather than merely weakens support.")]
         [Range(
@@ -1886,13 +1855,6 @@ namespace ProgrammaticStylized3D.Rivers
         [Min(0f)]
         [SerializeField] private float foamChipEdgeWidthPixels =
             DefaultFoamChipEdgeWidthPixels;
-
-        [Tooltip("Soft-visibility value treated as the exterior start of the Presence-Amplitude Eligibility coordinate. The default 0.06 matches the accepted historical Coverage-Only route. Higher values move the detected band inward; lower values include fainter fringe. This control affects Presence-Amplitude only.")]
-        [Range(
-            MinimumFoamChipSoftEdgeStart,
-            MaximumFoamChipSoftEdgeStart)]
-        [SerializeField] private float foamChipSoftEdgeStart =
-            DefaultFoamChipSoftEdgeStart;
 
         [Tooltip("Fraction of activated analytical candidate cells granted permission in the established visible body complementary to Chip Edge Width. Zero keeps every candidate edge-only; one grants every activated candidate full visible-body access. Admission is deterministic per candidate, so connected Chip contours remain intact.")]
         [Range(0f, 1f)]
@@ -2447,29 +2409,13 @@ namespace ProgrammaticStylized3D.Rivers
         public StylizedRiverFoamGridMode FoamGridMode => foamGridMode;
         public StylizedRiverFoamFixedMetricCellSize
             FoamFixedMetricCellSize => foamFixedMetricCellSize;
-        public StylizedRiverFoamTransportScheme FoamTransportScheme =>
-            foamTransportScheme switch
-            {
-                StylizedRiverFoamTransportScheme.TvdSuperbee =>
-                    StylizedRiverFoamTransportScheme.TvdSuperbee,
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
-                    StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd,
-                _ => StylizedRiverFoamTransportScheme.DonorCell
-            };
-#if UNITY_EDITOR
-        internal void SetFoamTransportSchemeForDiagnostics(
-            StylizedRiverFoamTransportScheme scheme)
-        {
-            foamTransportScheme = scheme switch
-            {
-                StylizedRiverFoamTransportScheme.TvdSuperbee =>
-                    StylizedRiverFoamTransportScheme.TvdSuperbee,
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
-                    StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd,
-                _ => StylizedRiverFoamTransportScheme.DonorCell
-            };
-        }
-#endif
+        public StylizedRiverFoamMaterialContract FoamMaterialContract =>
+            Enum.IsDefined(
+                typeof(StylizedRiverFoamMaterialContract),
+                foamMaterialContract)
+                ? foamMaterialContract
+                : StylizedRiverFoamMaterialContract
+                    .CoveragePresenceLifeBaseline;
 
         public float FoamFixedMetricRequestedCellSizeMetres =>
             ResolveFoamFixedMetricRequestedCellSizeMetres();
@@ -2914,8 +2860,8 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFreeWaterFragmentInitialLifeMin,
                 foamFreeWaterFragmentInitialLifeMax));
 
-        // D8.2 staged cell-source accessors. Runtime birth producers intentionally do not
-        // consume these until their D8.3 recipe conversion is complete.
+        // D9 cell-source accessors. Runtime birth producers use these as the active automatic recipe geometry and
+        // literal reveal-speed controls; legacy metric speed accessors are compatibility tombstones only.
         public float FoamShoreRibbonLengthMinCells => Mathf.Max(1f, foamShoreRibbonLengthMinCells);
         public float FoamShoreRibbonLengthMaxCells => Mathf.Max(FoamShoreRibbonLengthMinCells, foamShoreRibbonLengthMaxCells);
         public float FoamShoreRibbonRevealSpeedCellsPerSecond => Mathf.Max(0.01f, foamShoreRibbonRevealSpeedCellsPerSecond);
@@ -3021,17 +2967,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFullSupportedAgingAt,
                 MinimumFoamFullSupportedAgingAt,
                 MaximumFoamFullSupportedAgingAt);
-        public StylizedRiverFinalFoamVisibilityMode FoamFinalVisibilityMode =>
-            foamFinalVisibilityMode ==
-                StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
-                ? StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
-                : StylizedRiverFinalFoamVisibilityMode.ConcentrationAndLifetime;
-        public StylizedRiverFoamPresenceFootprintMode
-            FoamPresenceFootprintMode =>
-                foamPresenceFootprintMode ==
-                    StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
-                    ? StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
-                    : StylizedRiverFoamPresenceFootprintMode.Current;
         public float FoamNegativeAgingRate =>
             Mathf.Clamp(
                 foamNegativeAgingRate,
@@ -3131,11 +3066,6 @@ namespace ProgrammaticStylized3D.Rivers
                 MaximumFoamChipMaximumViewScale);
         public float FoamChipEdgeWidthPixels =>
             Mathf.Max(0f, foamChipEdgeWidthPixels);
-        public float FoamChipSoftEdgeStart =>
-            Mathf.Clamp(
-                foamChipSoftEdgeStart,
-                MinimumFoamChipSoftEdgeStart,
-                MaximumFoamChipSoftEdgeStart);
         public float FoamChipInteriorAccess =>
             Mathf.Clamp01(foamChipInteriorAccess);
         public float FoamChipFieldSpeed =>
@@ -4099,13 +4029,18 @@ namespace ProgrammaticStylized3D.Rivers
             bool parentGroundCommitted =
                 NotifyParentGround(
                     origin == RiverRegenerationRequestOrigin.OnEnable);
-            if (!parentGroundCommitted)
+            if (!parentGroundCommitted || !corridorBuildResult.IsValid)
             {
                 // A deferred Play-startup Ground transaction has not yet
-                // committed its final height field. Build a cheap immediate
-                // corridor against retained Ground data when available, or the
-                // established fallback sampler otherwise, so River output stays
-                // available until Ground commits once.
+                // committed its final height field, or a script/domain reload
+                // restored the generated corridor object without restoring this
+                // component's nonserialized build result. Build immediately
+                // against retained/final Ground data so the River-owned corridor
+                // and its Ground-owned bank/riverbed surface response cannot be
+                // left missing after a code-only reload. If Ground changed its
+                // geometry synchronously, its corridor callback has already
+                // rebuilt the output and made the result valid, avoiding a
+                // duplicate build here.
                 BuildCorridor();
             }
 
@@ -5081,11 +5016,12 @@ namespace ProgrammaticStylized3D.Rivers
                     StylizedRiverFoamFixedMetricCellSize.QualityDefault;
             }
             if (!Enum.IsDefined(
-                    typeof(StylizedRiverFoamTransportScheme),
-                    foamTransportScheme))
+                    typeof(StylizedRiverFoamMaterialContract),
+                    foamMaterialContract))
             {
-                foamTransportScheme =
-                    StylizedRiverFoamTransportScheme.DonorCell;
+                foamMaterialContract =
+                    StylizedRiverFoamMaterialContract
+                        .CoveragePresenceLifeBaseline;
             }
 
             width = Mathf.Max(0.5f, width);
@@ -5437,8 +5373,6 @@ namespace ProgrammaticStylized3D.Rivers
                 foamFullSupportedAgingAt,
                 MinimumFoamFullSupportedAgingAt,
                 MaximumFoamFullSupportedAgingAt);
-            foamFinalVisibilityMode = FoamFinalVisibilityMode;
-            foamPresenceFootprintMode = FoamPresenceFootprintMode;
             foamNegativeAgingRate = Mathf.Clamp(
                 foamNegativeAgingRate,
                 MinimumFoamNegativeAgingRate,
@@ -5523,10 +5457,6 @@ namespace ProgrammaticStylized3D.Rivers
             foamChipEdgeWidthPixels = Mathf.Max(
                 0f,
                 foamChipEdgeWidthPixels);
-            foamChipSoftEdgeStart = Mathf.Clamp(
-                foamChipSoftEdgeStart,
-                MinimumFoamChipSoftEdgeStart,
-                MaximumFoamChipSoftEdgeStart);
             foamChipInteriorAccess = Mathf.Clamp01(
                 foamChipInteriorAccess);
             foamChipFieldSpeed = Mathf.Clamp(
@@ -5765,6 +5695,10 @@ namespace ProgrammaticStylized3D.Rivers
 
             if (corridorMesh == null)
             {
+                corridorMesh = corridorMeshFilter.sharedMesh;
+            }
+            if (corridorMesh == null)
+            {
                 corridorMesh = new Mesh
                 {
                     name = "PS3D_StylizedRiverCorridor",
@@ -5772,6 +5706,10 @@ namespace ProgrammaticStylized3D.Rivers
                 };
             }
 
+            if (corridorColliderMesh == null)
+            {
+                corridorColliderMesh = corridorMeshCollider.sharedMesh;
+            }
             if (corridorColliderMesh == null)
             {
                 corridorColliderMesh = new Mesh

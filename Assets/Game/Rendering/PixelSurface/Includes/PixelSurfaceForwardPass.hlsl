@@ -13,6 +13,82 @@
 // mask/scalar outputs. Every executable branch added by 5Q is compiled only
 // under _SURFACE_CAUSALITY_AUDIT; ordinary production variants are unchanged.
 
+// GM-SURFACE.5S LOW-LIGHT FORM CONTRACT:
+// The primary form term remains illumination-derived from the actual main-light
+// direction and resolved fragment normal. GM-SURFACE.5S4 adds one explicitly
+// stylized, generation-time logical-face tone carried in Generated Mass UV2.w.
+// That tone is deterministic, area-centered around zero, material-independent,
+// and affects existing indirect GI only. Ground owns a separate UV2.w meaning
+// and never executes this branch. Face Separation zero is exact 5S2 parity;
+// both low-light authoring controls at zero recover the 5R baked-GI baseline.
+half3 ResolveGeneratedMassLowLightFormGI(
+    half3 bakedGI,
+    half3 normalWS,
+    half generatedFaceTone)
+{
+    Light mainLight = GetMainLight();
+    half sourceLuma = dot(
+        mainLight.color,
+        half3(0.2126h, 0.7152h, 0.0722h));
+    half sourceGate = saturate(sourceLuma);
+
+    half facing = clamp(
+        dot(normalWS, mainLight.direction),
+        -1.0h,
+        1.0h);
+    half wrap = saturate((half)_DiffuseWrap);
+    half wrappedFacing = lerp(
+        facing,
+        max(facing, 0.0h),
+        wrap);
+    half targetScale = 1.0h + 0.40h * wrappedFacing;
+    half formStrength = clamp(
+        (half)_ShadowAmbientStrength,
+        0.0h,
+        2.0h);
+    half formWeight = formStrength * sourceGate;
+    half primaryScale = lerp(1.0h, targetScale, formWeight);
+
+    half faceSeparationStrength =
+        saturate((half)_GeneratedMassLowLightFaceSeparation);
+    if (faceSeparationStrength <= 0.0001h)
+    {
+        return bakedGI * primaryScale;
+    }
+
+    // GM-SURFACE.5S4: final mesh generation assigns one signed tone to each
+    // logical planar face. Runtime no longer tries to infer a second face
+    // identity from camera direction. The small zero-mean tone redistribution
+    // is clamped inside the existing 5S2 0.20..1.80 contrast envelope.
+    half faceTone = clamp(generatedFaceTone, -1.0h, 1.0h);
+    half faceToneScale =
+        0.16h *
+        sourceGate *
+        faceSeparationStrength *
+        faceTone;
+    half finalScale = clamp(
+        primaryScale + faceToneScale,
+        0.20h,
+        1.80h);
+
+    return bakedGI * finalScale;
+}
+
+half3 ResolvePixelSurfaceBakedGI(
+    half3 normalWS,
+    half generatedFaceTone)
+{
+    half3 bakedGI = SampleSH(normalWS);
+    if (ResolveSurfaceContractIsGround() < 0.5)
+    {
+        bakedGI = ResolveGeneratedMassLowLightFormGI(
+            bakedGI,
+            normalWS,
+            generatedFaceTone);
+    }
+    return bakedGI;
+}
+
 #if defined(_SURFACE_CAUSALITY_AUDIT)
             int ResolveSurfaceCausalityMode()
             {
@@ -40,11 +116,14 @@
 
             half3 ResolveSurfaceCausalityAmbient(
                 half3 albedo,
+                Varyings input,
                 half3 normalWS)
             {
                 return
                     albedo *
-                    SampleSH(normalWS) *
+                    ResolvePixelSurfaceBakedGI(
+                        normalWS,
+                        (half)input.materialMasks.w) *
                     (half)max(0.0, _SurfaceCausalityLightScale);
             }
 #endif
@@ -67,6 +146,28 @@
                 }
 #endif
 
+                float isGroundSurface = ResolveSurfaceContractIsGround();
+                float generatedMassSurface = 1.0 - isGroundSurface;
+                float primaryConvexBoundary =
+                    step(0.5, 1.0 - abs(input.structuralFeatures.x - 1.0)) *
+                    step(0.0001, input.structuralFeatures.y);
+                float secondaryConvexBoundary =
+                    step(0.5, 1.0 - abs(input.structuralFeatures.z - 1.0)) *
+                    step(0.0001, input.structuralFeatures.w);
+                float generatedMassBevelMask =
+                    generatedMassSurface *
+                    saturate(max(primaryConvexBoundary, secondaryConvexBoundary));
+
+                // GM-SURFACE.5R: Stage E proved that the HLSL tonal stage is
+                // harmless to source-face orientation ordering but introduces a
+                // large bevel-only ordering error. Generated convex bevels must
+                // therefore not consume topology/interpolation-sensitive vertex-R,
+                // broad-value, or cell-warp authority. They retain the shared
+                // world-position pixel-cell variation, which is independent of
+                // bevel triangulation. Ground and non-bevel Generated Mass pixels
+                // retain their ordinary authored controls.
+                float bevelIndependentWarpStrength =
+                    _PixelWarpStrength * (1.0 - generatedMassBevelMask);
                 float broadCellSize = max(_PixelCellSize * 8.0, 0.0001);
                 float3 broadCoordinate =
                     input.positionWS / broadCellSize + _PixelSeed * 0.013;
@@ -79,7 +180,7 @@
                     1.0;
                 float3 pixelPositionWS =
                     input.positionWS +
-                    warp * _PixelCellSize * _PixelWarpStrength;
+                    warp * _PixelCellSize * bevelIndependentWarpStrength;
 
                 float pixelVariation;
                 PixelCellVariation_float(
@@ -101,16 +202,31 @@
                             (float)input.color.b));
                 float vertexVariation =
                     ((float)input.color.r - 0.5) * 2.0 * contractMask;
+                float bevelIndependentVertexVariation =
+                    vertexVariation * (1.0 - generatedMassBevelMask);
+                float bevelIndependentBroadVariation =
+                    broadValue * (1.0 - generatedMassBevelMask);
                 float pixelProfileContrast =
                     max(0.0, _ProfilePixelContrast) *
                     lerp(1.0, 1.0 - saturate(_WetPixelSoftening), saturate(_Wetness)) *
                     lerp(1.0, max(0.0, _FrostContrast), saturate(_FrostStrength)) *
                     lerp(1.0, 0.25, saturate(_MonolithicFlatten));
-                float tonalOffset =
+                float structuralVariationStrength =
+                    ResolveGeneratedMassStructuralVariationStrength(
+                        input.structuralFeatures);
+                float baseTonalOffset =
                     (pixelVariation * _PixelVariation +
-                     vertexVariation * _PixelVertexVariation +
-                     broadValue * _PixelBroadVariation) *
+                     bevelIndependentVertexVariation * _PixelVertexVariation +
+                     bevelIndependentBroadVariation * _PixelBroadVariation) *
                     pixelProfileContrast;
+                // GM-SURFACE.6A.4 reuses the already-evaluated pixel-cell
+                // variation as a direct structural material term. It is not
+                // attenuated by the pre-existing bevel breakup that 5R
+                // deliberately suppresses on convex transition geometry.
+                float structuralTonalOffset =
+                    pixelVariation * structuralVariationStrength;
+                float tonalOffset =
+                    baseTonalOffset + structuralTonalOffset;
                 half tonalScale =
                     (half)max(0.0, 1.0 + tonalOffset * _PixelEffectStrength);
 #if defined(_SURFACE_CAUSALITY_AUDIT)
@@ -127,7 +243,6 @@
                 }
 #endif
 
-                float isGroundSurface = ResolveSurfaceContractIsGround();
                 float exposureMask =
                     saturate((float)input.color.g) * contractMask;
 
@@ -179,7 +294,6 @@
                 float wetness = saturate(_Wetness);
                 float frostStrength = saturate(_FrostStrength);
                 float monolithicFlatten = saturate(_MonolithicFlatten);
-                float generatedMassSurface = 1.0 - isGroundSurface;
 
                 float exposureVisual =
                     pow(saturate(exposureMask), 0.72);
@@ -192,17 +306,15 @@
                 float dirtDepositVisual =
                     pow(saturate(dirtDepositMask), 0.70);
 
-                // Exposure remains the only generated-mass mask that primarily
-                // shifts the pre-layer value scale. Crevice, base, and dirt are
-                // handled below as independent material layers so their response
-                // controls do not collapse into one shared lower-region multiplier.
-                float generatedMassSemanticScale =
-                    1.0 +
-                    exposureVisual *
-                    _ExposureTintStrength *
-                    1.72 *
-                    generatedMassExposureResponse *
-                    profileContrast;
+                // GM-SURFACE.5R ORIENTATION-COHERENCE CONTRACT:
+                // Exposure is a material-semantic mask, not illumination. 5Q
+                // measured zero source-face inversions before this stage and 28
+                // newly introduced inversions when upwardness/height-driven
+                // exposure was allowed to scale albedo. Generated Mass exposure
+                // therefore has no luminance authority before PBR. The separate
+                // value-preserving exposure tint path remains available below.
+                // Ground semantic scaling is intentionally unchanged.
+                float generatedMassSemanticScale = 1.0;
                 float groundSemanticScale =
                     1.0 +
                     (groundSnowVisual * 0.11 -
@@ -338,36 +450,26 @@
                 }
 #endif
 
-                // Dedicated crevice layer: profile-aware depth/occlusion.
-                // Response 1.0 is intentionally stronger than H2L response 2.0.
-                half3 creviceNeutralTarget =
-                    albedo *
-                    (half)lerp(0.48, 0.38, wetness);
-                half3 creviceTarget =
+                // GM-SURFACE.5R: crevice is material identity, not a second
+                // shadow field. 5Q measured 38 new source-face orientation
+                // inversions at this stage while the direct NdotL product remained
+                // exact. Do not push direct-light albedo toward a fixed dark target.
+                // Preserve only value-preserving semantic tint authority; any
+                // future crevice occlusion must be authored in an indirect/AO
+                // contract rather than by corrupting pre-light direct albedo.
+                half3 creviceTintTarget =
                     PS3D_ApplyValuePreservingTint(
-                        creviceNeutralTarget,
+                        albedo,
                         _GeneratedMassCreviceTint.rgb,
                         _GeneratedMassCreviceTintStrength);
-                creviceTarget = lerp(
-                    creviceTarget,
-                    _BaseColor.rgb * (half)0.46,
-                    (half)(monolithicFlatten * 0.82));
-                float creviceOpacity =
-                    (1.0 - exp2(
-                        -creviceVisual *
-                        (2.80 +
-                         _CreviceDarkenStrength * 14.50 +
-                         wetness * 1.05 +
-                         frostStrength * 0.62) *
-                        generatedMassCreviceResponse *
-                        profileContrast)) *
-                    generatedMassSurface *
-                    lerp(1.0, 0.72, frostStrength) *
-                    lerp(1.0, 0.66, monolithicFlatten);
+                float creviceTintOpacity =
+                    creviceVisual *
+                    generatedMassCreviceResponse *
+                    generatedMassSurface;
                 albedo = lerp(
                     albedo,
-                    creviceTarget,
-                    (half)saturate(creviceOpacity));
+                    creviceTintTarget,
+                    (half)saturate(creviceTintOpacity));
 #if defined(_SURFACE_CAUSALITY_AUDIT)
                 if (ResolveSurfaceCausalityMode() == 26)
                 {
@@ -380,35 +482,24 @@
                 }
 #endif
 
-                // Dedicated base/contact layer: broader grounding, less deep
-                // than crevice, controlled only by Base Response.
-                half3 baseNeutralTarget =
-                    albedo *
-                    (half)lerp(0.70, 0.62, wetness);
-                half3 baseTarget =
+                // GM-SURFACE.5R: base/contact is also semantic material data,
+                // not a proxy for weaker incident light. 5Q measured 15 additional
+                // source-face inversions when this layer darkened pre-light albedo.
+                // Keep value-preserving tint only; grounding/occlusion must not
+                // override the actual surface-orientation response to direct light.
+                half3 baseTintTarget =
                     PS3D_ApplyValuePreservingTint(
-                        baseNeutralTarget,
+                        albedo,
                         _GeneratedMassBaseTint.rgb,
                         _GeneratedMassBaseTintStrength);
-                baseTarget = lerp(
-                    baseTarget,
-                    _BaseColor.rgb * (half)0.62,
-                    (half)(monolithicFlatten * 0.70));
-                float baseOpacity =
-                    (1.0 - exp2(
-                        -baseVisual *
-                        (1.25 +
-                         _BaseDarkenStrength * 9.50 +
-                         wetness * 0.42) *
-                        generatedMassBaseResponse *
-                        profileContrast)) *
-                    generatedMassSurface *
-                    lerp(1.0, 0.70, frostStrength) *
-                    lerp(1.0, 0.62, monolithicFlatten);
+                float baseTintOpacity =
+                    baseVisual *
+                    generatedMassBaseResponse *
+                    generatedMassSurface;
                 albedo = lerp(
                     albedo,
-                    baseTarget,
-                    (half)saturate(baseOpacity));
+                    baseTintTarget,
+                    (half)saturate(baseTintOpacity));
 #if defined(_SURFACE_CAUSALITY_AUDIT)
                 if (ResolveSurfaceCausalityMode() == 27)
                 {
@@ -640,7 +731,9 @@
                     (half)_FrostStrength * 0.06h);
             }
 
-            InputData BuildInputData(Varyings input, half3 normalWS)
+            InputData BuildInputData(
+                Varyings input,
+                half3 normalWS)
             {
                 InputData inputData = (InputData)0;
                 inputData.positionWS = input.positionWS;
@@ -652,14 +745,18 @@
                     TransformWorldToShadowCoord(input.positionWS);
                 inputData.fogCoord = input.fogFactor;
                 inputData.vertexLighting = half3(0.0h, 0.0h, 0.0h);
-                inputData.bakedGI = SampleSH(normalWS);
+                inputData.bakedGI = ResolvePixelSurfaceBakedGI(
+                    normalWS,
+                    (half)input.materialMasks.w);
                 inputData.normalizedScreenSpaceUV =
                     GetNormalizedScreenSpaceUV(input.positionCS);
                 inputData.shadowMask = half4(1.0h, 1.0h, 1.0h, 1.0h);
                 return inputData;
             }
 
-            SurfaceData BuildSurfaceData(half3 albedo)
+            SurfaceData BuildSurfaceData(
+                half3 albedo,
+                float4 structuralFeatures)
             {
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.albedo = albedo;
@@ -678,7 +775,10 @@
                         1.10h,
                         saturate((half)_MonolithicFlatten));
                 surfaceData.metallic = 0.0h;
-                surfaceData.smoothness = ResolveProfileSmoothness();
+                surfaceData.smoothness = saturate(
+                    ResolveProfileSmoothness() +
+                    ResolveGeneratedMassStructuralSmoothnessOffset(
+                        structuralFeatures));
                 surfaceData.normalTS = half3(0.0h, 0.0h, 1.0h);
                 surfaceData.emission = half3(0.0h, 0.0h, 0.0h);
                 surfaceData.occlusion = 1.0h;
@@ -692,6 +792,17 @@
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
+                // GM-SURFACE.6A.2: bypass normal/material/PBR work only for the
+                // two explicit structural transport diagnostics. Off mode
+                // returns a negative sentinel and preserves the 6A.1 path.
+                half3 structuralDiagnosticColor =
+                    ResolveGeneratedMassStructuralDiagnosticColor(
+                        input.structuralFeatures);
+                if (structuralDiagnosticColor.r >= 0.0h)
+                {
+                    return half4(structuralDiagnosticColor, 1.0h);
+                }
 
 #if !defined(_SURFACE_CAUSALITY_AUDIT)
                 // Production variant: intentionally identical to the validated
@@ -743,8 +854,12 @@
                     _GeneratedMassOverallRockTint.rgb,
                     _GeneratedMassOverallRockTintStrength);
 
-                InputData inputData = BuildInputData(input, normalWS);
-                SurfaceData surfaceData = BuildSurfaceData(albedo);
+                InputData inputData = BuildInputData(
+                    input,
+                    normalWS);
+                SurfaceData surfaceData = BuildSurfaceData(
+                    albedo,
+                    input.structuralFeatures);
                 half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
 
                 // GM-SURFACE.5E baseline parity: Generated Masses use raw URP/PBR
@@ -931,12 +1046,19 @@
                 if (ambientOnlyMode)
                 {
                     return half4(
-                        ResolveSurfaceCausalityAmbient(albedo, normalWS),
+                        ResolveSurfaceCausalityAmbient(
+                            albedo,
+                            input,
+                            normalWS),
                         1.0h);
                 }
 
-                InputData inputData = BuildInputData(input, normalWS);
-                SurfaceData surfaceData = BuildSurfaceData(albedo);
+                InputData inputData = BuildInputData(
+                    input,
+                    normalWS);
+                SurfaceData surfaceData = BuildSurfaceData(
+                    albedo,
+                    input.structuralFeatures);
                 half4 pbrColor = UniversalFragmentPBR(inputData, surfaceData);
 
                 half3 finalRgb;

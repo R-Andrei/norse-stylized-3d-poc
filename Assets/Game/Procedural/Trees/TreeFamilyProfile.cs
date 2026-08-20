@@ -92,9 +92,6 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField]
         private TreeFloatRange leanStrength = new TreeFloatRange(0f, 0.12f);
 
-        [SerializeField]
-        private TreeFloatRange leanDirectionDegrees = new TreeFloatRange(0f, 360f);
-
         [FormerlySerializedAs("twistDegrees")]
         [InspectorName("Trunk Twist Degrees")]
         [SerializeField]
@@ -144,7 +141,6 @@ namespace ProgrammaticStylized3D.Trees
         public TreeFloatRange BendCount => bendCount;
         public TreeFloatRange DirectionalDrift => directionalDrift;
         public TreeFloatRange LeanStrength => leanStrength;
-        public TreeFloatRange LeanDirectionDegrees => leanDirectionDegrees;
         public TreeFloatRange TwistDegrees => surfaceTorsionDegrees;
         public TreeFloatRange SurfaceTorsionDegrees => surfaceTorsionDegrees;
         public TreeIntRange RootButtressCount => rootButtressCount;
@@ -505,7 +501,6 @@ namespace ProgrammaticStylized3D.Trees
             bendCount = bendCountRange;
             directionalDrift = driftRange;
             leanStrength = leanRange;
-            leanDirectionDegrees = new TreeFloatRange(0f, 360f);
             surfaceTorsionDegrees = twistRange;
             irregularity = irregularityRange;
             taper = taperRange;
@@ -1070,9 +1065,7 @@ namespace ProgrammaticStylized3D.Trees
             return true;
         }
 
-        internal void ApplyTreeGen2BMigration(
-            TreeFamily family,
-            TreeFloatRange trunkLeanDirectionDegrees)
+        internal void ApplyTreeGen2BMigration(TreeFamily family)
         {
             ApplyTreeGen2BDefaults(family);
 
@@ -1121,23 +1114,6 @@ namespace ProgrammaticStylized3D.Trees
                         : Mathf.Min(
                             Mathf.Abs(orderedSideBias.Minimum),
                             Mathf.Abs(orderedSideBias.Maximum));
-                TreeFloatRange orderedLean =
-                    trunkLeanDirectionDegrees.Ordered();
-                if (orderedLean.Minimum < 0f && orderedLean.Maximum > 0f)
-                {
-                    directionalBiasAngleDegrees =
-                        new TreeFloatRange(0f, 360f);
-                }
-                else if (orderedLean.Maximum <= 0f)
-                {
-                    directionalBiasAngleDegrees = new TreeFloatRange(
-                        orderedLean.Minimum + 360f,
-                        orderedLean.Maximum + 360f);
-                }
-                else
-                {
-                    directionalBiasAngleDegrees = orderedLean;
-                }
                 directionalBiasStrength = new TreeFloatRange(
                     Mathf.Clamp01(minimumBias),
                     Mathf.Clamp01(maximumBias));
@@ -1762,9 +1738,7 @@ namespace ProgrammaticStylized3D.Trees
             trunk ??= new TreeTrunkSettings();
             primaryBranches ??= new TreePrimaryBranchSettings();
             trunk.ApplyTreeGen2BDefaults(targetFamily);
-            primaryBranches.ApplyTreeGen2BMigration(
-                targetFamily,
-                trunk.LeanDirectionDegrees);
+            primaryBranches.ApplyTreeGen2BMigration(targetFamily);
         }
 
         public bool ValidateProfile(List<string> failures)

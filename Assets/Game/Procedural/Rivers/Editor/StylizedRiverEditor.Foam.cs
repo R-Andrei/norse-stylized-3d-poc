@@ -21,7 +21,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 DrawFoamRuntimeQuality);
             DrawNestedSection(
                 InspectorSection.FoamTransportVisibilityContract,
-                "Transport & Visibility Contract",
+                "Material Contract",
                 DrawFoamTransportVisibilityContract);
             DrawNestedSection(
                 InspectorSection.FoamLayerA,
@@ -140,185 +140,54 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private void DrawFoamTransportVisibilityContract()
         {
-            SerializedProperty transport = Find("foamTransportScheme");
-            SerializedProperty visibility = Find("foamFinalVisibilityMode");
-            SerializedProperty footprint = Find("foamPresenceFootprintMode");
-
+            SerializedProperty materialContract = Find("foamMaterialContract");
             EditorGUILayout.PropertyField(
-                transport,
+                materialContract,
                 new GUIContent(
-                    "Material Transport Scheme",
-                    "Controls numerical transport of geometric Coverage. It must not silently change decoded intrinsic Presence or Remaining Life."));
-            EditorGUILayout.PropertyField(
-                visibility,
-                new GUIContent(
-                    "Final Foam Visibility Mode",
-                    "Controls how transported Coverage and Remaining Life form the Final Foam shape. It does not change persistent Layer C material."));
-            EditorGUILayout.PropertyField(
-                footprint,
-                new GUIContent(
-                    "Presence Footprint",
-                    "Controls whether decoded intrinsic Presence scales the resolved Final Foam shape. Coverage-Only ignores Presence as amplitude; Presence-Amplitude carries exact Presence through the same shape coupling without changing the coupling weights."));
+                    "Material Contract",
+                    "C × P × L Baseline preserves the accepted fractional C/P/L/Pattern path. Coverage + Life preserves fractional geometric Coverage and Remaining Life while Presence is implicit and Pattern is render-derived."));
 
             EditorGUILayout.Space(5f);
-            EditorGUILayout.LabelField(
-                "Resolved Foam Contract",
-                EditorStyles.miniBoldLabel);
+            bool coverageLife = materialContract.intValue ==
+                (int)StylizedRiverFoamMaterialContract.CoverageLife;
             EditorGUILayout.HelpBox(
-                ResolveFoamTransportContractText(transport),
-                MessageType.None);
-            EditorGUILayout.HelpBox(
-                ResolveFoamVisibilityContractText(visibility),
-                MessageType.None);
-            EditorGUILayout.HelpBox(
-                ResolveFoamPresenceContractText(footprint),
-                MessageType.None);
-            EditorGUILayout.HelpBox(
-                ResolveFoamCombinedContractText(
-                    transport,
-                    visibility,
-                    footprint),
+                coverageLife
+                    ? "Coverage + Life\n\n" +
+                      "Persistent material state — fractional geometric Coverage plus Remaining Life.\n" +
+                      "Presence — implicit unit material wherever Coverage exists; no weak/strong Foam authority.\n" +
+                      "Transport — Bulk-Phase Residual TVD, preserving subcell Coverage instead of whole-cell jumps.\n" +
+                      "Rendering — Coverage owns the footprint; Life is alive/dead state; Pattern, Chipping, Strands, and edge breakup remain shader-only.\n\n" +
+                      "Changing Material Contract during Play Mode clears existing Foam because the packed semantics differ."
+                    : "C × P × L Baseline\n\n" +
+                      "Transport — Bulk-Phase Residual TVD.\n" +
+                      "Visibility — Lifecycle-Faithful.\n" +
+                      "Presence — Coverage-Only.\n\n" +
+                      "Persistent state remains Coverage, Presence, Remaining Life, and Material Pattern.",
                 MessageType.Info);
-
-            EditorGUILayout.Space(3f);
-            EditorGUILayout.LabelField(
-                "Persistent State Meaning",
-                EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox(
-                "Coverage — geometric cell occupancy transported by Donor Cell, " +
-                "TVD Superbee, or Bulk-Phase Residual TVD. " +
-                "Source shape, subcell width, progressive reveal, " +
-                "and valid-fluid clipping may change Coverage.\n\n" +
-                "Presence — intrinsic authored material strength. New material " +
-                "writes Initial Presence exactly; transport must not reinterpret " +
-                "it as Coverage or source probability.\n\n" +
-                "Remaining Life — intrinsic normalized lifecycle state. New " +
-                "material writes Initial Life exactly; only explicit Layer C " +
-                "aging changes it. Negative topology remains allowed to consume " +
-                "it rapidly.\n\n" +
-                "Material Pattern — stable material identity transported with " +
-                "the same coherent state and used by deterioration/rendering.",
-                MessageType.None);
         }
 
-        private static string ResolveFoamTransportContractText(
-            SerializedProperty transport)
+        private bool IsCoverageLifeFoamMaterialContractSelected()
         {
-            if (transport.hasMultipleDifferentValues)
-            {
-                return "Transport — mixed selection. Selected Rivers do not share " +
-                    "one Material Transport Scheme.";
-            }
-
-            StylizedRiverFoamTransportScheme scheme =
-                (StylizedRiverFoamTransportScheme)transport.enumValueIndex;
-            return scheme switch
-            {
-                StylizedRiverFoamTransportScheme.TvdSuperbee =>
-                    "Transport — TVD Superbee reconstructs bounded geometric " +
-                    "Coverage at interior faces to reduce numerical diffusion " +
-                    "and retain sharper Foam footprints. One coherent donor " +
-                    "material state is transported, so decoded Presence and " +
-                    "Remaining Life are not independently limited or reduced.",
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd =>
-                    "Transport — Bulk-Phase Residual TVD advances the shared " +
-                    "downstream speed as one global subcell phase. The existing " +
-                    "single-pass TVD solver handles only local slowdown residuals, " +
-                    "lateral motion, and obstacle routing. It allocates no extra " +
-                    "full-field texture and adds no material dispatch.",
-                _ =>
-                    "Transport — Donor Cell transports the upstream coherent " +
-                    "material state conservatively. Coverage becomes broader " +
-                    "and more numerically diffuse, but decoded Presence and " +
-                    "Remaining Life are not reduced merely because material moved."
-            };
+            SerializedProperty materialContract = Find("foamMaterialContract");
+            return materialContract != null && materialContract.intValue ==
+                (int)StylizedRiverFoamMaterialContract.CoverageLife;
         }
 
-        private static string ResolveFoamVisibilityContractText(
-            SerializedProperty visibility)
+        private void DrawInitialPresenceForCurrentMaterialContract(
+            SerializedProperty minimum,
+            SerializedProperty maximum,
+            string tooltip)
         {
-            if (visibility.hasMultipleDifferentValues)
+            if (IsCoverageLifeFoamMaterialContractSelected())
             {
-                return "Final Visibility — mixed selection. Selected Rivers do " +
-                    "not share one Final Foam Visibility Mode.";
+                return;
             }
 
-            return visibility.enumValueIndex ==
-                    (int)StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful
-                ? "Final Visibility — Lifecycle-Faithful uses meaningful Coverage " +
-                    "to establish the Foam footprint. Explicit Layer C Remaining " +
-                    "Life owns ordinary survival, so transport dilution cannot " +
-                    "masquerade as early death. Negative topology may still " +
-                    "accelerate Remaining Life loss."
-                : "Final Visibility — Concentration + Lifetime lets both local " +
-                    "Coverage concentration and Remaining Life reduce visibility. " +
-                    "Diffuse transported Foam may disappear before its Remaining " +
-                    "Life reaches zero by explicit design.";
-        }
-
-        private static string ResolveFoamPresenceContractText(
-            SerializedProperty footprint)
-        {
-            if (footprint.hasMultipleDifferentValues)
-            {
-                return "Presence — mixed selection. Selected Rivers do not share " +
-                    "one Presence Footprint mode.";
-            }
-
-            return footprint.enumValueIndex ==
-                    (int)StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude
-                ? "Presence — Presence-Amplitude carries decoded intrinsic " +
-                    "Presence through the same Presence-independent shape and " +
-                    "surface-coupling weights. Uniform Presence 0.75 therefore " +
-                    "produces exactly 75% of the equivalent Presence 1.00 resolved " +
-                    "mask before other explicit global controls."
-                : "Presence — Coverage-Only stores authored Presence exactly but " +
-                    "does not use it as Final Foam amplitude. Coverage, Life, " +
-                    "Pattern, Chipping, and Strands determine the visible result.";
-        }
-
-        private static string ResolveFoamCombinedContractText(
-            SerializedProperty transport,
-            SerializedProperty visibility,
-            SerializedProperty footprint)
-        {
-            if (transport.hasMultipleDifferentValues ||
-                visibility.hasMultipleDifferentValues ||
-                footprint.hasMultipleDifferentValues)
-            {
-                return "Combined Result — mixed selection. Resolve the three " +
-                    "selectors to one shared combination to see an exact summary.";
-            }
-
-            StylizedRiverFoamTransportScheme transportScheme =
-                (StylizedRiverFoamTransportScheme)transport.enumValueIndex;
-            bool tvd = transportScheme ==
-                StylizedRiverFoamTransportScheme.TvdSuperbee;
-            bool bulkPhase = transportScheme ==
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
-            bool lifecycle = visibility.enumValueIndex ==
-                (int)StylizedRiverFinalFoamVisibilityMode.LifecycleFaithful;
-            bool amplitude = footprint.enumValueIndex ==
-                (int)StylizedRiverFoamPresenceFootprintMode.PresenceAmplitude;
-
-            string transportSummary = bulkPhase
-                ? "with the accepted one-dispatch Bulk-Phase transport"
-                : tvd
-                    ? "with sharper bounded Superbee reconstruction"
-                    : "with the more diffuse first-order Donor state";
-
-            return "Combined Result — Foam Coverage is transported " +
-                transportSummary + ". " +
-                (lifecycle
-                    ? "Meaningful living Coverage remains visible until explicit " +
-                        "lifecycle aging removes it. "
-                    : "Low Coverage concentration and Remaining Life may both " +
-                        "remove it from Final Foam. ") +
-                (amplitude
-                    ? "The surviving resolved shape retains exact proportional " +
-                        "intrinsic Presence through all shape coupling."
-                    : "Intrinsic Presence remains stored but does not scale the " +
-                        "surviving resolved shape.");
+            DrawMinMaxUnitControls(
+                "Initial Presence",
+                minimum,
+                maximum,
+                tooltip);
         }
 
         private void DrawFoamLayerA()
@@ -564,8 +433,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     "Time used by Layer D diagnostic temporal occupancy to release coverage after the instantaneous target recedes. Normal Final Foam is unchanged."));
         }
 
-        private void DrawFoamProductionChipping(
-            SerializedProperty presenceFootprint)
+        private void DrawFoamProductionChipping()
         {
             EditorGUILayout.LabelField(
                 "Production Chipping",
@@ -660,35 +528,14 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 Find("foamChipEdgeWidthPixels"),
                 new GUIContent(
                     "Chip Edge Width (px)",
-                    "Approximate inward width of the soft Foam edge band in rendered pixels. Coverage-Only and Presence-Amplitude use derivative-normalized soft-visibility coordinates. Zero disables edge permission exactly. The slider covers 0–256 px; numeric entry accepts any non-negative value for deliberately extreme bands."),
+                    "Approximate inward width of the canonical C × P × L Baseline soft Foam edge band in rendered pixels. Zero disables edge permission exactly. The slider covers 0–256 px; numeric entry accepts any non-negative value for deliberately extreme bands."),
                 0f,
                 256f);
-            bool showPresenceAmplitudeEdgeStart =
-                presenceFootprint.hasMultipleDifferentValues ||
-                presenceFootprint.enumValueIndex ==
-                    (int)StylizedRiverFoamPresenceFootprintMode
-                        .PresenceAmplitude;
-            if (showPresenceAmplitudeEdgeStart)
-            {
-                EditorGUILayout.PropertyField(
-                    Find("foamChipSoftEdgeStart"),
-                    new GUIContent(
-                        "Presence-Amplitude Edge Start",
-                        "Soft-visibility contour treated as the exterior start of the Presence-Amplitude Eligibility coordinate. Default 0.06 matches the historical Coverage-Only route. Raise it to move the band inward; lower it to include fainter fringe."));
-            }
-
-            bool showCoverageOnlyInteriorAccess =
-                presenceFootprint.hasMultipleDifferentValues ||
-                presenceFootprint.enumValueIndex ==
-                    (int)StylizedRiverFoamPresenceFootprintMode.Current;
-            if (showCoverageOnlyInteriorAccess)
-            {
-                EditorGUILayout.PropertyField(
-                    Find("foamChipInteriorAccess"),
-                    new GUIContent(
-                        "Chip Interior Access",
-                        "Coverage-Only Presence Footprint only. Fraction of activated candidate identities granted permission in the established body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body. Presence-Amplitude always disables Interior Access."));
-            }
+            EditorGUILayout.PropertyField(
+                Find("foamChipInteriorAccess"),
+                new GUIContent(
+                    "Chip Interior Access",
+                    "Fraction of activated candidate identities granted permission in the established Foam body outside Chip Edge Width. Zero is edge-only; one lets every active candidate cut the full visible body."));
             EditorGUILayout.Space(4f);
             EditorGUILayout.LabelField(
                 "View Readability LOD",
@@ -1017,9 +864,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
         private void DrawFoamLayerE()
         {
-            SerializedProperty presenceFootprint = Find(
-                "foamPresenceFootprintMode");
-            DrawFoamProductionChipping(presenceFootprint);
+            DrawFoamProductionChipping();
 
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
@@ -1367,8 +1212,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(
                         Find("foamShoreRibbonRevealSpeedCellsPerSecond"),
                         new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamShoreRibbonInitialPresenceMin"),
                         Find("foamShoreRibbonInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
@@ -1409,8 +1253,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         Find("foamInwardWashBendAmplitudeMinCells"),
                         Find("foamInwardWashBendAmplitudeMaxCells"));
                     EditorGUILayout.PropertyField(Find("foamInwardWashRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamInwardWashInitialPresenceMin"),
                         Find("foamInwardWashInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
@@ -1470,12 +1313,6 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                             "Contact Reinforcement Interval (s)",
                             "Seconds between finite contact-only maintenance strokes while the next full Object packet is still waiting for released-wake clearance. Full packets keep priority and reinforcement never changes their eligibility."));
                 }
-                EditorGUILayout.PropertyField(
-                    Find("foamObjectFoamFormationSpeedMetresPerSecond"),
-                    new GUIContent(
-                        "Base Reveal Speed",
-                        "Base reveal speed used independently by each finite Arc/Semi-Arc stroke and by each Fleck. Stroke Count changes total burst duration, not metres-per-second reveal speed. Activity, packet clearance, and later Layer C transport remain independent."));
-
                 EditorGUILayout.Space(4f);
                 EditorGUILayout.LabelField(
                     "Contact Packets & Reinforcement",
@@ -1495,7 +1332,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Debug Pattern Mode",
                         "Mixed uses Arc and Semi-Arc weights for per-object contact cycles and enables supplemental Flecks through their independent Coverage and Activity controls. Pure modes force one pattern for validation."));
                 EditorGUILayout.HelpBox(
-                    "The first Arc or Semi-Arc stroke derives a one-cell contact ring locally from the existing obstacle-exclusion field around the actual rock boundary, then emits only the recipe's finite straight downstream wake arm geometry. Later Arc strokes use the complete five-point contact profile; later Semi-Arc strokes use the deterministic selected half-profile. No later stroke emits a wake arm. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
+                    "The first Arc or Semi-Arc stroke derives a one-cell contact ring locally from the existing obstacle-exclusion field around the actual rock boundary, then emits only the recipe's finite straight downstream wake arm geometry. Contact and wake heads advance concurrently at the recipe's literal Reveal Speed in cells/s. Later Arc strokes use the complete five-point contact profile; later Semi-Arc strokes use the deterministic selected half-profile. No later stroke emits a wake arm. Fleck geometry remains independent, and Static Pressure Front Reach cannot widen any object source.",
                     MessageType.None);
 
                 EditorGUILayout.Space(4f);
@@ -1533,8 +1370,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamObjectArcAlongFlowOffsetCells"), new GUIContent("Along-Flow Offset Cells"));
                     EditorGUILayout.PropertyField(Find("foamObjectArcAcrossRiverOffsetCells"), new GUIContent("Across-River Offset Cells"));
                     EditorGUILayout.PropertyField(Find("foamObjectArcRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamObjectContactArcInitialPresenceMin"),
                         Find("foamObjectContactArcInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied open-C Arc material. Immediate-contact geometry and valid-fluid clipping affect Coverage only. Arc ribbons use no breakup or patterned source-fill holes.");
@@ -1560,8 +1396,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamObjectSemiArcAlongFlowOffsetCells"), new GUIContent("Along-Flow Offset Cells"));
                     EditorGUILayout.PropertyField(Find("foamObjectSemiArcAcrossRiverOffsetCells"), new GUIContent("Across-River Offset Cells"));
                     EditorGUILayout.PropertyField(Find("foamObjectSemiArcRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamObjectContactSemiArcInitialPresenceMin"),
                         Find("foamObjectContactSemiArcInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied open-C Semi-Arc material. Immediate-contact geometry and valid-fluid clipping affect Coverage only. Semi-Arc ribbons use no breakup or patterned source-fill holes.");
@@ -1584,8 +1419,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamObjectFleckHeadWidthCells"), new GUIContent("Head Width Cells"));
                     DrawMinMaxCellControls("Contact Offset", Find("foamObjectFleckOffsetMinCells"), Find("foamObjectFleckOffsetMaxCells"));
                     EditorGUILayout.PropertyField(Find("foamObjectFleckRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamObjectContactFleckInitialPresenceMin"),
                         Find("foamObjectContactFleckInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
@@ -1629,8 +1463,8 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                         "Minimum Packet Gap (m)",
                         "Minimum downstream clearance reserved after a Free Water packet completes. It rearms the same slot and extends shared cross-source packet separation."));
                 EditorGUILayout.HelpBox(
-                    "D8.2 cell geometry is staged only. Legacy metric Free-Water birth geometry remains active until D8.3 conversion.",
-                    MessageType.Info);
+                    "Reveal Speed is literal path velocity in Foam cells per second for every automatic stroke. Changing speed changes timing only; completed recipe geometry is unchanged.",
+                    MessageType.None);
                 EditorGUILayout.PropertyField(
                     Find("foamFreeWaterFoamPattern"),
                     new GUIContent(
@@ -1679,8 +1513,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamFreeWaterLaceHeadWidthCells"), new GUIContent("Head Width Cells"));
                     DrawMinMaxCellControls("Bend Amplitude", Find("foamFreeWaterLaceBendMinCells"), Find("foamFreeWaterLaceBendMaxCells"));
                     EditorGUILayout.PropertyField(Find("foamFreeWaterLaceRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamFreeWaterLaceInitialPresenceMin"),
                         Find("foamFreeWaterLaceInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
@@ -1703,8 +1536,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamFreeWaterCrossLaceHeadWidthCells"), new GUIContent("Head Width Cells"));
                     DrawMinMaxCellControls("Flow-Bend Amplitude", Find("foamFreeWaterCrossLaceBendMinCells"), Find("foamFreeWaterCrossLaceBendMaxCells"));
                     EditorGUILayout.PropertyField(Find("foamFreeWaterCrossLaceRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamFreeWaterCrossLaceInitialPresenceMin"),
                         Find("foamFreeWaterCrossLaceInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");
@@ -1729,8 +1561,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                     EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentBreakCountMin"), new GUIContent("Break Count Min"));
                     EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentBreakCountMax"), new GUIContent("Break Count Max"));
                     EditorGUILayout.PropertyField(Find("foamFreeWaterBrokenFilamentRevealSpeedCellsPerSecond"), new GUIContent("Reveal Speed (Cells/s)"));
-                    DrawMinMaxUnitControls(
-                        "Initial Presence",
+                    DrawInitialPresenceForCurrentMaterialContract(
                         Find("foamFreeWaterFragmentInitialPresenceMin"),
                         Find("foamFreeWaterFragmentInitialPresenceMax"),
                         "Intrinsic Presence written exactly to newly occupied material for this pattern. Shape, progressive reveal, subcell width, and valid-fluid clipping affect geometric Coverage only.");

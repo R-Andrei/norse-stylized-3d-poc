@@ -2692,3 +2692,81 @@ The runtime tile contains `109` recognized stones after removal of sub-runtime f
 Static 256/128/64/32 packed and shader-reference tests report a worst wrap-to-ordinary-adjacency ratio of approximately `1.29`; no exact Unity seam, mip, lighting, dry/wet, or production-camera acceptance is claimed until the project test. Runtime architecture and nominal cost remain unchanged: three temporary 256² slices during evaluation, one packed sample for the selected substrate, no new shader branch, draw call, geometry, renderer, or runtime CPU process.
 
 **Unity gate:** rebuild `SSDL_DefaultSurfaceDetails`, compare **Worn Edge** and **Strong Rim** with identical shared/application values from the same close and production cameras, include dry and wet views, and judge macro repetition, distant noise, worn-rim readability, internal form, cavity width, and mip stability. Promote neither candidate until explicit visual acceptance.
+
+## GROUND-RIVER-COUPLING-DIAG-A1 — River-Coupled Ground Contract Audit
+
+**Status:** implementation authorized; canonical plan recorded before code edits; Unity validation pending.
+
+### Objective
+
+Add one editor-only, one-click, read-only diagnostic that identifies the first broken authority in the live GeneratedGround → StylizedRiver corridor material-response chain. The audit must preserve evidence: it must not refresh the cached River registry, rebuild corridor geometry, rewrite renderer material state, or otherwise repair the scene before reporting.
+
+### Acceptance criteria
+
+1. Report cached versus actual child River registration and flag missing/stale entries.
+2. Inspect every corridor-like child under every actual River, including exact generated output and invalid/remnant names, without mutating them.
+3. Report Ground renderer/material state, corridor renderer/material identity, renderer enablement, bounds, and mesh existence/size.
+4. Read the live corridor `MaterialPropertyBlock` and compare River authorization, Bank layer, Riverbed layer, strengths, transition vectors, and debug mode against current Ground authoring.
+5. Inspect `TEXCOORD3` presence, dimension, count, finiteness, and per-channel min/max/nonzero statistics.
+6. Finish with one categorical `FIRST BROKEN AUTHORITY` verdict at the earliest failed stage, or explicitly state that the CPU/renderer/geometry contract passes and shader evaluation is downstream.
+7. Provide no corrective behavior and add zero active-gameplay runtime work.
+
+### Approved files
+
+- `Assets/Docs/Ground_River_Coupled_Surface_Response_Architecture.md`
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs`
+- `Assets/Game/Procedural/Ground/Editor/GeneratedGroundEditor.cs`
+
+Create: none. Delete: none. Move/rename: none. Generated project assets: none.
+
+### Reviewed evidence
+
+- Supplied source has no Git metadata. `StylizedRiver.cs` SHA-256 is `ce45775bf30bcf15d03bd0976ed0c000315db1f63c0276cfc1e2b7d3619c0e62`, matching the preserved C2B handoff snapshot.
+- `GeneratedGround.RefreshSurfaceMaterialProperties()` caches components, applies ordinary-Ground properties, then propagates corridor material properties through the cached River registry.
+- `GeneratedGround.ApplySurfaceProfileMaterialProperties(Renderer, GroundSurfaceRenderRole)` writes `_SurfaceContract`, `_GroundRiverCoupledEnabled`, Bank/Riverbed layer values, strengths, transition vectors, and `_MaskDebugMode` to a renderer-local property block.
+- River-side corridor setup, explicit material refresh, and corridor build all apply the Ground material with `GroundSurfaceRenderRole.RiverCorridor`.
+- Corridor geometry writes four-component UV channel 3 as Riverbed support, Bank outward distance, Bank inward distance, and Riverbed inward distance, and asserts `TexCoord3` dimension four after build.
+- Current Ground shader code gates both Bank and Riverbed response through `_GroundRiverCoupledEnabled`; existing debug modes already expose Riverbed Support, Bank Material Blend, and Bank Layer Identity.
+- The exact C1 rollback failed to restore visible Bank/Riverbed response, so persistent/generated/editor state and wrong live renderer/mesh/property-block identity remain valid hypotheses.
+- Recovery-scene evidence contains an exact generated corridor plus an `_Invalid` remnant name, while the serialized exact corridor mesh reference is empty; this does not prove the live mesh is missing but justifies auditing all corridor-like objects and live mesh identity.
+
+### Invariants and non-goals
+
+- Do not call `RefreshModifiers()` from the audit.
+- Do not call any River regeneration/rebuild/material-refresh method from the audit.
+- Do not set materials, property blocks, meshes, layers, enablement, debug modes, scene objects, profiles, prefabs, or serialized assets.
+- Do not add shader code, shader debug modes, River runtime changes, per-frame callbacks, GPU resources, draw calls, or persistent diagnostic allocations.
+- Existing River/Foam behavior, B1/B1A velocity behavior, C1 baseline behavior, and C2B source remain unchanged.
+- An `_Invalid` remnant without an enabled renderer is evidence only, not automatically the first broken authority.
+
+### Implementation sequence
+
+1. Add an editor-only report builder on `GeneratedGround` so private cached River/component state can be measured without reflection or repair.
+2. Build deterministic stage checks in authority order: Ground cache/registry → corridor identity/components → shared material → property block → semantic mesh stream → downstream shader boundary.
+3. Add a single-editor Inspector subsection with Run and Copy actions. Run must build the report, copy it to the clipboard, and log the complete report for submission.
+4. Perform static source/scope checks and compare the final three-file diff against the preserved pre-edit baseline.
+5. Re-read the complete review surface and update this section with implementation/audit results. Unity compilation and live report execution remain pending until the user installs the patch.
+
+### Risks
+
+- Multiple Rivers may fail at different stages. The final verdict must select the earliest authority stage observed across all actual Rivers while retaining per-River detail.
+- A valid MPB/UV3 contract cannot prove final shader composition. If all CPU/renderer/geometry stages pass, the diagnostic must stop at the downstream-shader boundary rather than speculate.
+- Generated meshes can be nonpersistent; serialized recovery-scene mesh references are not sufficient evidence of live mesh state.
+
+### Validation/compliance checks
+
+- Modified-file scope must remain exactly the approved three files.
+- No shader/include/scene/prefab/material/profile file may change.
+- The diagnostic must compile only under editor guards and must not be referenced by active gameplay code.
+- Offline checks must verify expected symbols, balanced preprocessor/braces, no forbidden repair calls inside the diagnostic, and unchanged hashes for the read-only River/geometry/shader review surface.
+- Unity validation must run the one-click audit on the affected Ground and return the complete copied/logged report; patch status remains pending until that evidence is reviewed.
+
+### DIAG-A1 implementation result
+
+The editor-only audit is implemented in the approved three-file scope. `GeneratedGround` now builds a read-only report from current live state; the custom Inspector exposes Run and Copy actions under Debug and Diagnostics. Run copies the complete report to the clipboard and logs it, while the Inspector shows the final categorical verdict.
+
+The implemented report checks cached/non-null/duplicate River registration against actual child Rivers; inventories all corridor-like descendants including renderable remnants; validates exact corridor components, renderer enablement, bounds, mesh identity and geometry size; compares the corridor shared material against the live Ground renderer material; verifies the required River-coupled shader properties; verifies that each required renderer-local property exists in the live `MaterialPropertyBlock` before comparing its value against current Ground authoring; and audits `TexCoord3` presence, dimension, count, finiteness, support range, and per-channel nonzero/min/max statistics.
+
+Offline Gate 4 scope comparison against a fresh extraction of the supplied archive reports exactly three modified files: this document, `GeneratedGround.cs`, and `GeneratedGroundEditor.cs`. The diagnostic block passes delimiter/preprocessor balance and forbidden-mutation scans. No shader/include, River source, scene, prefab, material, profile, or generated project asset changed. There is no Unity executable in the analysis environment, so Unity compilation and live report execution remain pending and this patch is not runtime-validated yet.
+
+One evidence limitation is explicit: installing any script patch causes a Unity script/domain reload, and current `GeneratedGround.OnEnable()` refreshes component caches and calls `RefreshModifiers()`. Therefore the audit reports the registry state that exists **after the patch reload**, not a historical pre-install registry state. It still measures the current registry without refreshing it when Run is pressed. This limitation does not affect the renderer/material/MPB/live-mesh/TexCoord3 checks, which remain the primary evidence for the persistent post-rollback failure.

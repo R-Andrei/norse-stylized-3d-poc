@@ -13,10 +13,21 @@ Shader "PS3D/Pixel Surface Lit"
         _PixelVariation("Pixel Variation", Range(0, 0.25)) = 0.057
         _PixelVertexVariation("Vertex Variation", Range(0, 0.25)) = 0.09
         _PixelEffectStrength("Pixel Effect Strength", Range(0, 2)) = 1
+        // GM-SURFACE.5R: broad/warp remain valid generic material controls,
+        // but Generated Mass convex bevels suppress them in the forward path so
+        // triangulation/interpolated bevel topology cannot acquire fake lighting
+        // authority from tonal breakup.
         _PixelBroadVariation("Broad Variation", Range(0, 0.25)) = 0.022
         _PixelWarpStrength("Cell Warp Strength", Range(0, 2)) = 0.18
 
         [Header(Semantic Surface Response)]
+        // GM-SURFACE.5R: for Generated Mass rendering these legacy scalar
+        // controls no longer authorize pre-light exposure brightening or
+        // crevice/base darkening. Stage E proved those geometry/height-driven
+        // value fields can reverse the real NdotL ordering of individual faces.
+        // Ground behavior is unchanged; Generated Mass semantic tint remains
+        // value-preserving. The serialized properties are retained for backward
+        // compatibility and possible future indirect/AO-specific use.
         _ExposureTintStrength("Exposure Brighten Strength", Range(0, 0.5)) = 0.04
         _CreviceDarkenStrength("Crevice Darken Strength", Range(0, 0.75)) = 0.075
         _BaseDarkenStrength("Base Darken Strength", Range(0, 0.75)) = 0.04
@@ -91,6 +102,11 @@ Shader "PS3D/Pixel Surface Lit"
         [HideInInspector] _GeneratedMassEdgeWearCoverage("Generated Mass Edge Wear Coverage", Float) = 1
         [HideInInspector] _GeneratedMassEdgeWearSoftness("Generated Mass Edge Wear Softness", Float) = 0.45
         [HideInInspector] _GeneratedMassEdgeWearResponseStrength("Generated Mass Edge Wear Response Strength", Float) = 0
+        [HideInInspector] _GeneratedMassChipInteriorResponse("Generated Mass Chip Interior Response", Float) = 0.60
+        [HideInInspector] _GeneratedMassConvexVariationStrength("Generated Mass Convex Variation Strength", Float) = 0.10
+        [HideInInspector] _GeneratedMassConvexSmoothnessOffset("Generated Mass Convex Smoothness Offset", Float) = 0.20
+        [HideInInspector] _GeneratedMassChipVariationStrength("Generated Mass Chip Variation Strength", Float) = 2.00
+        [HideInInspector] _GeneratedMassChipSmoothnessOffset("Generated Mass Chip Smoothness Offset", Float) = -0.20
         [HideInInspector] _GeneratedMassEdgeWearBrightnessLift("Generated Mass Edge Wear Brightness Lift", Float) = 0.25
         [HideInInspector] _GeneratedMassEdgeWearTint("Generated Mass Edge Wear Tint", Color) = (0.70, 0.69, 0.62, 1)
         [HideInInspector] _GeneratedMassEdgeWearTintStrength("Generated Mass Edge Wear Tint Strength", Float) = 0
@@ -131,8 +147,9 @@ Shader "PS3D/Pixel Surface Lit"
         _SpecularStrength("Specular Strength", Range(0, 1)) = 0.16
         _AmbientStrength("Ambient Strength", Range(0, 2)) = 0.95
         _DirectStrength("Direct Strength", Range(0, 2)) = 1.15
-        _DiffuseWrap("Diffuse Wrap", Range(0, 1)) = 0.12
-        _ShadowAmbientStrength("Shadow Ambient Strength", Range(0, 1)) = 0.42
+        _DiffuseWrap("Low-Light Form Wrap", Range(0, 1)) = 0.12
+        _ShadowAmbientStrength("Low-Light Form Strength", Range(0, 2)) = 0.42
+        [HideInInspector] _GeneratedMassLowLightFaceSeparation("Generated Mass Low-Light Face Separation", Float) = 0
         _FlatNormalStrength("Flat Normal Strength", Range(0, 1)) = 0
         [Toggle] _ReceiveShadows("Receive Shadows", Float) = 1
         [Enum(UnityEngine.Rendering.CullMode)] _Cull("Cull", Float) = 2
@@ -245,6 +262,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
+                float _GeneratedMassChipInteriorResponse;
+                float _GeneratedMassConvexVariationStrength;
+                float _GeneratedMassConvexSmoothnessOffset;
+                float _GeneratedMassChipVariationStrength;
+                float _GeneratedMassChipSmoothnessOffset;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
@@ -277,6 +299,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _DirectStrength;
                 float _DiffuseWrap;
                 float _ShadowAmbientStrength;
+                float _GeneratedMassLowLightFaceSeparation;
                 float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
@@ -369,6 +392,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
+                float _GeneratedMassChipInteriorResponse;
+                float _GeneratedMassConvexVariationStrength;
+                float _GeneratedMassConvexSmoothnessOffset;
+                float _GeneratedMassChipVariationStrength;
+                float _GeneratedMassChipSmoothnessOffset;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
@@ -401,6 +429,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _DirectStrength;
                 float _DiffuseWrap;
                 float _ShadowAmbientStrength;
+                float _GeneratedMassLowLightFaceSeparation;
                 float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
@@ -541,6 +570,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
+                float _GeneratedMassChipInteriorResponse;
+                float _GeneratedMassConvexVariationStrength;
+                float _GeneratedMassConvexSmoothnessOffset;
+                float _GeneratedMassChipVariationStrength;
+                float _GeneratedMassChipSmoothnessOffset;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
@@ -573,6 +607,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _DirectStrength;
                 float _DiffuseWrap;
                 float _ShadowAmbientStrength;
+                float _GeneratedMassLowLightFaceSeparation;
                 float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;
@@ -707,6 +742,11 @@ Shader "PS3D/Pixel Surface Lit"
                 float _GeneratedMassEdgeWearCoverage;
                 float _GeneratedMassEdgeWearSoftness;
                 float _GeneratedMassEdgeWearResponseStrength;
+                float _GeneratedMassChipInteriorResponse;
+                float _GeneratedMassConvexVariationStrength;
+                float _GeneratedMassConvexSmoothnessOffset;
+                float _GeneratedMassChipVariationStrength;
+                float _GeneratedMassChipSmoothnessOffset;
                 float _GeneratedMassEdgeWearBrightnessLift;
                 half4 _GeneratedMassEdgeWearTint;
                 float _GeneratedMassEdgeWearTintStrength;
@@ -739,6 +779,7 @@ Shader "PS3D/Pixel Surface Lit"
                 float _DirectStrength;
                 float _DiffuseWrap;
                 float _ShadowAmbientStrength;
+                float _GeneratedMassLowLightFaceSeparation;
                 float _FlatNormalStrength;
                 float _ReceiveShadows;
                 float _Cull;

@@ -913,10 +913,9 @@ namespace ProgrammaticStylized3D.Rivers
                 $"Authored lateral ratio used by middle cases: " +
                 $"{p12CandidateSweepAuthoredLateralRatio:0.000000}");
             report.AppendLine(
-                $"Material options held for all cases: " +
-                $"transport={river.FoamTransportScheme} / " +
-                $"presence footprint={river.FoamPresenceFootprintMode} / " +
-                $"final visibility={river.FoamFinalVisibilityMode}");
+                $"Material contract held for all cases: " +
+                ResolveMaterialContractDiagnosticLabel(
+                    river.FoamMaterialContract));
             report.AppendLine(
                 $"Frozen initialization Motion Time for all 12 cases: " +
                 $"{p12CandidateSweepInitializationMotionTime:0.000000} s");

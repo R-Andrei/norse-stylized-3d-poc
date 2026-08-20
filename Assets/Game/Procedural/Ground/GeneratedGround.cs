@@ -6254,6 +6254,1211 @@ namespace ProgrammaticStylized3D.Geometry.Ground
             }
         }
 
+#if UNITY_EDITOR
+        private enum RiverCoupledSurfaceAuditStage
+        {
+            GroundRiverRegistry = 1,
+            CorridorOutput = 2,
+            SharedMaterial = 3,
+            MaterialPropertyBlock = 4,
+            SemanticGeometry = 5,
+            DownstreamShader = 6
+        }
+
+        private struct RiverCoupledSurfaceAuditChannelStats
+        {
+            public float Minimum;
+            public float Maximum;
+            public int NonZeroCount;
+            public int NonFiniteCount;
+        }
+
+        private const string RiverCorridorAuditObjectPrefix =
+            "__PS3D_RiverCorridor";
+        private const float RiverCoupledAuditTolerance = 0.0005f;
+
+        public string BuildRiverCoupledSurfaceContractAuditReport()
+        {
+            StringBuilder report = new StringBuilder(16384);
+            RiverCoupledSurfaceAuditStage firstBrokenStage =
+                RiverCoupledSurfaceAuditStage.DownstreamShader;
+            string firstBrokenReason = string.Empty;
+
+            MeshRenderer actualGroundRenderer = GetComponent<MeshRenderer>();
+            Material actualGroundMaterial =
+                actualGroundRenderer != null
+                    ? actualGroundRenderer.sharedMaterial
+                    : null;
+            Material cachedGroundMaterial = SharedMaterial;
+            GroundMaterialControls resolvedMaterialControls =
+                ResolveMaterialControls();
+
+            report.AppendLine("GROUND-RIVER-COUPLING-DIAG-A1");
+            report.AppendLine("River-Coupled Ground Contract Audit");
+            report.Append("GeneratedGround: ")
+                .Append(name)
+                .AppendLine();
+            report.Append("Scene: ")
+                .Append(gameObject.scene.IsValid()
+                    ? gameObject.scene.name
+                    : "<invalid scene>")
+                .AppendLine();
+            report.Append("Timestamp: ")
+                .Append(DateTime.Now.ToString("O"))
+                .AppendLine();
+            report.AppendLine(
+                "Read-only audit: no River registry refresh, corridor rebuild, material refresh, or renderer mutation is performed.");
+            report.AppendLine();
+
+            report.AppendLine("== Ground authoring ==");
+            report.Append("Bank Surface Layer: ")
+                .Append(ResolveAuditObjectName(
+                    resolvedMaterialControls.BankSurfaceLayer))
+                .AppendLine();
+            report.Append("Riverbed Surface Source: ")
+                .Append(resolvedMaterialControls.RiverbedSurfaceSource)
+                .AppendLine();
+            report.Append("Authored Riverbed Surface Layer: ")
+                .Append(ResolveAuditObjectName(
+                    resolvedMaterialControls.RiverbedSurfaceLayer))
+                .AppendLine();
+            report.Append("Resolved Riverbed Surface Layer: ")
+                .Append(ResolveAuditObjectName(
+                    resolvedMaterialControls.ResolvedRiverbedSurfaceLayer))
+                .AppendLine();
+            report.Append("Bank Material Strength: ")
+                .Append(resolvedMaterialControls.BankMaterialStrength.ToString("F4"))
+                .AppendLine();
+            report.Append("Riverbed Material Strength: ")
+                .Append(resolvedMaterialControls.RiverbedMaterialStrength.ToString("F4"))
+                .AppendLine();
+            report.Append("Ground Debug View: ")
+                .Append(debugView)
+                .Append(" (")
+                .Append((int)debugView)
+                .AppendLine(")");
+            report.AppendLine();
+
+            report.AppendLine("== Ground renderer/material source ==");
+            report.Append("Cached MeshRenderer: ")
+                .Append(ResolveAuditObjectName(meshRenderer))
+                .AppendLine();
+            report.Append("Actual MeshRenderer component: ")
+                .Append(ResolveAuditObjectName(actualGroundRenderer))
+                .AppendLine();
+            report.Append("Cached renderer matches actual component: ")
+                .Append(meshRenderer == actualGroundRenderer)
+                .AppendLine();
+            report.Append("Ground.SharedMaterial: ")
+                .Append(ResolveAuditMaterialName(cachedGroundMaterial))
+                .AppendLine();
+            report.Append("Actual Ground renderer material: ")
+                .Append(ResolveAuditMaterialName(actualGroundMaterial))
+                .AppendLine();
+
+            if (actualGroundRenderer == null)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SharedMaterial,
+                    "GeneratedGround has no MeshRenderer component to own the shared Ground material.");
+            }
+            else if (meshRenderer != actualGroundRenderer)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SharedMaterial,
+                    "GeneratedGround cached MeshRenderer does not match the live MeshRenderer component; Ground.SharedMaterial can therefore resolve from stale/null cache state.");
+            }
+
+            if (actualGroundMaterial == null)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SharedMaterial,
+                    "The live GeneratedGround MeshRenderer has no shared material.");
+            }
+            else if (cachedGroundMaterial != actualGroundMaterial)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SharedMaterial,
+                    "Ground.SharedMaterial does not match the material currently assigned to the live GeneratedGround MeshRenderer.");
+            }
+
+            AppendRequiredGroundMaterialPropertyAudit(
+                report,
+                actualGroundMaterial,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            report.AppendLine();
+
+            StylizedRiver[] actualRivers =
+                GetComponentsInChildren<StylizedRiver>(true);
+            int cachedRawCount = rivers != null ? rivers.Length : 0;
+            int cachedNonNullCount = 0;
+            if (rivers != null)
+            {
+                for (int index = 0; index < rivers.Length; index++)
+                {
+                    if (rivers[index] != null)
+                    {
+                        cachedNonNullCount++;
+                    }
+                }
+            }
+
+            int activeRiverCount = 0;
+            for (int index = 0; index < actualRivers.Length; index++)
+            {
+                StylizedRiver river = actualRivers[index];
+                if (river != null && river.isActiveAndEnabled)
+                {
+                    activeRiverCount++;
+                }
+            }
+
+            report.AppendLine("== Ground River registry ==");
+            report.Append("Cached rivers[] raw count: ")
+                .Append(cachedRawCount)
+                .AppendLine();
+            report.Append("Cached rivers[] non-null count: ")
+                .Append(cachedNonNullCount)
+                .AppendLine();
+            report.Append("Actual child River count: ")
+                .Append(actualRivers.Length)
+                .AppendLine();
+            report.Append("Active/enabled child River count: ")
+                .Append(activeRiverCount)
+                .AppendLine();
+
+            if (cachedNonNullCount != actualRivers.Length)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.GroundRiverRegistry,
+                    $"Cached GeneratedGround rivers[] contains {cachedNonNullCount} non-null entries, while the hierarchy contains {actualRivers.Length} actual child Rivers.");
+            }
+
+            if (actualRivers.Length == 0)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.GroundRiverRegistry,
+                    "No StylizedRiver component exists under the selected GeneratedGround hierarchy.");
+            }
+
+            for (int index = 0; index < actualRivers.Length; index++)
+            {
+                StylizedRiver river = actualRivers[index];
+                bool cached = ContainsAuditRiverReference(rivers, river);
+                report.Append("Actual River[")
+                    .Append(index)
+                    .Append("]: ")
+                    .Append(ResolveAuditHierarchyPath(
+                        river != null ? river.transform : null))
+                    .Append(" | cached=")
+                    .Append(cached)
+                    .Append(" | activeAndEnabled=")
+                    .Append(river != null && river.isActiveAndEnabled)
+                    .AppendLine();
+
+                if (!cached)
+                {
+                    RegisterRiverCoupledAuditFailure(
+                        ref firstBrokenStage,
+                        ref firstBrokenReason,
+                        RiverCoupledSurfaceAuditStage.GroundRiverRegistry,
+                        $"Actual River '{ResolveAuditObjectName(river)}' is absent from the cached GeneratedGround rivers[] registry.");
+                }
+            }
+
+            if (rivers != null)
+            {
+                HashSet<StylizedRiver> seenCachedRivers =
+                    new HashSet<StylizedRiver>();
+                for (int index = 0; index < rivers.Length; index++)
+                {
+                    StylizedRiver cachedRiver = rivers[index];
+                    bool actual =
+                        cachedRiver != null &&
+                        Array.IndexOf(actualRivers, cachedRiver) >= 0;
+                    bool duplicate =
+                        cachedRiver != null &&
+                        !seenCachedRivers.Add(cachedRiver);
+                    report.Append("Cached River[")
+                        .Append(index)
+                        .Append("]: ")
+                        .Append(ResolveAuditHierarchyPath(
+                            cachedRiver != null
+                                ? cachedRiver.transform
+                                : null))
+                        .Append(" | actualChild=")
+                        .Append(actual)
+                        .Append(" | duplicate=")
+                        .Append(duplicate)
+                        .AppendLine();
+
+                    if (cachedRiver == null || !actual || duplicate)
+                    {
+                        RegisterRiverCoupledAuditFailure(
+                            ref firstBrokenStage,
+                            ref firstBrokenReason,
+                            RiverCoupledSurfaceAuditStage.GroundRiverRegistry,
+                            cachedRiver == null
+                                ? $"Cached GeneratedGround rivers[] entry {index} is null/stale."
+                                : duplicate
+                                    ? $"Cached River '{ResolveAuditObjectName(cachedRiver)}' appears more than once in GeneratedGround rivers[]."
+                                    : $"Cached River '{ResolveAuditObjectName(cachedRiver)}' is no longer an actual child River of the selected GeneratedGround.");
+                    }
+                }
+            }
+
+            report.AppendLine();
+
+            for (int riverIndex = 0;
+                 riverIndex < actualRivers.Length;
+                 riverIndex++)
+            {
+                StylizedRiver river = actualRivers[riverIndex];
+                if (river == null)
+                {
+                    continue;
+                }
+
+                AppendRiverCoupledCorridorAudit(
+                    report,
+                    river,
+                    riverIndex,
+                    actualGroundMaterial,
+                    resolvedMaterialControls,
+                    ref firstBrokenStage,
+                    ref firstBrokenReason);
+            }
+
+            report.AppendLine("== Categorical verdict ==");
+            report.AppendLine("FIRST BROKEN AUTHORITY:");
+            if (string.IsNullOrEmpty(firstBrokenReason))
+            {
+                report.AppendLine(
+                    "CPU/renderer/geometry contract passes. Failure is downstream in shader evaluation or final visible-renderer composition not measurable by this read-only CPU audit.");
+            }
+            else
+            {
+                report.Append(ResolveRiverCoupledAuditStageLabel(firstBrokenStage))
+                    .AppendLine();
+                report.Append("Reason: ")
+                    .Append(firstBrokenReason)
+                    .AppendLine();
+            }
+
+            return report.ToString();
+        }
+
+        private void AppendRiverCoupledCorridorAudit(
+            StringBuilder report,
+            StylizedRiver river,
+            int riverIndex,
+            Material actualGroundMaterial,
+            GroundMaterialControls resolvedMaterialControls,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            report.Append("== River ")
+                .Append(riverIndex)
+                .Append(": ")
+                .Append(ResolveAuditHierarchyPath(river.transform))
+                .AppendLine(" ==");
+
+            Transform[] transforms =
+                river.GetComponentsInChildren<Transform>(true);
+            List<Transform> corridorLikeTransforms =
+                new List<Transform>();
+            List<Transform> exactCorridorTransforms =
+                new List<Transform>();
+
+            for (int index = 0; index < transforms.Length; index++)
+            {
+                Transform candidate = transforms[index];
+                if (candidate == null ||
+                    !candidate.name.StartsWith(
+                        RiverCorridorAuditObjectPrefix,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                corridorLikeTransforms.Add(candidate);
+                if (candidate.name == RiverCorridorAuditObjectPrefix)
+                {
+                    exactCorridorTransforms.Add(candidate);
+                }
+            }
+
+            report.Append("Corridor-like objects: ")
+                .Append(corridorLikeTransforms.Count)
+                .Append(" | exact active-name objects: ")
+                .Append(exactCorridorTransforms.Count)
+                .AppendLine();
+
+            for (int index = 0;
+                 index < corridorLikeTransforms.Count;
+                 index++)
+            {
+                Transform candidate = corridorLikeTransforms[index];
+                MeshFilter candidateFilter =
+                    candidate.GetComponent<MeshFilter>();
+                MeshRenderer candidateRenderer =
+                    candidate.GetComponent<MeshRenderer>();
+                MeshCollider candidateCollider =
+                    candidate.GetComponent<MeshCollider>();
+                Mesh candidateMesh =
+                    candidateFilter != null
+                        ? candidateFilter.sharedMesh
+                        : null;
+                bool renderableRemnant =
+                    candidate.name != RiverCorridorAuditObjectPrefix &&
+                    candidateRenderer != null &&
+                    candidateRenderer.enabled &&
+                    !candidateRenderer.forceRenderingOff &&
+                    candidate.gameObject.activeInHierarchy;
+
+                report.Append("  [")
+                    .Append(index)
+                    .Append("] ")
+                    .Append(ResolveAuditHierarchyPath(candidate))
+                    .Append(" | activeSelf=")
+                    .Append(candidate.gameObject.activeSelf)
+                    .Append(" | activeInHierarchy=")
+                    .Append(candidate.gameObject.activeInHierarchy)
+                    .Append(" | MeshFilter=")
+                    .Append(candidateFilter != null)
+                    .Append(" | MeshRenderer=")
+                    .Append(candidateRenderer != null)
+                    .Append(" | MeshCollider=")
+                    .Append(candidateCollider != null)
+                    .Append(" | rendererEnabled=")
+                    .Append(candidateRenderer != null && candidateRenderer.enabled)
+                    .Append(" | forceRenderingOff=")
+                    .Append(candidateRenderer != null && candidateRenderer.forceRenderingOff)
+                    .Append(" | mesh=")
+                    .Append(ResolveAuditObjectName(candidateMesh))
+                    .Append(" | renderableRemnant=")
+                    .Append(renderableRemnant)
+                    .AppendLine();
+
+                if (renderableRemnant)
+                {
+                    RegisterRiverCoupledAuditFailure(
+                        ref firstBrokenStage,
+                        ref firstBrokenReason,
+                        RiverCoupledSurfaceAuditStage.CorridorOutput,
+                        $"Noncanonical corridor-like object '{candidate.name}' still has an enabled live renderer and can compete with the exact generated corridor.");
+                }
+            }
+
+            if (exactCorridorTransforms.Count != 1)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.CorridorOutput,
+                    exactCorridorTransforms.Count == 0
+                        ? $"River '{river.name}' has no exact '{RiverCorridorAuditObjectPrefix}' output object."
+                        : $"River '{river.name}' has {exactCorridorTransforms.Count} exact '{RiverCorridorAuditObjectPrefix}' output objects; exactly one is required.");
+                report.AppendLine();
+                return;
+            }
+
+            Transform corridorTransform = exactCorridorTransforms[0];
+            GameObject corridorObject = corridorTransform.gameObject;
+            MeshFilter corridorFilter =
+                corridorObject.GetComponent<MeshFilter>();
+            MeshRenderer corridorRenderer =
+                corridorObject.GetComponent<MeshRenderer>();
+            MeshCollider corridorCollider =
+                corridorObject.GetComponent<MeshCollider>();
+            Mesh corridorMesh =
+                corridorFilter != null
+                    ? corridorFilter.sharedMesh
+                    : null;
+
+            report.Append("Exact corridor activeSelf: ")
+                .Append(corridorObject.activeSelf)
+                .Append(" | activeInHierarchy: ")
+                .Append(corridorObject.activeInHierarchy)
+                .Append(" | layer: ")
+                .Append(corridorObject.layer)
+                .AppendLine();
+            report.Append("MeshFilter: ")
+                .Append(corridorFilter != null)
+                .Append(" | MeshRenderer: ")
+                .Append(corridorRenderer != null)
+                .Append(" | MeshCollider: ")
+                .Append(corridorCollider != null)
+                .AppendLine();
+
+            if (corridorFilter == null ||
+                corridorRenderer == null ||
+                corridorCollider == null)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.CorridorOutput,
+                    $"Exact corridor for River '{river.name}' is missing one or more required MeshFilter/MeshRenderer/MeshCollider components.");
+            }
+
+            if (!corridorObject.activeInHierarchy ||
+                corridorRenderer == null ||
+                !corridorRenderer.enabled ||
+                corridorRenderer.forceRenderingOff)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.CorridorOutput,
+                    $"Exact corridor for River '{river.name}' is not currently renderable by active/enabled renderer state.");
+            }
+
+            if (corridorRenderer != null)
+            {
+                report.Append("Renderer enabled: ")
+                    .Append(corridorRenderer.enabled)
+                    .Append(" | forceRenderingOff: ")
+                    .Append(corridorRenderer.forceRenderingOff)
+                    .AppendLine();
+                report.Append("Renderer local bounds center/size: ")
+                    .Append(FormatAuditVector3(corridorRenderer.localBounds.center))
+                    .Append(" / ")
+                    .Append(FormatAuditVector3(corridorRenderer.localBounds.size))
+                    .AppendLine();
+                report.Append("Renderer world bounds center/size: ")
+                    .Append(FormatAuditVector3(corridorRenderer.bounds.center))
+                    .Append(" / ")
+                    .Append(FormatAuditVector3(corridorRenderer.bounds.size))
+                    .AppendLine();
+            }
+
+            if (corridorMesh == null)
+            {
+                report.AppendLine("Corridor mesh: <null>");
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.CorridorOutput,
+                    $"Exact corridor MeshFilter for River '{river.name}' has no shared mesh.");
+                report.AppendLine();
+                return;
+            }
+
+            long indexCount = 0;
+            for (int subMeshIndex = 0;
+                 subMeshIndex < corridorMesh.subMeshCount;
+                 subMeshIndex++)
+            {
+                indexCount += corridorMesh.GetIndexCount(subMeshIndex);
+            }
+
+            report.Append("Corridor mesh: ")
+                .Append(corridorMesh.name)
+                .Append(" | hideFlags=")
+                .Append(corridorMesh.hideFlags)
+                .Append(" | vertexCount=")
+                .Append(corridorMesh.vertexCount)
+                .Append(" | subMeshCount=")
+                .Append(corridorMesh.subMeshCount)
+                .Append(" | indexCount=")
+                .Append(indexCount)
+                .Append(" | triangleCount≈")
+                .Append(indexCount / 3)
+                .AppendLine();
+            report.Append("Mesh bounds center/size: ")
+                .Append(FormatAuditVector3(corridorMesh.bounds.center))
+                .Append(" / ")
+                .Append(FormatAuditVector3(corridorMesh.bounds.size))
+                .AppendLine();
+
+            if (corridorMesh.vertexCount <= 0 || indexCount <= 0)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.CorridorOutput,
+                    $"Exact corridor mesh for River '{river.name}' contains no renderable geometry.");
+            }
+
+            if (corridorRenderer != null)
+            {
+                Material corridorMaterial = corridorRenderer.sharedMaterial;
+                report.Append("Corridor material: ")
+                    .Append(ResolveAuditMaterialName(corridorMaterial))
+                    .AppendLine();
+                report.Append("Matches live Ground renderer material: ")
+                    .Append(corridorMaterial == actualGroundMaterial)
+                    .AppendLine();
+
+                if (corridorMaterial == null)
+                {
+                    RegisterRiverCoupledAuditFailure(
+                        ref firstBrokenStage,
+                        ref firstBrokenReason,
+                        RiverCoupledSurfaceAuditStage.SharedMaterial,
+                        $"Exact corridor renderer for River '{river.name}' has no shared material.");
+                }
+                else if (corridorMaterial != actualGroundMaterial)
+                {
+                    RegisterRiverCoupledAuditFailure(
+                        ref firstBrokenStage,
+                        ref firstBrokenReason,
+                        RiverCoupledSurfaceAuditStage.SharedMaterial,
+                        $"Exact corridor renderer for River '{river.name}' does not use the live GeneratedGround renderer's shared material reference.");
+                }
+
+                AppendCorridorMaterialPropertyBlockAudit(
+                    report,
+                    river,
+                    corridorRenderer,
+                    resolvedMaterialControls,
+                    ref firstBrokenStage,
+                    ref firstBrokenReason);
+            }
+
+            AppendCorridorSemanticGeometryAudit(
+                report,
+                river,
+                corridorMesh,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+
+            report.AppendLine();
+        }
+
+        private static void AppendRequiredGroundMaterialPropertyAudit(
+            StringBuilder report,
+            Material material,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            if (material == null)
+            {
+                report.AppendLine("Required River-coupled shader properties: unavailable (no Ground material).");
+                return;
+            }
+
+            int[] requiredProperties =
+            {
+                SurfaceContractId,
+                GroundRiverCoupledEnabledId,
+                GroundBankLayerEnabledId,
+                GroundBankLayerBaseColorId,
+                GroundBankMaterialStrengthId,
+                GroundBankMaterialTransitionId,
+                GroundRiverbedLayerEnabledId,
+                GroundRiverbedLayerBaseColorId,
+                GroundRiverbedMaterialStrengthId,
+                GroundRiverbedMaterialTransitionId,
+                MaskDebugModeId
+            };
+            string[] requiredNames =
+            {
+                "_SurfaceContract",
+                "_GroundRiverCoupledEnabled",
+                "_GroundBankLayerEnabled",
+                "_GroundBankLayerBaseColor",
+                "_GroundBankMaterialStrength",
+                "_GroundBankMaterialTransition",
+                "_GroundRiverbedLayerEnabled",
+                "_GroundRiverbedLayerBaseColor",
+                "_GroundRiverbedMaterialStrength",
+                "_GroundRiverbedMaterialTransition",
+                "_MaskDebugMode"
+            };
+
+            report.Append("Ground shader: ")
+                .Append(material.shader != null
+                    ? material.shader.name
+                    : "<null shader>")
+                .AppendLine();
+
+            for (int index = 0; index < requiredProperties.Length; index++)
+            {
+                bool hasProperty = material.HasProperty(requiredProperties[index]);
+                report.Append("  shader has ")
+                    .Append(requiredNames[index])
+                    .Append(": ")
+                    .Append(hasProperty)
+                    .AppendLine();
+
+                if (!hasProperty)
+                {
+                    RegisterRiverCoupledAuditFailure(
+                        ref firstBrokenStage,
+                        ref firstBrokenReason,
+                        RiverCoupledSurfaceAuditStage.SharedMaterial,
+                        $"Ground material shader '{(material.shader != null ? material.shader.name : "<null>")}' does not expose required River-coupled property {requiredNames[index]}.");
+                }
+            }
+        }
+
+        private void AppendCorridorMaterialPropertyBlockAudit(
+            StringBuilder report,
+            StylizedRiver river,
+            MeshRenderer corridorRenderer,
+            GroundMaterialControls resolvedMaterialControls,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            MaterialPropertyBlock block = new MaterialPropertyBlock();
+            corridorRenderer.GetPropertyBlock(block);
+
+            GroundSurfaceLayerProfile bankLayer =
+                resolvedMaterialControls.BankSurfaceLayer;
+            GroundSurfaceLayerProfile riverbedLayer =
+                resolvedMaterialControls.ResolvedRiverbedSurfaceLayer;
+            bool hasBankLayer = bankLayer != null;
+            bool hasRiverbedLayer = riverbedLayer != null;
+            Color expectedBankColor = hasBankLayer
+                ? bankLayer.BaseColor
+                : resolvedMaterialControls.BaseColor;
+            Color expectedRiverbedColor = hasRiverbedLayer
+                ? riverbedLayer.BaseColor
+                : resolvedMaterialControls.BaseColor;
+            GroundSurfaceApplicationBlendSettings bankBlend =
+                resolvedMaterialControls.BankSurfaceApplicationBlend;
+            GroundSurfaceApplicationBlendSettings riverbedBlend =
+                resolvedMaterialControls.RiverbedSurfaceApplicationBlend;
+            Vector4 expectedBankTransition = new Vector4(
+                bankBlend.Distance,
+                bankBlend.Softness,
+                bankBlend.FeatureEdgeClearance,
+                bankBlend.FeatureReturnFade);
+            Vector4 expectedRiverbedTransition = new Vector4(
+                riverbedBlend.Distance,
+                riverbedBlend.Softness,
+                riverbedBlend.FeatureEdgeClearance,
+                riverbedBlend.FeatureReturnFade);
+
+            report.AppendLine("MaterialPropertyBlock:");
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                SurfaceContractId,
+                "_SurfaceContract",
+                1f,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                GroundRiverCoupledEnabledId,
+                "_GroundRiverCoupledEnabled",
+                1f,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                GroundBankLayerEnabledId,
+                "_GroundBankLayerEnabled",
+                hasBankLayer ? 1f : 0f,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditColorComparison(
+                report,
+                river,
+                block,
+                GroundBankLayerBaseColorId,
+                "_GroundBankLayerBaseColor",
+                expectedBankColor,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                GroundBankMaterialStrengthId,
+                "_GroundBankMaterialStrength",
+                resolvedMaterialControls.BankMaterialStrength,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditVectorComparison(
+                report,
+                river,
+                block,
+                GroundBankMaterialTransitionId,
+                "_GroundBankMaterialTransition",
+                expectedBankTransition,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                GroundRiverbedLayerEnabledId,
+                "_GroundRiverbedLayerEnabled",
+                hasRiverbedLayer ? 1f : 0f,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditColorComparison(
+                report,
+                river,
+                block,
+                GroundRiverbedLayerBaseColorId,
+                "_GroundRiverbedLayerBaseColor",
+                expectedRiverbedColor,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                GroundRiverbedMaterialStrengthId,
+                "_GroundRiverbedMaterialStrength",
+                resolvedMaterialControls.RiverbedMaterialStrength,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditVectorComparison(
+                report,
+                river,
+                block,
+                GroundRiverbedMaterialTransitionId,
+                "_GroundRiverbedMaterialTransition",
+                expectedRiverbedTransition,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+            AppendAuditFloatComparison(
+                report,
+                river,
+                block,
+                MaskDebugModeId,
+                "_MaskDebugMode",
+                (float)debugView,
+                ref firstBrokenStage,
+                ref firstBrokenReason);
+        }
+
+        private static void AppendAuditFloatComparison(
+            StringBuilder report,
+            StylizedRiver river,
+            MaterialPropertyBlock block,
+            int propertyId,
+            string propertyName,
+            float expected,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            bool present = block.HasProperty(propertyId);
+            float actual = block.GetFloat(propertyId);
+            bool matches =
+                present &&
+                IsFiniteAuditValue(actual) &&
+                Mathf.Abs(actual - expected) <= RiverCoupledAuditTolerance;
+            report.Append("  ")
+                .Append(propertyName)
+                .Append(" present=")
+                .Append(present)
+                .Append(" expected=")
+                .Append(expected.ToString("F5"))
+                .Append(" actual=")
+                .Append(actual.ToString("F5"))
+                .Append(" | ")
+                .AppendLine(matches ? "PASS" : "FAIL");
+
+            if (!matches)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.MaterialPropertyBlock,
+                    present
+                        ? $"River '{river.name}' corridor property {propertyName} expected {expected:F5} but reads {actual:F5} from the live MaterialPropertyBlock."
+                        : $"River '{river.name}' live corridor MaterialPropertyBlock does not contain required float property {propertyName}.");
+            }
+        }
+
+        private static void AppendAuditColorComparison(
+            StringBuilder report,
+            StylizedRiver river,
+            MaterialPropertyBlock block,
+            int propertyId,
+            string propertyName,
+            Color expected,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            bool present = block.HasProperty(propertyId);
+            Color actual = block.GetColor(propertyId);
+            bool matches =
+                present &&
+                AuditColorsApproximatelyEqual(actual, expected);
+            report.Append("  ")
+                .Append(propertyName)
+                .Append(" present=")
+                .Append(present)
+                .Append(" expected=")
+                .Append(FormatAuditColor(expected))
+                .Append(" actual=")
+                .Append(FormatAuditColor(actual))
+                .Append(" | ")
+                .AppendLine(matches ? "PASS" : "FAIL");
+
+            if (!matches)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.MaterialPropertyBlock,
+                    present
+                        ? $"River '{river.name}' corridor property {propertyName} does not match current Ground authoring."
+                        : $"River '{river.name}' live corridor MaterialPropertyBlock does not contain required color property {propertyName}.");
+            }
+        }
+
+        private static void AppendAuditVectorComparison(
+            StringBuilder report,
+            StylizedRiver river,
+            MaterialPropertyBlock block,
+            int propertyId,
+            string propertyName,
+            Vector4 expected,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            bool present = block.HasProperty(propertyId);
+            Vector4 actual = block.GetVector(propertyId);
+            bool matches =
+                present &&
+                AuditVectorsApproximatelyEqual(actual, expected);
+            report.Append("  ")
+                .Append(propertyName)
+                .Append(" present=")
+                .Append(present)
+                .Append(" expected=")
+                .Append(FormatAuditVector4(expected))
+                .Append(" actual=")
+                .Append(FormatAuditVector4(actual))
+                .Append(" | ")
+                .AppendLine(matches ? "PASS" : "FAIL");
+
+            if (!matches)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.MaterialPropertyBlock,
+                    present
+                        ? $"River '{river.name}' corridor property {propertyName} does not match current Ground authoring."
+                        : $"River '{river.name}' live corridor MaterialPropertyBlock does not contain required vector property {propertyName}.");
+            }
+        }
+
+        private static void AppendCorridorSemanticGeometryAudit(
+            StringBuilder report,
+            StylizedRiver river,
+            Mesh corridorMesh,
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason)
+        {
+            bool hasTexCoord3 = corridorMesh.HasVertexAttribute(
+                UnityEngine.Rendering.VertexAttribute.TexCoord3);
+            int texCoord3Dimension = hasTexCoord3
+                ? corridorMesh.GetVertexAttributeDimension(
+                    UnityEngine.Rendering.VertexAttribute.TexCoord3)
+                : 0;
+            List<Vector4> uv3 = new List<Vector4>(corridorMesh.vertexCount);
+            if (hasTexCoord3)
+            {
+                corridorMesh.GetUVs(3, uv3);
+            }
+
+            report.AppendLine("TexCoord3 semantic stream:");
+            report.Append("  present=")
+                .Append(hasTexCoord3)
+                .Append(" | dimension=")
+                .Append(texCoord3Dimension)
+                .Append(" | uv3Count=")
+                .Append(uv3.Count)
+                .Append(" | vertexCount=")
+                .Append(corridorMesh.vertexCount)
+                .AppendLine();
+
+            if (!hasTexCoord3 || texCoord3Dimension != 4)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SemanticGeometry,
+                    $"River '{river.name}' corridor mesh does not expose a four-component TexCoord3 stream.");
+                return;
+            }
+
+            if (uv3.Count != corridorMesh.vertexCount)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SemanticGeometry,
+                    $"River '{river.name}' corridor TexCoord3 count {uv3.Count} does not match vertex count {corridorMesh.vertexCount}.");
+                return;
+            }
+
+            RiverCoupledSurfaceAuditChannelStats[] stats =
+            {
+                CreateAuditChannelStats(),
+                CreateAuditChannelStats(),
+                CreateAuditChannelStats(),
+                CreateAuditChannelStats()
+            };
+
+            for (int index = 0; index < uv3.Count; index++)
+            {
+                Vector4 value = uv3[index];
+                AccumulateAuditChannel(ref stats[0], value.x);
+                AccumulateAuditChannel(ref stats[1], value.y);
+                AccumulateAuditChannel(ref stats[2], value.z);
+                AccumulateAuditChannel(ref stats[3], value.w);
+            }
+
+            string[] channelLabels =
+            {
+                "x riverbedSupport",
+                "y bankOutwardDistance",
+                "z bankInwardDistance",
+                "w riverbedInwardDistance"
+            };
+
+            for (int index = 0; index < stats.Length; index++)
+            {
+                report.Append("  ")
+                    .Append(channelLabels[index])
+                    .Append(" min=")
+                    .Append(stats[index].Minimum.ToString("F6"))
+                    .Append(" max=")
+                    .Append(stats[index].Maximum.ToString("F6"))
+                    .Append(" nonzero=")
+                    .Append(stats[index].NonZeroCount)
+                    .Append(" nonfinite=")
+                    .Append(stats[index].NonFiniteCount)
+                    .AppendLine();
+            }
+
+            bool semanticFailure = false;
+            for (int index = 0; index < stats.Length; index++)
+            {
+                if (stats[index].NonFiniteCount > 0)
+                {
+                    semanticFailure = true;
+                }
+            }
+
+            if (stats[0].NonZeroCount == 0 ||
+                stats[2].NonZeroCount == 0 ||
+                stats[3].NonZeroCount == 0)
+            {
+                semanticFailure = true;
+            }
+
+            if (stats[0].Minimum < -RiverCoupledAuditTolerance ||
+                stats[0].Maximum > 1f + RiverCoupledAuditTolerance ||
+                stats[1].Minimum < -RiverCoupledAuditTolerance ||
+                stats[2].Minimum < -RiverCoupledAuditTolerance ||
+                stats[3].Minimum < -RiverCoupledAuditTolerance)
+            {
+                semanticFailure = true;
+            }
+
+            if (semanticFailure)
+            {
+                RegisterRiverCoupledAuditFailure(
+                    ref firstBrokenStage,
+                    ref firstBrokenReason,
+                    RiverCoupledSurfaceAuditStage.SemanticGeometry,
+                    $"River '{river.name}' corridor TexCoord3 values violate the expected support/distance contract; inspect the per-channel statistics above.");
+            }
+        }
+
+        private static RiverCoupledSurfaceAuditChannelStats
+            CreateAuditChannelStats()
+        {
+            return new RiverCoupledSurfaceAuditChannelStats
+            {
+                Minimum = float.PositiveInfinity,
+                Maximum = float.NegativeInfinity,
+                NonZeroCount = 0,
+                NonFiniteCount = 0
+            };
+        }
+
+        private static void AccumulateAuditChannel(
+            ref RiverCoupledSurfaceAuditChannelStats stats,
+            float value)
+        {
+            if (!IsFiniteAuditValue(value))
+            {
+                stats.NonFiniteCount++;
+                return;
+            }
+
+            stats.Minimum = Mathf.Min(stats.Minimum, value);
+            stats.Maximum = Mathf.Max(stats.Maximum, value);
+            if (Mathf.Abs(value) > RiverCoupledAuditTolerance)
+            {
+                stats.NonZeroCount++;
+            }
+        }
+
+        private static bool ContainsAuditRiverReference(
+            StylizedRiver[] candidates,
+            StylizedRiver river)
+        {
+            if (candidates == null || river == null)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < candidates.Length; index++)
+            {
+                if (candidates[index] == river)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void RegisterRiverCoupledAuditFailure(
+            ref RiverCoupledSurfaceAuditStage firstBrokenStage,
+            ref string firstBrokenReason,
+            RiverCoupledSurfaceAuditStage stage,
+            string reason)
+        {
+            if (!string.IsNullOrEmpty(firstBrokenReason) &&
+                stage >= firstBrokenStage)
+            {
+                return;
+            }
+
+            firstBrokenStage = stage;
+            firstBrokenReason = reason;
+        }
+
+        private static string ResolveRiverCoupledAuditStageLabel(
+            RiverCoupledSurfaceAuditStage stage)
+        {
+            return stage switch
+            {
+                RiverCoupledSurfaceAuditStage.GroundRiverRegistry =>
+                    "Ground cached River registry",
+                RiverCoupledSurfaceAuditStage.CorridorOutput =>
+                    "River corridor output identity/components",
+                RiverCoupledSurfaceAuditStage.SharedMaterial =>
+                    "Ground/corridor shared-material and shader contract",
+                RiverCoupledSurfaceAuditStage.MaterialPropertyBlock =>
+                    "Ground → corridor MaterialPropertyBlock propagation",
+                RiverCoupledSurfaceAuditStage.SemanticGeometry =>
+                    "Corridor TexCoord3 semantic stream",
+                _ =>
+                    "CPU/renderer/geometry contract passes; downstream shader evaluation remains"
+            };
+        }
+
+        private static string ResolveAuditObjectName(UnityEngine.Object value)
+        {
+            return value != null ? value.name : "<null>";
+        }
+
+        private static string ResolveAuditMaterialName(Material material)
+        {
+            if (material == null)
+            {
+                return "<null>";
+            }
+
+            return material.name + " | shader=" +
+                (material.shader != null
+                    ? material.shader.name
+                    : "<null>");
+        }
+
+        private static string ResolveAuditHierarchyPath(Transform target)
+        {
+            if (target == null)
+            {
+                return "<null>";
+            }
+
+            StringBuilder path = new StringBuilder(target.name);
+            Transform current = target.parent;
+            while (current != null)
+            {
+                path.Insert(0, '/');
+                path.Insert(0, current.name);
+                current = current.parent;
+            }
+
+            return path.ToString();
+        }
+
+        private static string FormatAuditVector3(Vector3 value)
+        {
+            return $"({value.x:F5}, {value.y:F5}, {value.z:F5})";
+        }
+
+        private static string FormatAuditVector4(Vector4 value)
+        {
+            return $"({value.x:F5}, {value.y:F5}, {value.z:F5}, {value.w:F5})";
+        }
+
+        private static string FormatAuditColor(Color value)
+        {
+            return $"({value.r:F5}, {value.g:F5}, {value.b:F5}, {value.a:F5})";
+        }
+
+        private static bool AuditColorsApproximatelyEqual(
+            Color left,
+            Color right)
+        {
+            return IsFiniteAuditValue(left.r) &&
+                IsFiniteAuditValue(left.g) &&
+                IsFiniteAuditValue(left.b) &&
+                IsFiniteAuditValue(left.a) &&
+                Mathf.Abs(left.r - right.r) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.g - right.g) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.b - right.b) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.a - right.a) <= RiverCoupledAuditTolerance;
+        }
+
+        private static bool AuditVectorsApproximatelyEqual(
+            Vector4 left,
+            Vector4 right)
+        {
+            return IsFiniteAuditValue(left.x) &&
+                IsFiniteAuditValue(left.y) &&
+                IsFiniteAuditValue(left.z) &&
+                IsFiniteAuditValue(left.w) &&
+                Mathf.Abs(left.x - right.x) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.y - right.y) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.z - right.z) <= RiverCoupledAuditTolerance &&
+                Mathf.Abs(left.w - right.w) <= RiverCoupledAuditTolerance;
+        }
+
+        private static bool IsFiniteAuditValue(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+#endif
+
         private void OnDestroy()
         {
             ClearGeneratedAssignments();

@@ -13,13 +13,14 @@ MonoBehaviour:
   m_Name: GSLP_DarkRiverMud
   m_EditorClassIdentifier: Assembly-CSharp::ProgrammaticStylized3D.Geometry.Ground.GroundSurfaceLayerProfile
   displayName: Dark River Mud
-  baseColor: {r: 0.22, g: 0.18, b: 0.13, a: 1}
-  darkColor: {r: 0.12, g: 0.1, b: 0.08, a: 1}
-  lightColor: {r: 0.32, g: 0.27, b: 0.19, a: 1}
+  surfaceMaterial: {fileID: 0}
+  baseColor: {r: 0.5283019, g: 0.4986179, b: 0.46101815, a: 1}
+  darkColor: {r: 0.6226415, g: 0.5545568, b: 0.4728551, a: 1}
+  lightColor: {r: 0.31132078, g: 0.287177, b: 0.24817553, a: 1}
   wetColor: {r: 0.1, g: 0.09, b: 0.07, a: 1}
-  macroContrast: 0.35
+  macroContrast: 0.65
   pixelContrast: 0.3
-  drySmoothness: 0.22
+  drySmoothness: 0.079
   drySpecularStrength: 0.1
   wetDarkening: 0.45
   wetTintStrength: 0.9

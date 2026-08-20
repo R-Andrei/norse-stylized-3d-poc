@@ -872,6 +872,7 @@ namespace ProgrammaticStylized3D.Rivers
                 TopologyMetricCount,
                 64);
 
+            ConfigureGridDescriptorComputeParameters();
             computeShader.SetInts("_FoamDimensions", fieldWidth, fieldHeight);
             computeShader.SetInts(
                 "_FoamTopologyDimensions",

@@ -517,7 +517,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
         {
             if (instance != null && instance.UsesRecipeOnlyGeneration)
             {
-                // Wind-response authoring is not part of the accepted 42-control
+                // Wind-response authoring is not part of the accepted 40-control
                 // structural schema. Keep one neutral recipe-only response rather
                 // than deriving hidden behavior from a reference-family label or
                 // overloading an unrelated damage control.

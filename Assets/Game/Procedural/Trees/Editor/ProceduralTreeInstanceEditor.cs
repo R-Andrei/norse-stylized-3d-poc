@@ -368,7 +368,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "Exhaustive Control Validation",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Runs all 41 controls at baseline, low, neutral and high across available Alder, Norway Spruce, Wych Elm and Dead gallery representatives. The suite advances one bounded case per Editor update, checkpoints TXT/CSV output, reports ETA and remains cancellable.",
+                "Runs all 40 controls at baseline, low, neutral and high across available Alder, Norway Spruce, Wych Elm and Dead gallery representatives. The suite advances one bounded case per Editor update, checkpoints TXT/CSV output, reports ETA and remains cancellable.",
                 MessageType.None);
             if (TreeControlResponseSuite.IsRunning)
             {
@@ -386,7 +386,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 EditorGUILayout.LabelField(
                     "Timing",
                     TreeControlResponseSuite.CurrentEta);
-                if (GUILayout.Button("Cancel 41-Control Response Suite"))
+                if (GUILayout.Button("Cancel 40-Control Response Suite"))
                 {
                     TreeControlResponseSuite.RequestCancel();
                 }
@@ -396,9 +396,10 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 using (new EditorGUI.DisabledScope(
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
-                    TreeRootCollapseTournament.IsRunning))
+                    TreeRootCollapseTournament.IsRunning ||
+                    TreeTrunkResponseDiagnosticSuite.IsRunning))
                 {
-                    if (GUILayout.Button("Run 41-Control Response Suite"))
+                    if (GUILayout.Button("Run 40-Control Response Suite"))
                     {
                         TreeControlResponseSuite.Start(instance);
                     }
@@ -417,6 +418,65 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 if (GUILayout.Button("Open Control Response Folder"))
                 {
                     TreeControlResponseSuite.OpenOutputFolder();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Lean / Bend Contract Diagnostics",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Measures the current structural centreline against the production bark/root surface frame across Lean, Bend, Buttress Persistence, root extremes, axial twist and Path Spiral combinations. TREE-TRUNK.1 does not repair Lean/Bend behavior; this suite records the data needed for the follow-up contract change. It advances one topology-validated case per Editor update and remains cancellable.",
+                MessageType.None);
+            if (TreeTrunkResponseDiagnosticSuite.IsRunning)
+            {
+                Rect trunkResponseProgressRect = GUILayoutUtility.GetRect(
+                    10f,
+                    18f,
+                    GUILayout.ExpandWidth(true));
+                EditorGUI.ProgressBar(
+                    trunkResponseProgressRect,
+                    TreeTrunkResponseDiagnosticSuite.CurrentProgress,
+                    TreeTrunkResponseDiagnosticSuite.ProgressLabel);
+                EditorGUILayout.LabelField(
+                    "Current",
+                    TreeTrunkResponseDiagnosticSuite.CurrentDetail);
+                EditorGUILayout.LabelField(
+                    "Timing",
+                    TreeTrunkResponseDiagnosticSuite.CurrentEta);
+                if (GUILayout.Button("Cancel Lean / Bend Contract Diagnostic"))
+                {
+                    TreeTrunkResponseDiagnosticSuite.RequestCancel();
+                }
+            }
+            else
+            {
+                using (new EditorGUI.DisabledScope(
+                    TreeControlResponseSuite.IsRunning ||
+                    TreeGeometryEfficiencyAudit.IsRunning ||
+                    TreeRootQualityEvaluation.IsRunning ||
+                    TreeRootCollapseTournament.IsRunning))
+                {
+                    if (GUILayout.Button("Run Lean / Bend Contract Diagnostic"))
+                    {
+                        TreeTrunkResponseDiagnosticSuite.Start(instance);
+                    }
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                string.IsNullOrEmpty(
+                    TreeTrunkResponseDiagnosticSuite.LastReportPath)))
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy Lean / Bend Diagnostic Report"))
+                {
+                    TreeTrunkResponseDiagnosticSuite.CopyLastReport();
+                }
+                if (GUILayout.Button("Open Lean / Bend Diagnostic Folder"))
+                {
+                    TreeTrunkResponseDiagnosticSuite.OpenOutputFolder();
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -454,7 +514,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 using (new EditorGUI.DisabledScope(
                     TreeControlResponseSuite.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
-                    TreeRootCollapseTournament.IsRunning))
+                    TreeRootCollapseTournament.IsRunning ||
+                    TreeTrunkResponseDiagnosticSuite.IsRunning))
                 {
                     if (GUILayout.Button("Run Geometry Efficiency Audit"))
                     {
@@ -512,7 +573,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 using (new EditorGUI.DisabledScope(
                     TreeControlResponseSuite.IsRunning ||
                     TreeGeometryEfficiencyAudit.IsRunning ||
-                    TreeRootCollapseTournament.IsRunning))
+                    TreeRootCollapseTournament.IsRunning ||
+                    TreeTrunkResponseDiagnosticSuite.IsRunning))
                 {
                     if (GUILayout.Button("Run Ground-Contact Radial Board"))
                     {
@@ -574,7 +636,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 using (new EditorGUI.DisabledScope(
                     TreeControlResponseSuite.IsRunning ||
                     TreeGeometryEfficiencyAudit.IsRunning ||
-                    TreeRootQualityEvaluation.IsRunning))
+                    TreeRootQualityEvaluation.IsRunning ||
+                    TreeTrunkResponseDiagnosticSuite.IsRunning))
                 {
                     if (GUILayout.Button("Run Root-Frame Tournament"))
                     {

@@ -526,12 +526,13 @@ namespace ProgrammaticStylized3D.Rivers.Editor
                 "Coverage / Visibility Evidence",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Capture reads the exact previous/current committed Layer C " +
-                "ARGBHalf pair and the current interpolation alpha. The CPU " +
-                "report measures Coverage, Material Amount, Life-weighted " +
-                "Material Amount, and the selected scalar visibility base. " +
-                "The blue channel of Visibility Pipeline Composite remains " +
-                "the exact pixel-space pre-Chip production mask.",
+                "Capture reads the committed Layer C state for the selected " +
+                "Material Contract. C × P × L Baseline measures Coverage, " +
+                "Material Amount, and life moments from the interpolated pair. " +
+                "Coverage + Life measures fractional geometric Coverage and its " +
+                "Coverage-weighted Life moment with implicit unit Presence. " +
+                "The blue Visibility Pipeline channel remains the pixel-space " +
+                "pre-Chip production mask.",
                 MessageType.None);
 
             string status = !Application.isPlaying
@@ -1494,7 +1495,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
             {
                 case StylizedRiverFoamDebugView.Final:
                     return
-                        "The exact normal player-facing Foam result from ordinary temporal interpolation between the previous and current committed Layer C states after Coverage transport, topology-adjusted Remaining Life, the selected Presence amplitude policy, surface coupling, Chipping, Strands, and lighting. Rejected velocity backtracing remains inactive.";
+                        "The exact normal player-facing Foam result for the selected Material Contract. C × P × L Baseline uses its committed packed state and ordinary temporal interpolation. Coverage + Life uses the same temporal/phase-aware fractional Coverage presentation while Remaining Life remains the alive/dead lifecycle authority. Surface coupling, Chipping, Strands, and lighting remain render-side.";
 
                 case StylizedRiverFoamDebugView.FoamAndAgingTopology:
                     return
@@ -1502,47 +1503,47 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.AutomaticBirthSources:
                     return
-                        "Phase-correct automatic source and deposited-trail view. Dark grey is committed persistent Foam already deposited, yellow is the current Shore Ribbon or Inward Wash emitter, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update source overlap, and black means neither committed Foam nor a current source. Source colours do not encode intrinsic Presence or Remaining Life.";
+                        "Automatic source and deposited-trail view. Dark grey is committed persistent Foam already deposited, yellow is the current Shore Ribbon or Inward Wash emitter, cyan is Object Contact Arc, Semi-Arc, and Fleck, magenta is Free-Water Lace, Cross-Lace, and Torn Fragment, white is same-update source overlap, and black means neither committed Foam nor a current source. Under Coverage + Life, deposited trail occupancy is literal fractional geometric Coverage.";
 
                 case StylizedRiverFoamDebugView.MaterialCoverage:
                     return
-                        "Literal geometric Coverage C from the temporally interpolated committed Layer C state. Brightness equals C directly: 1 means the cell is fully occupied, 0.5 means half occupied, and 0 means no material. Presence and Remaining Life do not rescale this view.";
+                        "Material occupancy authority for the selected contract. C × P × L Baseline shows literal geometric Coverage C from the committed state. Coverage + Life shows literal geometric Coverage C; fractional values represent partial cell area occupied by normal Foam.";
 
                 case StylizedRiverFoamDebugView.MaterialPresence:
                     return
-                        "Decoded intrinsic material Presence P sampled at the unshifted field coordinate through ordinary temporal interpolation between committed Layer C states. At Coverage 0.02 or greater, brightness is literal P with no Coverage ramp; this describes material strength inside the occupied fraction, not occupied cell area.";
+                        "C × P × L Baseline shows decoded intrinsic Presence P. Coverage + Life has no independent persistent Presence authority; decoded Presence is the compatibility value 1 wherever Coverage exists. It must not be interpreted as weak/strong Foam.";
 
                 case StylizedRiverFoamDebugView.MaterialRemainingLife:
                     return
-                        "Exact normalized Remaining Life L decoded from the temporally interpolated committed Layer C life moment. At Coverage 0.02 or greater, brightness is literal L with no visibility floor or Coverage ramp; this is lifecycle progress for existing material, not occupied cell area or final opacity.";
+                        "Exact normalized Remaining Life L. C × P × L Baseline decodes L from the committed life moment. Coverage + Life decodes L from the transported C×L life moment; L > 0 means the covered Foam is alive and L = 0 clears that material. L does not scale Final Foam opacity.";
 
                 case StylizedRiverFoamDebugView.MaterialAmount:
                     return
-                        "Literal transported Material Amount C × P from the packed red channel of the same temporally interpolated committed Layer C state. Unlike the decoded Presence view, narrow or diffuse Coverage attenuates this brightness.";
+                        "C × P × L Baseline shows literal transported Material Amount C × P from the packed red channel. Coverage + Life uses compatibility Material Amount equal to Coverage C because Presence is implicitly 1.";
 
                 case StylizedRiverFoamDebugView.MaterialStateComposite:
                     return
-                        "Layer C state composite: red = literal Coverage C, green = decoded Presence P, blue = decoded Remaining Life L. Green and blue are gated black below Coverage 0.02, matching the individual Presence/Life authority rule. Cyan therefore means strong, living material with low Coverage; white means high Coverage, Presence, and Life.";
+                        "Layer C state composite. C × P × L Baseline: red = Coverage C, green = decoded Presence P, blue = Remaining Life L. Coverage + Life: red = literal Coverage C, green = implicit unit Presence where C > 0, blue = decoded Remaining Life L. Green is compatibility diagnostics, not a transported strength authority.";
 
                 case StylizedRiverFoamDebugView.VisibilityPipelineComposite:
                     return
-                        "Production visibility-stage composite: red = meaningful raw Coverage footprint smoothstep(0.02, 0.10, C); green = the selected Final Foam Visibility base before Pattern/life shaping; blue = the exact production pre-Chip Foam mask after Pattern/life shaping, surface warp/wake coupling, and the selected Presence Footprint. Red without green means the visibility base rejected existing Coverage. Green without blue means later pre-Chip shaping or coupling removed it. White means the material survives all three stages.";
+                        "Production visibility-stage composite for the selected Material Contract. Red = material occupancy authority (literal Coverage for both contracts); green = the scalar visibility base; blue = the exact production pre-Chip Foam mask after Pattern/life shaping and surface warp/wake coupling.";
 
                 case StylizedRiverFoamDebugView.FoamMotionField:
                     return
-                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses meaningful committed Coverage at the unshifted coordinate; it is an ownership overlay, not intrinsic Presence amplitude.";
+                        "Unified resolved Foam velocity contract. Bright neutral gray is straight full-speed downstream motion, red is rightward lateral velocity, blue is leftward lateral velocity, darker values are downstream slowdown/stagnation, and yellow marks obstacle-routing influence. Semi-transparent white uses committed material occupancy: Coverage for both contracts.";
 
                 case StylizedRiverFoamDebugView.FoamMotionFieldCellGrid:
                     return
-                        "Unified resolved Foam velocity contract plus the committed persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white uses the shared meaningful-Coverage gate. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks. Neither overlay nor grid follows render-only residual displacement.";
+                        "Unified resolved Foam velocity contract plus the committed persistent simulation-cell grid. Brightness shows downstream speed factor, red/blue show signed lateral velocity, yellow shows obstacle routing, and white shows committed material occupancy for the selected contract. Fine dark lines show individual Foam cells; pale lines show eight-cell blocks.";
 
                 case StylizedRiverFoamDebugView.FoamEvaluatedShape:
                     return
-                        "Layer D evaluated Foam Shape sampled from _FoamShapeMask. It intentionally combines full-resolution committed material amount (Coverage × Presence) with broader half-resolution temporal occupancy, so its footprint may exceed raw material. It is diagnostic-only, does not mutate FoamState, and is not consumed by Final Foam.";
+                        "Layer D evaluated Foam Shape sampled from _FoamShapeMask. The baseline uses committed Material Amount; Coverage + Life uses committed fractional Coverage with implicit unit Presence. Broader half-resolution temporal occupancy may extend the diagnostic shape beyond raw material. This does not mutate persistent state.";
 
                 case StylizedRiverFoamDebugView.FoamShapeDifference:
                     return
-                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent material amount (Coverage × Presence), green means evaluated shape adds visual coverage, and magenta/red means evaluated shape removes visual coverage. This exists so Layer D changes are visible without guessing between two similar masks.";
+                        "Layer D difference diagnostic. Black means _FoamShapeMask matches raw persistent material authority; green means evaluated shape adds visual coverage and magenta/red means it removes visual coverage. Raw authority is C × P for the baseline and literal C for Coverage + Life.";
 
                 case StylizedRiverFoamDebugView.FoamChipAndStrandProbe:
                     return
@@ -1559,7 +1560,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.ChipEligibilityComposite:
                     return
-                        "Layer E Chip permission diagnostic, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. Presence-Amplitude shows the continuous soft-visibility Edge Width band using Presence-Amplitude Edge Start and binary exact rendered support; Interior Access is disabled. Coverage-Only shows its historical continuous soft band plus optional magenta Interior Access. Cyan is permission outside visible support and should be absent.";
+                        "Layer E Chip permission diagnostic for the selected Material Contract, independent of current candidates and Activation. Dark gray is exact pre-Chip rendered Foam. Yellow is the existing continuous soft Edge Width band over the selected material footprint; optional magenta is Chip Interior Access. Cyan is permission outside visible support and should be absent.";
 
                 case StylizedRiverFoamDebugView.ProductionChipMask:
                     return
@@ -1579,7 +1580,7 @@ namespace ProgrammaticStylized3D.Rivers.Editor
 
                 case StylizedRiverFoamDebugView.FoamTemporalOccupancy:
                     return
-                        "The advected half-resolution Layer D visual sheet. One occupancy texel covers four full-resolution material cells, so narrow edges may appear broader or coarser than committed material amount. It moves through the canonical local velocity and closed-face rules, builds/releases toward the instantaneous film target, and never changes Coverage, Presence, or Remaining Life.";
+                        "The advected half-resolution Layer D visual sheet. One occupancy texel covers four full-resolution material cells, so narrow edges may appear broader or coarser than committed material authority. It moves through the canonical local velocity and closed-face rules, builds/releases toward the instantaneous film target, and never changes persistent Layer C state.";
 
                 case StylizedRiverFoamDebugView.FoamTemporalDifference:
                     return

@@ -4714,3 +4714,1317 @@ Each case uses its existing exact-control snapshot without overrides and produce
 - No distance LOD.
 - No exhaustive control-bound certification.
 - No recipe retuning or persistent gallery regeneration until validation passes.
+
+## TREE-GALLERY.1 — Recenter Source Recipe From Gallery Instance
+
+Status: TREE-GALLERY.1A compile hotfix implemented and cross-partial static audit complete after Unity reported CS0111; Unity compilation and live Editor validation remain pending.
+
+### Objective
+
+Add one explicit Editor authoring operation that treats a currently generated gallery tree as a visual target for its assigned curated recipe. The operation recenters the recipe's existing control intervals around the instance's current exact controls while preserving each interval's existing width whenever the authoritative control domain permits it. The generated instance remains disposable and no live or persistent instance-to-gallery synchronization is introduced.
+
+### Acceptance criteria
+
+1. A generated procedural comparison instance can be used to recenter the curated recipe that the gallery assignment maps to that slot.
+2. Ordinary float ranges preserve their pre-operation width exactly, except that the requested center may shift at hard-domain boundaries while the width remains unchanged.
+3. Integer ranges preserve their existing integer span; midpoint error of at most one half-step is permitted when parity prevents an exact integer midpoint.
+4. Angle ranges preserve their existing circular span and may wrap through zero; a full 360-degree range remains unchanged.
+5. Bark Tint preserves each RGB channel span and endpoint direction while moving the interval center as close as possible to the instance color inside 0..1; alpha remains one.
+6. Branch Start Height and Branch End Height preserve both existing widths and the recipe contract that every sampled End is at or above every sampled Start. The pair is recentered jointly when independent recentering would overlap.
+7. The operation modifies only the target TreeGenerationRecipe asset's ControlRanges. It does not change recipe identity, catalog membership, slot mapping, seeds, materials, scene objects, generated meshes, instance exact controls, or gallery rebuild behavior.
+8. Shared recipes are explicit before mutation: the confirmation identifies every curated gallery slot mapped to the same stable recipe identity.
+9. Undo restores the recipe asset's previous ranges.
+10. The operation never automatically rebuilds the gallery after a recipe is recentered.
+11. Existing author-modified curated recipes remain compatible with the curated-catalog validation policy; only the explicit approved-baseline reset operation may intentionally restore code-defined baseline ranges.
+
+### Approved files
+
+- `Assets/Game/Procedural/Trees/TreeRecipeControlRanges.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeCuratedGalleryUtility.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeReferenceGalleryEditor.cs`
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+
+No recipe asset, catalog asset, scene, prefab, material, generated mesh, structural generator, bark generator, shader, layer, tag, or project setting is approved for source-patch modification.
+
+### Reviewed evidence
+
+- The live control registry contains 41 controls: 35 float, 3 integer, 2 angle, and 1 color.
+- TreeRecipeControlRanges owns all serialized recipe intervals and the current hard-domain validation, including the coupled Branch Start Height / Branch End Height ordering contract.
+- TreeResolvedControls owns the exact per-instance values sampled from those intervals.
+- TreeGenerationRecipe exposes its nested ControlRanges and explicit curated-baseline reset remains a separate operation.
+- TreeCuratedGalleryAssignment owns the stable family/index to recipe-identity mapping; multiple slots may intentionally share one recipe.
+- TreeCuratedGalleryUtility already resolves the active catalog and configures slot spawners from that mapping.
+- TreeReferenceGalleryEditor owns the Curated Recipe Generation authoring surface and rebuild action.
+- ProceduralTreeInstanceEditor confirms generated children expose editable exact controls and recipe edits do not silently mutate those existing snapshots.
+- TreeCuratedRecipeCatalogBuilder preserves author-modified recipes during create-missing/validate operations and resets them only through the explicit approved-baseline reset action.
+
+### Production/editor invariants
+
+- The gallery remains an Editor/dev comparison tool; this patch adds no runtime dependency or per-frame work.
+- Rebuild Curated Recipe Comparison Gallery remains recipe-range + deterministic-slot-seed driven and continues to resample exact controls normally.
+- The instance is only an explicit one-shot authoring source. No dirty-state tracking, override state, bidirectional sync, or hidden exact gallery preset is added.
+- The authoritative target recipe is resolved from the selected instance's procedural comparison slot through the gallery assignment and catalog, not from a manually changed instance Recipe field that the next rebuild would overwrite.
+- Existing range widths are the authorial variation budget and are never silently collapsed to exact values.
+
+### Implementation sequence
+
+1. **Canonical plan — complete.** This section was the first project modification after the review surface and repository instructions were reloaded.
+2. **Transactional range recentering — complete in source.** `TreeRecipeControlRanges.RecenterFromResolvedControls` clones and upgrades the current ranges, recenters all 41 live controls against `TreeControlDescriptorRegistry`, validates the candidate, verifies every authored span is preserved, and commits only after the complete transaction passes. Float, integer, circular-angle, color, and the coupled Branch Start/End pair each use type-appropriate span-preserving recentering.
+3. **Gallery target resolution — complete in source.** `TreeCuratedGalleryUtility.TryResolveRecipeAuthoringTarget` requires the source to be the generated child owned by a procedural comparison slot in the current gallery, resolves the destination through `TreeCuratedGalleryAssignment` plus the gallery's assigned catalog, and enumerates every curated slot sharing that recipe identity. It deliberately does not auto-assign catalog bindings.
+4. **Gallery Inspector authoring action — complete in source.** Editor-session-only selection memory retains the most recently selected generated gallery instance while the operator selects the gallery object. The Curated Recipe Generation surface shows the source slot, mapped recipe, and shared consumers, warns on instance/mapped-recipe mismatch, asks for confirmation, records Undo, recenters only the recipe ranges, marks/saves that recipe asset, and does not rebuild the gallery.
+5. **Static/source/math audit — complete.** Closure checks cover the exact four-file scope, 41-control coverage, transactional commit, range-span preservation, branch-band ordering, wrapped/full-circle angles, signed RGB spans, mapped-recipe resolution, shared-consumer reporting, session-only selection state, Undo/dirty/save calls, and absence of automatic rebuild. Randomized mathematical probes passed for float, integer, circular-angle, color, and ordered-pair recentering. All 13 currently serialized curated recipe assets have Branch Start/End widths that fit the joint ordered-domain preservation contract.
+6. **Unity validation — pending.** Unity compilation and live Editor Undo/asset/rebuild behavior cannot be executed in the delivery environment. Compile, recenter one shared Wych Elm recipe from a tuned Twisted instance, inspect width preservation, verify Undo, then rebuild the curated gallery and confirm deterministic recipe sampling still operates normally.
+
+### Implemented source invariants
+
+- The source instance is never persisted as a gallery override. It is read only when the operator explicitly invokes the recenter action.
+- The destination recipe is the recipe the curated rebuild would actually assign to that family/variant slot; a manually changed instance recipe cannot redirect the write.
+- A failure during recentering leaves the target `ControlRanges` unchanged because calculation/validation occurs on cloned candidates and only the final validated candidate is copied into the live range object.
+- Uninitialized target ranges fail closed. Older initialized serialized range schema is normalized on the temporary baseline clone before recentering; the live recipe is not partially upgraded before the transaction passes.
+- Ordinary range width is never reduced to an exact instance value. When the desired center is too close to a hard boundary, the complete interval shifts inside the legal domain.
+- Integer ranges preserve integer span. If even/odd parity prevents the exact instance value from being the mathematical midpoint, the nearest valid integer placement is used and reported as center-constrained.
+- Full-circle angular ranges remain full-circle. Non-full-circle angle ranges retain their circular span and may wrap through zero.
+- Bark Tint preserves each RGB channel's signed endpoint span; alpha remains one.
+- Branch Start Height and Branch End Height are solved jointly when necessary so both widths survive and `End.Minimum >= Start.Maximum` remains true after validation.
+- The button records/saves only the mapped `TreeGenerationRecipe`; it creates no scene, prefab, mesh, material, catalog, seed, generator, bark, or runtime change.
+- `Rebuild Curated Recipe Comparison Gallery` remains unchanged and continues to resample exact controls from the edited recipe ranges using each slot's deterministic seed.
+
+### Audit result
+
+- **TREE-GALLERY.1A compile hotfix — implemented/static-audited:** Unity exposed that `TreeRecipeControlRanges` is split across partial declarations and the TREE-GALLERY.1 patch had added a second `Approximately(Color, Color)` member even though an identical private helper already existed in `TreeCuratedRecipeDefinitions.cs`. The duplicate declaration was removed only; `SameColorRange` now binds to the existing helper on the combined partial type. Cross-partial class-level method-signature audit reports zero duplicate signatures and exactly one `Approximately(Color, Color)` declaration. No recenter math, gallery authoring behavior, serialized asset, or public contract changed.
+- **TREE-GALLERY.1 audit correction:** the earlier 44/44 static closure did not inspect member-signature collisions across every partial declaration, so it was insufficient as a compilation preflight. TREE-GALLERY.1A adds that cross-partial check; Unity compilation is still the authoritative remaining gate.
+- Final static/source/math/packaging closure: **44/44 PASS**.
+- Live registry coverage: **41 controls = 35 float + 3 integer + 2 angle + 1 color**.
+- Randomized math probes: float 10,000; integer 10,000; circular angle 10,000; color 10,000; ordered Branch Start/End pair 20,000 — all PASS.
+- Current curated serialized recipes checked for ordered-pair feasibility: **13/13 PASS**.
+- Changed-files overlay reconstruction against the accepted pre-edit source: **PASS**.
+- Unified-patch reconstruction against the accepted pre-edit source: **PASS**.
+- Repository limitation: this extracted delivery workspace contains no `.git` metadata, so HEAD/branch/SHA verification is unavailable here. The patch is audited against explicit pre-edit copies of the accepted TREE-ROOTS.4C source; Unity compilation remains pending.
+
+### Risks and mitigations
+
+- **Shared-recipe surprise:** one tuned instance may affect several gallery slots on the next rebuild. Mitigation: mandatory consumer list in the confirmation dialog.
+- **Boundary compression:** independently clamping min/max would shrink ranges. Mitigation: clamp the desired center/interval position instead, preserving span.
+- **Branch-band invalidation:** independent recentering can make Branch End overlap Branch Start. Mitigation: solve the two intervals jointly while preserving both widths and the all-samples ordering contract.
+- **Angle discontinuity:** linear min/max arithmetic is wrong across zero. Mitigation: preserve circular angular span and allow wrapped intervals.
+- **Wrong destination recipe:** a user may manually change the instance Recipe field. Mitigation: resolve the destination from the stable gallery slot assignment, and report any instance/mapped-recipe mismatch before mutation.
+- **Unintended baseline reset:** curated definitions still contain approved initial ranges. Mitigation: this patch does not call ConfigureCuratedDefinition; the existing explicit baseline-reset operation remains the only reset path.
+
+### Non-goals
+
+- No exact per-slot gallery presets.
+- No instance override persistence.
+- No live recipe/instance binding.
+- No Sync All operation or averaging across instances.
+- No new public creative controls.
+- No gallery rebuild, regeneration, or recipe resampling triggered by the recenter button.
+- No changes to recipe ranges other than their centers/positions under the width-preservation contract.
+
+
+## TREE-TRUNK.1 — Lean Direction Removal + Lean/Bend Contract Diagnostics
+
+Status: source implementation complete; static/consistency audit 85/85 PASS. Unity compilation, 40-control response execution, and Lean/Bend diagnostic execution remain operator validation gates.
+
+### Objective
+
+1. Remove Lean Direction as a live tree control and generation parameter. Lean Amount becomes a canonical tree-local +X displacement; operators use whole-object yaw when a different world direction is desired.
+2. Preserve the current Lean Amount, Bend Amount, Bend Frequency, root-frame, root-foot, twist, Path Spiral, and bark geometry behavior otherwise.
+3. Add an incremental, cancellable Lean/Bend interaction diagnostic that measures the current structural-centreline versus bark-surface-frame contract across persistence, root, twist, and Path Spiral combinations before any corrective Lean/Bend/root-frame patch is designed.
+
+### Acceptance criteria
+
+- The live control registry contains 40 controls and no Lean Direction descriptor, exact-control field, recipe range, recenter operation, generation override, resolved parameter, fingerprint input, report field, curated-definition comparison, or Inspector condition remains.
+- Recipe-only and legacy generation both use one canonical tree-local +X lean direction. No automatic whole-object rotation is introduced.
+- Existing initialized exact snapshots and recipe ranges migrate without resampling surviving controls; removal of Lean Direction is the only intentional control-schema loss.
+- No Lean Amount/Bend Amount/Bend Frequency response equation, root-frame envelope, grounded-foot anchoring, axial twist, Path Spiral, root mass, or radial-resolution calculation is changed by this patch.
+- The focused diagnostic advances at most one bounded case per Editor update, supports cancellation, displays progress/ETA, checkpoints report/CSV evidence, builds temporary unsaved meshes only, and runs existing bark topology validation for every completed case.
+- The diagnostic reports structural and bark-frame measurements at fixed normalized trunk heights plus the current root collapse/transition landmarks, including tangent mismatch, azimuth mismatch, frame/root envelopes, tip displacement, curvature, and first height where tangent mismatch falls below 5 and 1 degrees.
+- The diagnostic matrix includes Lean x Buttress Persistence, Bend x Buttress Persistence, the Bend Amount/Frequency-zero dependency, combined Lean+Bend, light/heavy root profiles, axial twist handedness, and Path Spiral interaction.
+
+### Approved source scope
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeControlDescriptorRegistry.cs`
+- `Assets/Game/Procedural/Trees/TreeResolvedControls.cs`
+- `Assets/Game/Procedural/Trees/TreeRecipeControlRanges.cs`
+- `Assets/Game/Procedural/Trees/TreeGenerationParameters.cs`
+- `Assets/Game/Procedural/Trees/TreeGenerationOverrides.cs`
+- `Assets/Game/Procedural/Trees/TreeFamilyProfile.cs`
+- `Assets/Game/Procedural/Trees/TreeGenerator.cs`
+- `Assets/Game/Procedural/Trees/TreeCuratedRecipeDefinitions.cs`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeControlRangeDrawer.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeResolvedControlsDrawer.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeControlResponseSuite.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeBarkMeshAssetBuilder.cs`
+
+Create only:
+
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs.meta`
+
+No scene, prefab, material, recipe asset, catalog asset, gallery asset, layer, tag, package, shader, runtime component, generator-version, bark-version, or bark-settings-version change is approved.
+
+### Reviewed evidence
+
+- The current registry exposes Lean Amount and Lean Direction as separate Trunk Shape controls; Lean Direction is an angle control with stable ID `tree.trunk.lean-direction`.
+- Exact controls sample and fingerprint Lean Direction independently. Recipe ranges store, validate, recenter, copy, and compare an independent Lean Direction interval.
+- Recipe-only parameter resolution copies Lean Direction into the structural parameter block. Legacy family/profile generation samples and overrides a separate trunk-lean-yaw value.
+- Current structural trunk generation computes Bend, Drift, Roughness, and Lean as additive horizontal centreline offsets. Lean magnitude is `Lean Amount * Height * t^1.35`; Bend is gated by positive Bend Frequency and uses the existing sinusoidal two-axis curve.
+- Current bark root-frame resolution blends the structural tangent toward tree-local up using `EvaluateRootFrameEnvelope`. The same persistence-aware root envelope also controls fixed-root-normal adoption; Buttress Persistence can therefore extend frame stabilization well beyond the root collapse region.
+- Current grounded root-foot direction is independently anchored in the tree-local right/up frame and released only through the existing foot-anchor envelope. This patch records that relationship but does not modify it.
+- The existing exhaustive control suite is incremental/cancellable but primarily validates fingerprints and broad geometry invariants; it does not directly quantify structural-tangent versus bark-surface-tangent error for Lean/Bend combinations.
+- The current curated definitions and serialized recipe baselines use local zero-degree Lean Direction, so canonical +X lean matches their intended local orientation; stale serialized fields in existing Unity assets are not raw-edited by this source patch and become ignored removed fields until Unity reserializes those assets.
+
+### Invariants and non-goals
+
+- Do not fix the suspected persistence/tangent coupling in TREE-TRUNK.1. The suite must measure the current behavior first.
+- Do not retune Lean Amount, Bend Amount, Bend Frequency, Drift, Roughness, root controls, twist, or Path Spiral.
+- Do not change topology thresholds, root sampling density, root radial density, mixed-resolution stitching, materials, foliage, branch response, or runtime update cost.
+- The diagnostic is Editor-only and temporary-output-only; no diagnostic result is serialized into tree assets or instances.
+- Existing historical documentation may describe Lean Direction as historical behavior, but the active control contract after this patch treats it as removed and obsolete.
+
+### File-by-file implementation sequence
+
+1. **Canonical plan — complete.** This plan was the first project modification after the review gate.
+2. **Control/schema removal — source complete.** Lean Direction is removed from the 40-control live registry, exact controls, recipe ranges/recentering, curated definitions/comparison, drawers, response suite, fingerprints and reports. Exact-control and recipe-range schemas are version 3; initialized surviving values migrate in place without resampling.
+3. **Structural parameter removal — source complete.** Recipe-only and legacy Lean now use canonical tree-local +X. The old resolved parameter/profile range/override/sampling/validation/report ownership for Lean Direction is removed.
+4. **Production frame telemetry — source complete.** Read-only trunk-frame telemetry calls the existing production root-frame, surface-frame, foot-anchor, envelope and roll methods. Static comparison proves those production methods are byte-identical to the accepted pre-patch source.
+5. **Focused diagnostic runner — source complete.** The Editor-only runner contains 35 topology-validated cases, one case per Editor update, cancellation/reload/quit handling, progress/ETA, per-case checkpointing, a 36-column case CSV and a 24-column per-height sample CSV. It records effective tree/root context, structural Lean tip expectation/error, maximum horizontal displacement, structural/surface curvature, frame mismatch and root-transition envelopes.
+6. **Inspector action — source complete.** The 40-control suite and Lean/Bend diagnostic have explicit run/cancel/report actions and mutually exclude the other long-running tree diagnostics.
+7. **Audit — static complete; Unity pending.** Final scope is exactly the approved 17 files (15 modified, two created), with no asset/scene/prefab/material change. Static/consistency audit is 85/85 PASS: 40 live controls; 40 resolved fields; 40 recipe-range fields; 40 recenter operations; 40 curated comparisons; zero live Lean Direction symbols/stable IDs in tree C#; exact CreateTrunk equivalence aside from canonical +X direction; exact production bark-frame/root method equivalence; CSV alignment; unique meta GUID; cross-partial duplicate guard; no deprecated FindObjectsSortMode. Unity compilation and live suite execution remain operator gates.
+
+
+### Implementation result and static evidence
+
+- Live creative-control count: **40** (`35 float / 3 integer / 1 angle / 1 color`). Lean Direction is no longer a live descriptor, serialized exact-control member, recipe range, recenter target, generation parameter, legacy override/profile range, fingerprint/report value, curated-definition comparison, or Inspector dependency.
+- Lean Amount now uses canonical tree-local **+X**. The Bend, Drift, Roughness and Lean magnitude equations are otherwise unchanged from the accepted pre-patch `CreateTrunk` implementation.
+- Existing initialized exact snapshots are treated as authored snapshots across schema migration and are upgraded/clamped in place; uninitialized snapshots still resolve from recipe ranges. Recipe ranges upgrade in place and preserve all surviving ranges.
+- The 13 curated recipe assets are **byte-identical** to the pre-patch source. Their historical serialized Lean Direction values are all `0..0`; because no serialized asset mutation was approved, those now-unknown YAML keys remain historical text until Unity reserializes the assets, but they have no live source field or generation consumer.
+- Generator / bark / bark-settings algorithm versions remain **7 / 28 / 10**. The exact-control and recipe-range schema versions are **3 / 3**.
+- The focused diagnostic matrix totals **35 cases**: Neutral×Persistence (3), Lean×Persistence (9), Bend×Persistence (6), Bend Frequency zero (1), combined Lean+Bend×Persistence (6), root interaction (3), axial twist interaction (3), and Path Spiral interaction (4).
+- Static/consistency audit: **85 / 85 PASS**. Changed-files overlay reconstruction against the accepted pre-edit snapshot is **PASS**; unified-patch apply/check and byte-for-byte reconstruction are **PASS**.
+- No Unity compiler is available in the delivery environment, so compilation and generated diagnostic evidence are explicitly pending rather than inferred.
+
+### Risks and mitigations
+
+- **Serialized migration loss:** increasing schema version could resample all exact controls. Mitigation: initialized pre-current snapshots are upgraded in place and clamped; only uninitialized snapshots sample from ranges.
+- **Legacy compatibility drift:** removing a legacy yaw range changes old profile behavior. Mitigation: preserve Lean strength and every other legacy control while fixing Lean to canonical local +X, matching the explicitly accepted redundancy-removal contract.
+- **Diagnostic drift:** duplicating private frame equations could produce misleading evidence. Mitigation: expose read-only telemetry from the bark generator that calls the same production frame/envelope methods used for mesh emission.
+- **Diagnostic cost/editor freeze:** bark topology builds can take noticeable time. Mitigation: one case per Editor update, cancellation, ETA, and incremental flush after every case.
+- **Premature repair:** measured data may suggest a different Lean/Bend fix than the current hypothesis. Mitigation: TREE-TRUNK.1 changes no Lean/Bend/root-frame equation other than deleting Lean Direction.
+
+
+## TREE-TRUNK.2 — Lean/Bend Contract Repair
+
+### Status
+
+**Implementation and delivery-side static/source audit complete. Unity compilation, focused runtime diagnostics, broad regression, production geometry/topology validation, visual review, and measured performance remain operator gates.**
+
+### Objective
+
+Repair the two independently proven contracts behind the current Lean/Bend failure without changing the authored Lean or Bend equations:
+
+1. Recipe-only non-Path-Spiral trunk safety limiting must preserve the authored base, tip, and vertical profile instead of reconstructing a new three-dimensional chain that can move the Bend-only tip, change authored Height, or corrupt Lean's endpoint.
+2. Recipe-only root-frame tangent stabilization must release at the existing persistence-independent earliest safe root transition, while Buttress Persistence continues to control persistent root/buttress azimuth and frame adoption.
+
+### Reviewed evidence
+
+- Current structural generator version is `7`. `CreateTrunk` authors exact `y = Height × t`, Bend is multiplied by `sin(pi × t)` and therefore contributes zero at base/tip, and Lean uses canonical tree-local `+X`.
+- Ordinary non-Path-Spiral trunks currently route through the shared three-dimensional `ConstrainPolylineTurns` reconstruction. That method rebuilds every next point from the previously constrained point and a rotated segment direction, so once limiting occurs neither authored endpoint nor authored vertical progression is preserved.
+- The accepted active Path Spiral route already bypasses that reconstruction and preserves authored vertical progression; it must remain unchanged.
+- Current bark algorithm version is `28`. `ResolveTrunkBaseSurfaceFrame` currently uses the persistence-aware root-frame envelope both to Slerp the structural tangent toward `Vector3.up` and to adopt the transported structural normal.
+- `CalculateEarliestRootTransitionHeight` already provides a persistence-independent certified release boundary; `CalculateEffectiveRootTransitionHeight` extends only the persistence-aware frame transition toward the tip.
+- The focused 35-case diagnostic established that Lean-only endpoint response is correct, strong Bend acquires endpoint/height drift after authoring, and Buttress Persistence can delay rendered-vs-structural tangent agreement through most of the trunk.
+- The generic branch limiter, Path Spiral route, grounded root foot, root mass/thickness/reach formulas, local contact radial-density work, axial twist, and mixed-resolution stitching are accepted behavior and are non-goals.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeGenerator.cs`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/Delete/Move/Rename: none. Serialized assets: none.
+
+### Acceptance criteria
+
+1. Lean-only structural endpoint response remains unchanged.
+2. Recipe-only non-Path-Spiral Bend-only trunks preserve the authored base/tip and exact authored `Height`.
+3. Recipe-only non-Path-Spiral Lean+Bend trunks preserve the authored Lean endpoint; Bend changes only intermediate curvature.
+4. Existing trunk segment-turn and accumulated-turn policy limits remain enforced without using destructive point reconstruction on the recipe-only non-Path-Spiral trunk path.
+5. Shapes that already satisfy the policy remain byte-for-byte equivalent at the control-point level apart from the generator-version value.
+6. Active recipe-only Path Spiral routing and implementation remain unchanged.
+7. Generic branch and legacy `ConstrainPolylineTurns` behavior remain unchanged.
+8. Recipe-only bark tangent stabilization reaches zero by `CalculateEarliestRootTransitionHeight` for every Buttress Persistence value.
+9. Buttress Persistence continues to affect the existing root-frame/azimuth adoption and buttress-body persistence.
+10. Grounded root foot, root envelopes/mass, radial density, axial roll/twist, mixed-resolution stitching, and topology thresholds remain unchanged.
+11. Focused diagnostics expose separate tangent-safety and root-frame envelopes plus explicit endpoint, height, and transition invariants without weakening topology validation.
+12. Structural generator version advances `7 → 8`; bark algorithm version advances `28 → 29`; control count, exact-control schema, recipe-range schema, and bark settings remain unchanged.
+13. No per-frame/runtime update work, new persistent state, new component, tag, layer, dependency, or serialized asset edit is introduced.
+
+### Generator algorithm
+
+For recipe-only, non-Path-Spiral trunk control points only:
+
+1. Keep the authored `CreateTrunk` equations unchanged.
+2. Preserve authored base, tip, and every authored Y coordinate.
+3. Let `t_i = i / (N - 1)` and define the endpoint chord in XZ as `C_i = lerp(baseXZ, tipXZ, t_i)`.
+4. Define each authored interior residual `R_i = authoredXZ_i - C_i`.
+5. Candidate scale `s` produces `candidateXZ_i = C_i + s × R_i`, with original Y retained and endpoints copied exactly.
+6. Validate a candidate against the existing maximum horizontal displacement, maximum segment-turn, and maximum accumulated-turn requirements without mutating the candidate.
+7. If `s = 1` passes, leave the authored points unchanged.
+8. Otherwise run a fixed deterministic 10-iteration bisection on `s ∈ [0, 1]` and keep the largest passing candidate.
+9. If even `s = 0` cannot satisfy a hard policy because the authored endpoint itself is invalid, preserve the endpoint/Y contract and emit a generation warning rather than silently changing the public endpoint semantics.
+10. Keep the legacy/profile and branch reconstruction paths unchanged. Keep the dedicated active Path Spiral route unchanged.
+
+### Bark algorithm
+
+1. Add a persistence-independent tangent-safety envelope for recipe-only bark frames.
+2. Envelope is `1` through the current effective root-collapse end.
+3. Between collapse end and `CalculateEarliestRootTransitionHeight`, release with the existing smootherstep shape.
+4. Envelope is `0` at/above the earliest root transition.
+5. Use this envelope only for the structural-tangent-to-up Slerp.
+6. Keep `EvaluateRootFrameEnvelope` persistence-aware and continue using it for fixed-root-normal/transported-normal adoption and the existing persistent root/buttress frame semantics.
+7. Do not alter effective buttress-body persistence or grounded-foot behavior.
+8. Expose both envelope values through trunk-frame diagnostic telemetry.
+
+### Focused diagnostic update
+
+Retain all 35 current cases and existing topology auditing. Add/report:
+
+- `TangentSafetyEnvelope` separately from `RootFrameEnvelope`.
+- Final structural Y and authored-height error.
+- Bend-only endpoint horizontal error.
+- Lean+Bend endpoint error relative to the authored Lean endpoint for non-spiral cases.
+- Tangent mismatch at/after the earliest root transition.
+- Explicit invariant verdict text while retaining raw structural/surface vectors and existing measurements.
+
+Known low-Root-Height topology failure remains an external known failure and must be reported separately rather than hidden or repaired in this update.
+
+### Performance model
+
+The new structural limiter runs only during deterministic generation/dirty work on the recipe-only non-Path-Spiral trunk. With the current recipe-only trunk control-point count of 12 and a fixed 10-iteration bisection only when the authored shape fails, work is bounded `O(N × I)` over a very small N. Candidate validation must avoid per-iteration heap allocations. The bark change adds two scalar envelope evaluations during mesh build. No active-play per-frame, render-loop, physics, AI, shader, draw-call, or vertex-format cost is introduced.
+
+### Validation/compliance plan
+
+- Static/source: exact four-file diff; lexical/bracket checks; no stale version strings; CSV header/value parity; no deprecated API; no serialized assets.
+- Preservation: compare pre/post source for generic `ConstrainPolylineTurns`, active Path Spiral helpers/routing, grounded-foot/root contribution/radial-density/twist methods, and topology thresholds.
+- Algorithmic: reconstruct representative control-point cases and verify base/tip/Y preservation plus policy compliance.
+- Unity focused diagnostic: require previously topology-valid cases to remain valid; Lean endpoints remain exact; Bend-only tip and height errors collapse to numerical tolerance; non-spiral Lean+Bend endpoint equals authored Lean endpoint; tangent mismatch is approximately zero by earliest root transition for all Persistence values while RootFrameEnvelope still differs with Persistence.
+- Broad regression: rerun the 40-control response suite and compare failure set; do not require unrelated known Root Height/Persistence suite defects to disappear.
+- Production validation: run the existing geometry/topology workload and visually inspect current Twisted gallery trees for root-transition folding or changed accepted root contact.
+- Performance: compare same-workload generation/build timing and mesh counts before/after; runtime architecture must remain recurrence-free.
+
+### Implementation sequence/status
+
+1. Canonical plan first modification — **complete**.
+2. Generator endpoint/height-preserving recipe-only non-spiral limiter and version bump — **complete**.
+3. Bark tangent-safety/root-frame envelope split, telemetry, and version bump — **complete**.
+4. Focused diagnostic verification contract — **complete**.
+5. Final source/diff/consistency/performance audit — **complete for delivery-side static/source evidence; Unity/measured performance pending**.
+6. Unity compilation and operator validation — **pending**.
+
+
+### Implementation result and static/source evidence
+
+- Structural generator version is now `8`; bark algorithm version is now `29`. Exact-control schema and recipe-range schema remain `3`; no control/schema/settings change was made.
+- Recipe-only non-Path-Spiral trunks now route through `ConstrainRecipeOnlyTrunkPreservingEndpointAndHeight`. The authored candidate is returned untouched when it already satisfies the hard horizontal, per-segment-turn, and accumulated-turn policies. Failing authored candidates use one preallocated chord/residual/candidate set and a fixed 10-iteration residual-scale bisection; base, tip, and every authored Y coordinate are copied exactly.
+- The existing shared `ConstrainPolylineTurns` implementation is byte-identical to the pre-update source. The accepted active Path Spiral helpers/routing, including height-preserving horizontal-envelope scaling, are unchanged.
+- A static mathematical reconstruction of the diagnostic trunk equations over 128 primary-curve orientations per representative case confirmed: Lean `0.15/0.30/0.60`, Bend `0.50`, Lean `0.30` + Bend `0.50`, and Bend `1.00` with frequency `0` retain full residual scale `1.0`; Bend `1.00` resolves to scale `0.6875`; Lean `0.60` + Bend `1.00` resolves between approximately `0.725586` and `0.907227` depending on curve orientation. Every reconstructed candidate preserved the authored tip exactly, preserved every Y exactly, and satisfied the `0.65 × Height` horizontal envelope, `38°` segment-turn limit, and `190°` accumulated-turn limit. This is algorithmic/static evidence, not Unity execution.
+- Recipe-only bark now computes `TangentSafetyEnvelope` independently of Buttress Persistence: `1` through effective root collapse, smootherstep release through the existing earliest safe transition, and `0` at/after that transition. The existing persistence-aware `RootFrameEnvelope` remains byte-identical and still controls fixed-root-normal/transported-normal adoption.
+- The focused suite still contains the same 35 cases and still requires the existing production bark topology audit before contract checks. It now emits a 42-column summary CSV and 25-column sample CSV; source-level header/value parity is exact. New evidence includes final structural Y, authored-height error, Bend-only endpoint error, Lean+Bend endpoint error, earliest-transition tangent mismatch, invariant status, and separate tangent-safety/root-frame envelopes. Topology result and contract result are reported independently.
+- Lexical delimiter/state audit passes on all three edited C# files. No stale `TREE-TRUNK.1` runtime label remains in the focused suite. No hardcoded source dependency expects Generator `7` or Bark `28`.
+- Archive-overlay scope audit against the supplied source reports exactly four changed project files, matching the approved scope; zero files are missing and zero unapproved files are added.
+- Preservation audit confirms the shared branch/legacy turn limiter, root collapse calculation, earliest/effective root transitions, effective buttress-body end, persistence-aware root-frame envelope, and grounded root-foot radial resolver are unchanged. Active Path Spiral source was separately diff-checked and unchanged.
+- No new `FindObjectsSortMode`, `OnValidate` mutation, layer, tag, component, dependency, serialized asset edit, per-frame callback, shader work, or runtime persistent state was introduced. The suite's existing temporary-mesh `DestroyImmediate` remains Editor-runner cleanup and is not called from `OnValidate`.
+- Performance status remains analytical: the new limiter allocates three arrays only when an authored recipe-only non-spiral trunk first fails policy; its 10 bisection passes reuse those arrays and operate on the current 12 control points. Bark adds one scalar envelope evaluation during build. No active-gameplay recurring path was added. Unity profiler/build-time measurements remain pending.
+- Final direct-consumer audit found one stale Inspector help string in the existing procedural-tree instance Editor: it still describes TREE-TRUNK.1 as measurement-only and says Lean/Bend behavior is not repaired. That Editor file is outside the approved TREE-TRUNK.2 four-file scope, so it was not modified. This is a documentation/UI-copy inconsistency only; the diagnostic runner and production code use the TREE-TRUNK.2 contract. A scope-approved follow-up should update that help text before closure.
+- No Unity compiler/runtime is available in the delivery environment. Compilation, the updated focused 35-case run, 40-control regression comparison, production geometry/topology audit, Twisted visual inspection, and same-workload timing remain required operator evidence.
+
+### Risks and fail-closed rules
+
+- If the endpoint itself violates a hard displacement policy, do not silently move it; preserve the authored contract and report the conflict.
+- If the new tangent release causes root-transition topology failures in previously passing cases, do not restore Persistence-driven tangent locking wholesale; inspect the certified collapse/earliest-transition interval.
+- If Buttress Persistence loses frame/azimuth effect, restore the existing persistence-aware normal-adoption contract; do not move it onto the tangent-safety envelope.
+- If active Path Spiral or generic branch output changes, treat it as a regression and revert the routing leak.
+- If another file is required, stop implementation, amend this plan, and obtain scope approval before editing it.
+
+## TREE-TRUNK.2A — Root-Frame Transition Topology Diagnostic
+
+Status: diagnostic-stage implementation approved; production geometry behavior intentionally frozen pending first-unsafe-strip evidence.
+
+### Objective
+
+Explain the three TREE-TRUNK.2 topology regressions that occur only under strong Lean+Bend with nonzero Buttress Persistence before changing the production frame algorithm. Preserve the validated Generator 8 endpoint/height solver and Bark 29 tangent-release contract while exposing the exact geometry/frame state at the first unsafe trunk strip.
+
+### Observed Unity evidence
+
+The operator-completed 35-case TREE-TRUNK.2 focused run reports 31 PASS / 4 FAIL. The structural contract is repaired: Lean-only endpoints remain exact, Bend-only endpoint displacement is zero at Bend 0.50 and 1.00, final structural Y remains the authored 11 m, and non-spiral Lean+Bend preserves the Lean-authored endpoint. Persistence-independent tangent release also reaches zero mismatch at the earliest transition in topology-valid cases.
+
+Topology failures are concentrated as follows:
+
+- Lean 0.60 + Bend 1.00 / Persistence 0.0: PASS.
+- Lean 0.60 + Bend 1.00 / Persistence 0.5: FAIL, firstUnsafe=39, unsafeCount=1.
+- Lean 0.60 + Bend 1.00 / Persistence 1.0: FAIL, firstUnsafe=39, unsafeCount=1.
+- Light roots / strong Lean+Bend / Persistence 1.0: FAIL, firstUnsafe=29, unsafeCount=1; this case already failed before TREE-TRUNK.2 and remains a known external topology defect.
+- Authored roots / strong Lean+Bend / Persistence 1.0: FAIL, firstUnsafe=39, unsafeCount=1.
+- Heavy roots / strong Lean+Bend / Persistence 1.0: PASS.
+
+Inference — High confidence: the three new failures are more likely in the Bark tangent/root-frame decoupling than the Generator solver because the same strong Lean+Bend structural contract passes at Persistence 0.0 and fails only when the persistence-aware root frame remains active. Heavy roots passing shows the issue is transition-geometry dependent rather than a universal Persistence>0 failure. This inference must be verified with first-unsafe-strip frame/correspondence telemetry before any production correction.
+
+### Approved diagnostic-stage scope
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Invariants and non-goals
+
+- No Generator 8 behavior change.
+- No Lean, Bend, Bend Frequency, Path Spiral, Axial Twist, root mass, root reach/thickness, grounded-foot, contact-resolution, topology threshold, or branch constraint change.
+- No change to `EvaluateRootTangentSafetyEnvelope`, `EvaluateRootFrameEnvelope`, `ResolveTrunkBaseSurfaceFrame`, or any production frame/vertex calculation in this diagnostic stage.
+- No bark/generator/settings version bump.
+- Do not restore Persistence-driven tangent locking.
+- Do not tune or smooth the tangent envelope from inference alone.
+
+### Diagnostic implementation
+
+1. Preserve the complete bark-build failure text in the focused suite instead of reducing it to the first line.
+2. Extend the existing root-ring correspondence diagnostic with current->next TangentSafetyEnvelope, structural-to-resolved-surface tangent mismatch, and the collapse/earliest/effective transition/buttress-body landmarks.
+3. Keep the existing root-frame envelope, ring-frame rotation, contour orientation, local-sweep, cross-section multiplier, and quad coordinates in the same failure payload.
+4. Keep topology validation unchanged; diagnostics must explain the failure rather than suppress it.
+5. Report detailed topology evidence in the text report and escaped CSV field so one rerun is sufficient to identify the production repair candidate.
+
+### Acceptance criteria
+
+- Production geometry output is byte-equivalent before/after this diagnostic stage.
+- A rerun of the focused suite preserves the same pass/fail set unless nondeterminism is independently proven.
+- Every failed bark-build case includes a complete `[Root Ring Correspondence Diagnostic]` block rather than only `firstUnsafe`/`unsafeCount`.
+- The detailed block identifies whether the unsafe strip lies inside/after tangent release and quantifies how much persistence-aware root-frame adoption remains there.
+- Static audit confirms only the approved three files changed.
+
+### Status
+
+1. Review and plan — complete.
+2. Diagnostic instrumentation — pending.
+3. Static preservation/scope audit — pending.
+4. Unity rerun/evidence collection — pending.
+5. Production repair design — blocked on step 4 evidence.
+
+### Diagnostic-stage implementation result
+
+- `BuildRootRingCorrespondenceDiagnostic` now reports TangentSafetyEnvelope current->next, structural-to-resolved-surface tangent mismatch current->next, and the effective collapse / earliest transition / effective transition / buttress-body landmarks in addition to its existing ring-frame, contour, orientation, root-envelope, root-frame, roll, multiplier, and quad telemetry.
+- The focused suite now preserves the complete Bark build failure payload instead of reducing Bark topology failures to `FirstFailureLine`. The text report therefore contains the full `[Root Ring Correspondence Diagnostic]` block for each failed Bark build; the existing escaped CSV Failure field retains the same payload.
+- No production frame, envelope, vertex, topology-threshold, Generator, Path Spiral, root, twist, or branch behavior was edited. Bark remains algorithm version 29 and Generator remains version 8.
+- Static delimiter checks pass for both edited C# files. Diff against the accepted TREE-TRUNK.2 changed-files package shows the Bark delta is confined to `BuildRootRingCorrespondenceDiagnostic`; the focused-suite delta is confined to preserving full Bark failure text and TREE-TRUNK.2A report labels.
+- Unity compilation and rerun remain pending operator evidence. The production repair design remains blocked until the detailed first-unsafe-strip output is available.
+
+### Updated status
+
+1. Review and plan — complete.
+2. Diagnostic instrumentation — complete.
+3. Static preservation/scope audit — complete.
+4. Unity rerun/evidence collection — pending.
+5. Production repair design — blocked on step 4 evidence.
+
+
+---
+
+## TREE-TRUNK.2B — Exhaustive Root-Frame / Ring-Correspondence Candidate Search
+
+Status: implementation approved for diagnostic search only. The rejected Bark 30 resolved-surface-tangent production refinement is reverted by using the accepted Bark 29 TREE-TRUNK.2A diagnostic state as this update's source baseline. No candidate tested by this suite is promoted to production geometry in this update.
+
+### Objective
+
+Replace serial one-hypothesis debug patches with one broad, bounded, cancellable Editor search that evaluates a full Cartesian product of plausible repair families against both failing and passing control cases. Record enough per-candidate and per-case geometry/topology/contract/cost evidence to reject bad repair families, identify robust leads, and expose interactions among candidate mechanisms before any production repair is chosen.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Source baseline and revert requirement
+
+- Source baseline is the accepted TREE-TRUNK.2A diagnostic state: Generator 8 / Bark 29.
+- The rejected Bark 30 adaptive resolved-surface-tangent sampling experiment is not carried into production behavior.
+- Preserve TREE-TRUNK.2 endpoint/height repair, persistence-independent tangent release, expanded unsafe-strip telemetry, topology thresholds, Path Spiral, Axial Twist, roots, grounded foot, contact sampling, and branch behavior.
+
+### Search cases
+
+Keep the existing 35-case verification suite unchanged as the baseline gate. After those cases, run the candidate matrix on the targeted case set containing:
+
+1. strong Lean+Bend / Persistence 0.0 — known passing control;
+2. strong Lean+Bend / Persistence 0.5 — TREE-TRUNK.2 failure;
+3. strong Lean+Bend / Persistence 1.0 — TREE-TRUNK.2 failure;
+4. light roots / strong Lean+Bend — known pre-existing failure control;
+5. authored roots / strong Lean+Bend — TREE-TRUNK.2 failure;
+6. heavy roots / strong Lean+Bend — known passing root-transition control;
+7. Path Spiral +2 interaction — passing control in Bark 29, regression detector for Bark 30-style over-refinement;
+8. Path Spiral -2 interaction — passing control in Bark 29, opposite-handed regression detector.
+
+### Full factorial candidate dimensions
+
+Every combination of the following finite diagnostic policies must be evaluated; no policy is production behavior in this update.
+
+**A. Surface tangent policy**
+
+1. `CurrentSafetyRelease` — TREE-TRUNK.2 persistence-independent tangent safety envelope.
+2. `PersistenceLockedControl` — old persistence-aware tangent lock, retained only as a diagnostic control for topology-vs-readability tradeoff.
+3. `StructuralTangent` — no root tangent lock, diagnostic upper bound on structural fidelity.
+
+**B. Surface normal / azimuth policy**
+
+1. `CurrentPersistentBlend` — current fixed-root-normal -> transported-normal blend using RootFrameEnvelope.
+2. `TransportedOnly` — transported structural normal projected into the selected surface-tangent plane.
+3. `FixedRootOnly` — tree-local +X projected into the selected surface-tangent plane.
+4. `ParallelTransportPersistentBlend` — sequentially parallel-transport the previous resolved normal to the next selected surface tangent, then blend toward the current persistent root azimuth; tests whether independent per-ring reprojection is the correspondence defect.
+
+**C. Root body radial basis**
+
+1. `ResolvedSurfaceFrame` — current body radial basis.
+2. `StructuralFrame` — root body radial uses the structural transported frame while the grounded foot remains unchanged.
+3. `GroundAzimuthFrame` — root body azimuth remains tree-local around world/tree up, diagnostic bound on root-frame persistence independent of trunk lean.
+
+**D. Sweep orthogonalization**
+
+1. `None` — current emitted offset.
+2. `BodyOffsetToLocalSweepPlane` — project only the non-foot body offset onto the plane perpendicular to the local center-to-center sweep.
+3. `EntireOffsetToLocalSweepPlane` — project the complete emitted radial offset onto that plane; diagnostic only because this may disturb grounded-foot character.
+
+**E. Ring correspondence policy**
+
+1. `SameIndex` — production fixed side-index stitching.
+2. `BestCyclicPerStrip` — evaluate every cyclic ring phase shift and select the topology-best phase independently per strip.
+3. `PropagatedCyclic` — choose phase sequentially with continuity cost so ring phase changes remain globally coherent; tests whether correspondence rather than shape is the root cause.
+
+**F. Longitudinal diagnostic subdivision**
+
+1. `x1` — accepted Bark 29 sample density.
+2. `x2` — diagnostic-only interpolation of every render span.
+3. `x4` — diagnostic-only interpolation of every render span.
+
+**G. Diagnostic radial resolution**
+
+1. `x1` — production radial segments.
+2. `x2` — diagnostic-only doubled radial samples; tests whether circumferential resolution can cure a candidate or merely hides/moves failures.
+
+The full Cartesian product is 3 x 4 x 3 x 3 x 3 x 3 x 2 = 1,944 candidate configurations per targeted case, 15,552 candidate-case evaluations for the eight-case matrix.
+
+### Candidate evidence contract
+
+For every candidate-case evaluation record at minimum:
+
+- topology pass/fail and unsafe strip count;
+- minimum best-diagonal orientation score and strip/side location;
+- contour self-intersection count;
+- ring count, radial segments, estimated trunk vertex/triangle cost;
+- maximum selected surface-tangent, normal, and binormal step;
+- maximum structural-to-selected-surface tangent mismatch;
+- tangent mismatch at/after earliest safe root transition;
+- maximum same-side longitudinal backtracking against local centre sweep;
+- minimum same-side longitudinal advance;
+- maximum radial-direction angular change at corresponding sides;
+- selected cyclic phase shift per strip and maximum/total phase motion for cyclic policies;
+- maximum cross-section multiplier;
+- maximum emitted-position deviation from current Bark 29 production geometry on the same diagnostic samples;
+- root-foot displacement deviation from current Bark 29 geometry;
+- number of diagnostic subdivision/radial samples and candidate evaluation milliseconds.
+
+Aggregate each candidate configuration across all targeted cases with:
+
+- pass count / fail count;
+- whether every TREE-TRUNK.2 regression case passes;
+- whether all previously passing controls remain pass;
+- whether the known light-root external failure changes;
+- worst topology score;
+- worst tangent-contract violation;
+- worst geometry deviation;
+- worst root-foot deviation;
+- total geometry-cost multiplier;
+- total/mean evaluation time.
+
+### Ranking / interpretation rules
+
+The suite may calculate rankings for navigation but must not silently select a production winner. Hard rejection flags:
+
+1. fails any previously passing control;
+2. does not repair all TREE-TRUNK.2 regression cases;
+3. violates persistence-independent tangent release at/after the earliest safe transition;
+4. produces contour self-intersection;
+5. materially displaces the grounded root foot;
+6. exceeds existing production topology safety threshold.
+
+Among non-rejected candidates, report Pareto-style tradeoffs for geometry deviation, added geometry cost, root-frame deviation, correspondence phase motion, and evaluation cost. Keep raw rows for every candidate so alternative weighting can be applied later without rerunning the suite.
+
+### Output contract
+
+Preserve the existing three TREE-TRUNK verification outputs and add matrix outputs from the same existing Inspector runner:
+
+- candidate configuration summary CSV — one row per 1,944 configuration;
+- candidate-case CSV — one row per 15,552 candidate-case evaluation;
+- candidate worst-strip CSV — one row per candidate-case with the worst strip/side metrics;
+- text report section listing search dimensions, total evaluations, hard-rejection counts by reason, best non-rejected candidates, single-factor effects, pairwise interactions, and candidate families that can be discarded.
+
+The runner remains incremental and cancellable, updates progress/ETA, writes checkpoint rows as work completes, and performs bounded work per Editor update. No new Inspector action is required.
+
+### Invariants / non-goals
+
+- No production candidate is enabled by this patch.
+- Bark stays version 29; Generator stays version 8.
+- No change to production mesh output from the accepted TREE-TRUNK.2A diagnostic state.
+- Do not alter topology thresholds to make candidates pass.
+- Do not alter Lean/Bend equations, Generator endpoint solver, Path Spiral, Axial Twist, root contribution formulas, grounded foot, root contact radial boost, mixed-resolution stitching, or branch constraints.
+- Candidate-only geometry may intentionally violate production contracts; the suite must report those violations rather than suppress them.
+- The search is exhaustive over the finite candidate dimensions above, not a claim to enumerate every mathematically imaginable tree-meshing algorithm.
+
+### Validation and audit
+
+1. Static audit must prove production Bark geometry code is byte-equivalent to the accepted Bark 29 diagnostic baseline outside diagnostic-only helpers/telemetry access.
+2. Existing 35-case baseline output must remain 31 PASS / 4 FAIL on the same operator/source before interpreting candidate results; any drift invalidates the matrix comparison.
+3. Matrix row counts must equal 1,944 configurations and 15,552 candidate-case rows when complete.
+4. CSV header/value parity and unique candidate IDs must pass static checks.
+5. Search must remain Editor-responsive, cancellable, checkpointed, and expose progress/ETA.
+6. Final source diff must contain only the three approved files.
+
+### Status
+
+1. Review — complete.
+2. Canonical search plan — complete.
+3. Bark 30 production experiment revert — complete by baselining from accepted Bark 29 diagnostic source.
+4. Diagnostic candidate evaluator — pending.
+5. Full-factorial runner/reporting — pending.
+6. Static preservation/scope audit — pending.
+7. Unity matrix execution — pending operator evidence.
+8. Production repair selection — intentionally deferred until matrix evidence is reviewed.
+
+### TREE-TRUNK.2B implementation result
+
+- The rejected Bark 30 production sampling experiment is reverted by source selection: this patch is based on accepted Bark 29 TREE-TRUNK.2A diagnostic source. Bark remains 29; Generator remains 8.
+- Existing production Bark methods are unchanged. The runtime source delta is diagnostic-only public option/result types plus diagnostic-only candidate evaluation helpers. Static method-body comparison confirms the accepted implementations of trunk refinement, topology preflight, unsafe-strip detection, base surface-frame resolution, both root envelopes, production trunk surface position, and grounded-foot radial resolution are byte-identical.
+- Existing 35-case baseline definitions, per-case generation, measurement, invariant checks, and isolated-trunk setup are byte-identical. The runner now executes that baseline first and refuses to start the matrix unless it reproduces 31 PASS / 4 FAIL.
+- The candidate matrix contains exactly 1,944 configurations and exactly eight target cases, for 15,552 candidate-case evaluations. It evaluates the full Cartesian product declared above.
+- Each candidate-case records topology, worst strip/side orientation, contour self-intersections, longitudinal advance/backtracking, correspondence radial angle, phase shift/motion, surface-frame step metrics, earliest-transition tangent contract, cross-section multiplier, production-geometry deviation, grounded-foot deviation, geometry estimates, and evaluation time.
+- The candidate configuration summary records hard-rejection reasons, repaired-regression count, passing-control regressions, known-light-root outcome, worst contract/deviation metrics, geometry cost, and evaluation cost. Completion reporting includes single-factor and all pairwise dimension interactions plus up to 20 non-rejected candidates sorted for navigation only.
+- The reference candidate is the accepted Bark 29 production geometry contract. Before continuing beyond its eight rows, the scorer requires passing controls to PASS and the three TREE-TRUNK.2 regressions plus known light-root case to FAIL; any mismatch aborts the matrix as diagnostically invalid.
+- All candidate behavior is diagnostic-only. No candidate is selected, enabled, serialized, cached, or applied to production geometry by this patch.
+- Static CSV parity passes: candidate configuration summary 29/29 columns, candidate-case 37/37 columns, candidate worst-strip 17/17 columns.
+- Static delimiter checks pass for both modified C# files. No rejected Bark 30 production sampling symbol/version remains. No deprecated API was introduced.
+- Final scope audit: exactly the three approved project files differ from the accepted TREE-TRUNK.2A diagnostic baseline; no files were created, deleted, moved, or serialized.
+- Unity compilation and execution of the 15,552-row matrix remain pending operator evidence.
+
+### TREE-TRUNK.2B updated status
+
+1. Review — complete.
+2. Canonical search plan — complete.
+3. Bark 30 revert — complete.
+4. Diagnostic candidate evaluator — complete.
+5. Full-factorial runner/reporting — complete.
+6. Static preservation/scope audit — complete.
+7. Unity baseline + matrix execution — pending operator evidence.
+8. Production repair selection — intentionally deferred until the completed matrix is reviewed.
+
+### TREE-TRUNK.2B staged-search runtime correction
+
+Status: implementation approved after operator evidence showed the original 1,944-configuration / 15,552-evaluation full-factorial search projected an unacceptable multi-hour Editor runtime. This correction preserves the same diagnostic repair families and raw evidence contract, but replaces blind Cartesian enumeration with evidence-gated stages designed to finish within five minutes on the operator machine.
+
+#### Objective and acceptance criteria
+
+- Preserve the Bark 29 / Generator 8 production baseline and all diagnostic-only candidate geometry policies.
+- Keep the existing 35-case production baseline and Bark-29 reference-candidate fail-closed checks.
+- Stage A screens the production reference plus every single-factor alternative across all seven candidate dimensions against all eight targeted cases.
+- Stage B retains at most one evidence-leading alternative per dimension, then evaluates every pairwise combination of those dimension leaders on a six-case interaction set containing all three TREE-TRUNK.2 regressions and three previously passing controls.
+- Stage C builds a bounded set of merged multi-factor finalists from the best Stage-B pairs and re-evaluates them on all eight targeted cases.
+- Hard-cap candidate-case work at 320 evaluations and enforce a 4 minute 30 second whole-suite search budget so the runner finishes or stops with explicit TIME_BUDGET_REACHED evidence before five minutes.
+- Preserve raw candidate-case and worst-strip CSV rows for every actually evaluated configuration; report stage, screening disposition, and incomplete/time-budget status explicitly.
+- Do not promote any candidate to production behavior in this update.
+
+#### Search pruning rules
+
+Stage-A alternatives are eligible to lead a dimension only when they preserve every previously passing targeted control, introduce no contour self-intersection, preserve the earliest-transition tangent contract and grounded-foot contract, and improve at least one regression signal relative to the Bark-29 reference: regression topology passes, total regression unsafe-strip count, or worst regression orientation score. If no alternative in a dimension improves the reference, that dimension is discarded from Stage B.
+
+For each surviving dimension, retain the single best alternative ordered by regression pass count descending, regression unsafe-strip count ascending, worst regression orientation descending, geometry deviation ascending, then evaluation cost ascending. Stage B evaluates every pair of distinct surviving dimension leaders. Stage C retains up to four best Stage-B pairs under the same safety constraints, merges their non-default factor choices into unique compatible configurations, and evaluates at most eight unique finalists on the full eight-case set. Conflicting choices for the same dimension are not merged.
+
+#### Bounded-work model
+
+- Stage A: 15 configurations x 8 cases = 120 candidate-case evaluations maximum (reference plus 14 single-factor alternatives).
+- Stage B: at most seven dimension leaders, therefore at most 21 pairs x 6 cases = 126 evaluations maximum.
+- Stage C: at most eight finalists x 8 cases = 64 evaluations maximum.
+- Candidate maximum: 310 evaluations; with 35 baseline cases the planned workload is 345 case/evaluation units, versus the rejected 15,587-unit run.
+- A 320-candidate-evaluation hard cap protects against future dimension growth; a 270-second wall-clock cap protects the operator's five-minute budget independently of per-case cost.
+
+#### Approved files and invariants
+
+Keep the existing TREE-TRUNK.2B approved file scope. This runtime correction is expected to modify only the canonical tree handoff and focused trunk diagnostic suite; Bark diagnostic candidate geometry remains unchanged unless implementation review proves a required diagnostic contract change. No serialized assets, production geometry, topology thresholds, controls, Generator behavior, or Bark version change is authorized.
+
+#### Validation
+
+1. Static audit must prove Bark production/candidate geometry code is byte-identical to the pre-correction TREE-TRUNK.2B diagnostic state.
+2. Unity must reproduce the 31 PASS / 4 FAIL production baseline before staged search begins.
+3. The Bark-29 reference candidate must reproduce the expected targeted topology pattern.
+4. The staged run must report its actual evaluated count, elapsed time, stage transitions, discarded dimensions, leaders, pairwise candidates, finalists, and whether the time/evaluation budget was reached.
+5. Operator target: complete in under five minutes; if the 270-second guard fires, the partial outputs are still authoritative and the report must identify exactly which stages completed.
+
+#### Staged-search implementation result
+
+- The original full-factorial runner has been replaced by an evidence-gated Screening -> Pairwise -> Finalist state machine in the focused trunk diagnostic suite.
+- Screening contains exactly 15 configurations: Bark-29 reference plus all 14 single-factor alternatives across the seven existing diagnostic candidate dimensions. All eight targeted cases are evaluated, for 120 candidate-case evaluations.
+- Screening retains at most one leader per dimension. A leader must preserve all passing controls, contour validity, earliest-transition tangent contract, and grounded-foot contract, and must improve at least one regression signal versus Bark 29: regression pass count, regression unsafe-strip count, or worst regression orientation.
+- Pairwise evaluates every pair of distinct surviving dimension leaders against six cases: all three TREE-TRUNK.2 regressions plus strong Lean+Bend/P0, heavy roots, and Path Spiral +2 controls. With seven leaders this is at most 21 configurations / 126 evaluations.
+- Finalist selection ranks safe pairwise outcomes, retains the best four, adds compatible unique merges of those pairs, caps the finalist set at eight, and re-evaluates every finalist on all eight targeted cases. Maximum finalist work is 64 evaluations.
+- Maximum planned candidate work is therefore 310 evaluations. A separate 320-evaluation hard guard catches future accidental search growth.
+- The whole suite checks a 270-second wall-clock guard before each Editor tick's next baseline/candidate evaluation. If reached, it exits with `TIME_BUDGET_REACHED` and preserves partial report/CSV evidence rather than continuing toward the five-minute operator limit.
+- Progress/ETA now identify the active stage, actual completed/planned candidate count, conservative projected remaining work, and remaining wall-clock budget.
+- Candidate summary/case/worst-strip outputs now include stage and source provenance. Candidate aggregates additionally record regression unsafe-strip count and worst regression orientation so partial topology improvement can advance to interaction testing without requiring a single-factor candidate to solve every regression outright.
+- The existing Bark diagnostic candidate evaluator is unchanged. Generator remains 8 and Bark remains 29; no production geometry behavior, topology threshold, serialized asset, control, or cache/version contract changes in this correction.
+
+#### Staged-search static audit
+
+- Planned-work proof: 15 x 8 = 120 screening evaluations; C(7,2) x 6 = 126 maximum pairwise evaluations; 8 x 8 = 64 maximum finalist evaluations; total = 310 <= 320 hard cap.
+- CSV parity check: candidate configuration summary 34 fields / 34 emitted values; candidate-case 39 / 39; worst-strip 19 / 19.
+- Lexical delimiter/state audit of the modified focused diagnostic passes with balanced parentheses, braces, and brackets outside comments/strings.
+- SHA-256 comparison against the pre-correction TREE-TRUNK.2B reconstruction confirms `TreeBarkMeshGenerator.cs` and `TreeGenerator.cs` are byte-identical; the runtime production/candidate geometry implementation therefore did not change in this correction.
+- Unity compilation and operator runtime remain pending. Acceptance requires the production baseline to reproduce 31 PASS / 4 FAIL, the Bark-29 reference candidate to reproduce the targeted reference topology pattern, and the staged search to terminate in under five minutes or hit its explicit 270-second evidence-preserving guard.
+
+## TREE-TRUNK.2C — Ground-Azimuth Root Body Basis
+
+Status: implementation approved from the completed TREE-TRUNK.2B staged candidate search. This update promotes only the winning single-factor `GroundAzimuthFrame` root-body basis from diagnostic candidate `C0007` into production Bark geometry. No other candidate factor is authorized.
+
+### Objective
+
+Repair the remaining strong Lean+Bend / Buttress Persistence trunk topology failures without changing the accepted Generator 8 endpoint/height contract or TREE-TRUNK.2 persistence-independent tangent release. Promote the smallest candidate proven by the staged search to repair all targeted regressions while preserving all targeted passing controls.
+
+### Operator evidence and selection rationale
+
+- Production baseline reproduced 35 completed cases with 31 PASS / 4 FAIL, matching the accepted Bark 29 state.
+- The staged candidate search completed 170 / 170 planned candidate-case evaluations within its bounded search budget.
+- Screening candidate `C0007` changed only `BodyBasisPolicy` from `ResolvedSurfaceFrame` to `GroundAzimuthFrame`. It passed 8 / 8 targeted cases, repaired all 3 TREE-TRUNK.2 regression cases, produced 0 regression unsafe strips, preserved all passing controls, passed the known light-root case in the candidate evaluator, preserved the earliest-transition tangent contract, produced 0 grounded-foot deviation, and retained 1.0x estimated geometry cost.
+- Finalists that additionally changed normal policy and/or cyclic correspondence also passed 8 / 8 but did not improve the reported topology or geometry metrics over the ground-azimuth body-basis family. Those extra factors are therefore excluded from production promotion.
+- The rejected Bark 30 longitudinal sampling experiment remains superseded and is not restored.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Production contract
+
+1. Keep Generator 8 unchanged.
+2. Keep the current persistence-independent root tangent-safety envelope unchanged.
+3. Keep the current persistence-aware surface-normal / root-frame blend unchanged.
+4. Keep same-index ring stitching and current longitudinal/radial sampling unchanged.
+5. Keep grounded root-foot radial resolution and anchoring unchanged.
+6. For recipe-only trunk surface generation, resolve the root-body radial basis in the stable tree-local ground azimuth frame used by diagnostic candidate `C0007`, including authored trunk surface roll around tree-local up.
+7. Preserve non-recipe/legacy trunk surface behavior unchanged.
+8. Bump Bark algorithm version 29 -> 30 because emitted production trunk/root vertex positions change and cached/generated output must invalidate.
+9. Do not promote transported-only normals, cyclic correspondence, sweep projection, extra longitudinal subdivision, extra radial resolution, structural tangent, persistence-locked tangent, or structural body basis.
+
+### Implementation sequence
+
+1. Add one private production helper that reproduces the `C0007` ground-azimuth root-body radial calculation from the diagnostic evaluator.
+2. In recipe-only trunk surface position evaluation, use that helper for the root-body offset while leaving the existing grounded foot offset path unchanged.
+3. Leave the legacy/non-recipe path on its existing resolved surface-frame radial calculation.
+4. Update the focused verification suite/report identity to TREE-TRUNK.2C production verification without changing the established 35 cases or invariant thresholds.
+   The prior TREE-TRUNK.2B staged candidate search remains compiled as diagnostic evidence code but is no longer auto-run by the focused production verification, because its Bark-29 reference assumptions are superseded once C0007 is promoted. Existing candidate CSV evidence must not be overwritten by the production verification run.
+5. Run final source/scope/preservation audits and package only the approved changed files.
+
+### Acceptance criteria
+
+- Unity compilation: zero compiler errors attributable to this patch.
+- Focused 35-case run: no TREE-TRUNK.2C regression in endpoint, authored height, or earliest-transition tangent contracts; targeted strong Lean+Bend P0.5/P1 and authored-root/P1 topology failures must pass.
+- Candidate evidence predicts the light-root strong Lean+Bend case may also pass; treat that as a desirable result, not a weakened topology threshold.
+- Previously passing Lean-only, Bend-only, moderate Lean+Bend, heavy-root, Twist, and Path Spiral cases remain PASS.
+- No topology threshold change is permitted.
+- After focused acceptance, run the 40-control response suite and production geometry-efficiency/topology audit as broad regression gates.
+- Active-gameplay recurring cost remains unchanged; the basis change is deterministic mesh-build work with no added vertices/triangles by construction.
+
+### Invariants / non-goals
+
+- Do not change Lean Amount, Bend, Bend Frequency, Path Spiral, Axial Twist, root contribution formulas, root thickness/reach, root contact radial boost, mixed-resolution stitching, branch constraints, or the Generator 8 endpoint-preserving solver.
+- Do not alter Buttress Persistence semantics or the TREE-TRUNK.2 tangent-safety release.
+- Do not add controls, serialized data, dependencies, tags, layers, components, or Inspector actions.
+- Do not retain rejected Bark 30 adaptive resolved-surface-tangent sampling behavior.
+- Do not remove the TREE-TRUNK.2B candidate evaluator in this patch; it remains diagnostic evidence unless a later cleanup is separately approved.
+
+### Performance model
+
+The promoted C0007 factor changes only the basis used to resolve the existing recipe-only root-body radial vector. It adds no sample, ring, radial segment, triangle, texture, shader, per-frame update, or runtime allocation contract. Candidate evidence reported geometry-cost multiplier 1.0 and estimated vertex/triangle counts unchanged relative to Bark 29. Actual Unity generation/build timing remains a post-implementation validation item.
+
+### Implementation result and delivery-side evidence
+
+- Bark algorithm version advances 29 -> 30. Recipe-only production trunk surface generation now replaces only the root-body radial basis with the ground-azimuth basis proven by candidate `C0007`; the existing grounded-foot radial remains additive and unchanged. Legacy/non-recipe output remains on the pre-existing resolved surface frame.
+- The production helper uses tree-local up, canonical +X ground azimuth, and authored trunk-surface roll around tree-local up, matching the `GroundAzimuthFrame` candidate equation. No normal-policy, tangent-policy, sweep-projection, correspondence, longitudinal-subdivision, or radial-resolution candidate factor is promoted.
+- The focused verification runner now executes only the established 35 production cases. The superseded staged search implementation remains compiled for historical/diagnostic evidence but is not auto-run and its prior candidate CSV evidence is not overwritten.
+- Exact source-scope comparison against the accepted staged-search baseline reports 3 modified files, 0 additions, and 0 deletions.
+- Generator 8 is byte-identical to the accepted staged-search baseline. `ResolveTrunkBaseSurfaceFrame`, `ResolveTrunkSurfaceFrame`, `EvaluateRootTangentSafetyEnvelope`, `EvaluateRootFrameEnvelope`, `EvaluateTrunkRootContributions`, and `ResolveGroundAnchoredRootFootRadial` are byte-identical. The established `BuildCases`, `RunCase`, summary writer, and sample writer are also byte-identical.
+- Lexical delimiter checks pass for both modified C# files. Unity compilation/runtime and measured generation timing remain pending operator evidence.
+
+### Status
+
+1. Review — complete.
+2. Canonical production plan — complete.
+3. Production Bark implementation — complete.
+4. Focused verification runner update — complete.
+5. Static preservation/scope audit — complete.
+6. Unity focused validation — pending operator evidence.
+7. Broad control/geometry/performance regression — pending focused acceptance.
+
+
+## TREE-TRUNK.2D — Axial-Twist Validator Semantics Audit
+
+Status: implementation approved as a diagnostic-only audit after TREE-TRUNK.2C production geometry looked visually coherent while the focused suite failed 22/35 cases almost entirely on the absolute axial-twist validator.
+
+### Objective
+
+Determine whether TREE-TRUNK.2C introduced visually/materially incorrect axial roll, or whether the existing recipe-only axial-twist validator is measuring a frame-convention offset that is no longer equivalent to authored twist after promotion of the ground-azimuth root-body basis.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Reviewed evidence
+
+- TREE-TRUNK.2C operator run completed 35 cases with 13 PASS / 22 FAIL. Nearly every Bend/Lean+Bend/Path-Spiral case failed before topology/contract measurement because `MeasureGeneratedTrunkAxialTwist` reported a non-zero absolute roll offset even when requested twist was zero.
+- The same run measured approximately +5.888 degrees for the zero-twist moderate Lean+Bend case, +409.748 degrees at requested +400, and -397.414 degrees at requested -400. Relative to the zero-twist baseline, the control response is therefore approximately +403.860 / -403.302 degrees, close to the authored +/-400-degree deltas even though the absolute zero reference moved.
+- Current recipe-only `MeasureGeneratedTrunkAxialTwist` resolves the old zero-roll surface frame per ring, projects emitted side-0 radial into that tangent plane, and accumulates the signed angle from that old-frame normal. TREE-TRUNK.2C deliberately emits the root-body radial from the ground-azimuth basis, so that absolute measurement now includes frame-convention/curvature offset.
+- `TreeControlResponseSuite` already validates Axial Twist response by comparing measured twist between control anchors rather than requiring the absolute measured value to equal the authored value.
+
+### Diagnostic contract
+
+1. Keep Generator 8 and Bark 30 production geometry unchanged.
+2. Keep the existing production absolute axial-twist rejection unchanged for normal builds in this audit.
+3. Add a diagnostic-only Bark build path that records the same requested/measured absolute twist but can bypass only the `abs(measured-requested) > 2 degrees` early rejection so the remaining production topology audit can execute.
+4. The focused 35-case suite must retain the normal production build result, but when failure is solely the absolute axial-twist gate it must rerun the same generated tree through the diagnostic-only bypass and report whether the mesh would otherwise pass topology and TREE-TRUNK.2 endpoint/height/tangent contracts.
+5. Add a bounded differential-twist audit over representative curved trunks. For each structural/root configuration, generate twist -400, 0, +400 with identical non-twist controls and compare measured deltas relative to that configuration's zero-twist baseline.
+6. Report absolute zero-reference offset, +400/-400 differential response, differential error from authored +/-400, bypassed topology result, and structural fingerprint invariance. Do not change production validation thresholds in this patch.
+7. Keep the run short; the differential audit is a small fixed matrix and must not restore the superseded exhaustive/staged candidate search.
+
+### Acceptance / decision criteria
+
+- If zero-twist absolute offsets are non-zero but +400/-400 differentials remain near +/-400 across representative Bend, strong Lean+Bend, and Path-Spiral configurations, and bypassed meshes pass production topology, classify the old absolute twist gate as stale for the TREE-TRUNK.2C frame convention.
+- If differential response itself materially deviates from authored twist, structural fingerprints change with twist, or bypassed meshes still fail topology, classify TREE-TRUNK.2C geometry as genuinely incorrect and do not weaken the validator.
+- No production validator change is authorized by this audit; any validator replacement requires a separate evidence-backed production patch and explicit approval.
+
+### Invariants / non-goals
+
+- No root-body basis change, tangent-release change, Persistence change, root-foot change, ring-stitching change, sampling change, Lean/Bend/Path-Spiral change, or Generator change.
+- No topology threshold change.
+- No serialized data, controls, Inspector actions, dependencies, tags, layers, or components.
+- Do not treat visual appearance alone as proof; the decision must combine differential twist response with topology and structural invariance.
+
+### TREE-TRUNK.2D implementation result and static audit
+
+- Added a diagnostic-only Bark build entry point that temporarily bypasses only the absolute `abs(measured-requested) > 2 degrees` axial-twist rejection and restores the prior thread-local state in `finally`. Normal `Build` behavior remains unchanged when that entry point is not used.
+- The existing recipe-only absolute measurement equation, ground-azimuth body basis, tangent/root-frame equations, root contributions, grounded foot, topology thresholds, stitching, and sampling are unchanged.
+- The focused suite keeps the normal TREE-TRUNK.2C production build as the primary result. When and only when that build fails on the absolute axial-twist gate, it reruns the identical generated definition through the diagnostic bypass, records requested/measured/absolute-error telemetry, and reports the unchanged downstream topology and Lean/Bend contract outcome separately.
+- Added a fixed 18-build differential semantics matrix: six curved scenarios x twist {-400, 0, +400}. The report records each scenario's zero-twist frame offset, measured +/-400 delta relative to that zero baseline, differential error, topology of all three bypass builds, and trunk/branch structural fingerprint invariance.
+- The additional diagnostic workload is bounded at 18 builds after the existing 35-case run; no exhaustive candidate search is re-enabled.
+- Generator remains version 8 and Bark remains version 30. SHA-256 comparison confirms the Generator source is unchanged from the accepted TREE-TRUNK.2B reconstruction. Source comparison confirms the production trunk surface-position equation, TREE-TRUNK.2C ground-azimuth body-basis helper, grounded root-foot helper, base/rolled surface-frame equations, both root envelopes, and `MeasureGeneratedTrunkAxialTwist` itself are unchanged.
+- Lexical delimiter checks pass for both modified C# files. No project-side compiler is available in the supplied extracted workspace, so Unity compilation and runtime evidence remain pending.
+
+### TREE-TRUNK.2D decision gate
+
+Run the focused diagnostic once. The resulting report is sufficient for the next decision:
+
+- If cases blocked by the absolute gate become topology/contract PASS under the diagnostic bypass and the six differential triplets preserve structure with measured deltas near +/-400, the absolute recipe-only twist gate is stale under the TREE-TRUNK.2C frame convention and should be replaced by a baseline-relative/differential contract in a separately approved production patch.
+- If bypassed topology/contract still fails or the differential triplets do not preserve authored roll response, TREE-TRUNK.2C geometry remains invalid and must be corrected rather than weakening validation.
+
+## TREE-TRUNK.2E — Axial-Twist Validator Reference Repair
+
+Status: implementation approved after TREE-TRUNK.2D proved that TREE-TRUNK.2C production geometry passes downstream topology/Lean-Bend contracts when the stale absolute axial-twist gate is bypassed, while differential Axial Twist response remains close to authored values on ordinary Bend and moderate Lean+Bend cases.
+
+### Objective
+
+Replace the recipe-only absolute axial-twist validator's old transported-surface-frame reference with the zero-roll reference implied by the TREE-TRUNK.2C ground-azimuth body-frame convention. Keep production geometry unchanged and retain the differential semantics audit as a cross-check.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Reviewed evidence
+
+- TREE-TRUNK.2D operator evidence: 22 normal production cases failed only at the absolute axial-twist gate; every one of those same generated trees passed the diagnostic bypass build, unchanged downstream topology audit, and Lean/Bend contract checks.
+- The old recipe-only `MeasureGeneratedTrunkAxialTwist` projects side-0 emitted radial into the resolved surface-tangent plane and accumulates signed angle from the old zero-roll surface normal. That frame convention no longer matches TREE-TRUNK.2C recipe-only output, whose body radial is authored in a ground-azimuth basis around tree-local up.
+- TREE-TRUNK.2D differential evidence: Bend 0.50 and Bend 1.00 respond within about 0.6 degrees of authored +/-400; moderate Lean+Bend is within about 3.9 degrees; stronger curved/spiralled cases remain topology PASS but the old absolute measurement becomes increasingly contaminated by the frame-reference mismatch.
+- The generic control-response suite already treats Axial Twist as a response/delta contract and requires structural trunk/branch fingerprints to remain invariant.
+
+### Production contract
+
+1. Keep Generator 8, Bark 30 production vertex positions, TREE-TRUNK.2C ground-azimuth body basis, tangent release, Persistence frame blending, root-foot anchoring, stitching, sampling, and topology thresholds unchanged.
+2. For recipe-only axial-twist measurement, use tree-local up as the measurement axis and canonical tree-local +X as the zero-roll radial reference, matching the basis used by `ResolveGroundAzimuthRootBodyRadial`.
+3. Measure the emitted side-0 radial after removing any vertical component, unwrap signed angle around tree-local up ring-to-ring, and preserve the existing tip-closure authored-roll compensation.
+4. Keep the existing absolute requested-vs-measured tolerance unchanged. This patch changes the reference, not the threshold.
+5. Legacy/non-recipe axial-twist measurement remains unchanged.
+6. Retain the TREE-TRUNK.2D bypass and differential audit temporarily as verification evidence; normal production builds remain authoritative and should no longer need the bypass when the new reference is correct.
+
+### Acceptance criteria
+
+- The established 35-case focused suite should complete without false absolute-twist rejections; expected outcome is 35/35 PASS if no independent topology/contract defect remains.
+- Zero-twist Bend, Lean+Bend, root-interaction, and Path-Spiral cases should measure near zero under the repaired reference.
+- Twist -400 / 0 / +400 differential triplets should remain structurally invariant and report response close to authored +/-400; any remaining material differential error must be reported rather than hidden by threshold changes.
+- Production mesh positions, normals, tangents, topology, vertex/triangle counts, and structural fingerprints must be byte/measurement-equivalent to TREE-TRUNK.2D for identical controls.
+
+### Non-goals
+
+- No geometry/frame/basis change.
+- No tolerance increase or topology-threshold change.
+- No Lean/Bend/Path-Spiral equation change.
+- No control/schema/default/serialized-data change.
+- No removal of the differential audit until the repaired production validator is operator-validated.
+
+### Performance model
+
+The recipe-only validator changes only the reference axis used while walking existing trunk rings after mesh emission. Complexity remains O(number of trunk rings), with no additional geometry, allocations, per-frame work, or runtime gameplay cost. The differential audit remains Editor-only and fixed-size.
+
+### Implementation sequence
+
+1. Replace only the recipe-only branch of generated axial-twist measurement with ground-azimuth-reference accumulation; leave legacy measurement untouched.
+2. Update focused diagnostic/report labels and decision text to TREE-TRUNK.2E while retaining the bypass/differential cross-check.
+3. Audit production geometry helpers and emitted surface equations against TREE-TRUNK.2D; they must remain unchanged.
+4. Run static scope/schema/lexical checks and package only the approved files.
+5. Unity focused validation remains pending operator evidence.
+
+### TREE-TRUNK.2E implementation result and static audit
+
+- Recipe-only generated axial-twist measurement now uses canonical tree-local +X as the zero-roll radial reference and tree-local up as the signed-angle axis. The emitted side-0 radial is projected into the ground plane and unwrapped ring-to-ring. This matches the TREE-TRUNK.2C production body-frame convention and removes transported-surface-frame curvature from the authored-roll measurement.
+- The existing requested-vs-measured absolute tolerance remains 2 degrees. Legacy/non-recipe measurement remains unchanged. Existing terminal-tip closure compensation remains unchanged.
+- Bark remains version 30 because production vertex positions/topology are unchanged; this patch repairs validation semantics rather than geometry/cache determinism.
+- The TREE-TRUNK.2D diagnostic bypass and 18-build differential audit remain active as cross-checks. Report/status labels now identify TREE-TRUNK.2E validation.
+- Source-preservation audit against TREE-TRUNK.2D confirms `EvaluateTrunkSurfacePosition`, `ResolveGroundAzimuthRootBodyRadial`, `ResolveGroundAnchoredRootFootRadial`, `ResolveTrunkBaseSurfaceFrame`, `ResolveTrunkSurfaceFrame`, `EvaluateRootTangentSafetyEnvelope`, `EvaluateRootFrameEnvelope`, and `EvaluateTrunkRootContributions` are byte-identical. Only the recipe-only branch of `MeasureGeneratedTrunkAxialTwist` changes in production code.
+- Lexical delimiter counts are balanced in both modified C# files. Generator remains version 8. No Unity compiler/runtime is available in the extracted workspace; focused operator validation remains pending.
+
+### TREE-TRUNK.2E status
+
+1. Review — complete.
+2. Canonical plan — complete.
+3. Validator reference repair — complete.
+4. Diagnostic-label/cross-check update — complete.
+5. Static scope/preservation audit — complete.
+6. Unity focused validation — pending operator evidence.
+7. Broad control/geometry/performance regression — pending focused acceptance.
+
+
+## TREE-TRUNK.2F — Production Gallery Closure Audit
+
+Status: implemented in source; static scope/preservation audit passed. Unity compilation and the single twenty-tree operator run are pending.
+
+### Objective
+
+Close TREE-TRUNK.2 with one compact production-relevant regression audit instead of running the generic 40-control matrix or the three-policy geometry tournament. The audit must fresh-generate and production-build each of the twenty curated procedural comparison trees exactly once, proving that Generator 8 and Bark 30 remain valid across the real curated gallery while recording the geometry-cost evidence needed to detect an accidental regression.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+
+Create only:
+
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkProductionClosureAudit.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkProductionClosureAudit.cs.meta`
+
+No production generator, bark, settings, recipe, scene, prefab, material, shader, layer, tag, component, or serialized gallery asset changes are authorized.
+
+### Reviewed evidence
+
+- TREE-TRUNK.2E operator evidence completed the focused structural/root-frame contract at 35 / 35 PASS with zero topology failures. The repaired axial-twist reference measured `-400 / 0 / +400` to essentially machine precision across Bend, strong Lean+Bend, and Path Spiral +/-2.
+- The existing 40-control response suite is intentionally not the next gate: it executes four samples for every exposed creative control across four representatives, spending most of its work on foliage, branch, palette, and unrelated controls that TREE-TRUNK.2 did not modify.
+- The existing geometry-efficiency audit is intentionally not the next gate: it executes every gallery tree under Current, LegacyCurrent, and RadialAggressive policies and includes silhouette-capture comparison machinery. TREE-TRUNK.2 needs only Current production topology/cost evidence.
+- The accepted prior twenty-tree Production Current aggregate recorded in this document is `131252` vertices and `206391` triangles. The subsystem still has no hard complete-tree geometry budget, so the closure audit must report aggregate delta rather than invent a new pass/fail budget.
+- TREE-TRUNK.2C changed the recipe-only root-body basis but was designed to add no samples, rings, radial segments, vertices, or triangles by construction. TREE-TRUNK.2E changed validation semantics only.
+
+### Audit contract
+
+1. Locate the complete procedural comparison-gallery root beneath the selected tree's gallery and require exactly twenty `ProceduralTreeInstance` targets.
+2. Require every target to expose an initialized recipe-only exact-control snapshot.
+3. For each target, run one fresh `TreeGenerator.GenerateExactForValidation(...)` call from its current exact controls, seed, source identity, and family.
+4. Build one temporary bark mesh from that fresh definition with the Current recipe-only production settings plus geometry-audit telemetry only. No Legacy, aggressive, conservative, screenshot, capture, or candidate policy is run.
+5. Require fresh generation PASS, bark build PASS, and topology audit PASS. The normal Bark 30 axial-twist validator remains authoritative and may not be bypassed.
+6. Record per tree: family/variant/recipe identity, fresh-vs-serialized structural fingerprint parity, requested/measured/error axial twist, vertices, triangles, estimated mesh bytes, render-ring/root-zone telemetry, build time, and existing generated-mesh count parity when a comparable stored definition/mesh is available.
+7. Report aggregate vertices/triangles/estimated mesh bytes and delta versus the accepted `131252 / 206391` Production Current aggregate. This delta is evidence only because no canonical hard complete-tree geometry budget exists.
+8. Run incrementally at one tree per Editor update, remain cancellable, display progress/ETA, checkpoint report/CSV output, and perform no scene or asset mutation.
+
+### Acceptance criteria
+
+- Exactly 20 / 20 curated procedural targets are discovered.
+- 20 / 20 fresh structural generations pass.
+- 20 / 20 Current bark builds pass the normal production validator and complete topology audit.
+- No target reports a nonzero Bark axial-twist error outside the existing production tolerance.
+- The report includes aggregate geometry and explicit delta versus `131252 / 206391`; any material increase is surfaced for review rather than hidden by an invented threshold.
+- Existing generated-mesh count parity is reported only when meaningful; stale/missing stored gallery output must be identified rather than treated as proof of a production-code failure.
+- No additional stress matrix is run: the accepted TREE-TRUNK.2E 35-case suite already covers strong Lean/Bend, Persistence extremes, light/authored/heavy roots, axial twist, and Path Spiral. Repeating those cases would add runtime without closing a new uncertainty.
+
+### Invariants / non-goals
+
+- Do not modify Generator 8, Bark 30, TREE-TRUNK.2C geometry, TREE-TRUNK.2E axial-twist measurement, topology thresholds, efficiency policies, control domains, recipes, or exact-control values.
+- Do not run or embed the generic 40-control suite as part of this audit.
+- Do not run LegacyCurrent, RadialAggressive, RadialConservative, or silhouette captures.
+- Do not regenerate or commit gallery meshes.
+- Do not add a new gameplay/runtime path or recurring work.
+
+### Implementation sequence
+
+1. Add the bounded twenty-tree Editor-only closure runner with TXT/CSV checkpoint output.
+2. Add one Inspector section with run/cancel/progress/copy/open controls and mutual-exclusion guards against the existing long-running tree diagnostics.
+3. Perform source-preservation and scope audit: Generator and Bark must be byte-identical to TREE-TRUNK.2E; only the approved Editor/document files may differ.
+4. Run available static checks and package the approved changed files. Unity compilation and the single twenty-tree operator run remain the live validation gate.
+
+### Risks and mitigations
+
+- **Stale gallery output mistaken for code regression:** fresh generation/build is authoritative; stored fingerprint/count parity is labeled separately and only interpreted when comparable.
+- **Audit creep:** exactly one Current build per target; no policy tournament, control sweep, screenshots, or duplicate TREE-TRUNK.2E stress cases.
+- **Editor stall:** one case per Editor update with cancellation, ETA, and partial output.
+- **Hidden geometry-cost regression:** record per-tree and aggregate vertices/triangles/bytes plus accepted-aggregate delta, while avoiding an unsupported hard budget.
+
+### Validation plan
+
+- Unity compile after installing the patch.
+- Run the new TREE-TRUNK.2 production closure audit once from a procedural gallery tree.
+- Acceptance target: 20 / 20 generation PASS, 20 / 20 production bark/topology PASS; then review the reported aggregate geometry delta and any stale stored-gallery parity warnings.
+
+
+### TREE-TRUNK.2F implementation result and static audit
+
+- Added one Editor-only incremental closure runner that discovers exactly twenty procedural gallery instances and executes one fresh exact-control generation plus one Current recipe-only bark build per tree.
+- The bark build uses the production recipe-only settings with geometry-audit telemetry enabled; it does not run LegacyCurrent, conservative/aggressive policies, silhouette capture, screenshots, candidate search, or the already-accepted TREE-TRUNK.2E stress matrix.
+- Core case PASS requires fresh generation PASS, normal Bark 30 build PASS, and complete topology-audit PASS. The TREE-TRUNK.2D axial-twist bypass is not used.
+- Per-tree TXT/CSV evidence includes structural fingerprint parity, normal axial-twist requested/measured/error values, vertices/triangles/estimated payload, build/topology time, trunk/root sampling telemetry, and stored generated-mesh count parity when the stored structure is actually comparable.
+- Aggregate reporting records current vertices/triangles/estimated payload and, only after all twenty cases complete, the delta against the accepted `131252 / 206391` aggregate. No unsupported complete-tree pass/fail geometry budget was introduced.
+- The Inspector now exposes one dedicated TREE-TRUNK.2 closure section with run/cancel/progress/ETA/copy/open controls. Existing long-running tree diagnostics are mutually excluded while the closure audit is active.
+- Generator 8, Bark 30, and the TREE-TRUNK.2E focused diagnostic suite are byte-identical to the accepted pre-2F state. SHA-256 preservation checks passed for all three files.
+- Final source scope is exactly the canonical document, the procedural-tree Inspector, the new closure-audit source, and its script meta file. No production geometry/settings/runtime/serialized asset changed.
+- Lexical delimiter checks pass for both modified C# files. The new audit statically contains one Current policy reference and no LegacyCurrent/RadialAggressive/AxialAggressive policy execution, no silhouette/capture API, and no axial-twist validator bypass.
+- No C# compiler or Unity runtime is available in the extracted workspace. Unity compilation and the single twenty-tree operator run remain pending.
+
+### TREE-TRUNK.2F decision gate
+
+Run only this closure audit next. If it reports 20 / 20 fresh generation + production bark/topology PASS, review the aggregate geometry delta and stored-gallery parity warnings. Do not run the generic 40-control or three-policy geometry suites merely to close TREE-TRUNK.2; use them later only when a separate change creates uncertainty in the controls or policy comparisons they uniquely test.
+
+## TREE-TRUNK.2G — Twisted-1 Render-Ring Centre Collapse Diagnostic
+
+Status: implementation approved as a diagnostic-only follow-up after curated gallery regeneration exposed one Bark topology failure on the deterministic Twisted 1 production slot. No production geometry change is authorized in this patch.
+
+### Objective
+
+Reproduce the exact `Wych Elm Leaning` / seed `1617923258` production structure once and run exactly one normal recipe-only Bark build while capturing the render-ring centreline at the points where Bark transforms source branch samples. Identify the exact branch and pipeline stage that first creates the single zero-length consecutive render-ring-centre segment reported by the production topology audit.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+
+Create only:
+
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkRingCollapseDiagnostic.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkRingCollapseDiagnostic.cs.meta`
+
+No Generator algorithm, Bark geometry equation, Bark topology threshold, recipe/control value, scene, prefab, material, mesh asset, layer, tag, or serialized gallery object change is authorized.
+
+### Reviewed evidence
+
+- Operator curated-gallery regeneration completed deterministic structural generation for all twenty slots, but Twisted 1 alone failed Bark topology. Its sole reported topology defect was `zero-length ring segments: 1`; invalid indices, degenerate triangles, finite-stream failures, side/cap orientation failures, non-manifold edges, embedded-root matching, and unexpected boundary loops were all zero/clean.
+- Current Bark code increments the zero-length counter from consecutive final `RenderSample.Position` values, not circumference-edge vertex lengths. The audit therefore proves one final Bark render-ring centre pair coincides within the generator epsilon.
+- `BuildRenderSamples` is the first Bark stage that can move branch centres: for child branches it applies branch-root transition inset/root-side clamping, then rebuilds transported frames and curvature-radius safety.
+- Trunk render samples can subsequently be refined and tip-trimmed. Non-trunk samples can subsequently be reduced by adaptive circular sampling and repaired by collapsed-strip removal. The diagnostic must capture these existing stages from the actual production build rather than reimplementing them in a second geometry path.
+- The failing gallery build samples exact controls directly from the mapped curated recipe at seed `1617923258`, then generates with the recipe-only exact-control path and builds Bark with `CreateRecipeOnlyDefaults()`. The diagnostic must reproduce those inputs directly and must not depend on a stale stored gallery instance.
+
+### Diagnostic contract
+
+1. Resolve the current curated recipe catalog and the Twisted variant-1 stable recipe identity; require the mapped recipe to resolve to `Wych Elm Leaning`.
+2. Sample a fresh exact-control snapshot from that recipe at seed `1617923258` and run exactly one structural generation using the recipe-only exact-control generator path.
+3. Run exactly one normal Bark 30 build with recipe-only production settings. Do not bypass topology, axial-twist validation, or any production repair/reduction stage.
+4. During that same Bark build, capture consecutive centre distances for every branch at: source samples before Bark adjustment, immediately after `BuildRenderSamples`, after trunk refinement when applicable, after trunk tip preparation when applicable, after non-trunk efficiency reduction when applicable, and after non-trunk topology-collapse removal/final render-sample preparation.
+5. Report every zero-length pair at each captured stage and identify the first stage where a pair appears. For the final failing pair report stable branch ID, branch order, parent index, parent attachment distance, local reference axis, sample indices, normalized distances, positions, radii, tangents/normals/binormals, previous/next neighbour distances, and source-vs-render positional deltas where a same-index source sample exists.
+6. Preserve the normal Bark build result and full topology report beside the diagnostic evidence. The diagnostic itself may not mutate any scene, asset, recipe, generated mesh, or stored exact controls.
+
+### Acceptance criteria
+
+- Exactly one fresh structure generation and one normal production Bark build are executed.
+- The normal Bark build reproduces `ZeroLengthRingSegmentCount == 1`; if it does not, report the mismatch and stop diagnosis rather than guessing.
+- The report identifies one exact branch/sample pair and the earliest Bark pipeline stage at which the pair becomes zero-length.
+- Source-stage evidence explicitly determines whether the duplicate already existed in Generator output.
+- No production geometry, topology threshold, sampling/reduction policy, or version number changes.
+
+### Implementation sequence
+
+1. Add diagnostic-only stage capture around the existing Bark render-sample pipeline; capture data only while the dedicated diagnostic entry point is active.
+2. Add one Editor-only one-shot runner that resolves the current curated Twisted-1 recipe, resamples the exact failing seed, performs one generation plus one normal Bark build, and writes/copies a focused TXT report.
+3. Add one compact Inspector action and copy/open controls, mutually excluded with existing long-running tree diagnostics.
+4. Audit source preservation against TREE-TRUNK.2F: production Bark equations and normal build behavior must be unchanged when diagnostic capture is inactive; Generator 8 remains untouched.
+5. Run static scope/lexical checks and package only the approved files. Unity compilation and one operator diagnostic run remain the live validation gate.
+
+### Risks and mitigations
+
+- **False reproduction from stale gallery state:** resolve recipe + seed directly and resample exact controls; do not reuse stored instance controls.
+- **Diagnostic reimplementation diverges from production:** instrument the actual `AppendBranchTube` render-sample pipeline during the one normal Bark build rather than creating a second Bark geometry algorithm.
+- **Instrumentation changes normal builds:** use thread-static diagnostic capture that is null outside the dedicated entry point and audit production output code for byte-equivalent geometry equations.
+- **Over-testing:** one structural generation and one Bark build only; no gallery rerun, 40-control suite, efficiency policy tournament, or unrelated stress matrix.
+
+### Validation plan
+
+- Unity compile after installing the patch.
+- Run the dedicated Twisted-1 ring-collapse diagnostic once.
+- Acceptance target: reproduce the one zero-length render-ring-centre pair and identify its stable branch/sample indices plus first introducing Bark stage; submit the complete focused report for the production-fix decision.
+
+### TREE-TRUNK.2G implementation result and static audit
+
+- Added a thread-static diagnostic capture that is null during ordinary Bark builds. The dedicated wrapper calls the existing normal `Build(...)` exactly once and only records source/render-sample centreline state while that build executes.
+- Stage capture records Generator source samples, post-`BuildRenderSamples`, post-trunk refinement, post-trunk tip preparation, post-branch efficiency reduction, post-branch topology-collapse removal, and final render samples. Every pair tested uses the exact same squared-distance threshold as the production zero-length counter.
+- Duplicate detail includes branch identity/order/parent/attachment/reference axis, pair indices, normalized distances, positions, radii, transported frames, neighbouring centre distances, and nearest/same-index source-position deltas. The summary ranks pipeline stages independently of branch iteration order so a later branch's earlier-stage duplicate cannot be mislabeled as a later-stage origin.
+- Added one Editor-only synchronous runner hard-targeted to curated Twisted variant 1 / `Wych Elm Leaning` / seed `1617923258`. It resolves the current catalog without assigning or dirtying gallery state, samples one fresh exact-control snapshot, runs one recipe-only `TreeGenerator.Generate(...)`, then one normal Bark build with `CreateRecipeOnlyDefaults()` through the diagnostic wrapper.
+- The runner does not call the axial-twist bypass, tournament/unsafe preview builders, gallery mesh builder, Undo, `SetDirty`, or any scene/asset mutation API. It writes one TXT report, copies it to the clipboard, and classifies the run as `REPRODUCED` only when the normal Bark build fails with a topology result containing exactly one zero-length ring segment.
+- Added one compact Inspector section with run/copy/open actions. The run action is disabled while the existing long-running tree generation/audit/diagnostic jobs are active.
+- Scope audit reports exactly five changed files: the canonical document, Bark source, procedural-tree Inspector, new diagnostic source, and its script meta. Generator 8, Bark topology audit, Bark settings, and the accepted focused/closure diagnostic sources remain unchanged.
+- Bark algorithm version remains 30. The Bark diff contains diagnostic declarations/wrapper/callback additions only; no existing production geometry equation, topology condition, repair/reduction policy, or threshold line is replaced or deleted.
+- Lexical delimiter checks pass for all three modified/created C# sources. Static scan confirms exactly one generator call in the one-shot runner, exactly one diagnostic Bark-wrapper call there, and exactly one normal `Build(...)` call inside that wrapper.
+- No C# compiler or Unity runtime is available in the extracted workspace. Unity compilation and the single operator diagnostic run remain pending.
+
+### TREE-TRUNK.2G decision gate
+
+Run only the Twisted-1 ring-collapse diagnostic next. If it reproduces exactly one final zero-length ring-centre pair, use the reported branch/sample/stage evidence to design the smallest production repair. If reproduction mismatches, do not patch Bark from inference; reconcile the diagnostic inputs with the live curated-gallery generation state first.
+
+## TREE-TRUNK.2H — Dense-Root Boundary Spacing Repair
+
+Status: implementation approved; plan recorded before code changes. Unity compilation and the exact Twisted-1 verification run remain pending.
+
+### Objective
+
+Repair the single Twisted-1 Bark topology failure by preventing trunk refinement from inserting the non-legacy dense-root-domain boundary sample when that interpolated boundary lies within Bark's existing zero-length ring-centre threshold of one of the source span endpoints. Preserve the semantic dense/non-dense boundary by assigning the whole source span to the side whose endpoint is not separated from the boundary by a topology-valid distance.
+
+### Approved files
+
+Modify only:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkRingCollapseDiagnostic.cs`
+
+Create/delete/move/serialized assets: none.
+
+### Reviewed evidence
+
+- The exact `Wych Elm Leaning` / seed `1617923258` diagnostic reproduces Generator 8 PASS followed by Bark 30 FAIL with exactly one zero-length render-ring-centre segment.
+- Generator source samples and post-`BuildRenderSamples` trunk samples contain zero zero-length pairs. The first and only pair appears immediately after trunk refinement on trunk stable branch `683310912`, pair `28 -> 29`.
+- The failing pair is at normalized distances `0.222178 -> 0.222222` with physical centre distance `0.000552713 m`. Its neighbouring distances are approximately `0.099744 m` before and `0.200126 m` after.
+- `RefineTrunkRenderSamples` explicitly interpolates and inserts the non-legacy dense-root sampling boundary whenever one source span straddles that normalized boundary. It currently checks normalized straddling only; it does not check whether the interpolated boundary is within the existing Bark zero-length centre threshold of either source endpoint.
+- Final Bark branch accounting counts a zero-length centre segment when consecutive `RenderSample.Position` values have squared distance `<= Epsilon`, where Bark `Epsilon` is `0.000001f` (1 mm physical distance threshold). The observed `0.552713 mm` inserted pair is therefore guaranteed to fail the unchanged topology contract.
+- `AppendRefinedTrunkSpan` adds its terminal sample and all ordinary subdivisions uniformly over the supplied span; no production evidence implicates Generator output, root/body radial deformation, topology thresholds, or non-trunk sampling.
+
+### Production contract
+
+1. Keep Generator 8, TREE-TRUNK.2C ground-azimuth root/body geometry, TREE-TRUNK.2E axial-twist reference, topology thresholds, dense-root normalized boundary, adaptive refinement limits, branch sampling, root feet, and all authored controls unchanged.
+2. When a non-legacy source span straddles `denseRootSamplingEnd`, interpolate the existing boundary sample exactly as before.
+3. If the interpolated boundary is topology-validly separated from both source endpoints (`sqrDistance > Epsilon`), retain the existing two-span split and inserted-boundary-ring behavior unchanged.
+4. If the boundary lies within `Epsilon` of the lower endpoint only, do not insert a boundary ring; refine the original source span once using the post-boundary/non-dense classification.
+5. If the boundary lies within `Epsilon` of the upper endpoint only, do not insert a boundary ring; refine the original source span once using the pre-boundary/dense classification. This is the observed Twisted-1 repair path.
+6. If both endpoints lie within `Epsilon` of the boundary, do not insert a boundary ring; classify the whole tiny source span by which side occupies the larger normalized fraction, avoiding any new topology-invalid centre while minimizing semantic boundary displacement.
+7. Count the explicit boundary ring in root-refinement telemetry only when that ring is actually inserted.
+8. Because emitted production sample topology can change for affected inputs, advance Bark algorithm version `30 -> 31`; Bark settings and Generator versions remain unchanged.
+
+### Acceptance criteria
+
+- The exact Twisted-1 diagnostic fresh generation remains deterministic and unchanged.
+- `POST_BUILD_RENDER_SAMPLES`, `POST_TRUNK_REFINEMENT`, later trunk stages, and final production Bark topology all report zero zero-length ring-centre pairs for the target case.
+- The normal production Bark build for the target case passes without bypassing any validator or topology rule.
+- No source Generator samples, topology threshold, axial-twist rule, root/body basis, root-foot equation, or non-trunk sampling logic changes.
+- A final curated-gallery regeneration should return 20 / 20 Bark PASS before TREE-TRUNK.2 is closed.
+
+### Non-goals
+
+- No topology-threshold relaxation.
+- No generic removal/merging of close rings after refinement.
+- No retuning of dense-root sampling density or root-collapse intervals.
+- No changes to Lean, Bend, Persistence, Axial Twist, Path Spiral, radial resolution, branch sampling, or recipes.
+- No broad 40-control or multi-policy efficiency suite as part of this repair.
+
+### Performance model
+
+The repair adds two squared-distance comparisons only on the single source span that crosses the non-legacy dense-root boundary. It can remove one otherwise-invalid explicit boundary ring in endpoint-near cases and adds no per-frame work, allocations, textures, or gameplay runtime cost.
+
+### Implementation sequence
+
+1. Add the endpoint-spacing guard around the existing dense-root boundary insertion in trunk refinement, preserving the current split path byte-for-byte when both endpoint distances exceed `Epsilon`.
+2. Advance Bark algorithm version to 31 because affected production sample topology changes.
+3. Update the exact Twisted-1 diagnostic acceptance/report semantics from reproduction (`REPRODUCED`) to repair verification: normal Bark PASS, zero final zero-length segments, and zero captured post-refinement/final duplicates.
+4. Audit the final diff against TREE-TRUNK.2G and verify all unrelated production equations, thresholds, and diagnostic capture remain unchanged.
+5. Run available static checks and package only the approved files. Unity compile plus one exact Twisted-1 diagnostic run remain the live validation gate.
+
+### Risks and mitigations
+
+- **Boundary semantics drift:** classify the unsplit source span according to which endpoint is coincident with the boundary; displacement is bounded by the same <=1 mm interval that the topology contract already forbids as a separate ring.
+- **Hidden broad sampling change:** alter only the non-legacy boundary-crossing branch; ordinary spans and topology-valid boundary splits remain unchanged.
+- **Stale cached bark:** Bark algorithm version advances because a production render-ring can be removed for affected inputs.
+- **False acceptance:** the dedicated diagnostic still captures the actual production pipeline and requires a normal Bark PASS with zero final zero-length centre segments.
+
+### Validation plan
+
+- Unity compile after installing the patch.
+- Run the existing dedicated Twisted-1 ring-collapse diagnostic once; expected repair result is normal Bark PASS, zero post-refinement/final duplicate pairs, and `Status: PASS`.
+- If that exact case passes, regenerate the curated twenty-tree gallery once; required closure result is 20 / 20 Bark PASS.
+
+### TREE-TRUNK.2H implementation result and static audit
+
+- Bark algorithm version advances `30 -> 31` because the repair can remove one production trunk render ring for source spans whose dense-root boundary interpolation would otherwise violate the existing centre-spacing topology invariant.
+- `RefineTrunkRenderSamples` now measures the interpolated dense-root boundary against both source-span endpoint positions using the same squared-distance `Epsilon` contract used by final Bark ring-centre accounting. Topology-valid boundary splits retain the existing two-span path unchanged.
+- Endpoint-near boundary crossings no longer emit the explicit boundary ring. A boundary near the upper endpoint keeps the original source span in dense-root sampling; a boundary near the lower endpoint keeps it post-boundary/non-dense; a boundary within threshold of both endpoints uses the larger normalized-domain side. Explicit boundary-ring telemetry increments only on actual insertion.
+- The exact Twisted-1 diagnostic now verifies the repair rather than reproduction: success requires a normal production Bark PASS with zero final zero-length ring-centre segments. Existing stage capture remains active so the operator report can confirm zero duplicates immediately after trunk refinement and at final render samples.
+- Preservation audit: Generator source, Bark settings, Bark topology audit, procedural-tree Inspector, focused Lean/Bend suite, and production-gallery closure audit are byte-identical to TREE-TRUNK.2G. Within Bark, `AppendRefinedTrunkSpan`, trunk/root surface equations, GroundAzimuth body basis, grounded root foot, tangent/root-frame envelopes, axial-twist measurement, `BuildRenderSamples`, and trunk-tip preparation are byte-identical. Only Bark versioning, the dense-root boundary-crossing guard, and diagnostic/report semantics change.
+- Static lexical delimiter checks pass for both modified C# files. No C# compiler or Unity runtime is available in the extracted workspace, so Unity compilation and the exact one-case operator verification remain pending.
+
+### TREE-TRUNK.2H status
+
+1. Review — complete.
+2. Canonical plan — complete before code modification.
+3. Dense-root boundary spacing repair — complete in source.
+4. Bark version invalidation — complete.
+5. Exact Twisted-1 verification semantics update — complete.
+6. Static scope/preservation/lexical audit — complete.
+7. Unity compilation and exact Twisted-1 diagnostic — pending operator evidence.
+8. Twenty-tree curated gallery regeneration — pending only after the exact case passes.
+
+## TREE-TRUNK.2I — Acceptance Cleanup and Diagnostic Retirement
+
+Status: implementation approved after the repaired Generator 8 / Bark 31 curated gallery completed 20 / 20 Bark PASS. This patch is cleanup-only: production tree geometry and accepted validation contracts are frozen.
+
+### Objective
+
+Close TREE-TRUNK.2 by removing temporary diagnostic/audit infrastructure created solely to discover, compare, or verify the now-accepted repair sequence. Perform a deep dependency cleanup rather than only removing Inspector controls: delete one-off runners, remove their Bark hooks and state, remove the superseded TREE-TRUNK.2B candidate-search engine and TREE-TRUNK.2D axial-twist bypass/differential instrumentation, then retain the useful general Lean/Bend contract suite and the accepted production implementations.
+
+### Approved files
+
+Modify:
+
+- `Assets/Docs/Stylized_Nature_Tree_Integration_Handoff.md`
+- `Assets/Game/Procedural/Trees/TreeBarkMeshGenerator.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkResponseDiagnosticSuite.cs`
+- `Assets/Game/Procedural/Trees/Editor/ProceduralTreeInstanceEditor.cs`
+
+Delete:
+
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkProductionClosureAudit.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkProductionClosureAudit.cs.meta`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkRingCollapseDiagnostic.cs`
+- `Assets/Game/Procedural/Trees/Editor/TreeTrunkRingCollapseDiagnostic.cs.meta`
+
+No serialized scene, prefab, material, recipe, layer, tag, component, dependency, or folder change is authorized.
+
+### Reviewed evidence
+
+- Complete repository instructions were reloaded before review.
+- Complete current canonical handoff, Bark generator, Generator 8, focused trunk suite, procedural-tree Inspector editor, both one-off TREE-TRUNK.2F/2G-H runners, Bark settings, tree definition, procedural-tree instance, curated-gallery coordinator, gallery coordinator, bark asset builder, 40-control suite, geometry-efficiency audit, root-quality evaluation, and root-collapse tournament were reviewed.
+- Whole-tree symbol search shows the TREE-TRUNK.2B candidate option/result types and candidate evaluator are consumed only by the focused trunk suite; no production or unrelated tool consumes them.
+- The TREE-TRUNK.2D axial-twist absolute-gate bypass entry point is consumed only by the temporary semantics/bypass logic in the focused trunk suite.
+- The TREE-TRUNK.2G render-ring centreline capture entry point/state is consumed only by the one-off Twisted-1 runner.
+- The TREE-TRUNK.2F closure runner is consumed only by its temporary Inspector section and job-interlock checks.
+- `RootTrunkBoundaryCandidateActivated`, the existing root-collapse tournament path, trunk-frame diagnostic telemetry, and root-ring correspondence failure diagnostics predate the temporary candidate search and remain live consumers; they are not cleanup targets.
+- The retained production delta from the accepted pre-candidate state is intentionally limited to Generator 8 endpoint-preserving trunk behavior, Bark 31 ground-azimuth root-body basis, repaired recipe-only axial-twist measurement reference, and the dense-root boundary-spacing guard.
+- Operator evidence: the exact Twisted-1 repair verification passed, followed by a full curated-gallery regeneration with 20 / 20 Bark PASS.
+
+### Invariants / non-goals
+
+1. Keep Generator version 8 and its source byte-identical.
+2. Keep Bark algorithm version 31.
+3. Keep emitted production Bark geometry byte-equivalent for identical input/settings to the accepted TREE-TRUNK.2H state.
+4. Keep the ground-azimuth recipe-only root-body basis, persistence-independent tangent-safety release, grounded root-foot path, repaired recipe-only axial-twist reference, dense-root boundary-spacing guard, topology thresholds, and all authored control semantics unchanged.
+5. Keep the general 35-case Lean/Bend contract suite, its incremental/cancellable Editor behavior, endpoint/height/tangent/topology contracts, and rich root-frame failure evidence.
+6. Remove diagnostic candidate-policy enumeration/evaluation code rather than leaving unreachable helpers/types compiled.
+7. Remove axial-twist bypass/differential-audit code rather than leaving a hidden validation escape hatch compiled.
+8. Remove render-ring centreline capture state/callbacks/wrapper rather than leaving dormant per-stage hooks in the Bark production pipeline.
+9. Remove closure/ring one-off Inspector controls and their cross-job interlock references completely.
+10. Do not run or modify the generic 40-control suite or multi-policy geometry audit merely for this cleanup.
+
+### File-by-file implementation sequence
+
+1. Canonical handoff: record this approved plan first, then later record exact cleanup results, preservation evidence, and final accepted TREE-TRUNK.2 state.
+2. Bark generator: start from the accepted pre-candidate diagnostic surface and reapply only the accepted production changes; this removes the candidate-search engine, axial-twist bypass, ring-centre capture machinery, and every private helper used only by those temporary paths while preserving existing permanent diagnostics.
+3. Focused trunk suite: return to the retained TREE-TRUNK.2A-era 35-case runner/evidence surface, remove candidate CSV/state/search code and TREE-TRUNK.2D bypass/differential work, then update report identity/contract text to the accepted Generator 8 / Bark 31 closure state without changing cases or thresholds.
+4. Procedural-tree Inspector editor: remove both one-off audit/diagnostic sections and all job-interlock references introduced solely for them; preserve the pre-existing diagnostic/audit controls byte-for-byte where practical.
+5. Delete the two one-off runner source files and their metadata.
+6. Run whole-tree reference searches for every removed type/API/identifier family; any remaining reference is a blocker unless proven historical documentation only.
+7. Compare retained production methods and Generator source against TREE-TRUNK.2H; run static delimiter/symbol checks and package only approved changes/deletions.
+
+### Acceptance criteria
+
+- No C# reference remains to the deleted one-off runner classes.
+- No C# reference remains to candidate-search policy/result types, the candidate evaluator, candidate CSV/state helpers, axial-twist validation bypass state/API, twist-semantics audit types/runner, or render-ring centreline capture state/API.
+- No private helper remains whose only caller belonged to one of those removed temporary systems.
+- Generator 8 is byte-identical to TREE-TRUNK.2H.
+- Bark 31 production method bodies/equations for geometry, frame resolution, axial-twist validation, dense-root boundary repair, topology audit, and root-collapse tournament behavior are preserved; only diagnostic-only branches/hooks and unreachable helpers are removed.
+- The retained focused 35-case suite still calls the normal production Bark build and contains the same case definitions and invariant thresholds as the accepted pre-candidate focused suite.
+- The procedural-tree Inspector contains no TREE-TRUNK.2F closure or Twisted-1 one-off UI/job state.
+- Static C# lexical/delimiter checks pass.
+- Unity compilation after installing the cleanup patch is the only required operator validation. No additional suite rerun is required unless compilation or static preservation evidence exposes a behavioral change.
+
+### Risks and mitigations
+
+- **Deleting a diagnostic hook still used elsewhere:** whole-tree reference search before and after each removal; preserve any symbol with a non-temporary consumer.
+- **Accidentally reverting accepted production behavior while stripping Bark diagnostics:** reconstruct Bark from the accepted pre-candidate diagnostic state and reapply only the three later accepted Bark production deltas, then compare targeted production method bodies against TREE-TRUNK.2H.
+- **Changing focused-suite semantics while removing temporary work:** base the retained suite on the accepted pre-candidate 35-case implementation, preserving case construction, measurements, tolerances, topology gate, and Editor cadence.
+- **Leaving dead helper code under removed public surfaces:** run a post-removal method/type reference audit and delete helpers that have no remaining caller and were introduced by the retired systems.
+
+### Status
+
+1. Review — complete.
+2. Canonical cleanup plan — complete before implementation edits.
+3. Deep temporary diagnostic removal — complete.
+4. Production-preservation reconstruction — complete.
+5. Dead-helper/reference audit — complete.
+6. Final canonical acceptance update — complete.
+7. Static/scope/compliance audit — complete.
+8. Unity compilation — pending operator validation.
+
+### TREE-TRUNK.2I implementation result and acceptance state
+
+- The temporary production-gallery closure runner and Twisted-1 ring-collapse runner are deleted together with their metadata and all Inspector/job-interlock references.
+- Bark no longer compiles the TREE-TRUNK.2B candidate-policy enums/options/results, the candidate topology evaluator, the TREE-TRUNK.2D axial-twist validation bypass, or the TREE-TRUNK.2G render-ring centreline capture state/callback/wrapper. The associated private helper families were removed with their only callers.
+- The focused trunk suite no longer contains candidate-search state/CSV writers/stage selection, candidate geometry controls, legacy-gate bypass handling, or the 18-build differential twist-semantics audit. It is restored to the accepted 35-case Lean/Bend contract runner and retains the richer permanent root-frame failure evidence.
+- The procedural-tree Inspector editor is byte-identical to its pre-TREE-TRUNK.2F/G state, so the one-off closure/ring sections and their cross-job disable checks are fully gone while the pre-existing permanent diagnostics remain unchanged.
+- Generator 8 is byte-identical to the accepted TREE-TRUNK.2H state.
+- Bark remains algorithm 31. Exact method-body comparison against TREE-TRUNK.2H confirms the accepted dense-root boundary-spacing guard, recipe-only ground-azimuth root-body basis, grounded root-foot radial path, tangent-safety envelope, root-frame envelope, root contribution equations, recipe-only axial-twist measurement reference, legacy twist measurement, normal render-sample construction, and topology-safe trunk-tip preparation are byte-identical.
+- The Bark cleanup diff against TREE-TRUNK.2H consists only of temporary candidate/capture/bypass type and helper removal, removal of dormant capture callbacks, removal of duplicate diagnostic-only pre-failure twist telemetry assignment, and restoration of the normal unconditional 2-degree axial-twist production gate. With the old bypass flag false during every normal production build, accepted production behavior is unchanged.
+- Whole-tree C# reference search returns zero references to the deleted runner classes, candidate-search policy/result types, candidate evaluator, axial-twist bypass API/state, twist-semantics audit types, or ring-centre capture API/state.
+- Deep symbol audit removed 10 Bark temporary types, 28 Bark temporary methods, 18 Bark temporary fields, 7 focused-suite temporary types, and 47 focused-suite temporary methods. Pre-existing root-collapse tournament telemetry and permanent trunk-frame/root-ring diagnostics remain because they have live non-temporary consumers or predate this repair sequence.
+- Final source-scope comparison against TREE-TRUNK.2H reports four modified project files, zero additions, and four deletions, exactly matching the approved cleanup scope.
+- Static C# lexical scanning reports balanced parentheses, brackets, and braces with no unterminated string/comment state in all modified C# files.
+- Unity compilation is unavailable in the extracted workspace and remains the only operator validation required for this cleanup. No TREE-TRUNK.2 suite rerun is required unless compilation exposes a cleanup error.
+
+### TREE-TRUNK.2 accepted baseline
+
+TREE-TRUNK.2 is accepted at Generator 8 / Bark 31. The accepted behavior consists of endpoint/height-preserving recipe-only trunk Bend/Lean generation, persistence-independent tangent safety, ground-azimuth recipe-only root-body geometry with grounded root feet kept separate, axial-twist validation measured in the same ground-azimuth convention, and dense-root boundary insertion that respects Bark's existing minimum ring-centre spacing invariant. The focused 35-case Lean/Bend contract suite remains the permanent targeted regression tool.
+
+TREE-TRUNK.2B candidate search, TREE-TRUNK.2D validator-semantics bypass/differential audit, TREE-TRUNK.2F production-gallery closure audit, and TREE-TRUNK.2G/H Twisted-1 ring-collapse capture are historical evidence only and are superseded as active tooling by this acceptance cleanup.

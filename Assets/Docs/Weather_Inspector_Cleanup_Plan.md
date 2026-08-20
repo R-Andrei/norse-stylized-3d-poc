@@ -2,9 +2,9 @@
 
 ## Status
 
-**Current patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY`
+**Current patch:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A5-AUTHORITY-CLOSURE`
 
-**Current state:** V1.3A/A1/A2/A3 are runtime-accepted through the user validation of A3. V1.3A4 per-ray preset authority and presentation grouping is implemented and has passed the available static, scope, compatibility, and protected-contract audits. Unity compilation and runtime validation remain pending because Unity is unavailable in the implementation environment. Destructive serialized Anchor/Controller migration remains separately gated because the supplied archive does not contain authoritative live scene/prefab serialization.
+**Current state:** V1.3A/A1/A2/A3/A4 are runtime-accepted. V1.3A5 is the approved authority-closure patch: it removes source-level serialized appearance/evolution fallbacks that A4 no longer consumes, replaces the last global transition-getter side effect with explicit tick-time cleanup, and freezes the generic per-ray preset architecture. No serialized scene/prefab/preset asset is edited because authoritative live serialization is not present in the supplied archive.
 
 ## Objective
 
@@ -22,6 +22,107 @@ The patch will:
 8. make the LightRay and Cloud Inspectors production authoring surfaces with one telemetry root each;
 9. replace stale Weather documentation with the current agreed architecture;
 10. preserve `_TEST.asset` as an intentional high-strength testing preset that future production orchestration must ignore.
+
+## V1.3A5 — LightRay authority closure
+
+### Status
+
+**Patch identifier:** `WEATHER-LIGHT-RAY-CLEANUP-V1.3A5-AUTHORITY-CLOSURE`
+
+**Approval state:** approved for implementation after a second A4 code-consumer audit. This section is the canonical implementation plan and is written before source edits. Unity validation remains pending until the resulting overlay is compiled and exercised in Unity 6000.5.0f1.
+
+### Objective
+
+Remove the remaining serialized appearance/evolution fallback authority and migration baggage that A4 no longer consumes, while preserving every validated A4 runtime contract. The closure must leave one appearance authority per ray: Preset Override first, Controller Default Preset second, and no legacy appearance fallback.
+
+### Approved files
+
+Modify exactly:
+
+- `Assets/Docs/Weather_Inspector_Cleanup_Plan.md`
+- `Assets/Docs/Weather_Light_Ray_Architecture.md`
+- `Assets/Docs/Weather_System_Architecture_Provisional.md`
+- `Assets/Game/Procedural/Weather/WeatherLightRayAnchor.cs`
+- `Assets/Game/Procedural/Weather/WeatherLightRayController.cs`
+
+No renderer, population, cloud, shader/HLSL, preset asset, scene, prefab, material, `.meta`, layer, tag, package, or project-setting modification is approved. The intentional `_TEST.asset` remains untouched.
+
+### Reviewed evidence
+
+- A4 `WeatherLightRayAnchor.BuildLocalDescriptor()` constructs only request-local source, lifecycle, placement, spacing, seed, and local-intensity state. It deliberately supplies neutral placeholder presentation values; `WeatherLightRayController.UpdateAuthoredSlot()` must apply the resolved preset before the descriptor becomes active. Therefore the old Anchor appearance/evolution serialization is no longer runtime authority.
+- A4 procedural slots already require a resolved override/default preset and use the same `WeatherLightRayPreset.ApplyTo()` boundary.
+- The vegetation sidecar publisher reads intensity, coverage, and softness from each active ray descriptor. No Controller fallback vegetation field participates in publication.
+- Beam evolution reads `descriptor.EvolutionStrength` and `descriptor.EvolutionSpeed`; Controller fallback evolution fields are not part of active slot construction.
+- The four Anchor convenience properties `AreaLayout`, `BeamCount`, `BeamPitchMetres`, and `FootprintRadiusMetres` calculate from local serialized spacing even when preset spacing is authoritative. They have no project consumer and can misreport resolved runtime layout.
+- `PresetPresentationBlend` is no longer a valid global presentation API, but its getter currently clears completed Controller-default transition bookkeeping. The property may be deleted only after that side effect is replaced by explicit tick-time transition finalization.
+- `previousPresentationPreset`, `presetTransitionStartedAt`, and `presetTransitionDurationSeconds` remain required because inherited rays created or updated during an active Controller-default transition must join that transition.
+- The supplied archive still does not contain authoritative live scene/prefab LightRay serialization. A5 therefore proves runtime-safety, not recoverability of historical values stored in fields that A4 already ignores. No serialized scene/prefab asset is edited by this patch.
+
+### Anchor deletion contract
+
+Retain only genuine instance/request serialization: Controller Override, Preset Override, Edit Mode Preview, Source Kind, Cloud Policy, Source Gate Policy, Lifetime Policy, fade/hold durations, external visibility, Height, Maximum Visual Lean, Area Diameter, Beam Spacing, Variation Seed, Local Intensity Multiplier, and Override Preset Beam Spacing. Preserve the `FormerlySerializedAs("legacyBeamSpacingMetres")` compatibility attribute on Beam Spacing.
+
+Delete all legacy Anchor presentation/migration serialization and its support code: version counters, legacy beam-count/width/packing data, preset-owned beam appearance, colour/warmth/atmospheric presentation, surface-response fallbacks, hidden historical surface/cloud values, footprint migration values, Anchor-local evolution override/preset/strength/speed, migration constants/methods, presentation clamps, and obsolete appearance accessors.
+
+Delete the unused/misleading Anchor convenience layout properties `AreaLayout`, `BeamCount`, `BeamPitchMetres`, and `FootprintRadiusMetres`; Inspector/runtime telemetry must continue deriving layout from the resolved descriptor or from explicit resolved preset/local-spacing authoring logic.
+
+### Controller deletion contract
+
+Delete the five serialized fallback-authority fields for Controller vegetation/evolution presentation and all fallback-only clamps/helpers/properties that depend on them. Delete the redundant default-preset vegetation summary from the comprehensive report; per-ray descriptor vegetation telemetry remains.
+
+Rename private `SharedAccentLine...` mapping identifiers to vegetation-specific terminology without changing their numeric mapping. The mapping remains a pure per-ray conversion from descriptor vegetation intensity to sidecar scale.
+
+Delete the global `PresetPresentationBlend` property only after adding explicit default-preset transition finalization to the regular Controller tick. The transition finalizer must clear only completed Controller-default transition bookkeeping and must not alter any per-slot transition state.
+
+### Invariants / non-goals
+
+1. No A4 population, A1 camera-footprint, A2 turnover, cloud-transition, cloud-query, renderer grouping, source-resolution, surface Spot, vegetation sidecar, shader, or beam-evolution calculus change.
+2. No change to preset artistic values or preset assets. `_TEST.asset` remains intentionally retained.
+3. No deletion of generic gameplay/request contracts such as Spawn Priority, Movement Policy, Gameplay Channel, or GameplayRequested origin merely because current producers use only a subset.
+4. Keep historical public Controller `ActivePreset` / `TrySetActivePreset` API names for compatibility while authoring continues to present Default Preset.
+5. Keep the D3D12-safe renderer vegetation fallback buffer; it is unrelated to deleted appearance fallback authority.
+6. No raw serialized scene/prefab/material/preset edits. Historical ignored field values may cease to deserialize after source-field deletion; A4 runtime behavior must remain unchanged.
+
+### File-by-file implementation sequence
+
+1. Update this canonical plan first and record the second audit evidence and exact deletion contract.
+2. Simplify the Anchor serialization/public surface/validation to the retained request-local state only.
+3. Simplify Controller fallback presentation state, add explicit default-transition finalization, remove redundant report telemetry, and rename only private vegetation accent mapping identifiers.
+4. Update the canonical LightRay and Weather current-state documents to freeze the closed authority contract and distinguish historical A4 migration notes from current state.
+5. Re-run repository-wide consumer scans for every deleted symbol, verify Editor serialized-property bindings, compare protected A4 modules byte-for-byte, and package only the exact approved changed files.
+
+### Acceptance criteria
+
+- Deleted Anchor/Controller fallback symbols have zero live C# consumers.
+- Anchor retains exactly the approved request-local serialized state and no hidden presentation authority.
+- Every active authored/procedural ray still requires a resolved override/default preset.
+- Controller Default Preset transitions still allow inherited slots to join an in-progress transition; completed Controller-level transition bookkeeping is explicitly cleared without the removed getter side effect.
+- Per-ray vegetation descriptor publication, renderer presentation grouping, source resolution, automatic population, A1 footprint recovery, A2 stateless turnover, and A3 sidecar contract are unchanged.
+- Current Inspectors resolve every serialized property they draw.
+- No approved-external project file changes.
+- Available static/contract/scope checks pass; Unity compilation/runtime checks are reported pending until executed in the project.
+
+### Implementation status
+
+- [x] Gate 1 review and second deletion-consumer audit complete.
+- [x] Canonical A5 plan recorded before source edits.
+- [x] Anchor authority cleanup.
+- [x] Controller authority/transition cleanup.
+- [x] Canonical architecture/current-state update.
+- [x] Final scope/consumer/protected-contract audit.
+- [x] Package overlay and provide Unity validation contract.
+
+### A5 final audit evidence
+
+The final A5 source/scope audit passed 107 checks with zero failures. It verified the exact 18-field Anchor serialization, removal of every approved legacy Anchor/Controller authority symbol, explicit Controller-default transition finalization, continued authored/procedural preset requirements, descriptor-owned vegetation publication, current Inspector serialized-property resolution, lexical/delimiter integrity of both modified C# files, exact five-file project scope, and byte identity of the A4 renderer, population, preset/types, vegetation shader/include, Editors, and `_TEST.asset` protected surfaces. Unity compilation and Play Mode validation remain pending because Unity is unavailable in the implementation environment.
+
+### A5 implementation evidence
+
+- Anchor serialization is reduced to the 18 approved request-local fields; all 30 legacy presentation/migration fields and their helper/accessor code are removed.
+- Controller fallback vegetation/evolution serialization and fallback-only public properties are removed.
+- `PresetPresentationBlend` is removed; completed Controller-default transitions are finalized explicitly from the Controller tick while per-slot transition state remains untouched.
+- Vegetation accent mapping remains numerically identical but uses vegetation-specific private naming and still consumes descriptor values per ray.
+- No renderer, population, cloud, shader/HLSL, preset asset, scene, prefab, material, or project-setting implementation change is part of A5.
 
 ## V1.3A4 — Per-ray preset authority and presentation grouping
 
@@ -347,7 +448,7 @@ It does not own daylight, the Sun, Weather eligibility, quest eligibility, story
 
 A preset owns appearance and shared presentation only. It must not determine source ownership, automatic eligibility, or Weather dependencies.
 
-The legacy serialized preset `SourceKind` remains in this patch only because deleting serialized preset data belongs to the later mandatory-preset migration patch. Production automatic population must not read it.
+Preset `SourceKind` is not runtime authority. A4 removed the C# preset source-kind member; inert legacy YAML keys may remain in existing preset assets until Unity naturally reserializes them. A5 does not raw-edit working preset assets solely to remove ignored keys.
 
 ### Runtime request
 
@@ -476,7 +577,7 @@ Historical V1.3A stopped at the Controller/Inspector boundary and deliberately l
 
 ### Serialized migration
 
-At the historical V1.3A boundary, legacy Controller and Anchor appearance fields and preset `SourceKind` remained until the later serialized migration audit. V1.3A4 removes runtime preset `SourceKind` authority and stops using legacy Anchor appearance as runtime authority, while physical serialized-field deletion remains deferred.
+At the historical V1.3A boundary, legacy Controller and Anchor appearance fields and preset `SourceKind` remained. V1.3A4 removed runtime preset source authority and stopped consuming the legacy Anchor appearance path. V1.3A5 closes that debt by deleting the obsolete source-level Anchor/Controller fallback and migration fields without raw-editing scenes, prefabs, or preset assets.
 
 ### Source coupling
 

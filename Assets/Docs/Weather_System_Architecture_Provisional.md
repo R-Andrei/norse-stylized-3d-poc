@@ -2,7 +2,7 @@
 
 ## Status
 
-**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-08-07-A4`
+**Current documentation revision:** `WEATHER-SYSTEM-ARCHITECTURE-2026-08-08-A5`
 
 This document defines current subsystem ownership and integration boundaries. Detailed implementation contracts remain in the subsystem documents:
 
@@ -147,7 +147,6 @@ The current cleanup does not implement:
 - hardcoded Sun/Moon LightRay ownership;
 - visible cloud geometry or volumetrics;
 - new wind gameplay effects;
-- destructive deletion/migration of legacy serialized LightRay Controller/Anchor fallback fields before the live scene/prefab audit;
 - a new cloud receiver path.
 
 ## 7. Test-only LightRay preset
@@ -160,6 +159,6 @@ Future production orchestration must exclude it from automatic selection. It is 
 
 The cloud-shadow V0 producer and receiver path are frozen based on its recorded Unity validation and benchmark evidence.
 
-V1.3A/A1/A2/A3 are runtime-accepted. V1.3A4 adds per-ray preset authority, per-ray vegetation response, resolved per-ray source presentation, and atmospheric presentation grouping; it requires fresh Unity 6000.5.0f1 compilation and mixed-preset runtime validation.
+V1.3A/A1/A2/A3/A4 are runtime-accepted. V1.3A5 removes the remaining source-level legacy LightRay appearance/evolution fallback and migration state while preserving the accepted per-ray preset, source, renderer-grouping, vegetation, cloud, and automatic-population contracts. Fresh Unity 6000.5.0f1 compilation and runtime validation of A5 remain required.
 
-Destructive serialized fallback-field removal remains blocked until the live project's complete `.meta`, scene, prefab, Controller, and Anchor state is audited.
+A5 performs no raw scene, prefab, preset-asset, material, or project-setting migration. Historical values in deleted source fields are intentionally not retained as permanent dead serialization because A4 already removed them from runtime authority.

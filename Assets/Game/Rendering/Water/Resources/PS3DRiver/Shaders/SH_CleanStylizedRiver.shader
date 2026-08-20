@@ -94,6 +94,7 @@ Shader "PS3D/Stylized River Water"
 
         [Header(Stage 6 Foam Field)]
         [HideInInspector] _FoamEnabled("Foam Enabled", Float) = 0
+        [HideInInspector] _FoamMaterialContract("Foam Material Contract", Float) = 0
         [HideInInspector] _FoamPrevious("Foam Previous", 2D) = "black" {}
         [HideInInspector] _FoamCurrent("Foam Current", 2D) = "black" {}
         [HideInInspector] _FoamShapeMask("Foam Shape Mask", 2D) = "black" {}
@@ -128,7 +129,6 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamChipStableScreenRadiusPixels("Foam Chip Stable Screen Radius Pixels", Range(0, 16)) = 2
         [HideInInspector] _FoamChipMaximumViewScale("Foam Chip Maximum View Scale", Range(1, 2.5)) = 1.75
         [HideInInspector] _FoamChipEdgeWidthPixels("Foam Chip Edge Width Pixels", Float) = 4
-        [HideInInspector] _FoamChipSoftEdgeStart("Foam Chip Soft Edge Start", Range(0, 0.25)) = 0.06
         [HideInInspector] _FoamChipInteriorAccess("Foam Chip Interior Access", Range(0, 1)) = 0
         [HideInInspector] _FoamChipFieldSpeed("Foam Chip Downstream Speed", Float) = 0
         [HideInInspector] _FoamChipFormationTime("Foam Chip Formation Time", Float) = 2.5
@@ -149,8 +149,6 @@ Shader "PS3D/Stylized River Water"
         [HideInInspector] _FoamStrandDensity("Foam Strand Density", Range(0, 1)) = 0.5
         [HideInInspector] _FoamStrandReach("Foam Strand Reach", Range(0, 1)) = 0.55
         [HideInInspector] _FoamSharpness("Foam Sharpness", Range(0, 1)) = 0.8
-        [HideInInspector] _FoamFinalVisibilityMode("Foam Final Visibility Mode", Float) = 0
-        [HideInInspector] _FoamPresenceFootprintMode("Foam Presence Footprint Mode", Float) = 0
         [HideInInspector] _FoamDebugView("Foam Debug View", Float) = 0
 
         [Header(Lighting Response)]
@@ -304,6 +302,7 @@ Shader "PS3D/Stylized River Water"
                 float4 _DisturbanceStaticWakeTexelSize;
 
                 float _FoamEnabled;
+                float _FoamMaterialContract;
                 float _FoamInterpolation;
                 float _FoamPreviousBulkPhaseCells;
                 float _FoamCurrentBulkPhaseCells;
@@ -319,7 +318,6 @@ Shader "PS3D/Stylized River Water"
                 float _FoamChipStableScreenRadiusPixels;
                 float _FoamChipMaximumViewScale;
                 float _FoamChipEdgeWidthPixels;
-                float _FoamChipSoftEdgeStart;
                 float _FoamChipInteriorAccess;
                 float _FoamChipFieldSpeed;
                 float _FoamChipFormationTime;
@@ -340,8 +338,6 @@ Shader "PS3D/Stylized River Water"
                 float _FoamStrandDensity;
                 float _FoamStrandReach;
                 float _FoamSharpness;
-                float _FoamFinalVisibilityMode;
-                float _FoamPresenceFootprintMode;
                 float _FoamDebugView;
                 float _FoamMotionLaneScrollCells;
                 float _FoamBaseDownstreamSpeed;
@@ -402,7 +398,7 @@ Shader "PS3D/Stylized River Water"
 
             float4 SampleCommittedFoamState(float2 fieldUV)
             {
-                return RiverWaterFoamSampleInterpolatedState(
+                return RiverWaterFoamSampleContractState(
                     TEXTURE2D_ARGS(
                         _FoamPrevious,
                         sampler_FoamPrevious),
@@ -418,7 +414,9 @@ Shader "PS3D/Stylized River Water"
                     float2(
                         _FoamCurrentBulkPhaseCells *
                             _FoamCurrent_TexelSize.x,
-                        0.0));
+                        0.0),
+                    _FoamMaterialContract,
+                    _FoamCurrent_TexelSize);
             }
 
             float ResolveCommittedFoamCoverageVisibility(
@@ -994,9 +992,9 @@ Shader "PS3D/Stylized River Water"
                         _FoamCurrentBulkPhaseCells *
                             _FoamCurrent_TexelSize.x,
                         0.0),
+                    _FoamMaterialContract,
+                    _FoamCurrent_TexelSize,
                     _FoamSharpness,
-                    _FoamFinalVisibilityMode,
-                    _FoamPresenceFootprintMode,
                     _FoamStrandStrength,
                     _FoamStrandScale,
                     _FoamStrandReach,
@@ -1034,31 +1032,12 @@ Shader "PS3D/Stylized River Water"
                     foamDebug == 18
                         ? 1.0
                         : 0.0;
-                float preChipRenderedMask = foam.mask;
-                [branch]
-                if (_FoamPresenceFootprintMode > 0.5)
-                {
-                    preChipRenderedMask =
-                        RiverWaterFoamResolvePreChipRenderedMask(
-                            foam.mask,
-                            foam.softVisibility,
-                            foam.strandSoftVisibility,
-                            foam.strandPattern,
-                            foam.strandResolution,
-                            _FoamStrandStrength,
-                            _FoamStrandDensity,
-                            _FoamStrandReach);
-                }
-
                 RiverWaterFoamSelectionDiagnostics selectionDiagnostics =
                     RiverWaterFoamEvaluateSelectionDiagnostics(
                         input.domainData.x,
                         input.domainData.y,
                         foam.softVisibility,
                         foam.mask,
-                        preChipRenderedMask,
-                        _FoamPresenceFootprintMode,
-                        _FoamChipSoftEdgeStart,
                         evaluateChipSelection,
                         evaluateChipCandidates,
                         evaluateCandidatesOutsideMaterial,
@@ -1156,8 +1135,7 @@ Shader "PS3D/Stylized River Water"
                     }
 
                     float renderedFoam =
-                        RiverWaterFoamResolveBaseCoverage(
-                            preChipRenderedMask);
+                        RiverWaterFoamResolveBaseCoverage(foam.mask);
                     float edgeEligibility = saturate(
                         selectionDiagnostics.chipEdgeEligibility);
                     float interiorEligibility = saturate(
@@ -1196,21 +1174,6 @@ Shader "PS3D/Stylized River Water"
                             : 1.0;
                     float evaluatedStrandShape =
                         evaluatedShape * evaluatedStrandRatio;
-                    float evaluatedPreChipRenderedMask = evaluatedShape;
-                    [branch]
-                    if (_FoamPresenceFootprintMode > 0.5)
-                    {
-                        evaluatedPreChipRenderedMask =
-                            RiverWaterFoamResolvePreChipRenderedMask(
-                                evaluatedShape,
-                                evaluatedShape,
-                                evaluatedStrandShape,
-                                foam.strandPattern,
-                                foam.strandResolution,
-                                _FoamStrandStrength,
-                                _FoamStrandDensity,
-                                _FoamStrandReach);
-                    }
                     float evaluatedChipRemovedMask;
                     float evaluatedPreviewMask =
                         RiverWaterFoamApplyChipAndStrands(
@@ -1373,6 +1336,7 @@ Shader "PS3D/Stylized River Water"
                     float committedPattern;
                     RiverWaterFoamDecodeMaterialState(
                         committedState,
+                        _FoamMaterialContract,
                         committedCoverage,
                         committedPresence,
                         committedLife,
@@ -1521,8 +1485,9 @@ Shader "PS3D/Stylized River Water"
 
                     if (foamDebug == 8)
                     {
-                        float materialAmount = saturate(
-                            SampleCommittedFoamState(foam.fieldUV).r);
+                        float4 committedState =
+                            SampleCommittedFoamState(foam.fieldUV);
+                        float materialAmount = saturate(committedState.r);
                         float addedByShape = saturate(
                             (evaluatedShape - materialAmount) * 4.0);
                         float removedByShape = saturate(
@@ -1555,6 +1520,56 @@ Shader "PS3D/Stylized River Water"
                     return half4(evaluatedShape.xxx, 1.0);
                 }
 
+                if (foamDebug == 27 || foamDebug == 28 ||
+                    foamDebug == 29 || foamDebug == 30)
+                {
+                    float4 committedState =
+                        SampleCommittedFoamState(foam.fieldUV);
+                    float committedCoverage;
+                    float committedPresence;
+                    float committedRemainingLife;
+                    float committedPattern;
+                    RiverWaterFoamDecodeMaterialState(
+                        committedState,
+                        _FoamMaterialContract,
+                        committedCoverage,
+                        committedPresence,
+                        committedRemainingLife,
+                        committedPattern);
+                    float materialAmount = saturate(committedState.r);
+
+                    if (foamDebug == 27)
+                    {
+                        return half4(
+                            saturate(committedCoverage).xxx,
+                            1.0);
+                    }
+
+                    if (foamDebug == 28)
+                    {
+                        return half4(materialAmount.xxx, 1.0);
+                    }
+
+                    if (foamDebug == 29)
+                    {
+                        return half4(
+                            saturate(float3(
+                                committedCoverage,
+                                committedPresence,
+                                committedRemainingLife)),
+                            1.0);
+                    }
+
+                    float scalarVisibilityBase = saturate(
+                        committedCoverage);
+                    return half4(
+                        saturate(float3(
+                            committedCoverage,
+                            scalarVisibilityBase,
+                            foam.mask)),
+                        1.0);
+                }
+
                 if (foamDebug == 4)
                 {
                     float4 committedState =
@@ -1565,6 +1580,7 @@ Shader "PS3D/Stylized River Water"
                     float committedPattern;
                     RiverWaterFoamDecodeMaterialState(
                         committedState,
+                        _FoamMaterialContract,
                         committedCoverage,
                         committedPresence,
                         committedRemainingLife,
@@ -1587,6 +1603,7 @@ Shader "PS3D/Stylized River Water"
                     float committedPattern;
                     RiverWaterFoamDecodeMaterialState(
                         committedState,
+                        _FoamMaterialContract,
                         committedCoverage,
                         committedPresence,
                         committedRemainingLife,
@@ -1607,6 +1624,7 @@ Shader "PS3D/Stylized River Water"
                     float committedPattern;
                     RiverWaterFoamDecodeMaterialState(
                         committedState,
+                        _FoamMaterialContract,
                         committedCoverage,
                         committedPresence,
                         committedRemainingLife,

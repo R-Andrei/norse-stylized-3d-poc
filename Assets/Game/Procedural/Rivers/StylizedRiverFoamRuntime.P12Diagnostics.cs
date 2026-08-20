@@ -104,9 +104,9 @@ namespace ProgrammaticStylized3D.Rivers
             report.AppendLine(
                 $"Authored fixed size: {river.FoamFixedMetricCellSize}");
             report.AppendLine(
-                $"Material options: transport={river.FoamTransportScheme} / " +
-                $"presence footprint={river.FoamPresenceFootprintMode} / " +
-                $"final visibility={river.FoamFinalVisibilityMode}");
+                $"Material contract: " +
+                ResolveMaterialContractDiagnosticLabel(
+                    river.FoamMaterialContract));
             report.AppendLine(
                 $"Requested fixed spacing: " +
                 $"{ResolveEffectiveFoamRequestedCellSizeMetres():0.000} m");

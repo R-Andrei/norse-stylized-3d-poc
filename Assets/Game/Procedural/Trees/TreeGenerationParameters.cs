@@ -56,9 +56,6 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField]
         private float trunkLeanStrength;
 
-        [SerializeField]
-        private float trunkLeanDirectionDegrees;
-
         [FormerlySerializedAs("trunkTwistDegrees")]
         [SerializeField]
         private float trunkSurfaceTorsionDegrees;
@@ -277,7 +274,6 @@ namespace ProgrammaticStylized3D.Trees
         public float TrunkBendCount { get => trunkBendCount; internal set => trunkBendCount = value; }
         public float TrunkDirectionalDrift { get => trunkDirectionalDrift; internal set => trunkDirectionalDrift = value; }
         public float TrunkLeanStrength { get => trunkLeanStrength; internal set => trunkLeanStrength = value; }
-        public float TrunkLeanDirectionDegrees { get => trunkLeanDirectionDegrees; internal set => trunkLeanDirectionDegrees = value; }
         public float TrunkTwistDegrees { get => trunkSurfaceTorsionDegrees; internal set => trunkSurfaceTorsionDegrees = value; }
         public float TrunkSurfaceTorsionDegrees { get => trunkSurfaceTorsionDegrees; internal set => trunkSurfaceTorsionDegrees = value; }
         public int RootButtressCount { get => rootButtressCount; internal set => rootButtressCount = value; }

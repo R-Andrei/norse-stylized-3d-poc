@@ -71,7 +71,7 @@ namespace ProgrammaticStylized3D.Trees
     public static class TreeCuratedRecipeDefinitions
     {
         public const int ExpectedRecipeCount = 13;
-        public const int ExpectedControlCount = 42;
+        public const int ExpectedControlCount = 40;
 
         private static readonly TreeCuratedRecipeDefinition[] definitions =
         {
@@ -103,7 +103,7 @@ namespace ProgrammaticStylized3D.Trees
                 "Asymmetrical alder with coherent trunk lean and branch bias in one tree-local direction.",
                 new[] { "alder", "broadleaf", "living", "windswept", "asymmetrical" },
                 "Broadleaf reference 5; reference 3 may partly fit.",
-                "Foliage occupancy biased toward the same local direction as Lean Direction and Directional Bias.",
+                "Foliage occupancy biased toward the canonical local lean direction and authored Directional Bias.",
                 TreeCuratedBarkMaterialKind.CommonPine),
             new TreeCuratedRecipeDefinition(
                 TreeCuratedRecipeId.NorwaySpruceStandard,
@@ -262,8 +262,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.72f, 0.86f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.08f, 0.22f),
-                new TreeFloatControlRange(0f, 0.06f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.06f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.015f),
                 new TreeFloatControlRange(0f, 0.2f),
@@ -321,8 +320,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.76f, 0.9f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.18f, 0.34f),
-                new TreeFloatControlRange(0.02f, 0.1f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0.02f, 0.1f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0.01f, 0.04f),
                 new TreeFloatControlRange(0.1f, 0.35f),
@@ -380,8 +378,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.72f, 0.86f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.16f, 0.3f),
-                new TreeFloatControlRange(0.12f, 0.24f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0.12f, 0.24f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.015f),
                 new TreeFloatControlRange(0f, 0.2f),
@@ -439,8 +436,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.82f, 0.93f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.02f, 0.1f),
-                new TreeFloatControlRange(0f, 0.035f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.035f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.008f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -498,8 +494,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.82f, 0.93f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.02f, 0.1f),
-                new TreeFloatControlRange(0f, 0.035f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.035f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.008f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -557,8 +552,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.86f, 0.95f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.02f, 0.08f),
-                new TreeFloatControlRange(0f, 0.035f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.035f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.008f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -616,8 +610,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.82f, 0.93f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.02f, 0.1f),
-                new TreeFloatControlRange(0f, 0.035f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.035f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.008f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -675,8 +668,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.58f, 0.78f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.18f, 0.34f),
-                new TreeFloatControlRange(0f, 0.06f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.06f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0.08f, 0.15f),
                 new TreeFloatControlRange(0.75f, 1.1f),
@@ -734,8 +726,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.58f, 0.78f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.26f, 0.48f),
-                new TreeFloatControlRange(0.18f, 0.32f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0.18f, 0.32f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0.1f, 0.2f),
                 new TreeFloatControlRange(0.85f, 1.25f),
@@ -793,8 +784,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.65f, 0.84f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.12f, 0.3f),
-                new TreeFloatControlRange(0f, 0.1f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.1f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.015f),
                 new TreeFloatControlRange(0f, 0.2f),
@@ -852,8 +842,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.84f, 0.96f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.02f, 0.1f),
-                new TreeFloatControlRange(0f, 0.035f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.035f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.008f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -911,8 +900,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.55f, 0.8f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.22f, 0.45f),
-                new TreeFloatControlRange(0.05f, 0.22f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0.05f, 0.22f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0.08f, 0.18f),
                 new TreeFloatControlRange(0.75f, 1.2f),
@@ -970,8 +958,7 @@ namespace ProgrammaticStylized3D.Trees
                 new TreeFloatControlRange(0.88f, 0.97f));
             ranges.SetTrunkShape(
                 new TreeFloatControlRange(0.03f, 0.12f),
-                new TreeFloatControlRange(0f, 0.06f),
-                new TreeAngleControlRange(0f, 0f));
+                new TreeFloatControlRange(0f, 0.06f));
             ranges.SetTrunkSpiralAndTwist(
                 new TreeFloatControlRange(0f, 0.01f),
                 new TreeFloatControlRange(0f, 0.1f),
@@ -1036,12 +1023,10 @@ namespace ProgrammaticStylized3D.Trees
         }
         internal void SetTrunkShape(
             TreeFloatControlRange bendAmountRange,
-            TreeFloatControlRange leanAmountRange,
-            TreeAngleControlRange leanDirectionRange)
+            TreeFloatControlRange leanAmountRange)
         {
             bendAmount = bendAmountRange;
             leanAmount = leanAmountRange;
-            leanDirection = leanDirectionRange;
             schemaVersion = CurrentSchemaVersion;
         }
         internal void SetTrunkSpiralAndTwist(
@@ -1174,7 +1159,6 @@ namespace ProgrammaticStylized3D.Trees
             Compare("Trunk Taper", MatchFloat(TrunkTaper, expected.TrunkTaper), mismatches, ref matched);
             Compare("Bend Amount", MatchFloat(BendAmount, expected.BendAmount), mismatches, ref matched);
             Compare("Lean Amount", MatchFloat(LeanAmount, expected.LeanAmount), mismatches, ref matched);
-            Compare("Lean Direction", MatchAngle(LeanDirection, expected.LeanDirection), mismatches, ref matched);
             Compare("Path Spiral Radius", MatchFloat(PathSpiralRadius, expected.PathSpiralRadius), mismatches, ref matched);
             Compare("Signed Path Spiral Turns", MatchFloat(SignedPathSpiralTurns, expected.SignedPathSpiralTurns), mismatches, ref matched);
             Compare("Axial Twist", MatchFloat(AxialTwist, expected.AxialTwist), mismatches, ref matched);
@@ -1182,6 +1166,7 @@ namespace ProgrammaticStylized3D.Trees
             Compare("Root Reach", MatchFloat(RootReach, expected.RootReach), mismatches, ref matched);
             Compare("Root Thickness", MatchFloat(RootThickness, expected.RootThickness), mismatches, ref matched);
             Compare("Root Height", MatchFloat(RootHeight, expected.RootHeight), mismatches, ref matched);
+            Compare("Buttress Persistence", MatchFloat(ButtressTransition, expected.ButtressTransition), mismatches, ref matched);
             Compare("Primary Branch Count", MatchInt(PrimaryBranchCount, expected.PrimaryBranchCount), mismatches, ref matched);
             Compare("Branch Start Height", MatchFloat(BranchStartHeight, expected.BranchStartHeight), mismatches, ref matched);
             Compare("Branch End Height", MatchFloat(BranchEndHeight, expected.BranchEndHeight), mismatches, ref matched);

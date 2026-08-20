@@ -326,27 +326,61 @@ namespace ProgrammaticStylized3D.Rivers
                 Mathf.RoundToInt(
                     sourceEvent.BodyLengthCells > 0f
                         ? sourceEvent.BodyLengthCells
-                        : sourceEvent.RevealPathDistanceMetres));
-            int previousHeadCell = gpuData.Deposit.z > 0.5f
-                ? ResolveShoreRibbonHeadCellIndex(
-                    sourceEvent,
-                    gpuData.Deposit.y)
-                : -1;
-            int currentHeadCell = ResolveShoreRibbonHeadCellIndex(
-                sourceEvent,
-                gpuData.Header.z);
-            int firstRequiredCell = previousHeadCell < currentHeadCell
-                ? previousHeadCell + 1
-                : currentHeadCell;
-            if (!includePersistentDebugHead &&
-                firstRequiredCell > currentHeadCell)
+                        : sourceEvent.RevealPathLengthCells));
+            float currentHeadDistanceCells = Mathf.Clamp(
+                gpuData.Header.z,
+                0f,
+                totalCellCount);
+            float previousHeadDistanceCells = gpuData.Deposit.z > 0.5f
+                ? Mathf.Clamp(gpuData.Deposit.y, 0f, totalCellCount)
+                : 0f;
+            int previousCompletedCellCount = gpuData.Deposit.z > 0.5f
+                ? Mathf.Clamp(
+                    Mathf.FloorToInt(
+                        previousHeadDistanceCells + 0.00001f),
+                    0,
+                    totalCellCount)
+                : 0;
+            int currentCompletedCellCount = Mathf.Clamp(
+                Mathf.FloorToInt(currentHeadDistanceCells + 0.00001f),
+                0,
+                totalCellCount);
+            bool hasNewCompletedCell =
+                currentCompletedCellCount > previousCompletedCellCount;
+            int currentHeadCell = Mathf.Clamp(
+                Mathf.FloorToInt(
+                    Mathf.Min(
+                        currentHeadDistanceCells,
+                        totalCellCount - 0.00001f)),
+                0,
+                totalCellCount - 1);
+            if (!hasNewCompletedCell && !includePersistentDebugHead)
             {
                 return false;
             }
 
+            int firstRequiredCell = hasNewCompletedCell
+                ? previousCompletedCellCount
+                : currentHeadCell;
+            int lastRequiredCell = hasNewCompletedCell
+                ? currentCompletedCellCount - 1
+                : currentHeadCell;
+            if (includePersistentDebugHead)
+            {
+                firstRequiredCell = Mathf.Min(
+                    firstRequiredCell,
+                    currentHeadCell);
+                lastRequiredCell = Mathf.Max(
+                    lastRequiredCell,
+                    currentHeadCell);
+            }
             firstRequiredCell = Mathf.Clamp(
                 firstRequiredCell,
                 0,
+                totalCellCount - 1);
+            lastRequiredCell = Mathf.Clamp(
+                lastRequiredCell,
+                firstRequiredCell,
                 totalCellCount - 1);
             float pathLengthMetres = Mathf.Abs(
                 sourceEvent.EndGlobalDistance -
@@ -363,7 +397,7 @@ namespace ProgrammaticStylized3D.Rivers
                 (firstRequiredCell + 0.5f) * longitudinalCellSpacing;
             float lastWorldGlobal = sourceEvent.StartGlobalDistance +
                 flowDirection *
-                (currentHeadCell + 0.5f) * longitudinalCellSpacing;
+                (lastRequiredCell + 0.5f) * longitudinalCellSpacing;
             float firstStorageGlobal =
                 WorldGlobalDistanceToFoamStorageGlobalDistance(
                     firstWorldGlobal);

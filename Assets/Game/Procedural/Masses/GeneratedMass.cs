@@ -110,7 +110,13 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         BoundaryAlongCoordinate = 23,
         BoundaryCrossCoordinate = 24,
         BoundaryCoarseModulation = 25,
-        BoundaryFineModulation = 26
+        BoundaryFineModulation = 26,
+
+        // GM-SURFACE.6A.2 temporary structural transport diagnostics. Values
+        // 27/28 are already occupied by shared Ground debug modes, so keep
+        // these Generated-Mass-only values outside both existing ranges.
+        StructuralSemantics = 29,
+        StructuralResolvedResponse = 30
     }
 
     public enum ShapeDiversity
@@ -362,7 +368,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private const int StandardFeatureAtlasResolution = 256;
         private const int DetailedFeatureAtlasResolution = 256;
         private const int HeroFeatureAtlasResolution = 512;
-        private const int ProductionGenerationContractVersion = 3;
+        private const int ProductionGenerationContractVersion = 4;
         private const int FeatureAtlasGenerationContractVersion = 1;
         private const string GeneratedMeshNamePrefix = "GeneratedMass_";
         private const string PlaneCutPreviewMeshNameSuffix =
@@ -453,6 +459,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassOverallRockTintStrength");
         private static readonly int GeneratedMassLightingTintInfluenceId =
             Shader.PropertyToID("_GeneratedMassLightingTintInfluence");
+        private static readonly int LowLightFormStrengthId =
+            Shader.PropertyToID("_ShadowAmbientStrength");
+        private static readonly int LowLightFaceSeparationId =
+            Shader.PropertyToID("_GeneratedMassLowLightFaceSeparation");
         private static readonly int GeneratedMassSurfaceNormalStrengthId =
             Shader.PropertyToID("_GeneratedMassSurfaceNormalStrength");
         private static readonly int GeneratedMassSurfaceNormalScaleId =
@@ -475,6 +485,16 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             Shader.PropertyToID("_GeneratedMassEdgeWearSoftness");
         private static readonly int GeneratedMassEdgeWearResponseStrengthId =
             Shader.PropertyToID("_GeneratedMassEdgeWearResponseStrength");
+        private static readonly int GeneratedMassChipInteriorResponseId =
+            Shader.PropertyToID("_GeneratedMassChipInteriorResponse");
+        private static readonly int GeneratedMassConvexVariationStrengthId =
+            Shader.PropertyToID("_GeneratedMassConvexVariationStrength");
+        private static readonly int GeneratedMassConvexSmoothnessOffsetId =
+            Shader.PropertyToID("_GeneratedMassConvexSmoothnessOffset");
+        private static readonly int GeneratedMassChipVariationStrengthId =
+            Shader.PropertyToID("_GeneratedMassChipVariationStrength");
+        private static readonly int GeneratedMassChipSmoothnessOffsetId =
+            Shader.PropertyToID("_GeneratedMassChipSmoothnessOffset");
         private static readonly int GeneratedMassEdgeWearBrightnessLiftId =
             Shader.PropertyToID("_GeneratedMassEdgeWearBrightnessLift");
         private static readonly int GeneratedMassEdgeWearTintId =
@@ -821,6 +841,18 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float lightingTintInfluence = 0.35f;
 
+        [Tooltip("Generated-Mass-owned strength for the low-light directional form-readability helper. This is published through the renderer MaterialPropertyBlock so one mass can keep the same low-light readability strength across compatible stone materials. 0 disables the primary Sun-facing form term; 2 uses the current approved maximum 5S2 strength.")]
+        [InspectorName("Low-Light Form Strength")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        private float lowLightFormStrength = 0.42f;
+
+        [Tooltip("Scales the deterministic generation-time tonal palette used to distinguish neighboring logical low-poly faces in weak/uniform light. 0 disables the stylized face-tone layer and preserves exact 5S2 behavior; 1 uses the full bounded face-tone response.")]
+        [InspectorName("Low-Light Face Separation")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float lowLightFaceSeparation;
+
         [Tooltip("Whole-rock procedural normal intensity. This affects every generated-mass surface using one shared object-space field; it does not allocate per-rock textures.")]
         [Range(0f, 1f)]
         [SerializeField]
@@ -846,15 +878,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [SerializeField]
         private float edgeWearCoverage = 1f;
 
-        [Tooltip("Softens the visible worn-edge material response. EW-4A.1 no longer changes physical bevel width from this control.")]
+        [Tooltip("Legacy edge-wear softness retained for recipe/diagnostic compatibility. GM-SURFACE.6A.4 structural material response uses the explicit Convex Variation Strength and Convex Smoothness Offset instead; this control does not change physical bevel width.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearSoftness = 0.45f;
 
-        [Tooltip("Master visible intensity for UV2.z-marked generated bevel/chamfer edge-wear faces. Set above zero to see worn-edge response in normal rendering.")]
+        [Tooltip("Master material-response intensity for semantic ConvexBoundary surfaces. Zero disables the structural material response while preserving bevel geometry and lighting.")]
         [Range(0f, 1f)]
         [SerializeField]
         private float edgeWearResponseStrength;
+
+        [Tooltip("Absolute zero-mean tonal breakup strength for semantic ConvexBoundary surfaces at full response. One strength unit contributes up to approximately +/-0.10 tonal amplitude before Pixel Effect Strength; 0 disables this tonal term. This reuses the existing pixel-cell variation and does not depend on baseline bevel breakup.")]
+        [InspectorName("Convex Variation Strength")]
+        [Range(0f, 2f)]
+        [SerializeField]
+        [FormerlySerializedAs("convexVariationMultiplier")]
+        private float convexVariationStrength = 0.10f;
+
+        [Tooltip("Full-response signed smoothness offset for semantic ConvexBoundary surfaces. Positive values make the transition smoother; negative values make it rougher. The master Convex Surface Response still gates this value.")]
+        [InspectorName("Convex Smoothness Offset")]
+        [Range(-0.40f, 0.40f)]
+        [SerializeField]
+        private float convexSmoothnessOffset = 0.20f;
 
         [Tooltip("How much the worn convex ridge response brightens the base stone value.")]
         [Range(0f, 1f)]
@@ -916,6 +961,25 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         [Range(0f, 1.50f)]
         [SerializeField]
         private float cornerChipCapRingWearStrength = 1f;
+
+        [Tooltip("Master material-response intensity for semantic CornerChipCap surfaces. Zero disables the chip-interior material response; one applies the authored absolute variation strength and smoothness offset. This does not alter chip geometry or normals.")]
+        [InspectorName("Chip Interior Response")]
+        [Range(0f, 1f)]
+        [SerializeField]
+        private float chipInteriorResponse = 0.60f;
+
+        [Tooltip("Absolute zero-mean tonal breakup strength for semantic CornerChipCap surfaces at full response. One strength unit contributes up to approximately +/-0.10 tonal amplitude before Pixel Effect Strength; 0 disables this tonal term. This reuses the existing pixel-cell variation and does not depend on baseline material breakup.")]
+        [InspectorName("Chip Variation Strength")]
+        [Range(0f, 3f)]
+        [SerializeField]
+        [FormerlySerializedAs("chipVariationMultiplier")]
+        private float chipVariationStrength = 2.00f;
+
+        [Tooltip("Full-response signed smoothness offset for semantic CornerChipCap surfaces. Negative values make the exposed interior rougher; positive values make it smoother. The master Chip Interior Response still gates this value.")]
+        [InspectorName("Chip Smoothness Offset")]
+        [Range(-0.40f, 0.40f)]
+        [SerializeField]
+        private float chipSmoothnessOffset = -0.20f;
 
         [Tooltip("Reserved ConcaveCrease amount for the future atlas-based crack/seam feature. Current Patch 14C does not render secondary crease meshes.")]
         [Range(0f, 2f)]
@@ -2572,6 +2636,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !IsFiniteGeneratedRenderValue(secondaryUv.y) ||
                     !IsFiniteGeneratedRenderValue(secondaryUv.z) ||
                     !IsFiniteGeneratedRenderValue(secondaryUv.w) ||
+                    secondaryUv.w < -1.0001f ||
+                    secondaryUv.w > 1.0001f ||
                     !IsValidGeneratedStructuralFeatureChannel(
                         structuralFeature) ||
                     !IsFiniteGeneratedRenderValue(color.r) ||
@@ -3128,12 +3194,28 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearSoftnessId,
                 Mathf.Clamp01(edgeWearSoftness));
-            // GM-SURFACE.5E baseline parity quarantines the old bevel-specific
-            // pre-light albedo response. Keep serialized authoring values intact,
-            // but do not publish them to the production renderer.
+            // GM-SURFACE.6A.4 consumes the existing response-strength authoring
+            // only through the packed ConvexBoundary semantic material module.
+            // The historical UV2.z bevel brightness/tint path remains
+            // quarantined: brightness lift and tint strength stay hard-zero.
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearResponseStrengthId,
-                0f);
+                Mathf.Clamp01(edgeWearResponseStrength));
+            materialProperties.SetFloat(
+                GeneratedMassChipInteriorResponseId,
+                Mathf.Clamp01(chipInteriorResponse));
+            materialProperties.SetFloat(
+                GeneratedMassConvexVariationStrengthId,
+                Mathf.Clamp(convexVariationStrength, 0f, 2f));
+            materialProperties.SetFloat(
+                GeneratedMassConvexSmoothnessOffsetId,
+                Mathf.Clamp(convexSmoothnessOffset, -0.40f, 0.40f));
+            materialProperties.SetFloat(
+                GeneratedMassChipVariationStrengthId,
+                Mathf.Clamp(chipVariationStrength, 0f, 3f));
+            materialProperties.SetFloat(
+                GeneratedMassChipSmoothnessOffsetId,
+                Mathf.Clamp(chipSmoothnessOffset, -0.40f, 0.40f));
             materialProperties.SetFloat(
                 GeneratedMassEdgeWearBrightnessLiftId,
                 0f);
@@ -3243,6 +3325,17 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             materialProperties.SetFloat(
                 GeneratedMassLightingTintInfluenceId,
                 Mathf.Clamp01(lightingTintInfluence));
+            // GM-SURFACE.5S4 AUTHORING CONTRACT:
+            // Generated Mass owns low-light primary strength and the generation-
+            // time face-tone separation amount. Publish object-level overrides so
+            // material/profile swaps cannot replace those choices. Wrap remains
+            // material-owned until a separately approved patch says otherwise.
+            materialProperties.SetFloat(
+                LowLightFormStrengthId,
+                Mathf.Clamp(lowLightFormStrength, 0f, 2f));
+            materialProperties.SetFloat(
+                LowLightFaceSeparationId,
+                Mathf.Clamp01(lowLightFaceSeparation));
             // GM-SURFACE.5P ACTIVE DEFECT CONTRACT:
             // The unresolved defect is NOT whole-rock darkness and NOT specular
             // magnitude. It is incoherent per-surface/per-bevel response to the

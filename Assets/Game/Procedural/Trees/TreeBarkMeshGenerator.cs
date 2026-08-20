@@ -204,9 +204,80 @@ namespace ProgrammaticStylized3D.Trees
         internal int BoundaryMorphRings { get; }
     }
 
+    public readonly struct TreeBarkTrunkFrameDiagnostic
+    {
+        public TreeBarkTrunkFrameDiagnostic(
+            Vector3 structuralPosition,
+            Vector3 structuralTangent,
+            Vector3 structuralNormal,
+            Vector3 structuralBinormal,
+            Vector3 baseSurfaceTangent,
+            Vector3 baseSurfaceNormal,
+            Vector3 baseSurfaceBinormal,
+            Vector3 rolledSurfaceNormal,
+            Vector3 rolledSurfaceBinormal,
+            float normalizedDistance,
+            float tangentSafetyEnvelope,
+            float rootFrameEnvelope,
+            float bodyEnvelope,
+            float footShapeEnvelope,
+            float footAnchorEnvelope,
+            float groundPlateauEnd,
+            float rootCollapseEnd,
+            float earliestRootTransition,
+            float effectiveRootTransition,
+            float effectiveButtressBodyEnd,
+            float authoredRollDegrees)
+        {
+            StructuralPosition = structuralPosition;
+            StructuralTangent = structuralTangent;
+            StructuralNormal = structuralNormal;
+            StructuralBinormal = structuralBinormal;
+            BaseSurfaceTangent = baseSurfaceTangent;
+            BaseSurfaceNormal = baseSurfaceNormal;
+            BaseSurfaceBinormal = baseSurfaceBinormal;
+            RolledSurfaceNormal = rolledSurfaceNormal;
+            RolledSurfaceBinormal = rolledSurfaceBinormal;
+            NormalizedDistance = normalizedDistance;
+            TangentSafetyEnvelope = tangentSafetyEnvelope;
+            RootFrameEnvelope = rootFrameEnvelope;
+            BodyEnvelope = bodyEnvelope;
+            FootShapeEnvelope = footShapeEnvelope;
+            FootAnchorEnvelope = footAnchorEnvelope;
+            GroundPlateauEnd = groundPlateauEnd;
+            RootCollapseEnd = rootCollapseEnd;
+            EarliestRootTransition = earliestRootTransition;
+            EffectiveRootTransition = effectiveRootTransition;
+            EffectiveButtressBodyEnd = effectiveButtressBodyEnd;
+            AuthoredRollDegrees = authoredRollDegrees;
+        }
+
+        public Vector3 StructuralPosition { get; }
+        public Vector3 StructuralTangent { get; }
+        public Vector3 StructuralNormal { get; }
+        public Vector3 StructuralBinormal { get; }
+        public Vector3 BaseSurfaceTangent { get; }
+        public Vector3 BaseSurfaceNormal { get; }
+        public Vector3 BaseSurfaceBinormal { get; }
+        public Vector3 RolledSurfaceNormal { get; }
+        public Vector3 RolledSurfaceBinormal { get; }
+        public float NormalizedDistance { get; }
+        public float TangentSafetyEnvelope { get; }
+        public float RootFrameEnvelope { get; }
+        public float BodyEnvelope { get; }
+        public float FootShapeEnvelope { get; }
+        public float FootAnchorEnvelope { get; }
+        public float GroundPlateauEnd { get; }
+        public float RootCollapseEnd { get; }
+        public float EarliestRootTransition { get; }
+        public float EffectiveRootTransition { get; }
+        public float EffectiveButtressBodyEnd { get; }
+        public float AuthoredRollDegrees { get; }
+    }
+
     public static class TreeBarkMeshGenerator
     {
-        public const int BarkAlgorithmVersion = 28;
+        public const int BarkAlgorithmVersion = 31;
         private const float TwoPi = Mathf.PI * 2f;
         private const float Epsilon = 0.000001f;
         private const float TriangleAreaSquaredEpsilon = 0.0000000001f;
@@ -2514,6 +2585,42 @@ namespace ProgrammaticStylized3D.Trees
                         a,
                         b,
                         boundaryT);
+                    bool boundaryNearA =
+                        (boundary.Position - a.Position).sqrMagnitude <= Epsilon;
+                    bool boundaryNearB =
+                        (b.Position - boundary.Position).sqrMagnitude <= Epsilon;
+                    if (boundaryNearA || boundaryNearB)
+                    {
+                        bool applyDenseRootSampling;
+                        if (boundaryNearA && boundaryNearB)
+                        {
+                            applyDenseRootSampling = boundaryT >= 0.5f;
+                        }
+                        else
+                        {
+                            applyDenseRootSampling = boundaryNearB;
+                        }
+
+                        AppendRefinedTrunkSpan(
+                            refined,
+                            a,
+                            b,
+                            parameters,
+                            settings,
+                            applyDenseRootSampling,
+                            legacyAxialSampling,
+                            maximumRootStep,
+                            maximumTwistStepDegrees,
+                            maximumTangentStepDegrees,
+                            maximumRadiusChangeRatio,
+                            maximumRootEnvelopeStep,
+                            maximumSubdivisions,
+                            ref rootRefinementInsertedRings,
+                            ref twistRefinementInsertedRings,
+                            ref adaptiveShapeRefinementInsertedRings);
+                        continue;
+                    }
+
                     if (settings.GeometryAuditTelemetryEnabled)
                     {
                         rootRefinementInsertedRings++;
@@ -3650,10 +3757,28 @@ namespace ProgrammaticStylized3D.Trees
             EvaluateRootEnvelopes(
                 parameters, next.NormalizedDistance,
                 out float nextBody, out float nextFoot);
+            float currentTangentSafetyEnvelope =
+                EvaluateRootTangentSafetyEnvelope(
+                    parameters, current.NormalizedDistance);
+            float nextTangentSafetyEnvelope =
+                EvaluateRootTangentSafetyEnvelope(
+                    parameters, next.NormalizedDistance);
             float currentFrameEnvelope = EvaluateRootFrameEnvelope(
                 parameters, current.NormalizedDistance);
             float nextFrameEnvelope = EvaluateRootFrameEnvelope(
                 parameters, next.NormalizedDistance);
+            float currentStructuralSurfaceTangentMismatch =
+                Vector3.Angle(current.Tangent, currentAxis);
+            float nextStructuralSurfaceTangentMismatch =
+                Vector3.Angle(next.Tangent, nextAxis);
+            float rootCollapseEnd =
+                CalculateEffectiveRootCollapseHeight(parameters);
+            float earliestRootTransition =
+                CalculateEarliestRootTransitionHeight(parameters);
+            float effectiveRootTransition =
+                CalculateEffectiveRootTransitionHeight(parameters);
+            float effectiveButtressBodyEnd =
+                CalculateEffectiveButtressBodyEnd(parameters);
             float currentRollDegrees =
                 ResolveAuthoredTrunkSurfaceRollDegrees(
                     parameters,
@@ -3722,10 +3847,23 @@ namespace ProgrammaticStylized3D.Trees
             report.Append("root foot envelope current -> next: ")
                 .Append(currentFoot.ToString("F6")).Append(" -> ")
                 .AppendLine(nextFoot.ToString("F6"));
+            report.Append("tangent-safety envelope current -> next: ")
+                .Append(currentTangentSafetyEnvelope.ToString("F6"))
+                .Append(" -> ")
+                .AppendLine(nextTangentSafetyEnvelope.ToString("F6"));
             report.Append("root-frame envelope current -> next: ")
                 .Append(currentFrameEnvelope.ToString("F6"))
                 .Append(" -> ")
                 .AppendLine(nextFrameEnvelope.ToString("F6"));
+            report.Append("structural-to-surface tangent mismatch current -> next: ")
+                .Append(currentStructuralSurfaceTangentMismatch.ToString("F4"))
+                .Append(" -> ")
+                .AppendLine(nextStructuralSurfaceTangentMismatch.ToString("F4"));
+            report.Append("root landmarks collapse / earliest / effective transition / buttress body end: ")
+                .Append(rootCollapseEnd.ToString("F6")).Append(" / ")
+                .Append(earliestRootTransition.ToString("F6")).Append(" / ")
+                .Append(effectiveRootTransition.ToString("F6")).Append(" / ")
+                .AppendLine(effectiveButtressBodyEnd.ToString("F6"));
             report.Append("bark-roll progress current -> next / degrees: ")
                 .Append(currentRollProgress.ToString("F6"))
                 .Append(" -> ")
@@ -4148,6 +4286,10 @@ namespace ProgrammaticStylized3D.Trees
                     crossSectionMultiplier;
             }
 
+            radial = ResolveGroundAzimuthRootBodyRadial(
+                parameters,
+                sample.NormalizedDistance,
+                angle);
             Vector3 bodyOffset = radial *
                 sample.Radius *
                 (1f + bodyContribution);
@@ -4161,6 +4303,79 @@ namespace ProgrammaticStylized3D.Trees
             crossSectionMultiplier = offset.magnitude /
                 Mathf.Max(Epsilon, sample.Radius);
             return sample.Position + offset;
+        }
+
+        public static TreeBarkTrunkFrameDiagnostic EvaluateTrunkFrameForDiagnostics(
+            TreeResolvedParameters parameters,
+            TreeCurveSample sourceSample)
+        {
+            if (parameters == null)
+            {
+                throw new ArgumentNullException(nameof(parameters));
+            }
+
+            var sample = new RenderSample
+            {
+                Position = sourceSample.Position,
+                Tangent = sourceSample.Tangent,
+                Normal = sourceSample.Normal,
+                Binormal = sourceSample.Binormal,
+                Radius = sourceSample.Radius,
+                NormalizedDistance = sourceSample.NormalizedDistance,
+                CumulativeDistance = 0f
+            };
+
+            ResolveTrunkBaseSurfaceFrame(
+                parameters,
+                sample,
+                out Vector3 baseTangent,
+                out Vector3 baseNormal,
+                out Vector3 baseBinormal);
+            ResolveTrunkSurfaceFrame(
+                parameters,
+                sample,
+                out _,
+                out Vector3 rolledNormal,
+                out Vector3 rolledBinormal);
+            EvaluateRootEnvelopes(
+                parameters,
+                sample.NormalizedDistance,
+                out float bodyEnvelope,
+                out float footShapeEnvelope);
+            float footAnchorEnvelope = parameters.RecipeOnlyControlSource
+                ? EvaluateRootFootAnchorEnvelope(
+                    parameters,
+                    sample.NormalizedDistance)
+                : footShapeEnvelope;
+
+            return new TreeBarkTrunkFrameDiagnostic(
+                sample.Position,
+                sample.Tangent,
+                sample.Normal,
+                sample.Binormal,
+                baseTangent,
+                baseNormal,
+                baseBinormal,
+                rolledNormal,
+                rolledBinormal,
+                sample.NormalizedDistance,
+                EvaluateRootTangentSafetyEnvelope(
+                    parameters,
+                    sample.NormalizedDistance),
+                EvaluateRootFrameEnvelope(
+                    parameters,
+                    sample.NormalizedDistance),
+                bodyEnvelope,
+                footShapeEnvelope,
+                footAnchorEnvelope,
+                CalculateRootGroundPlateauEnd(parameters),
+                CalculateEffectiveRootCollapseHeight(parameters),
+                CalculateEarliestRootTransitionHeight(parameters),
+                CalculateEffectiveRootTransitionHeight(parameters),
+                CalculateEffectiveButtressBodyEnd(parameters),
+                ResolveAuthoredTrunkSurfaceRollDegrees(
+                    parameters,
+                    sample.NormalizedDistance));
         }
 
         private static void ResolveTrunkSurfaceFrame(
@@ -4206,6 +4421,10 @@ namespace ProgrammaticStylized3D.Trees
             out Vector3 normal,
             out Vector3 binormal)
         {
+            float tangentSafetyEnvelope =
+                EvaluateRootTangentSafetyEnvelope(
+                    parameters,
+                    sample.NormalizedDistance);
             float rootEnvelope = EvaluateRootFrameEnvelope(
                 parameters,
                 sample.NormalizedDistance);
@@ -4213,7 +4432,7 @@ namespace ProgrammaticStylized3D.Trees
                 Vector3.Slerp(
                     sample.Tangent,
                     Vector3.up,
-                    rootEnvelope),
+                    tangentSafetyEnvelope),
                 sample.Tangent);
 
             Vector3 transportedNormal = Vector3.ProjectOnPlane(
@@ -4386,6 +4605,38 @@ namespace ProgrammaticStylized3D.Trees
             return t * t * t * (t * (t * 6f - 15f) + 10f);
         }
 
+        private static float EvaluateRootTangentSafetyEnvelope(
+            TreeResolvedParameters parameters,
+            float normalizedDistance)
+        {
+            if (!parameters.RecipeOnlyControlSource)
+            {
+                return EvaluateRootFrameEnvelope(
+                    parameters,
+                    normalizedDistance);
+            }
+
+            float collapseEnd =
+                CalculateEffectiveRootCollapseHeight(parameters);
+            if (normalizedDistance <= collapseEnd)
+            {
+                return 1f;
+            }
+
+            float earliestTransition =
+                CalculateEarliestRootTransitionHeight(parameters);
+            if (normalizedDistance >= earliestTransition)
+            {
+                return 0f;
+            }
+
+            float adoption = Mathf.InverseLerp(
+                collapseEnd,
+                earliestTransition,
+                normalizedDistance);
+            return 1f - SmootherStep01(adoption);
+        }
+
         private static float EvaluateRootFrameEnvelope(
             TreeResolvedParameters parameters,
             float normalizedDistance)
@@ -4540,6 +4791,27 @@ namespace ProgrammaticStylized3D.Trees
                 (Mathf.Max(1f, parameters.RootFlareScale) - 1f);
             footContribution =
                 footAmplitude * footShapeEnvelope * footMask;
+        }
+
+        private static Vector3 ResolveGroundAzimuthRootBodyRadial(
+            TreeResolvedParameters parameters,
+            float normalizedDistance,
+            float angle)
+        {
+            float groundRoll = ResolveAuthoredTrunkSurfaceRollDegrees(
+                parameters,
+                normalizedDistance);
+            Quaternion groundRotation = Quaternion.AngleAxis(
+                groundRoll,
+                Vector3.up);
+            Vector3 bodyNormal = groundRotation * Vector3.right;
+            Vector3 bodyBinormal = groundRotation * Vector3.Cross(
+                Vector3.up,
+                Vector3.right).normalized;
+            return SafeNormalize(
+                bodyNormal * Mathf.Cos(angle) +
+                bodyBinormal * Mathf.Sin(angle),
+                bodyNormal);
         }
 
         private static Vector3 ResolveGroundAnchoredRootFootRadial(
@@ -5124,29 +5396,29 @@ namespace ProgrammaticStylized3D.Trees
                     ringVertexStarts);
             }
 
+            // TREE-TRUNK.2C recipe-only body geometry is authored in the
+            // ground-azimuth frame: canonical tree-local +X rotated around
+            // tree-local up by authored surface roll. Measure that same frame
+            // directly so path curvature and the transported surface frame do
+            // not contaminate authored axial twist.
+            Vector3 zeroRollRadial = Vector3.right;
+            Vector3 rollAxis = Vector3.up;
             float previousWrappedAngle = 0f;
             float accumulatedAngle = 0f;
             for (int ring = 0; ring < samples.Count; ring++)
             {
                 RenderSample sample = samples[ring];
-                ResolveTrunkBaseSurfaceFrame(
-                    parameters,
-                    sample,
-                    out Vector3 surfaceTangent,
-                    out Vector3 zeroRollNormal,
-                    out _);
-
                 int vertexIndex = ringVertexStarts[ring];
                 Vector3 emittedRadial = Vector3.ProjectOnPlane(
                     vertices[vertexIndex] - sample.Position,
-                    surfaceTangent);
+                    rollAxis);
                 emittedRadial = SafeNormalize(
                     emittedRadial,
-                    zeroRollNormal);
+                    zeroRollRadial);
                 float wrappedAngle = Vector3.SignedAngle(
-                    zeroRollNormal,
+                    zeroRollRadial,
                     emittedRadial,
-                    surfaceTangent);
+                    rollAxis);
                 if (ring > 0)
                 {
                     accumulatedAngle += Mathf.DeltaAngle(

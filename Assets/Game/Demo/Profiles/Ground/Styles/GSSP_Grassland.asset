@@ -27,8 +27,8 @@ MonoBehaviour:
       vegetationTint: {r: 0.36, g: 0.49, b: 0.25, a: 1}
       vegetationTintStrength: 0.42
       bankSurfaceLayer: {fileID: 11400000, guid: 7950ee0a279cf0948b5126a5b0a0d107, type: 2}
-      riverbedSurfaceLayer: {fileID: 0}
-      riverbedSurfaceSource: 2
+      riverbedSurfaceLayer: {fileID: 11400000, guid: 656d0545204046bf932849f0f2ccc4bd, type: 2}
+      riverbedSurfaceSource: 3
       shoreHydrologyModifier: {fileID: 11400000, guid: 0993d09f3cc2ac545941e48fab022de0, type: 2}
       riverbedHydrologySource: 0
       riverbedHydrologyModifier: {fileID: 0}
@@ -54,7 +54,7 @@ MonoBehaviour:
       bankLegacyPixelCellInfluenceMultiplier: 1
       riverbedMaterialStrength: 1
       riverbedMaterialBlendDistance: 0
-      riverbedMaterialBlendSoftness: 0.75
+      riverbedMaterialBlendSoftness: 0.788
       riverbedFeatureEdgeClearance: 0.5
       riverbedFeatureReturnFade: 0.15
       riverbedDetailScaleMultiplier: 1
@@ -67,7 +67,7 @@ MonoBehaviour:
       riverbedLegacyPixelCellInfluenceMultiplier: 1
       riverbedWetnessStrength: 1
       riverbedToBankWetnessBlendDistance: 0.23
-      riverbedToBankWetnessBlendSoftness: 0.923
+      riverbedToBankWetnessBlendSoftness: 0.874
       riverbedWetSmoothnessResponse: 0
       riverbedWetSpecularResponse: 0
       vegetationRetreatStrength: 0

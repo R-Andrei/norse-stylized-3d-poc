@@ -5192,3 +5192,147 @@ shoreVelocitySupport = cellTouchesCurrentWater
 The stored alpha value additionally applies the existing valid-domain and exact obstacle-footprint gates. Compute canonical velocity and Motion Field debug modes consume alpha for Shore component suppression; lifecycle/material-topology consumers continue to consume blue.
 
 This change adds no texture, buffer, kernel, pass, dispatch, readback, shoreline solve, or additional canonical-velocity texture sample. It changes only which channel of the already loaded topology-source texel supplies Shore velocity influence.
+
+### Material-contract consolidation implemented in source — RIVER-FOAM-MATERIAL-C1
+
+C1 supersedes the C0 **future** three-selector consolidation direction at source level. Unity compile/import and Play Mode parity are still pending; until those checks pass this section describes implemented source, not runtime-validated behavior.
+
+The authoring surface is now one selector:
+
+```text
+Material Contract
+  C × P × L Baseline
+```
+
+`C × P × L Baseline` is the unconditional production composition of the previously accepted settings:
+
+```text
+Bulk-Phase Residual TVD
++ Lifecycle-Faithful
++ Coverage-Only
+```
+
+C1 removes the independent Donor Cell / TVD Superbee / Bulk-Phase selector, Concentration + Lifetime / Lifecycle-Faithful selector, and Coverage-Only / Presence-Amplitude selector. It also removes Presence-Amplitude-only `Soft Edge Start` authoring and shader plumbing.
+
+The baseline transport still retains the Superbee limiter, donor/upwind state ownership, previous/next neighbour reconstruction samples, global Bulk Phase, whole-cell integer shift, residual downstream subtraction, coherent centre-row Motion Lane sampling, and the one-dispatch/no-extra-field contract. These are implementation dependencies of Bulk-Phase Residual TVD, not retired experiment baggage.
+
+The persistent material state remains unchanged in C1:
+
+```text
+R = Coverage × Presence
+G = Coverage × Presence × Remaining Life
+B = Coverage × Presence × Material Pattern
+A = Coverage
+```
+
+`Life Only` remains a separate C2 behavior patch. C1 does not change fractional transport semantics, material packing, birth, lifecycle, Chipping candidates, Structural Strands, or source behavior.
+
+
+## RIVER-FOAM-MATERIAL-C2 — Life-Only Binary Cellular Contract — implemented source contract
+
+C2 adds `Life Only` beside the validated `C × P × L Baseline`. Contract 0 remains the serialized default and retains the C1 packed/TVD/Bulk-Phase behavior. Contract 1 uses Remaining Life as the sole persistent material authority:
+
+```text
+R = Remaining Life
+G = 0
+B = 0
+A = 0
+
+Life > 0  => one complete Foam cell
+Life == 0 => empty
+```
+
+Life Only has no persistent Coverage, Presence, Material Amount, or Material Pattern semantics. Shared diagnostic/helper code may expose binary occupancy aliases (`Coverage=1`, `Presence=1`) for a live cell, but those aliases are not stored state. Birth of any valid touched cell creates one complete cell; repeated birth over a live cell does not refresh its Life.
+
+Life-Only transport is a dedicated one-dispatch destination-gather kernel per existing CFL substep. Each live source uses the canonical Layer B velocity resolver and one shared low-discrepancy temporal sample to choose exactly one outcome: stay, one longitudinal neighbour, or one lateral neighbour. A destination inspects itself and its four adjacent candidate sources and stores `max(RemainingLife)` among sources that target it. This implements the accepted merge rule for convergence without fractional splitting, weak/strong Foam, atomics, a claim buffer, or a second resolve dispatch. Invalid lateral/bank targets stay in the source cell; physical longitudinal endpoint motion remains open outflow.
+
+Bulk Phase and residual TVD are baseline-only transport machinery. Life Only uses the full canonical velocity directly and therefore still consumes Motion Lane, obstacle routing/slowdown, and B1/B1A Shore component suppression. Existing lifecycle topology/rates remain authoritative and decrement Life after movement. Life does not multiply Final Foam opacity; it is alive/dead material authority.
+
+Life-Only Final Foam point-samples the current committed state without bilinear material sampling or previous/current interpolation. Pattern used by render-side fragmentation, Chipping, and Strands is derived deterministically from coordinates/hash and is not transported state. Switching Material Contract clears incompatible persistent state and resets transport phase/sequence state.
+
+The physical persistent textures remain `ARGBHalf` because the C × P × L Baseline remains selectable. C2 adds one compute kernel but no new texture, buffer, pass, readback, or extra per-substep dispatch. Runtime cost and any later `RHalf` specialization require Unity profiling before claims are made.
+
+## RIVER-FOAM-MATERIAL-C3 — Coverage + Life Geometric Occupancy Contract — implemented source contract
+
+C2 `Life Only` is rejected by live visual validation. Its binary decode (`Life > 0 => Coverage = 1`), current-state point sampling, and whole-cell destination-gather transport produced visibly complete simulation cells instead of the thinner/subcell Foam footprint retained by the baseline.
+
+C3 replaces contract value `1` with `Coverage + Life`. Contract value/default `0` remains `C × P × L Baseline`.
+
+C3 persistent state uses the existing `ARGBHalf` allocation:
+
+```text
+R = C
+G = C × L
+B = 0
+A = C
+```
+
+`C` is literal geometric cell occupancy. `L` is Remaining Life for the covered Foam. Presence is implicit unit material wherever `C > 0`; there is no independent persistent weak/strong-Foam authority. Material Pattern is not persistent state and is derived deterministically in rendering.
+
+Both contracts use the existing Bulk-Phase Residual TVD `SimulateFoam` transport. For C3, the packed transport moments reduce naturally to `(C, C×L, 0, C)`, so fractional Coverage moves conservatively while its Coverage-weighted Life remains attached to the same transported material. The rejected C2 destination-gather whole-cell kernel and transport-step sequence are removed.
+
+Birth continues to compute geometric injected Coverage from the existing source shape/raster. Under C3, authored Initial Presence is ignored and implicit Presence is `1`; no persistent Pattern is written. The existing packet-independence rule remains: repeated overlap over already occupied Coverage does not refresh its Life, and only genuinely newly occupied Coverage receives the source Life.
+
+Lifecycle remains topology-owned. Aging decodes `L = (C×L)/C`, subtracts the existing age delta, and re-encodes the same Coverage while Life remains positive; material clears when Life reaches zero. Remaining Life is therefore lifecycle authority, not a direct Final Foam opacity multiplier.
+
+Final rendering returns to the phase-aware previous/current interpolation used by the baseline. Literal Coverage supplies the geometric footprint, while Pattern is derived from stable River coordinates for Chipping/Strands/fragmentation. C3 does not point-sample a binary cell and does not promote positive Life to full Coverage.
+
+Diagnostics under C3 report literal Coverage, compatibility Material Amount equal to Coverage, implicit unit Presence where Coverage exists, and the `C×L` life moment. P8 remains baseline-only because it proves the independent Presence/Pattern packed moments that C3 intentionally removes.
+
+Resource/performance contract: no new texture, buffer, pass, readback, draw call, cache format, or per-frame rebuild. C3 removes the C2-only simulation kernel and transport-step uniform/state but uses the same TVD/Bulk-Phase solver as the baseline; no runtime-speed claim is made before Unity profiling.
+
+Unity 6000.5.0f1 compile/import, Play Mode visual validation, baseline parity, no-refresh birth behavior, Shore suppression parity, contract-switch clear, and GPU profiling remain pending.
+
+## RIVER-FOAM-MATERIAL-C3A — Coverage + Life Transported Visual Pattern Repair
+
+C3A supersedes only the C3 statement that Coverage + Life Material Pattern is derived from a fixed render-space/River-coordinate hash. Live validation showed a repeatable failure: Final Foam contained stationary rectangular holes while Material Coverage remained continuous and Remaining Life remained positive through the same regions. That proves the missing Final Foam was introduced after persistent occupancy/lifecycle evaluation.
+
+Coverage + Life keeps the same material authorities:
+
+```text
+Coverage C
+Remaining Life L
+Presence = implicit 1 wherever live C > 0
+```
+
+Pattern returns only as transported visual metadata:
+
+```text
+Mvisual = visual breakup identity, not material strength
+
+R = C
+G = C × L
+B = C × Mvisual
+A = C
+```
+
+`Mvisual` is born from the existing deterministic source Pattern evaluation, is merged only with genuinely newly occupied Coverage, moves through the same finite-volume packed-state flux, is interpolated with committed state, and is decoded as `B/C`. It does not participate in Coverage conservation, lifecycle age/death, source eligibility, velocity, or material-strength semantics.
+
+The fixed Coverage + Life Final-render override based on quantized River coordinates is removed. Final Foam, Chipping, Strands, and pattern-resolution logic consume the transported/interpolated Pattern exactly as a visual phase input. The accepted `C × P × L Baseline` packing and rendering branch remain unchanged.
+
+C3A adds no texture, buffer, kernel, dispatch, pass, readback, draw call, cache format, or per-frame rebuild. Coverage + Life source birth now runs the existing deterministic Material Pattern noise evaluation used by the baseline, only for valid injected-Coverage/Life samples; Final rendering adds no new sampling pass. Unity compile/import and Play Mode confirmation that the previous stationary rectangular holes are removed remain pending.
+
+
+
+## RIVER-FOAM-SPAWN-D9 — Unified Stroke/Head Reveal Kinematics
+
+D9 replaces all recipe-specific automatic-source reveal timing with one literal cell-space kinematics contract:
+
+```text
+headDistanceCells(t) = clamp(revealSpeedCellsPerSecond × elapsedSeconds, 0, pathLengthCells)
+durationSeconds = pathLengthCells / revealSpeedCellsPerSecond
+```
+
+The eight visible recipe `Reveal Speed (Cells/s)` controls are the only production reveal-speed authorities. Legacy family metres-per-second fields and per-pattern speed multipliers remain serialized compatibility tombstones in D9 but have no production reveal-timing consumers. Reveal timing has no speed jitter and no material-update duration floor.
+
+Every automatic event snapshots one cells/s value at birth. Shore Ribbon uses authored path-cell count. Inward Wash uses the deterministic seven-point/six-segment cell-space polyline defined by its along length, inward reach, and bend. Fleck uses its authored body length. Lace, Cross-Lace, and Broken Filament/Torn use the deterministic seven-point/six-segment bent-ribbon polyline shared with GPU rasterization. Object Arc and Semi-Arc resolve contact-profile path distance in cells; the initial contact and wake components advance concurrently at the same captured cells/s, so initial duration is the longest concurrent component divided by speed. Later contact-only strokes use contact-path length divided by the same speed.
+
+The fixed automatic-source GPU record remains eight `float4` lanes. Universal current/previous reveal state is head distance in cells rather than normalized progress. Recipe evaluators receive a common reveal window containing clamped stroke length, head distance, and tail distance. They return cumulative revealed geometry plus a current-head-only debug shape. Raster permission is the positive current-minus-previous cumulative difference, so one update that crosses many cells or path segments emits all newly crossed geometry rather than slowing the logical head to update cadence.
+
+Object finite bursts retain their existing initial plus contact-only stroke phases. If one material update crosses a phase boundary, D9 splits the existing source-raster work into bounded phase slices so the end of the old stroke and the beginning of the new stroke are both emitted. This adds no new kernel, persistent resource, or full-field process; extra source-raster dispatches occur only on the bounded update that crosses one or more finite Object stroke boundaries.
+
+Shore Ribbon keeps one-cell-wide source geometry, but its logical head is now cell-distance based and monotonic. Completed path cells are derived from head distance and every crossed cell is included in the bounded dispatch range. Bulk-Phase/storage mapping occurs after logical path-cell progression and is not reveal timing authority.
+
+D9 does not change source population scheduling policy, Activity/Coverage semantics, packet-gap rules, source material birth values, persistent material contracts, transport, lifecycle, final Foam, Chipping, Strands, object routing/slowdown, Shore velocity suppression, Ground/corridor behavior, or recipe completed-shape authoring. Update cadence can quantize when a logically completed event becomes visible by at most the source material-update interval; it does not alter the captured cells/s kinematics or final completed footprint.
+
+Unity 6000.5.0f1 compile/import, automatic-source diagnostics, visual low/high-speed parity, P7/Shore regression suites, and runtime profiling remain pending.

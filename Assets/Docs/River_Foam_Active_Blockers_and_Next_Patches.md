@@ -5682,3 +5682,1098 @@ Final C0 status:
 - Unity validation: **not required; documentation-only patch**.
 
 No C1 production cleanup or C2 Life-Only implementation is included in C0.
+
+## RIVER-FOAM-MATERIAL-C1 — Baseline Contract Consolidation — Implementation Plan
+
+Status: Gate 1 review complete; Gate 2 plan recorded before implementation; Gate 3 source implementation complete; Gate 4 offline scope/contract/static audit complete with `133/133 PASS`. C1 is cleanup/consolidation only. Unity 6000.5.0f1 compilation, shader import, Play Mode behavior, and final visual parity remain pending and are not represented as passed.
+
+### Objective
+
+Replace the three independent experimental Foam transport/visibility/presence selectors with one user-facing `Material Contract` selector containing only `C × P × L Baseline`, while preserving the exact currently accepted behavior:
+
+```text
+Bulk-Phase Residual TVD
++ Lifecycle-Faithful
++ Coverage-Only
+= C × P × L Baseline
+```
+
+Delete only selector plumbing and implementation branches proven exclusive to rejected alternatives. Preserve every shared algorithm still required by the retained baseline. Do not begin the later Life-Only material redesign in C1.
+
+### Approved file scope
+
+Exactly these 19 files are approved for C1:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+4. `Assets/Docs/River_Rendering_Roadmap.md`
+5. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+6. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs`
+13. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Diagnostics.cs`
+14. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P12Sweep.cs`
+15. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+16. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl`
+17. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+18. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+19. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+No scene, prefab, material, cache, generated asset, texture, buffer, kernel, pass, dispatch, layer, tag, component, dependency, or file/folder rename is approved.
+
+### Gate 1 reviewed evidence
+
+Repository baseline: exact B1A + C0 source state in the working tree before C1 edits. Gate-1 SHA-256 evidence for all 19 approved files is recorded separately in the implementation audit.
+
+#### Selector ownership
+
+`Assets/Game/Procedural/Rivers/StylizedRiver.cs` currently defines three independent public enums: `StylizedRiverFinalFoamVisibilityMode`, `StylizedRiverFoamPresenceFootprintMode`, and `StylizedRiverFoamTransportScheme`. The same file owns the serialized fields `foamTransportScheme`, `foamFinalVisibilityMode`, and `foamPresenceFootprintMode`, their public getters, transport diagnostic setter, validation/normalization, and the Presence-Amplitude-only `foamChipSoftEdgeStart` constants/field/getter.
+
+`Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs::DrawFoamTransportVisibilityContract()` independently draws all three selectors and resolves four explanatory blocks through `ResolveFoamTransportContractText`, `ResolveFoamVisibilityContractText`, `ResolveFoamPresenceContractText`, and `ResolveFoamCombinedContractText`. `DrawFoamProductionChipping(...)` also conditionally exposes `Presence-Amplitude Edge Start` versus Coverage-Only `Chip Interior Access` using `foamPresenceFootprintMode`.
+
+#### Retained Bulk-Phase transport dependency
+
+`Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs::PrepareBulkTransportSubstep(...)` currently executes only when `transportScheme == StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd`; `SimulateFullField(...)` resolves `river.FoamTransportScheme` and passes it into the helper. The retained C1 baseline must make that exact phase/integer-shift accumulation unconditional rather than alter its arithmetic.
+
+`Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs::ConfigureSharedComputeParameters(...)` binds `_FoamTransportScheme`; `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl` declares it.
+
+`Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl` uses `_FoamTransportScheme == 2` to subtract `_FoamBulkTransportIntegerShift` in `FoamLoadTransportPacked(...)` and subtract `_FoamBulkTransportSpeed` from residual downstream velocity in `FoamResolveGridVelocity(...)`.
+
+The same file defines `FoamTransportUsesTvdSuperbee()`, which returns true for standalone TVD Superbee **and** Bulk-Phase Residual TVD, and `FoamResolveInteriorFaceDonor(...)` uses that result to choose between plain donor state and bounded Superbee Coverage reconstruction. Therefore C1 may remove the mode selector/gate but must retain `FoamTransportSuperbeeSlopeComponent(...)`, `FoamTransportCoverage(...)`, `FoamLoadTransportPackedOrFallback(...)`, donor/upwind state selection, previous/next neighbour loads, bounded reconstructed-Coverage clamp, and coherent encoded C/P/L/Pattern state.
+
+`Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Motion.hlsl::FoamSampleMotionLaneSmooth(...)` uses the coherent centre lane only when `_FoamTransportScheme == 2`; C1 must make that exact Bulk-Phase row selection unconditional.
+
+#### Retained Lifecycle-Faithful visibility dependency
+
+`Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl::RiverWaterFoamResolveStateMask(...)` currently branches on `finalVisibilityMode`. The retained branch uses `RiverWaterFoamResolveMeaningfulCoverageFootprint(coverage)` as both `baseMask` and `patternedCoverage` and converts positive Remaining Life to lifecycle-pattern authority. The rejected branch alone calls `RiverWaterFoamSharpenCoverage(...)`. Repository search finds no other caller of `RiverWaterFoamSharpenCoverage(...)`, so C1 may delete it once Lifecycle-Faithful is unconditional.
+
+Current production `RiverWaterFoamResolveMeaningfulCoverageFootprint(...)` returns `saturate(coverage)`. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs::ResolveDiagnosticBaseVisibility(...)` currently reports Lifecycle-Faithful as `smoothstep(0.02, 0.10, C)`, which does not match production. C1 must correct the diagnostic to `Mathf.Clamp01(coverage)` while leaving production arithmetic unchanged.
+
+#### Retained Coverage-Only dependency
+
+`RiverWaterFoam.hlsl::RiverWaterFoamResolveChipEligibility(...)` contains a protected Coverage-Only branch selected by `presenceFootprintMode <= 0.5`. That branch uses the accepted fixed soft-edge origin `0.06`, the authored `Chip Edge Width`, and returns a separate interior region. The rejected Presence-Amplitude branch alone consumes `preChipRenderedMask` and `softEdgeStart`.
+
+`RiverWaterFoam.hlsl::RiverWaterFoamEvaluateSelectionDiagnostics(...)` currently disables Interior Access for Presence-Amplitude and contains separate final selection branches. C1 must preserve the existing Coverage-Only edge-selection/interior-selection arithmetic and make authored `chipInteriorAccess` unconditional baseline authority.
+
+`RiverWaterFoamResolvePreChipRenderedMask(...)` is called only from two `_FoamPresenceFootprintMode > 0.5` branches in `SH_CleanStylizedRiver.shader`, so it becomes dead when Presence-Amplitude is removed and may be deleted.
+
+`RiverWaterFoam.hlsl::RiverWaterEvaluateFoam(...)` currently carries both `coupledMask` and `coupledPresenceMask` through surface coupling, stretch, breakup, stored retention, and liquid-factor application, then chooses between them by `presenceFootprintMode`. C1 must retain the exact Coverage-Only `coupledMask` route and delete only the parallel Presence-Amplitude mask arithmetic.
+
+`SH_CleanStylizedRiver.shader` currently owns `_FoamFinalVisibilityMode`, `_FoamPresenceFootprintMode`, and `_FoamChipSoftEdgeStart` properties/CBUFFER members, passes the first two into `RiverWaterEvaluateFoam(...)`, conditionally calls `RiverWaterFoamResolvePreChipRenderedMask(...)`, and passes presence/soft-edge parameters into `RiverWaterFoamEvaluateSelectionDiagnostics(...)`. These are all exclusive selector/Presence-Amplitude plumbing once C1 makes the retained baseline unconditional.
+
+`StylizedRiverFoamRuntime.Binding.cs` and `StylizedRiverFoamRuntime.Constants.cs` bind/property-ID all three obsolete shader values; those bindings/IDs become dead and may be removed.
+
+#### Diagnostics and report ownership
+
+`StylizedRiverFoamRuntime.VisibilityDiagnostics.cs::FoamVisibilityDiagnosticCapture` captures all three legacy selector enums, report construction prints all three, and helper label resolvers map them independently. C1 will capture/report one `StylizedRiverFoamMaterialContract` instead.
+
+`StylizedRiverFoamRuntime.P12Diagnostics.cs` and `StylizedRiverFoamRuntime.P12Sweep.cs` only report the three selectors; they do not switch them. C1 will replace those report strings with the single Material Contract and leave the diagnostic/sweep mechanics otherwise unchanged.
+
+`StylizedRiverEditor.DebugViews.cs` contains stale user-facing descriptions for the three-option visibility pipeline and Presence-Amplitude Chipping. C1 will make those descriptions baseline-specific; no debug-view algorithm or enum changes are authorized.
+
+#### Shared-shader impact audit
+
+Repository search finds `RiverWaterFoam.hlsl` included only by `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`. `CS_RiverFoam.Motion.hlsl` is included only by `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`. Therefore the approved shared HLSL edits affect only the River water/Foam shader and Foam compute subsystem already in scope; no other shader subsystem consumer was found.
+
+### C1 implementation contract
+
+Introduce:
+
+```csharp
+public enum StylizedRiverFoamMaterialContract
+{
+    [InspectorName("C × P × L Baseline")]
+    CoveragePresenceLifeBaseline = 0
+}
+```
+
+and one serialized `foamMaterialContract` field defaulting to `CoveragePresenceLifeBaseline`.
+
+The user-facing Inspector section becomes `Material Contract` and exposes only that property. C1 does not add `Life Only`; C2 owns the second option and its behavior branch.
+
+The retained baseline becomes unconditional in production:
+
+1. Bulk-Phase integer shift, subcell phase, coherent lane row, and residual downstream subtraction always execute.
+2. TVD Superbee bounded reconstruction always executes for interior faces; shared donor/upwind mechanics remain.
+3. Lifecycle-Faithful visibility always executes; Concentration + Lifetime code is removed where exclusive.
+4. Coverage-Only rendering/chipping always executes; Presence-Amplitude-only mask, eligibility, soft-edge-start authoring, and selector plumbing are removed.
+5. Packed persistent material remains exactly C/P/L/Pattern: `R = C × P`, `G = C × P × L`, `B = C × P × Pattern`, `A = C`.
+
+### Invariants
+
+- No C1 change to `FoamEncodeMaterialState(...)` or `FoamDecodeMaterialState(...)` semantics.
+- No C1 change to source birth, source scheduling, `FoamMergeBornMaterial`, lifecycle aging, topology, canonical velocity, Shore movement suppression, Object slowdown, grid/cache formats, or resource dimensions.
+- No change to TVD limiter mathematics, face-flux equations, CFL/substep ownership, or Bulk-Phase arithmetic order beyond removing selector gates around the already-retained path.
+- No change to Chipping candidate generation, Structural Strands, surface-coupling weights, or artistic tuning values used by Coverage-Only.
+- `foamChipInteriorAccess` remains. Only Presence-Amplitude-only `foamChipSoftEdgeStart` is removed.
+- No new runtime shader/compute uniform is required for `foamMaterialContract` while C1 has only one behavior option.
+- C1 adds no texture, buffer, kernel, pass, dispatch, readback, or per-frame full-field work.
+- Historical documents/sections remain historical evidence; only current canonical direction/status text is updated.
+
+### Non-goals
+
+C1 does not implement Life Only, make Foam occupancy binary, remove Coverage/Presence/Remaining Life/Material Pattern, change transport from fractional finite-volume/TVD semantics, alter final Foam artistic parameters, repair unrelated diagnostics/debug modes, or edit scenes/prefabs/materials/caches/generated assets.
+
+### File-by-file implementation sequence
+
+1. **This file** — record Gate 1 evidence, exact C1 scope, contract, invariants, risks, validation, and status before code edits.
+2. `StylizedRiver.cs` — replace three enums/serialized fields/getters with one Material Contract enum/field/getter; remove transport diagnostic setter and Presence-Amplitude-only Soft Edge Start state; validate the new enum.
+3. `StylizedRiverEditor.Foam.cs` — collapse Transport & Visibility UI to one Material Contract property; remove mode-summary helpers and Presence-Amplitude Chipping UI branches; keep Chip Interior Access visible.
+4. `StylizedRiverFoamRuntime.Injection.cs` — remove transport enum parameter/resolution and make the accepted Bulk-Phase phase update unconditional.
+5. `StylizedRiverFoamRuntime.Compute.cs`, `CS_RiverFoam.Resources.hlsl`, `CS_RiverFoam.Motion.hlsl`, `CS_RiverFoam.Simulation.hlsl` — remove transport-scheme binding/declaration/branches while retaining exact Bulk-Phase/TVD mechanics.
+6. `StylizedRiverFoamRuntime.Constants.cs`, `StylizedRiverFoamRuntime.Binding.cs`, `SH_CleanStylizedRiver.shader`, `RiverWaterFoam.hlsl` — remove obsolete visibility/presence/soft-edge shader properties and alternative branches while retaining exact Lifecycle-Faithful + Coverage-Only arithmetic.
+7. `StylizedRiverFoamRuntime.VisibilityDiagnostics.cs`, `StylizedRiverFoamRuntime.P12Diagnostics.cs`, `StylizedRiverFoamRuntime.P12Sweep.cs`, `StylizedRiverEditor.DebugViews.cs` — collapse labels to one contract and correct the stale diagnostic base to production `C`.
+8. `River_Foam_Stage6_Architecture.md`, `River_Foam_Fixed_Metric_Dependency_Register.md`, `River_Rendering_Roadmap.md` — advance C0 future direction to implemented C1 source state while keeping C2 separate.
+9. Gate 4 — audit exact changed-file set, re-read final review surface, compare retained branch arithmetic with pre-C1 source, run repository-wide stale-symbol searches, delimiter/static checks, and any available compile/shader validation; record pending Unity validation explicitly.
+
+### Risks and mitigations
+
+1. **Deleting shared TVD mechanics:** standalone mode names can be mistaken for exclusive algorithms. Mitigation: remove only selector gates/constants; retain Superbee/downwind/upwind functions and compare their final bodies against pre-C1.
+2. **Behavior drift from branch removal:** arithmetic can change if expressions are rewritten. Mitigation: promote the currently selected branch bodies verbatim where possible and diff the before/after retained code paths.
+3. **Serialized transition:** old selector fields disappear and the new contract has one legal value. This intentionally discards obsolete mode selections without editing serialized assets. Existing unrelated serialized Foam settings remain untouched.
+4. **Shader signature mismatch:** removing mode parameters changes helper signatures and all callers must be updated together. Mitigation: repository-wide symbol/call search plus delimiter/static checks.
+5. **Diagnostic semantic drift:** the visibility report currently disagrees with production Lifecycle-Faithful base. Mitigation: align report calculation to `saturate(C)` and document this as diagnostic correction only.
+6. **C2 scope bleed:** simplification could tempt packed-state cleanup. Mitigation: C/P/L/Pattern encode/decode functions are protected invariants and body-compared in Gate 4.
+
+### C1 acceptance criteria
+
+- Exactly the 19 approved files change.
+- `StylizedRiverFoamMaterialContract` exists with exactly one option: `C × P × L Baseline`.
+- No production/editor/diagnostic reference remains to the three retired enum types/serialized fields/getters, `_FoamTransportScheme`, `_FoamFinalVisibilityMode`, `_FoamPresenceFootprintMode`, or `_FoamChipSoftEdgeStart`.
+- Bulk-Phase integer shift/phase/residual subtraction and coherent motion-lane row are unconditional.
+- Superbee reconstruction remains present and is the unconditional interior-face reconstruction; donor/upwind mechanics remain.
+- Lifecycle-Faithful state-mask arithmetic is unconditional; `RiverWaterFoamSharpenCoverage(...)` is removed.
+- Coverage-Only Chip and final-mask arithmetic are unconditional; Presence-Amplitude-only parallel mask and pre-Chip helper are removed.
+- C/P/L/Pattern packing semantics are unchanged.
+- Visibility diagnostics report one Material Contract and compute baseline visibility as clamped Coverage, matching production.
+- No resource/kernel/pass/dispatch/readback count increase.
+- Unity compilation/shader import/Play Mode parity are either passed or explicitly pending; C1 must not be called runtime-validated until those checks run.
+
+### Planned validation
+
+Offline/static:
+
+- exact changed-file scope diff against the C0 baseline;
+- repository-wide stale-symbol search;
+- C#/HLSL/shader delimiter balance;
+- compute kernel/pragmas/resource declaration count comparison;
+- protected packed-state function body comparison (`FoamDecodeMaterialState`, `FoamEncodeMaterialState`, and `FoamMergeBornMaterial` where present);
+- retained Superbee/upwind function presence and branch-removal checks;
+- shared-shader consumer search.
+
+Unity 6000.5.0f1, pending after source application:
+
+1. compile/import with no C# or shader errors;
+2. Inspector shows one `Foam → Material Contract → Material Contract = C × P × L Baseline` control and no three retired selectors/Presence-Amplitude Edge Start;
+3. Play Mode held-state Final Foam from the same authored River matches the pre-C1 accepted Bulk-Phase Residual TVD + Lifecycle-Faithful + Coverage-Only appearance/behavior;
+4. Layer B Motion Field still shows B1/B1A Shore suppression correctly;
+5. if any failure occurs, collect the complete relevant Console/shader error or a same-state screenshot pair rather than running unrelated broad suites.
+
+### C1 implementation and Gate 4 audit record
+
+Implemented exactly within the approved 19-file scope. The final source state replaces the three retired selectors with `StylizedRiverFoamMaterialContract` containing the single `C × P × L Baseline` option; makes the previously selected Bulk-Phase Residual TVD, Lifecycle-Faithful, and Coverage-Only branches unconditional; removes only code exclusive to rejected selector alternatives; and leaves C/P/L/Pattern packed-state semantics unchanged.
+
+Gate 4 evidence against the exact C0 pre-edit tree:
+
+- changed-file reconciliation: exactly `19/19` approved files differ; no scene, prefab, material, `.asset`, cache, generated asset, or other file differs;
+- repository-wide production-source stale-symbol scan: no remaining legacy selector enum/field/getter/shader-property references, no `_FoamTransportScheme`, `_FoamFinalVisibilityMode`, `_FoamPresenceFootprintMode`, `_FoamChipSoftEdgeStart`, `Presence-Amplitude`, or `Concentration + Lifetime` production path;
+- protected material-state body comparison: `FoamDecodeMaterialState`, `FoamEncodeMaterialState`, `FoamClampPackedMaterialState`, `FoamMergeBornMaterial`, and `FoamClipPackedToValidFluid` are byte-identical to C0;
+- broader protected pipeline comparison: `CS_RiverFoam.compute`, `StylizedRiverFoamRuntime.Lifecycle.cs`, `StylizedRiverFoamRuntime.SourceUnits.cs`, and `StylizedRiverFoamRuntime.BirthEvents.cs` are byte-identical to C0;
+- retained transport evidence: Bulk-Phase integer shift, phase accumulation, residual downstream subtraction, and coherent motion-lane row are unconditional; `FoamTransportSuperbeeSlopeComponent`, upwind fallback loads, and bounded reconstructed-Coverage clamp remain;
+- retained rendering evidence: `RiverWaterFoamResolveMeaningfulCoverageFootprint` remains `saturate(coverage)`, Coverage-Only Chip edge origin remains `0.06`, `foamChipInteriorAccess` remains, and Final Foam resolves unconditionally from `coupledMask` rather than the deleted parallel Presence-amplitude mask;
+- diagnostic correction: `ResolveDiagnosticBaseVisibility` now returns clamped Coverage, matching the production Lifecycle-Faithful base; this changes diagnostic reporting only, not production visibility;
+- shared-include impact: `RiverWaterFoam.hlsl` has one actual shader `#include` consumer (`SH_CleanStylizedRiver.shader`) and `CS_RiverFoam.Motion.hlsl` has one actual compute `#include` consumer (`CS_RiverFoam.compute`); no other shader subsystem consumer is affected;
+- static structure: changed C#/HLSL/shader delimiters and C# preprocessor pairs balance; no illegal ordinary multiline C# string literal remains;
+- compute topology: `CS_RiverFoam.compute` is byte-identical and kernel count remains `22 -> 22`; no new texture, buffer, kernel, pass, dispatch, or readback is introduced;
+- final offline static/compliance audit: **`133/133 PASS`**;
+- no Git metadata is present in the supplied working tree, so comparison authority is the exact C0 pre-edit tree rather than repository `HEAD`;
+- no Unity 6000.5.0f1 editor, C# compiler, DXC, or GLSL shader compiler is available in this environment. Unity C# compilation, shader import, Play Mode baseline parity, and B1/B1A Motion Field regression validation remain **pending** and require validation in the user project.
+
+### C1 status
+
+- Gate 1 review: **complete**.
+- Gate 2 canonical plan: **complete; this section was the first C1 repository modification**.
+- Gate 3 scoped source implementation: **complete**.
+- Gate 4 offline scope/contract/static audit: **complete; `133/133 PASS`**.
+- Unity compilation/shader import/Play Mode validation: **pending**.
+
+
+
+## RIVER-FOAM-MATERIAL-C2 — Life-Only Binary Cellular Contract — Implementation Plan
+
+Status: Gate 1 review complete; Gate 2 plan recorded before implementation; Gate 3 source implementation complete; Gate 4 offline/static audit complete. Unity 6000.5.0f1 compile/import, Play Mode behavior, and GPU profiling validation remain pending.
+
+### Objective
+
+Add `Life Only` as the second `Material Contract` option while preserving the validated C1 `C × P × L Baseline` path unchanged in behavior. In Life Only, Remaining Life is the sole persistent material authority: `Life > 0` means one complete Foam cell exists and `Life == 0` means the cell is empty. Coverage, Presence, and Material Pattern have no persistent material meaning in this contract. Render-side Pattern/Chipping/Strands remain visual breakup only.
+
+### Approved file scope
+
+Exactly these 22 files are approved for C2:
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Docs/River_Foam_Stage6_Architecture.md`
+3. `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+4. `Assets/Docs/River_Rendering_Roadmap.md`
+5. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+6. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+7. `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs`
+8. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Constants.cs`
+9. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs`
+10. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs`
+11. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs`
+12. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+13. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs`
+14. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs`
+15. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Topology.cs`
+16. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs`
+17. `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P8Diagnostics.cs`
+18. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl`
+19. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+20. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+21. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl`
+22. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader`
+
+No scene, prefab, material, `.asset`, cache, texture-format, layer, tag, component, dependency, or folder/file rename is approved. No new persistent GPU texture or buffer is approved.
+
+### Gate 1 reviewed evidence
+
+Repository baseline is the exact validated C1 source state reconstructed in the C2 review tree before edits.
+
+- `StylizedRiver.cs::StylizedRiverFoamMaterialContract` currently contains only `CoveragePresenceLifeBaseline = 0`; C2 adds `LifeOnly = 1` while keeping the C1 value/default stable.
+- `CS_RiverFoam.Simulation.hlsl::FoamMaterialState`, `FoamDecodeMaterialState(...)`, and `FoamEncodeMaterialState(...)` prove the C1 packed contract is `R=C×P`, `G=C×P×L`, `B=C×P×Pattern`, `A=C`. C2 must preserve that encoding byte-for-byte in behavior when contract 0 is selected.
+- `CS_RiverFoam.compute::SimulateFoam(...)` currently performs conservative `float4` finite-volume face fluxes and therefore creates fractional occupancy. Life Only must not execute this transport kernel.
+- `StylizedRiverFoamRuntime.Injection.cs::SimulateFullField(...)` already ping-pongs `currentState` and `writeState` once per CFL-safe substep. C2 reuses that one-dispatch cadence and selects a dedicated Life-Only gather kernel instead of adding a claim buffer or second resolve pass.
+- `StylizedRiverFoamRuntime.Lifecycle.cs::ResolveTransportCflContract(...)` bounds downstream plus lateral movement by `TransportTargetCfl = 0.90`. The Life-Only movement probabilities use the same fixed-metric longitudinal spacing, curvature Jacobian, and lateral spacing, so one source selects at most one adjacent destination per substep.
+- `CS_RiverFoam.Motion.hlsl::FoamResolveVelocity(...)` is the canonical full velocity authority and already includes Motion Lane, obstacle routing/slowdown, and Shore lateral/downstream suppression. Life Only consumes this resolver directly and does not modify canonical velocity code.
+- `CS_RiverFoam.compute::RasterizeFoamSourceEvent(...)` merges source state through `FoamMergeBornMaterial(...)`. C2 makes the shared encode/merge helpers contract-aware so any touched valid cell becomes one full Life-Only cell and repeated birth over an already-live cell does not refresh its Life.
+- `CS_RiverFoam.compute::FoamApplyLifecycleAndWrite(...)` owns lifecycle aging. Contract-aware decode/encode lets the existing aging authority continue to decrement Remaining Life without introducing Coverage/Presence semantics in Life Only.
+- `RiverWaterFoam.hlsl::RiverWaterFoamSampleInterpolatedState(...)` bilinearly/interpolates C1 packed material. Life Only must point-sample the current committed state only; otherwise rendering would recreate fractional material between binary cells.
+- `RiverWaterFoam.hlsl::RiverWaterFoamPatternedMask(...)` and downstream Chipping/Strand logic need a Pattern seed. In Life Only the seed is derived deterministically in the shader from material/world coordinates; it is not stored or transported.
+- `CS_RiverFoam.compute::MeasureTopologyMetrics(...)` and `StylizedRiverFoamRuntime.VisibilityDiagnostics.cs` currently interpret `C`, `P`, and `C×P`. They must report Life-Only occupancy as binary `Life > 0` and Remaining Life literally without claiming persistent Coverage or Presence exists.
+- `StylizedRiverFoamRuntime.P8Diagnostics.cs` is a C×P×L conservative-packed-transport proof. C2 must explicitly skip that proof under Life Only rather than reinterpret it.
+- `StylizedRiverFoamRuntime.Resources.cs` allocates ARGBHalf persistent state. C2 keeps that physical format because C1 remains selectable; Life Only uses only `R` and writes `GBA=0`. No RHalf migration is included.
+
+### Accepted Life-Only material contract
+
+Persistent representation in contract 1:
+
+```text
+R = Remaining Life
+G = 0
+B = 0
+A = 0
+
+R > 0  => one complete Foam cell
+R == 0 => empty
+```
+
+Decoded compatibility view used only by shared compute/render helpers:
+
+```text
+Coverage = Life > 0 ? 1 : 0
+Presence = Life > 0 ? 1 : 0
+Remaining Life = R
+Material Pattern = not persistent; render derives its own deterministic seed
+```
+
+### Accepted discrete transport contract
+
+Life Only uses one destination-gather dispatch per CFL-safe substep. Every live source cell deterministically chooses exactly one outcome using one shared low-discrepancy temporal sample for the substep:
+
+```text
+pDown = abs(vDownstream) * dt / local effective longitudinal cell distance
+pLat  = abs(vLateral)    * dt / local lateral cell distance
+
+if r < pDown:         choose one longitudinal neighbour
+else if r < pDown+pLat: choose one lateral neighbour
+else:                 stay
+```
+
+`vDownstream`/`vLateral` come from canonical `FoamResolveVelocity(...)`. The effective longitudinal distance uses the same fixed-metric curvature Jacobian used by the CFL contract. Invalid lateral/bank/obstacle targets cause the source to stay. A move beyond the physical longitudinal simulation endpoint is outflow and removes the cell.
+
+Every destination evaluates only itself plus its four adjacent source candidates. A source target function is deterministic, so one source can never be accepted by two destinations.
+
+Approved collision rule from the user:
+
+```text
+Multiple live sources -> same destination
+=> one occupied destination with max(RemainingLife)
+```
+
+This is deterministic and order-independent. Converging cells may merge; Life/opacity/density are never accumulated.
+
+No atomic claim buffer, no extra resolve kernel, no extra transport texture/buffer, and no second dispatch per substep are allowed by this plan.
+
+### Contract switching
+
+The C1 and Life-Only packed formats are intentionally incompatible. Runtime contract change must clear persistent Foam state and reset Bulk-Phase scalar state / Life-Only temporal transport step state before continuing. No packed-state conversion is allowed.
+
+### Rendering contract
+
+- C×P×L Baseline keeps its existing interpolated/phase-shifted packed-state rendering.
+- Life Only point-samples the current committed state; it does not bilinearly or temporally interpolate material occupancy.
+- Life is an alive/dead authority, not an opacity multiplier: any `Life > 0` produces the same base Foam material strength.
+- Chipping, Strands, erosion, surface coupling, and other Layer E breakup remain render-side only.
+- Life-Only visual Pattern is shader-derived and never written back to persistent state.
+
+### Inspector/debug contract
+
+`Material Contract` exposes:
+
+```text
+C × P × L Baseline
+Life Only
+```
+
+When Life Only is selected, source-family `Initial Presence` authoring is hidden because it has no effect; `Initial Life` remains. The serialized Presence fields remain untouched for C1 compatibility.
+
+Existing Layer C debug views remain available. Under Life Only, Coverage/Presence/Material Amount views are explicitly documented/rendered as binary occupancy aliases derived from `Life > 0`, not as stored material properties. Remaining Life remains literal.
+
+### Non-goals
+
+C2 does not:
+
+- delete or alter C1 baseline TVD/Superbee/Bulk-Phase transport;
+- change canonical velocity, Shore suppression, Object slowdown/routing, source scheduling, or source geometry;
+- change lifecycle rates or topology-support aging;
+- change persistent texture format;
+- add a GPU buffer/resource;
+- add continuous presentation smoothing for binary material movement;
+- remove serialized Initial Presence fields required by the C1 baseline;
+- reopen Nearest-Characteristic transport;
+- change scene/prefab/material data.
+
+### File-by-file implementation sequence
+
+1. Add `LifeOnly = 1`, contract-aware Inspector help/Presence visibility, and contract-aware debug descriptions.
+2. Add material-contract shader/compute IDs, runtime active-contract/transport-step state, kernel resolution/reset, and contract-switch clearing.
+3. Add `_FoamMaterialContract` / `_FoamLifeOnlyTransportStepIndex` compute uniforms and contract-aware packed-state helpers while preserving contract-0 behavior.
+4. Add one `SimulateLifeOnlyFoam` destination-gather kernel and select it in the existing one-dispatch substep loop; keep Bulk Phase baseline-only.
+5. Make birth, boundary clipping/remap/lifecycle/film/topology metrics interpret Life Only correctly through shared helpers.
+6. Bind Material Contract to the render shader. Add Life-Only current-state point sampling, binary occupancy/life decode, and shader-derived Pattern while retaining the existing C1 renderer for contract 0.
+7. Make visibility/topology diagnostics contract-aware and guard P8 as baseline-only.
+8. Update canonical architecture/dependency/roadmap documents to implemented-source status.
+9. Gate 4: exact-scope diff, cross-subsystem shader impact audit, baseline protected-function comparison, kernel/resource count audit, static syntax/contract checks, and available compile validation.
+
+### Acceptance criteria
+
+- Contract 0 retains validated C1 behavior and default serialization.
+- Contract 1 stores no material significance outside Remaining Life in R.
+- A live Life-Only source cell selects at most one target per substep.
+- No Life-Only operation creates fractional Coverage/Presence or weak/strong Foam.
+- Multiple incoming cells merge by max Life.
+- Repeated birth cannot refresh an already-live Life-Only cell.
+- Life-Only final rendering uses binary occupancy and point-sampled current state.
+- Shore suppression/Object routing remain visible through actual Life-Only movement because canonical velocity is shared.
+- No new persistent texture/buffer and no extra per-substep dispatch relative to C1.
+- Existing ARGBHalf state allocation remains unchanged.
+- Switching contract clears incompatible state.
+- P8 does not claim to validate Life Only.
+- No out-of-scope files change.
+
+### Validation plan
+
+Offline before delivery:
+
+- exact changed-file set and serialized-asset audit;
+- syntax/delimiter/static symbol checks;
+- kernel count and no-new-resource check;
+- exact comparison of protected C1 baseline transport functions/branches where applicable;
+- repository-wide search for material-contract consumers and stale C1-only labels;
+- shared shader/include consumer impact audit.
+
+Unity after source delivery:
+
+1. compile/import with zero C# or shader errors;
+2. verify `Material Contract` exposes both options and Life Only hides Initial Presence authoring;
+3. validate C1 baseline parity after selecting `C × P × L Baseline`;
+4. select Life Only, clear/spawn Foam, hold state, and verify Material Remaining Life plus binary occupancy aliases while Final Foam matches the occupied cell footprint apart from render-side breakup;
+5. verify movement is whole-cell/no fractional ballooning, Shore suppression remains effective, cells die only when Life reaches zero, and converging cells merge without brightness/density growth;
+6. compare runtime dispatch/resource/profiler cost with C1 baseline.
+
+### C2 Gate 3 implementation and Gate 4 offline audit record
+
+Gate 3 source implementation is complete within the approved 22-file C2 scope. Gate 4 offline/static review is complete; Unity 6000.5.0f1 compile/import, Play Mode behavior, and GPU profiling remain pending and are required before C2 can be accepted as runtime-validated.
+
+Implemented intentional differences from validated C1:
+
+- `Material Contract` adds `Life Only = 1`; `C × P × L Baseline = 0` remains the serialized default.
+- Life Only packs `R=Remaining Life`, `GBA=0`; any live cell is binary full occupancy. Initial Presence is hidden in Life-Only authoring and ignored by GPU birth evaluation.
+- `SimulateLifeOnlyFoam` is a dedicated one-pass destination-gather kernel selected instead of `SimulateFoam` for contract 1. Each source chooses at most one adjacent destination from the canonical velocity/CFL metric contract; each destination resolves itself plus four neighbours and stores maximum Remaining Life. No atomic claim buffer or second transport dispatch exists.
+- Life Only does not use Bulk Phase or TVD transport metrics. Motion Lane, obstacle routing/slowdown, B1/B1A Shore suppression, valid-fluid/obstacle exclusion, and existing topology-adjusted lifecycle remain shared authorities.
+- Final Foam and committed Layer C debug sampling point-sample the current state under Life Only. No material interpolation or bilinear occupancy reconstruction is used. Render Pattern is hash-derived and remains visual-only.
+- Layer C/visibility diagnostics explicitly treat Coverage/Presence/Material Amount as binary occupancy aliases under Life Only and do not claim they are stored state. P8 packed-material proof reports skipped for Life Only.
+- Changing Material Contract during Play Mode clears incompatible Foam state and resets Life-Only/Bulk-Phase transport state.
+
+Gate 4 evidence:
+
+- Exact changed-file set: **22/22 approved files; no additions/deletions and no scene/prefab/material/.asset/.meta changes**.
+- Offline static/scope/contract audit: **132/132 PASS** (`RIVER-FOAM-MATERIAL-C2_STATIC_AUDIT.txt`).
+- C1 protected baseline bodies are byte-identical: `CS_RiverFoam.compute::SimulateFoam`, `FoamApplyLifecycleAndWrite`, `CS_RiverFoam.Simulation.hlsl::FoamTransportSuperbeeSlopeComponent`, and `FoamResolveInteriorFaceDonor`.
+- Critical unchanged dependencies are hash-identical to C1: `CS_RiverFoam.Motion.hlsl`, `RiverWaterFoamVelocity.hlsl`, `StylizedRiverFoamRuntime.BirthEvents.cs`, and `StylizedRiverFoamRuntime.SourceUnits.cs`.
+- Shared-shader impact audit: `RiverWaterFoam.hlsl` has exactly one shader consumer, `SH_CleanStylizedRiver.shader`; no non-River subsystem consumer was found.
+- Compute kernel declarations: **22 -> 23** because C2 adds `SimulateLifeOnlyFoam`; only one material-simulation kernel is dispatched per CFL substep for the selected contract.
+- Persistent state remains existing `ARGBHalf`; resource diff adds no `RenderTexture`, `ComputeBuffer`, `GraphicsBuffer`, claim buffer, readback, pass, or second Life-Only simulation dispatch.
+- Complete Gate 1 final surface plus direct unchanged producer/consumer contracts was re-read after implementation; hashes recorded in `c2_gate4_review_hashes.txt`.
+- No Unity executable/compiler or standalone HLSL compiler is available in the working environment. Therefore C# compile, compute/shader import, runtime behavior, and performance are **pending**, not passed.
+
+C2 acceptance remains blocked on Unity validation. Required next evidence is focused: compile/import, selectable baseline/Life Only Inspector behavior, baseline parity, Life-Only binary birth/whole-cell movement/max-Life convergence/lifecycle death, B1/B1A velocity response, contract-switch clear, and GPU timing versus C1.
+
+
+## RIVER-FOAM-MATERIAL-C2A — D3D11 Definite-Initialization Remediation and Shore-Response Containment
+
+Status: Gate 1 review complete; Gate 2 corrective plan recorded before source edits. Unity 6000.5.0f1 D3D11 shader import and live shore-response validation remain pending.
+
+### Objective
+
+Remove the C2 D3D11 `potentially uninitialized variable` warnings without changing either material contract, and contain the reported generated-ground riverbank/riverbed surface regression to proven C2 dependencies before touching the Ground/PixelSurface subsystem.
+
+### User-reported failures
+
+Unity D3D11 reports:
+
+```text
+Shader warning in 'CS_RiverFoam': use of potentially uninitialized variable (FoamSampleMaterialStateForDomainUV) at kernel BuildFoamFilmSource at CS_RiverFoam.compute(232)
+Shader warning in 'CS_RiverFoam': use of potentially uninitialized variable (FoamSampleMaterialStateForDomainUV) at kernel EvaluateFoamShape at CS_RiverFoam.compute(232)
+Shader warning in 'CS_RiverFoam': use of potentially uninitialized variable (FoamSampleMetricMaterialState) at kernel MeasureTopologyMetrics at CS_RiverFoam.compute(3374)
+```
+
+The user also reports that the generated-ground river shore response no longer distinguishes the authored riverbank and riverbed surfaces after C2.
+
+### Gate 1 code evidence
+
+- `CS_RiverFoam.Simulation.hlsl::FoamDecodeMaterialState(float4)` declares `FoamMaterialState state;` before the C2 material-contract branch. Every intended logical path assigns all four fields, but FXC/D3D11 is not proving definite initialization across the helper return and reports the callers `FoamSampleMaterialStateForDomainUV(...)` and `FoamSampleMetricMaterialState(...)` as potentially uninitialized. The minimal source correction is explicit zero initialization of this shared decode result before either contract branch.
+- Both reported helpers return `FoamDecodeMaterialState(...)`: `CS_RiverFoam.compute::FoamSampleMaterialStateForDomainUV(...)` at the Layer D film/shape sampling path and `CS_RiverFoam.compute::FoamSampleMetricMaterialState(...)` at topology metrics. Therefore one explicit initialization at the shared decoder is the narrowest fix covering all three warnings.
+- C2 did **not** modify the generated-ground/PixelSurface implementation. Exact C1-vs-C2 hashes are identical for `GeneratedGround.cs`, `SH_PixelGroundSurfaceLit.shader`, `PixelSurfaceGroundResponse.hlsl`, and `PixelSurfaceGroundForwardPass.hlsl`.
+- C2 changed `StylizedRiver.cs` only at `StylizedRiverFoamMaterialContract` and its tooltip. The ground/corridor methods `EnsureCorridorOutput`, `RefreshCorridorMaterialProperties`, `CreateGroundSnapshot`, `NotifyParentGround`, and `BuildCorridor` are byte-identical to C1.
+- `RiverWaterFoam.hlsl` has one shader consumer, `SH_CleanStylizedRiver.shader`; no Ground/PixelSurface shader consumes it. The reported ground regression therefore has no proven direct C2 Ground-shader edit path.
+- `StylizedRiver::EnsureCorridorOutput()` still assigns `ground.SharedMaterial` and calls `GeneratedGround.ApplySurfaceProfileMaterialProperties(..., GroundSurfaceRenderRole.RiverCorridor)`, which sets `_GroundRiverCoupledEnabled=1` and the bank/riverbed layer properties on the corridor renderer. That ownership path is unchanged from C1.
+
+### Approved corrective file scope
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl`
+
+No Ground, PixelSurface, scene, prefab, material, serialized asset, renderer-role, corridor, source, lifecycle, transport, velocity, or render-contract behavior change is approved by this corrective patch.
+
+### Invariants / non-goals
+
+- C × P × L Baseline decode/encode results remain numerically identical.
+- Life Only decode/encode results remain numerically identical.
+- `SimulateFoam`, `SimulateLifeOnlyFoam`, birth, lifecycle, canonical velocity, B1/B1A Shore suppression, final rendering, and topology metrics arithmetic do not change.
+- Do not modify GeneratedGround/PixelSurface code without a reproduced or code-proven defect. The current evidence proves those source paths are C1-identical.
+- The explicit initialization is a compiler-definite-initialization correction, not a new material default or fallback.
+
+### Implementation sequence
+
+1. Explicitly zero-initialize the local `FoamMaterialState` result in `FoamDecodeMaterialState(...)` before the contract branch.
+2. Re-read the final decoder and all three reported caller paths; prove the only executable delta is initial value establishment before fields are overwritten by the existing branch logic.
+3. Re-run static scope checks and compare protected C1/C2 transport/lifecycle/render functions byte-for-byte where outside the one-line decoder change.
+4. Unity validation: require warning-free D3D11 import first, then re-check the generated-ground riverbank/riverbed surface response before authorizing any Ground/PixelSurface edit.
+
+### Acceptance
+
+- All three reported D3D11 potentially-uninitialized warnings are absent after Unity import.
+- C × P × L Baseline remains visually/simulation-identical to validated C1/C2 baseline behavior.
+- Life Only retains binary occupancy/life behavior.
+- Generated-ground riverbank/riverbed surfaces are re-checked after warning-free import. If they remain broken, C2A is not allowed to claim that regression fixed; the next step is a focused Ground/corridor property-block diagnosis using a screenshot plus the live renderer/material state. No speculative Ground source edit is permitted.
+
+### C2A Gate 3 implementation and Gate 4 offline audit record
+
+Gate 3 source implementation is complete inside the approved two-file corrective scope. The only executable shader delta is in `CS_RiverFoam.Simulation.hlsl::FoamDecodeMaterialState(float4)`: the local decode result now initializes as `FoamMaterialState state = (FoamMaterialState)0;` before the existing material-contract branches. Existing branch assignments and return values are otherwise unchanged.
+
+Gate 4 offline/static review is complete:
+
+- exact changed-file set: **2/2 approved files** (`River_Foam_Active_Blockers_and_Next_Patches.md` and `CS_RiverFoam.Simulation.hlsl`); no Ground, PixelSurface, scene, prefab, material, `.asset`, `.meta`, C#, compute-kernel, lifecycle, source, transport, velocity, or render-shader file changed;
+- offline scope/contract audit: **36/36 PASS** (`RIVER-FOAM-MATERIAL-C2A_STATIC_AUDIT.txt`);
+- the executable HLSL diff is exactly one replacement: `FoamMaterialState state;` -> `FoamMaterialState state = (FoamMaterialState)0;`;
+- `FoamEncodeMaterialState`, `FoamClampPackedMaterialState`, `FoamMergeBornMaterial`, `FoamClipPackedToValidFluid`, and `FoamResolveInteriorFaceDonor` are byte-identical to C2;
+- `CS_RiverFoam.compute` is byte-identical to C2; therefore `BuildFoamFilmSource`, `EvaluateFoamShape`, `MeasureTopologyMetrics`, `SimulateFoam`, and `SimulateLifeOnlyFoam` are unchanged and consume the corrected shared decoder only;
+- C1-vs-C2 hashes remain identical for `GeneratedGround.cs`, `SH_PixelGroundSurfaceLit.shader`, `PixelSurfaceGroundResponse.hlsl`, and `PixelSurfaceGroundForwardPass.hlsl`; the `StylizedRiver` corridor/ground bridge methods reviewed in Gate 1 are also C1-identical;
+- final review re-read the complete decoder plus both warned sampling helpers (`FoamSampleMaterialStateForDomainUV`, `FoamSampleMetricMaterialState`) and the generated-ground corridor material ownership path. No source-level dependency justifies a speculative Ground/PixelSurface edit in C2A.
+
+Unity 6000.5.0f1 D3D11 shader import is **pending** and is required to prove the three reported warnings are eliminated. The generated-ground riverbank/riverbed visual regression is also **pending live verification**. Because its C1/C2 source paths are unchanged, C2A does not claim that visual regression fixed; if it persists after warning-free import, the required next action is a focused live corridor/MaterialPropertyBlock diagnosis before any Ground source change.
+
+## RIVER-FOAM-MATERIAL-C2B — D3D11 helper initialization + River corridor reload recovery
+
+**Status:** Gate 1 review complete; Gate 2 plan recorded; implementation pending at plan creation time.
+
+### Objective
+
+Correct two regressions observed immediately after C2/C2A without changing the accepted Life-Only or C × P × L material contracts:
+
+1. remove the remaining D3D11 `potentially uninitialized variable` warnings reported for `FoamSampleMaterialStateForDomainUV` in `BuildFoamFilmSource` / `EvaluateFoamShape` and `FoamSampleMetricMaterialState` in `MeasureTopologyMetrics`;
+2. preserve/recover the generated River corridor mesh across Unity script/domain reload so the Ground-owned River bank/riverbed material response is not lost after a code-only River patch.
+
+### Gate 1 reviewed evidence
+
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute::FoamSampleMaterialStateForDomainUV(...)` now has a Life-Only early-return branch and a baseline return branch, both returning `FoamMaterialState`. D3D11/FXC still reports the helper itself as potentially uninitialized in kernels `BuildFoamFilmSource` and `EvaluateFoamShape` even after C2A initialized the local struct inside `FoamDecodeMaterialState(...)`.
+- `CS_RiverFoam.compute::FoamSampleMetricMaterialState(...)` has the same branched `FoamMaterialState` return pattern and D3D11 reports it at `MeasureTopologyMetrics`.
+- C1 had no branched material-state sampling helper: `FoamSampleMaterialStateForDomainUV(...)` returned one decoded baseline path directly, and `MeasureTopologyMetrics(...)` decoded `SampleStateAtUV(...)` directly.
+- Corrective strategy: keep contract selection identical but make both helpers construct one definitely initialized packed `float4`, assign it on each branch, then decode once at the final return. This removes branched struct returns while preserving the exact Life-Only point-load and baseline phase-shifted/bilinear sample semantics.
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs::OnEnable()` calls `EnsureCorridorOutput()` before `RegenerateAll(...)`.
+- `StylizedRiver.cs::EnsureCorridorOutput()` recovers the surviving generated corridor child/components after script reload, but `corridorMesh` / `corridorColliderMesh` are nonserialized cached fields. When either cached field is null, the current code creates a new empty `Mesh`; linearly afterward it assigns the new visual mesh to `corridorMeshFilter.sharedMesh`.
+- `StylizedRiver.cs::RegenerateAll(...)` only calls `BuildCorridor()` itself when `NotifyParentGround(...)` reports that Ground did **not** commit before return.
+- `Assets/Game/Procedural/Ground/GeneratedGround.cs::ExecuteRegenerationPass()` calls `NotifyRiverCorridorsChanged()` only when `geometryChanged` is true. A code-only River/Foam patch can leave the Ground geometry signature unchanged, so Ground may commit successfully without rebuilding River corridors.
+- Therefore a domain reload can produce this exact sequence: surviving valid corridor child -> River cached mesh fields reset -> `EnsureCorridorOutput()` replaces surviving mesh with a new empty mesh -> Ground regeneration reports committed with unchanged geometry -> no Ground corridor callback -> River skips its fallback `BuildCorridor()`. This is a River-side reload recovery defect even though Ground source did not change.
+- `GeneratedGround.ApplySurfaceProfileMaterialProperties(renderer, GroundSurfaceRenderRole.RiverCorridor)` remains the owner of the per-renderer bank/riverbed material properties. C2B must not change Ground material composition, Ground shader code, surface-layer controls, or corridor geometry generation.
+
+### Approved file scope
+
+1. `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+2. `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+3. `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+No Ground file, scene, prefab, material, `.asset`, shader include, lifecycle, transport, birth, or material-contract file is approved for modification.
+
+### Implementation plan
+
+1. In `CS_RiverFoam.compute`, rewrite `FoamSampleMaterialStateForDomainUV(...)` and `FoamSampleMetricMaterialState(...)` to use a definitely initialized local `float4 packed = 0.0.xxxx`, assign the Life-Only or baseline sample into that value, and return `FoamDecodeMaterialState(packed)` once. Do not change sample coordinates, valid-fluid clipping, Bulk-Phase offset, or decode semantics.
+2. In `StylizedRiver.EnsureCorridorOutput()`, after re-fetching the surviving corridor `MeshFilter` / `MeshCollider`, re-adopt their existing generated `sharedMesh` references when the corresponding cached `corridorMesh` / `corridorColliderMesh` fields are null. Only allocate a new generated mesh if no surviving mesh exists. Preserve generated mesh names/flags for newly allocated output and leave `BuildCorridor()` / Ground material-property ownership unchanged.
+3. Gate 4: compare final diff to this three-file scope; re-read the complete helper/caller surface and River↔Ground reload/regeneration surface; verify C1/C2 material contract functions and Ground files are unchanged; run static checks and package audit. Unity/D3D11 import and live Ground corridor validation remain pending for the user.
+
+### Invariants / acceptance criteria
+
+- All three reported D3D11 warnings disappear after shader import.
+- Life-Only and C × P × L sampling semantics are unchanged.
+- A valid surviving generated River corridor visual/collider mesh is not replaced merely because C# cached references were reset by a script/domain reload.
+- A genuinely missing corridor mesh is still created normally.
+- Ground remains the sole owner of River-corridor bank/riverbed material-property composition.
+- No Ground source or shader changes.
+- No additional runtime per-frame work; corridor adoption occurs only through existing output-ensure/reload paths.
+
+### Gate 2 refinement before code edits
+
+The reviewed reload sequence shows that mesh re-adoption alone is insufficient to repair a corridor that was already replaced by an empty generated mesh by C2/C2A. `corridorBuildResult` is also a nonserialized runtime field and resets to its invalid default after domain reload. Therefore C2B additionally uses that existing validity authority in `RegenerateAll(...)`: after `NotifyParentGround(...)` returns, River calls `BuildCorridor()` when Ground did not commit **or** the current `corridorBuildResult` is invalid. If Ground geometry changed, its synchronous `NotifyRiverCorridorsChanged()` callback rebuilds the corridor first and sets the result valid, avoiding a duplicate build. If Ground geometry is unchanged, the invalid post-reload result forces the missing repair build. This remains inside the approved `StylizedRiver.cs` scope and does not change Ground ownership or geometry algorithms.
+
+### C2B implementation / Gate 4 audit record
+
+**Source status:** implemented. **Unity/D3D11 validation:** pending; no Unity executable is available in the working environment.
+
+Implemented differences:
+
+- `CS_RiverFoam.compute::FoamSampleMaterialStateForDomainUV(...)` and `FoamSampleMetricMaterialState(...)` now initialize one packed `float4`, assign either the existing Life-Only or baseline sample path, and decode once at function exit. No sample coordinate, clipping, Bulk-Phase, point/bilinear, material decode, lifecycle, birth, or transport behavior changed.
+- `StylizedRiver.EnsureCorridorOutput()` now re-adopts surviving `MeshFilter.sharedMesh` / `MeshCollider.sharedMesh` references when the nonserialized cached mesh fields are null after script/domain reload, allocating only when no surviving mesh exists.
+- `StylizedRiver.RegenerateAll(...)` now executes its existing `BuildCorridor()` fallback when Ground did not commit **or** the nonserialized `corridorBuildResult` is invalid. A synchronous Ground geometry-change callback rebuilds first and makes the result valid, so that case does not double-build. An unchanged-Ground code reload now repairs/rebuilds the River-owned corridor instead of leaving an empty replacement mesh.
+
+Gate 4 offline audit:
+
+- exact changed scope: 3/3 approved files;
+- serialized Unity assets changed: 0;
+- Ground source files: 27/27 byte-identical to C2A;
+- protected C2 material/transport files (`CS_RiverFoam.Simulation.hlsl`, `CS_RiverFoam.Motion.hlsl`, `RiverWaterFoam.hlsl`, Runtime Injection/Lifecycle/Compute/Binding): byte-identical to C2A;
+- compute kernel list unchanged at 23;
+- no new compute resource declaration;
+- delimiter/static contract audit: 31 PASS / 0 FAIL;
+- C2A `FoamDecodeMaterialState` explicit struct initialization remains present;
+- reviewed final River reload/regeneration path, Ground regeneration/corridor callback/material-property ownership path, warned compute helper/caller path, material decoder, and corridor build-result validity contract.
+
+Pending Unity validation:
+
+1. D3D11 import must show none of the three reported `potentially uninitialized variable` warnings.
+2. Generated River corridor must be rebuilt/preserved after script reload and again show Ground-owned Bank and Riverbed surface layers.
+3. C × P × L Baseline and Life Only must retain their C2 material behavior.
+
+## RIVER-FOAM-MATERIAL-C3 — Coverage + Life Geometric Occupancy Contract — Implementation Plan
+
+**Status:** Gate 1 review complete; Gate 2 plan recorded before production edits. Unity compile/import, Play Mode behavior, and GPU profiling remain pending.
+
+### Objective
+
+Replace the rejected C2 `Life Only` binary-cell behavior with a `Coverage + Life` material contract while preserving the validated `C × P × L Baseline` unchanged.
+
+The C3 contract separates geometric occupancy from material strength:
+
+```text
+Coverage C
+    = fraction of the simulation cell geometrically occupied by normal Foam
+
+Remaining Life L
+    = lifecycle state of that occupied Foam
+
+Presence
+    = no independent persistent authority; implicit 1 wherever C > 0
+
+Material Pattern
+    = no persistent authority; derived in rendering
+```
+
+Persistent C3 packing remains in the existing `ARGBHalf` state texture for baseline compatibility:
+
+```text
+R = C
+G = C × L
+B = 0
+A = C
+```
+
+`A` is the canonical explicit Coverage channel. `R` mirrors Coverage only to preserve the existing packed transport/material-amount interfaces; it is not a second authority.
+
+### User-observed C2 rejection evidence
+
+The user compared live Unity output and rejected C2 `Life Only`: every live cell rendered as a visibly complete cell, producing blocky full-cell Foam. The validated `C × P × L Baseline` retained fractional Coverage and produced the preferred thinner, more continuous footprint.
+
+Current source confirms that C2 intentionally point-samples the current state and decodes every positive-Life cell as `Coverage=1`, while its dedicated destination-gather kernel moves whole cells. C3 removes those binary-cell requirements rather than attempting to hide them with additional render noise.
+
+### Approved files
+
+Modify only:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.DebugViews.cs
+Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs
+Assets/Game/Procedural/Rivers/StylizedRiver.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Binding.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Compute.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Lifecycle.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Members.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P8Diagnostics.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Resources.cs
+Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.VisibilityDiagnostics.cs
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Resources.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/SH_CleanStylizedRiver.shader
+```
+
+Create: none. Delete: none. Move/rename assets: none. Scene/prefab/material changes: none. Layer/tag/component/dependency changes: none.
+
+### Reviewed evidence and dependencies
+
+1. `StylizedRiverFoamMaterialContract` currently keeps the accepted baseline at serialized value `0` and C2 `Life Only` at value `1`. C3 repurposes serialized value `1` as `Coverage + Life`; the baseline remains value/default `0`.
+2. C2 `Life Only` owns a dedicated `SimulateLifeOnlyFoam` destination-gather kernel plus a transport-step index. Those exist only to enforce whole-cell motion and are removed by C3.
+3. `SimulateFoam` already transports explicit Coverage conservatively with Bulk-Phase Residual TVD. Its face reconstruction reconstructs Coverage and re-encodes coherent intrinsic state, so C3 can use the same solver with `P=1`, `Pattern=0`, and the life moment `C×L`.
+4. Existing birth geometry already computes injected Coverage independently from Initial Presence. C3 keeps that geometry, forces implicit unit Presence, and preserves the existing packet-independence rule: overlapping birth changes only genuinely newly added Coverage and does not refresh already occupied Coverage.
+5. Existing lifecycle ownership decodes the material state, subtracts normalized Remaining Life, and re-encodes. C3 preserves Coverage while Life is positive and clears material when Life reaches zero.
+6. Final Foam already uses Coverage as the geometric footprint and treats Remaining Life as an alive/dead gate rather than an opacity multiplier under the retained Lifecycle-Faithful/Coverage-Only rendering baseline. C3 restores ordinary previous/current interpolation and phase-aware sampling instead of C2 point sampling.
+7. Render-side Pattern remains required for Chipping/Strands/warp coherence. C3 derives it deterministically from coordinates and does not transport it persistently.
+8. The canonical Foam velocity resolver already includes Motion Lane, obstacle routing/slowdown, and the accepted B1/B1A Shore lateral/downstream suppression. C3 reuses the same `SimulateFoam` path and does not edit velocity code.
+9. The water Foam include has one shader consumer. The shared velocity include is consumed by both Foam compute and water rendering; C3 does not modify it. Cross-subsystem review therefore remains bounded to the water shader/compute call sites in this plan.
+10. C2B's D3D11 definite-initialization correction in the material sampling helpers must remain intact. C3 changes their contract branch but retains explicit packed-value initialization before decoding.
+
+### Invariants
+
+- `C × P × L Baseline` remains serialized value/default `0` and retains its C1/C2B behavior.
+- Coverage remains geometric occupancy, not opacity or weak/strong Foam.
+- C3 has no independently authored/transported Presence.
+- C3 has no persistent Material Pattern.
+- Remaining Life does not directly scale Final Foam opacity.
+- Initial Presence authoring remains serialized for baseline compatibility but is hidden/ignored under C3.
+- Birth overlap must not refresh Life on already occupied Coverage.
+- Canonical velocity, B1/B1A Shore suppression, object slowdown/routing, valid-fluid clipping, lifecycle topology, source scheduling, Chipping, Strands, and surface coupling remain unchanged.
+- Contract switching continues to clear incompatible persistent Foam state.
+- No new GPU texture, buffer, draw call, pass, readback, or per-frame rebuild is allowed.
+
+### Implementation sequence
+
+1. Rename material-contract value `1` from rejected `Life Only` to `Coverage + Life`; update Inspector/debug descriptions while retaining baseline default `0`.
+2. Replace C2 binary packing with `R=C, G=C×L, B=0, A=C`. Decode C3 from explicit Coverage and its life moment with implicit unit Presence.
+3. Remove the dedicated whole-cell Life-Only transport kernel, transport-step uniform/state, and destination-gather helpers. Route both contracts through the existing `SimulateFoam` TVD/Bulk-Phase substep path.
+4. Keep C3 birth Coverage geometric, ignore Initial Presence, derive no persistent Pattern, and preserve no-refresh overlap behavior.
+5. Restore phase-aware/interpolated committed-state sampling for C3. Derive Pattern in the render shader using the same coordinate-stable hash for both Pattern use and projected Pattern footprint.
+6. Update film/topology/debug/visibility diagnostics so C3 reports literal Coverage, implicit unit Presence compatibility, `C×L` Life moment, and Coverage-based material amount instead of binary occupancy aliases.
+7. Keep the P8 proof explicitly baseline-only because it validates the full `C/P/L/Pattern` packed contract rather than C3's reduced semantic subset.
+8. Update the three architecture/dependency/roadmap documents: mark C2 Life Only rejected by live visual validation and define C3 as its replacement.
+9. Gate 4: exact-scope diff audit; C1/C2B baseline-path comparison; stale `LifeOnly`/whole-cell symbol search; shared-shader consumer audit; delimiter/preprocessor/static checks; available compile checks; record Unity validation pending.
+
+### Acceptance criteria
+
+1. Inspector exposes `C × P × L Baseline` and `Coverage + Life`; baseline remains the default.
+2. Under Coverage + Life, `Material Coverage` shows fractional occupancy rather than binary full cells.
+3. Final Coverage + Life Foam preserves thin/subcell contours comparable to the baseline instead of C2's visible full-cell blocks.
+4. `Material Presence` under Coverage + Life is documented as non-authoritative/implicit unit material, not a transported strength control.
+5. Remaining Life ages continuously but only controls alive/dead state in Final Foam; it does not fade Foam opacity directly.
+6. Birth over already occupied Coverage does not refresh existing Life.
+7. Shore lateral/downstream suppression, object routing/slowdown, source behavior, Chipping, Strands, and surface coupling remain unchanged.
+8. Switching contracts clears incompatible Foam state.
+9. Baseline visual/runtime behavior remains equivalent to validated C1.
+10. No C#/compute/shader errors or D3D11 definite-initialization warnings.
+
+### Performance expectation
+
+C3 deliberately returns contract `1` to the existing Bulk-Phase Residual TVD solver, so no claim is made that it is cheaper than the C1 baseline. It removes the C2-only whole-cell kernel and one per-substep integer uniform/state, adds no resource, and keeps the existing `ARGBHalf` allocation because the baseline remains selectable. Runtime cost must be profiled after visual acceptance before any performance conclusion or texture-format specialization.
+
+### Non-goals
+
+- Do not retune Foam artistic controls.
+- Do not change cell size, source frequency, source geometry, or lifecycle rates.
+- Do not change the baseline contract.
+- Do not add an `RGHalf`/`RHalf` specialization yet.
+- Do not edit Ground, Weather, scene, prefab, material, or profile assets.
+- Do not redesign canonical velocity or Shore suppression.
+- Do not preserve the rejected whole-cell/max-Life collision model merely for compatibility.
+
+
+### C3 Gate 3 implementation record
+
+**Source status:** implemented. **Unity compile/import/Play Mode/profiling:** pending.
+
+Implemented changes trace directly to the C3 plan:
+
+- material-contract serialized value `0` remains `C × P × L Baseline`; value `1` is now `Coverage + Life` instead of rejected `Life Only`;
+- C3 persistent packing is `R=C`, `G=C×L`, `B=0`, `A=C`; decoded Presence is implicit unit material wherever meaningful Coverage and Life exist;
+- both contracts dispatch the existing `SimulateFoam` Bulk-Phase Residual TVD path; the C2 whole-cell destination-gather kernel, its kernel handle, transport-step state, and transport-step uniform are removed;
+- C3 source birth keeps existing geometric Coverage, forces implicit unit Presence, writes no persistent Pattern, and reuses the existing added-Coverage-only merge so overlap does not refresh already occupied material;
+- C3 lifecycle reuses the existing topology-adjusted age path; Remaining Life is decoded from `C×L`, Coverage persists while Life remains positive, and the cell clears at death;
+- C3 Final/diagnostic sampling uses the existing previous/current phase-aware interpolation instead of C2 point sampling; Pattern is derived from stable River coordinates before both Pattern shaping and projected Pattern-footprint evaluation;
+- C3 film/topology/debug reports use literal fractional Coverage and Coverage-weighted Life. Initial Presence authoring is hidden/ignored for C3 but preserved for baseline serialization;
+- P8 remains explicitly baseline-only because it proves independent Presence/Pattern moments absent from C3.
+
+### C3 Gate 4 offline audit
+
+Result: **PASS** for all available offline checks. Unity validation remains pending.
+
+- exact changed scope: `20/20` approved files;
+- serialized scenes/prefabs/materials/profiles/meta files changed: `0`;
+- rejected production symbols/text (`LifeOnly`, `Life Only`, `SimulateLifeOnlyFoam`, C2 transport-step state/uniform/helpers): `0` remaining;
+- material-contract enum/default: baseline `0`, Coverage + Life `1`;
+- C3 packing/decode contract: `C / C×L / 0 / C`, implicit unit Presence;
+- compute kernels: `22`; rejected C2 whole-cell kernel removed;
+- both contracts route through the existing `SimulateFoam` dispatch and Bulk-Phase preparation;
+- baseline `SimulateFoam(...)` body and `FoamResolveInteriorFaceDonor(...)` body: byte-identical to the pre-C3 C2B snapshot;
+- canonical Foam velocity files, GeneratedGround source, and corridor semantic-geometry producer: byte-identical to pre-C3;
+- C2B D3D11 definite-initialization pattern (`float4 packed = 0.0.xxxx` before decode) retained in both sampling helpers;
+- actual preprocessor consumer count of the shared Foam render include remains one water shader;
+- new compute texture/buffer/resource declarations: `0`;
+- delimiter/preprocessor deltas for every changed C#/HLSL/compute/shader file: balanced;
+- all four canonical River Foam documents contain the C3 supersession/contract state.
+
+Unavailable in this environment: Unity 6000.5.0f1, C# compiler, DXC/FXC, or another standalone HLSL compiler. Therefore C# compilation, compute/shader import, live rendering, no-refresh birth behavior, baseline parity, and performance are **pending**, not passed.
+
+### C3 required Unity validation
+
+1. Compile/import must produce no C# errors, compute/shader errors, or recurrence of the C2B D3D11 definite-initialization warnings.
+2. `Material Contract = Coverage + Life`: Material Coverage must show fractional/subcell values and Final Foam must no longer expose the C2 complete-cell blocks.
+3. Remaining Life must age while visible Foam remains full-strength inside its Coverage footprint until death; overlapping source birth must not refresh already occupied Coverage.
+4. Shore lateral/downstream suppression and object routing/slowdown must remain effective because C3 uses the unchanged canonical velocity resolver.
+5. Switching between baseline and Coverage + Life must clear incompatible persistent state.
+6. `C × P × L Baseline` must retain the previously accepted visual/runtime behavior before C3 can be accepted.
+
+## RIVER-FOAM-MATERIAL-C3A — Coverage + Life Transported Visual Pattern Repair — Implementation Plan
+
+**Status:** source implemented; Gate 4 offline/static audit passed. Unity compile/import and Play Mode validation remain pending.
+
+### Objective
+
+Repair the C3 `Coverage + Life` Final Foam holes without changing `C × P × L Baseline` behavior or any accepted transport, velocity, spawning, Ground, Shore, object, Chipping, Strands, or surface-coupling contract.
+
+Live validation proves that the rectangular gaps are render-only: Material Coverage remains present through the gaps and Remaining Life remains positive, while Final Foam removes the same stationary rectangular regions. Current C3 source derives Material Pattern from a quantized River-coordinate hash in Final rendering. C3A removes that stationary render stencil and restores a Pattern value that is born with, transported with, interpolated with, and decoded from Coverage + Life material. Pattern remains visual-only metadata; it is not a material-strength or lifecycle authority.
+
+Coverage + Life persistent packing becomes:
+
+```text
+R = C
+G = C × L
+B = C × Mvisual
+A = C
+```
+
+where `C` is geometric Coverage, `L` is Remaining Life, and `Mvisual` is transported visual Pattern metadata used only by render breakup/Strands/Chipping. Presence remains implicit `1` wherever live Coverage exists.
+
+### Approved files
+
+Modify only:
+
+```text
+Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md
+Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md
+Assets/Docs/River_Foam_Stage6_Architecture.md
+Assets/Docs/River_Rendering_Roadmap.md
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Simulation.hlsl
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute
+Assets/Game/Rendering/Water/Resources/PS3DRiver/Shaders/Includes/RiverWaterFoam.hlsl
+```
+
+Create: none. Delete: none. Move/rename: none. Scene/prefab/material/profile/meta changes: none. Layer/tag/component/dependency changes: none.
+
+### Reviewed evidence and direct dependencies
+
+1. C3 `FoamDecodeMaterialState(...)`, `FoamEncodeMaterialState(...)`, and `FoamClampPackedMaterialState(...)` currently force Coverage + Life Pattern to zero while retaining fractional Coverage and `C×L`.
+2. Automatic birth currently computes the same stable source Pattern used by the baseline but explicitly replaces it with zero for Coverage + Life. C3A keeps the baseline branch byte-equivalent and allows Coverage + Life to retain that already-computed visual Pattern.
+3. `FoamMergeBornMaterial(...)` already combines Pattern as an additive Coverage/Presence-weighted moment over newly added Coverage only. With implicit Presence `1`, its existing algebra naturally combines `C×Mvisual` without refreshing already occupied material.
+4. `FoamResolveInteriorFaceDonor(...)` already copies decoded donor Pattern and reconstructs Coverage only before re-encoding. Encoding `C×Mvisual` therefore transports Pattern coherently through the same accepted Bulk-Phase Residual TVD flux without a new solver or resource.
+5. C3 Final rendering currently overwrites decoded Pattern with `Hash(floor(RiverMetres×4))` both for the actual state mask and the projected Pattern footprint. Those fixed 0.25 m quantized tiles are the only C3-specific stationary Pattern authority and match the observed rectangular Final-only holes.
+6. The water Foam include has one shader consumer. C3A changes only Coverage + Life branches inside the shared include; baseline decode and mask logic remain unchanged.
+7. The C2B D3D11 definite-initialization correction remains required and is outside the edited branch logic.
+
+### Invariants
+
+- `C × P × L Baseline` remains serialized/default contract `0` and must remain behaviorally unchanged.
+- Coverage + Life remains contract `1` with fractional geometric Coverage and `C×L` lifecycle transport.
+- Presence remains implicit unit material under Coverage + Life; no weak/strong Foam authority is restored.
+- `Mvisual` is visual-only transported metadata. It must not affect Coverage conservation, lifecycle age/death, source eligibility, velocity, or material strength.
+- Birth overlap must continue to affect only genuinely newly added Coverage and must not refresh Life or Pattern on already occupied Coverage.
+- No stationary coordinate-quantized Pattern replacement remains in the Coverage + Life Final path.
+- Existing PatternedMask/Chipping/Strands algorithms are not retuned; they receive transported Pattern instead of a fixed River-space tile hash.
+- No new texture, buffer, kernel, dispatch, pass, readback, draw call, cache format, or per-frame rebuild.
+- No Ground, Shore velocity, obstacle routing/slowdown, topology, source scheduling, or baseline behavior changes.
+
+### Implementation sequence
+
+1. Update Coverage + Life encode/decode/clamp so blue stores and preserves `C×Mvisual`; leave baseline packing unchanged.
+2. Under Coverage + Life birth, retain the existing `EvaluateFoamMaterialPattern(...)` result instead of forcing Pattern to zero; preserve the existing no-refresh overlap path.
+3. Remove the C3-only stationary quantized Pattern overrides from Final rendering and projected Pattern-footprint evaluation so decoded/interpolated transported Pattern is used directly.
+4. Update the canonical architecture, dependency register, and roadmap to distinguish material authorities (`Coverage`, `Life`) from visual-only transported metadata (`Pattern`).
+5. Gate 4: exact-scope diff audit; verify baseline branches byte-equivalent where intended; verify no stationary C3 `floor(...*4)` Pattern override remains; verify no new GPU resources/kernels; shared-shader consumer audit; delimiter/preprocessor/static checks; record Unity validation pending.
+
+### Acceptance criteria
+
+1. Coverage + Life Material Coverage remains continuous/fractional through locations that previously showed Final-only rectangular holes.
+2. Coverage + Life Remaining Life remains positive where living Coverage exists and continues to age/death exactly as before C3A.
+3. Coverage + Life Final Foam no longer contains stationary rectangular holes that remain fixed while Foam passes through them.
+4. Visual breakup still moves/evolves with Foam rather than becoming a featureless solid Coverage mask.
+5. `C × P × L Baseline` Final Foam, Coverage, Presence, Life, Pattern, transport, Chipping, and Strands remain unchanged.
+6. No changes to Shore suppression, object routing/slowdown, source scheduling, Ground/corridor rendering, or surface coupling.
+7. Contract switching still clears incompatible persistent state.
+8. No C#/compute/shader errors or D3D11 definite-initialization warnings.
+
+### Risks and mitigations
+
+- **Pattern becomes a hidden material authority:** mitigate by restricting Pattern to blue packed metadata and render consumers; Coverage/Life remain the only C3 material/lifecycle authorities.
+- **Baseline drift in shared helpers:** mitigate by editing only Coverage + Life branches and auditing baseline branch text/behavior against pre-C3A source.
+- **Birth overlap refreshes visual identity:** existing added-Coverage-only merge is retained; repeated overlap with no added Coverage returns existing packed state unchanged.
+- **Transport moment incoherence:** encode/clamp/decode use `C×Mvisual` and donor reconstruction re-encodes the donor's decoded Pattern with reconstructed Coverage, matching the existing moment pattern used by the baseline.
+- **Shared shader regression:** audit the sole water-shader consumer and verify C3A removes only Coverage + Life hash overrides while leaving baseline resolution untouched.
+
+### Validation requirements
+
+Unity 6000.5.0f1 must validate clean import/compile, Coverage + Life Final-vs-Coverage-vs-Life behavior at a previously reproducible rectangular gap, and baseline parity. GPU profiling is not required to accept this correctness repair because C3A adds no resource, kernel, dispatch, or additional render sampling pass. Coverage + Life birth now executes the existing deterministic Material Pattern noise evaluation that the baseline already uses, only after a valid injected-Coverage/Life sample passes the source gate; broader C3 performance profiling remains pending after visual acceptance.
+
+### Gate 4 implementation and audit record
+
+Implemented differences are confined to Coverage + Life behavior plus canonical documentation:
+
+- Coverage + Life now encodes/decodes/clamps blue as the Coverage-weighted visual Pattern moment `C×Mvisual`; `Coverage`, `C×L`, and explicit Coverage alpha are unchanged.
+- Automatic source birth now retains the existing deterministic Pattern evaluation under Coverage + Life instead of forcing Pattern to zero. Baseline source Pattern evaluation is behaviorally unchanged.
+- The two Coverage + Life Final-render replacements that generated Pattern from `floor(RiverMetres×4)` are removed. Final mask evaluation and projected Pattern-footprint evaluation now consume the decoded/interpolated transported Pattern.
+- No PatternedMask, Chipping, Strands, Coverage, Remaining-Life, velocity, topology, source scheduling, Ground, or surface-coupling algorithm was retuned.
+
+Offline/static audit:
+
+- approved changed scope: 7 files; no create/delete/move/rename/serialized-asset change;
+- compute kernel list unchanged at 22; no new GPU resource declaration or dispatch path; Coverage + Life source birth gains the existing baseline Pattern-noise evaluation only for valid birth samples;
+- rejected `SimulateLifeOnlyFoam` remains absent;
+- stationary Coverage + Life `floor(...×4)` / `(17,29)` Pattern override: absent;
+- Coverage + Life compute decode/encode/clamp preserves `C×Mvisual`; render decode preserves the same moment;
+- simulation baseline decode and encode branches: byte-identical to pre-C3A;
+- render baseline decode branch: byte-identical to pre-C3A;
+- final HLSL/compute delimiter, preprocessor, and trailing-whitespace checks: PASS;
+- no `dxc`, `fxc`, Unity executable, or Unity Editor executable is available in the working environment, so shader import/compile and live runtime validation remain pending.
+
+Known wording limitation intentionally left outside the approved seven-file C3A scope: two pre-C3A Inspector/help strings still describe Coverage + Life Pattern as render-derived/shader-only. They do not affect runtime behavior. Correcting those strings requires a separate approved editor/source wording-only scope rather than broadening this correctness patch after implementation.
+
+
+
+# RIVER-FOAM-SPAWN-D9 — Unified Stroke/Head Reveal Kinematics
+
+**Status:** Gate 1 review complete; Gate 2 implementation plan recorded before production edits. Unity 6000.5.0f1 compile/import, Play Mode behavior, GPU raster validation, and timing validation remain pending.
+
+## Objective
+
+Replace the split automatic-source reveal implementations with one literal cell-space kinematics contract used by every automatic stroke/head recipe. `Reveal Speed (Cells/s)` becomes the sole runtime reveal-speed authority for Shore Ribbon, Inward Wash, Object Arc, Object Semi-Arc, Object Fleck, Free-Water Lace, Free-Water Cross-Lace, and Broken Filament/Torn. If a stroke path is `L` Foam cells long and its captured speed is `v` cells/s, its logical build duration is exactly `L / v`; changing `v` changes only reveal time, not the completed source geometry.
+
+The shared contract is:
+
+```text
+headDistanceCells(t) = clamp(v * t, 0, pathLengthCells)
+durationSeconds       = pathLengthCells / v
+```
+
+There is no family base metres-per-second speed, recipe speed multiplier, deterministic speed jitter, or material-update-duration floor in reveal kinematics. Material cadence may delay observation by at most one material update, but it never changes logical head speed or completed geometry.
+
+## User-observed failures addressed
+
+- Shore Ribbon heads visibly stutter/backtrack and do not respond proportionally to 1 versus 100 cells/s.
+- Lace/Cross-Lace sometimes appear near the requested speed and sometimes much slower/faster.
+- Object reveal is substantially slower than the authored cells/s control.
+- The same `Reveal Speed (Cells/s)` label currently fronts different runtime timing systems.
+
+## Gate 1 reviewed evidence
+
+1. The eight cell-speed controls are serialized and visible, but only Shore Ribbon/Inward Wash currently consume them in production timing. Object Arc/Semi-Arc/Fleck and all three Free-Water recipes still time themselves from legacy family metres-per-second speed plus recipe multiplier plus deterministic `0.90–1.10` jitter.
+2. `ResolveAutomaticRevealTiming(...)` currently computes `base m/s × pattern multiplier × jitter` and then clamps duration to at least one material update. This contradicts literal cells/s semantics.
+3. Object and Free-Water timing is resolved from legacy metric geometry before the D8 cell-authoritative body/head geometry is generated. Timing therefore measures a different path from the one rasterized.
+4. Object Arc/Semi-Arc GPU contact and wake heads reveal in parallel from one normalized progress, while CPU full-packet duration currently adds contact and wake distances as if traversed serially. This mathematically forces the visible heads below requested speed.
+5. Shore Ribbon has a separate CPU/GPU integer-head conversion and special every-tick dispatch path. Other recipes independently convert normalized progress into recipe-local moving intervals. No shared head-distance authority exists.
+6. `EvaluateFoamAutomaticSourceRasterSample(...)` uses current-minus-previous moving windows for non-Shore recipes. If one material update advances farther than the head window, high speeds can skip intervening geometry. D9 therefore changes source evaluators to cumulative revealed geometry plus current-head debug geometry; current-minus-previous cumulative permission then catches every crossed region independently of cadence.
+7. The current reveal-speed diagnostic reports the legacy metres-per-second contract and can PASS after merely capturing evidence; it does not prove literal cells/s behavior.
+8. Historical D8.2 staged all cell controls, D8.3A made Shore/Inward cell-authoritative, and D8.3B converted remaining recipe geometry without completing reveal-speed migration. D9 completes that migration instead of layering another recipe-specific timing path.
+
+## Approved implementation scope
+
+Modify only:
+
+- `Assets/Docs/River_Foam_Active_Blockers_and_Next_Patches.md`
+- `Assets/Docs/River_Foam_Stage6_Architecture.md`
+- `Assets/Docs/River_Foam_Fixed_Metric_Dependency_Register.md`
+- `Assets/Docs/River_Rendering_Roadmap.md`
+- `Assets/Game/Procedural/Rivers/StylizedRiver.cs`
+- `Assets/Game/Procedural/Rivers/Editor/StylizedRiverEditor.Foam.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.State.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.BirthEvents.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.Injection.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.SourceUnits.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.RevealSpeedDiagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.P7Diagnostics.cs`
+- `Assets/Game/Procedural/Rivers/StylizedRiverFoamRuntime.ShoreRibbonDiagnostics.cs`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.Structs.hlsl`
+- `Assets/Game/Rendering/Water/Resources/PS3DRiver/Compute/CS_RiverFoam.compute`
+
+Create: none. Delete: none. Move/rename: none. Serialized Unity assets: none. Layers/tags/components/dependencies: none.
+
+## Required architecture
+
+### 1. Shared CPU kinematics
+
+One resolver accepts only `pathLengthCells` and `speedCellsPerSecond` and returns exact duration. One head-distance resolver computes `speed × elapsed`, clamped to the current stroke path. Every recipe snapshots its visible cell-speed control when the event is born and uses these helpers. Existing events do not retime when Inspector values change.
+
+### 2. Cell-space path length is the timing authority
+
+- Shore Ribbon: resolved discrete ribbon length in cells.
+- Inward Wash: deterministic cell-space arc length of the same bent path rasterized on GPU.
+- Object Fleck: resolved body length in cells.
+- Object Arc: contact-profile stroke and both wake arms advance concurrently at the same speed; initial stroke path length is the longest concurrently active component.
+- Object Semi-Arc: selected contact half-profile and selected wake arm advance concurrently; initial path length is the longer component.
+- Object later contact-only/reinforcement strokes: selected contact path only.
+- Lace, Cross-Lace, Broken Filament/Torn: deterministic cell-space arc length of the same seven-segment bent path approximation used by the GPU.
+
+Bent-path length must be calculated once at event creation using the same deterministic fixed subdivision as the GPU; no per-frame CPU curve integration or new persistent resource is allowed.
+
+### 3. Shared GPU reveal state
+
+The existing fixed eight-`float4` / 128-byte event ABI is retained. The universal current/previous reveal lanes carry **head distance in cells**, not normalized progress. Normalized recipe parameters may be derived locally only when geometry requires them; they are never timing authority.
+
+A shared reveal-window helper clamps current head distance, tail distance, and stroke length. All source evaluators consume cell-distance reveal state.
+
+### 4. Cadence-independent catch-up
+
+Recipe evaluators return the **cumulative revealed geometry from path start to current head** plus a current-head-only debug shape. Current-minus-previous cumulative permission therefore emits every newly crossed spatial region even when one material update advances many cells. Final completed geometry for a fixed recipe/seed must be invariant under reveal speed and update cadence.
+
+Shore Ribbon retains its one-cell-wide discrete source identity, but uses the same head-distance kinematics. Completed path cells are derived from head distance; Bulk-Phase/storage mapping occurs only after logical path progression and cannot move the logical head backward.
+
+### 5. Object multi-stroke boundary catch-up
+
+An update may cross an Object initial/contact-stroke boundary at high speed. Dispatch must split that elapsed interval at crossed stroke boundaries so the end of one stroke and beginning of the next are both rasterized. No stroke geometry may be skipped merely because a material tick spans a phase transition. The existing maximum finite stroke count remains unchanged.
+
+### 6. Legacy speed authorities become tombstones
+
+Existing serialized family metres-per-second fields and per-pattern formation-speed multipliers remain serialized for compatibility in D9 but have zero production reveal-timing consumers. The custom Inspector stops exposing the misleading Object `Base Reveal Speed`. Stale staged-cell help/comments are corrected. Removal of tombstone fields is deferred to a separate cleanup after repository-wide proof that no migration consumer remains.
+
+## Invariants / non-goals
+
+- Do not modify either material contract, persistent Foam packing, transport, lifecycle, Chipping, Strands, Final Foam, or Coverage/Life behavior.
+- Do not modify Shore lateral/downstream velocity suppression, object routing/slowdown, obstacle topology, Ground/corridor, Weather, source population frequency, Activity/Coverage scheduling, packet-gap semantics, or source material birth values.
+- Do not add a texture, buffer, kernel, dispatch pass, readback, draw call, cache format, scene/prefab/material/profile change, or per-frame full-field process.
+- Preserve the fixed GPU event record size.
+- Preserve each recipe's completed spatial pattern for a fixed seed/settings; D9 changes reveal progression only. The only geometry-side calculation change permitted is measuring the already-authored bent/contact path in cell-space so timing matches the geometry being revealed.
+- High reveal speed may cause more than one crossed cell/segment to be emitted in one existing raster update; it must not change the final footprint.
+
+## File-by-file implementation sequence
+
+1. This active plan — freeze D9 contract, evidence, exact scope, invariants, risks, and validation before source edits.
+2. River authoring/editor — make existing eight cells/s controls explicitly authoritative, remove misleading legacy speed UI, and correct stale staged-cell descriptions without changing serialized defaults.
+3. Runtime state/event ABI comments — replace metre/progress timing telemetry with cell-distance/speed semantics while retaining the event-record stride.
+4. Birth-event preparation — centralize exact `L / v` timing, resolve recipe cell geometry before timing, calculate deterministic bent/contact path lengths, remove hidden speed jitter/multipliers/floors, and snapshot one recipe cells/s value per event.
+5. Injection/source-unit packing — pack current/previous head distance in cells, split Object elapsed intervals across crossed stroke boundaries, and remove Shore-specific normalized-progress timing authority.
+6. Compute source rasterization — add shared cell-distance reveal helpers; convert all eight recipe evaluators to cumulative reveal plus current-head debug geometry; preserve one-cell Shore identity and existing recipe shapes; keep current-minus-previous as the common newly-revealed permission contract.
+7. Diagnostics — migrate P7/Shore fixtures to head-distance semantics and replace the Reveal Speed report with literal cells/s assertions covering all eight recipes, representative lengths/speeds/update rates, monotonic head motion, catch-up, Object concurrent-head timing, and completed-footprint invariance criteria.
+8. Architecture/dependency/roadmap documents — supersede the old P12u metre-based reveal contract with D9 and record zero-resource/performance expectations.
+9. Gate 4 — audit exact changed scope; re-read the complete review surface; prove old speed authorities have zero production timing consumers; verify ABI stride/kernel/resource counts; compare protected material/transport/lifecycle/velocity/Ground code with pre-D9; run delimiter/preprocessor/static contract checks and every available compile/shader test; leave Unity-only checks explicitly pending.
+
+## Risks and mitigations
+
+1. **High-speed skipped geometry.** Mitigation: cumulative current/previous source geometry, not moving-window subtraction.
+2. **Object phase-boundary loss.** Mitigation: split a material-tick elapsed interval at each crossed finite stroke boundary before raster dispatch.
+3. **Bent-path speed drift.** Mitigation: CPU and GPU use the same fixed seven-point polyline definition for path distance.
+4. **Shore storage-phase jitter.** Mitigation: logical head distance is independent of Bulk Phase; storage mapping is performed only after path-cell identity is resolved.
+5. **Geometry drift while centralizing.** Mitigation: retain recipe point/width/bend formulas and compare final completed footprints/critical evaluator bodies against pre-D9.
+6. **Serialized migration risk.** Mitigation: retain old metric speed fields/multipliers as hidden runtime-unused tombstones in D9; do not raw-edit serialized assets.
+7. **Runtime cost.** Mitigation: no new persistent resources or full-field work; fixed seven-segment path length is event-creation CPU work; cumulative geometry reuses existing bounded source dispatches; extra Object buffer upload/dispatch occurs only when one material update crosses a finite stroke boundary.
+
+## Acceptance criteria
+
+1. Every visible automatic-source `Reveal Speed (Cells/s)` control is a production timing authority and no hidden speed modifier participates.
+2. For any stroke: `duration = pathLengthCells / revealSpeedCellsPerSecond` before cadence observation. Explicit assertion: 15 cells at 1 cell/s = 15 s; 15 cells at 5 cells/s = 3 s; 15 cells at 100 cells/s = 0.15 s.
+3. Logical head distance is monotonic and advances by requested cells/s until clamped at path end.
+4. A material update that crosses N path cells/segments emits all crossed geometry; no reveal hole appears because speed exceeds cadence.
+5. Fixed seed/settings produce the same completed source footprint at 1, 5, and 100 cells/s.
+6. Arc/Semi-Arc contact and wake heads each advance at the same requested cells/s while concurrent; later contact strokes use the same speed.
+7. Shore Ribbon logical progression never reverses; 1 versus 100 cells/s differs only in elapsed build time/catch-up quantity.
+8. `C × P × L Baseline`, `Coverage + Life`, transport/lifecycle, B1/B1A Shore velocity suppression, Ground/corridor, packet population scheduling, and final rendering remain behaviorally unchanged.
+9. No new GPU resource/kernel/pass/full-field process and no event ABI stride increase.
+
+## Validation plan
+
+### Offline/static
+
+- Exact changed-file set equals the approved 15-file scope.
+- Repository-wide search: old family metres-per-second speed getters and recipe formation-speed multipliers have zero production reveal-timing consumers.
+- All eight cells/s getters have production consumers.
+- Event GPU record remains eight `float4` lanes / 128 bytes; compute kernel/resource declaration counts unchanged.
+- Shared CPU timing assertions cover 15/1, 15/5, and 15/100 examples plus representative 3/8/15/31-cell lengths at 1/2/5/10/100 cells/s.
+- CPU/HLSL braces, parentheses, brackets, and preprocessor directives balance.
+- Protected C3/C3A material/transport/lifecycle and B1/B1A velocity files/functions compare unchanged outside approved shared automatic-source raster code.
+
+### Unity / Play Mode pending
+
+- Clean C# and compute/shader import with no D3D11 initialization warnings.
+- Run the automatic Reveal Speed diagnostic and require every recipe/matrix assertion to PASS.
+- Visually test Shore Ribbon, Lace/Cross-Lace, Object Arc/Semi-Arc/Fleck at low and high cells/s: same completed pattern, proportional completion time, no visible backtracking, no cadence holes.
+- Re-run Cell-Exact/P7 and Shore Ribbon suites for source-geometry and one-cell Shore regression coverage.
+- Profile the automatic-source raster pass under representative active-event counts; no performance acceptance claim until measured.
+
+### D9 Gate 3 implementation record
+
+Implemented source behavior:
+
+- one CPU reveal-kinematics authority now resolves `pathLengthCells`, captured `speedCellsPerSecond`, exact logical duration `L/v`, and monotonic `v×t` head distance for every automatic recipe;
+- all eight visible recipe cells/s controls route through the same speed resolver; legacy family m/s values and formation-speed multipliers remain serialized compatibility tombstones with zero production timing consumers;
+- Shore Ribbon uses authored path cells; Inward Wash and Free-Water bent recipes use matching deterministic seven-point/six-segment cell-space path length; Fleck uses body length; Object contact uses the authored contact-profile distance in cells;
+- initial Object Arc/Semi contact and wake components advance concurrently from the same captured head distance, with initial duration based on the longest concurrent component; later finite/reinforcement strokes use contact-only path length at the same captured speed;
+- the existing fixed event ABI carries current/previous head distance in cells instead of normalized reveal progress; no ABI lane or stride was added;
+- all GPU automatic-source recipes route through the shared reveal-window contract and the common automatic-source shape dispatcher; cumulative current-minus-previous permission emits every newly crossed region;
+- Shore's bespoke normalized head-index resolver and repeated-head timing exception are removed; crossed discrete Shore path cells are resolved from shared head distance and included in the bounded source dispatch range;
+- Object updates that cross one or more finite-stroke phase boundaries split the existing source raster into bounded phase slices so no phase geometry is skipped;
+- the Reveal Speed report now validates literal cells/s kinematics, representative 3/8/15/31-cell lengths, 1/2/5/10/100 cells/s, 8/12/16 Hz observation cadence, monotonicity, exact head position, completion, active-event duration, and the explicit 15/1, 15/5, and 15/100 examples;
+- P7 and Shore diagnostics are migrated to cell-distance event state; Inspector wording removes the misleading Object base-speed control and marks old metric speed fields as compatibility-only.
+
+D9 does not change either material contract, persistent state packing, transport/lifecycle, final Foam, Chipping/Strands, canonical velocity, B1/B1A Shore suppression, object routing/slowdown, Ground/corridor behavior, source population policy, packet-gap rules, or source material birth values.
+
+### D9 Gate 4 audit record
+
+Offline/static audit: **139/139 PASS**.
+
+Verified:
+
+- final diff matches the approved 15-file scope exactly; no create/delete/move/rename or serialized Unity asset change;
+- all eight cells/s getters are present in the universal production speed resolver;
+- all legacy family m/s getters and recipe speed multipliers have zero production runtime timing consumers;
+- the misleading Object `Base Reveal Speed` UI is absent and exactly eight `Reveal Speed (Cells/s)` controls remain;
+- universal CPU `duration=L/v` and `head=v×t` contracts are present, including hard 15-cell assertions at 1, 5, and 100 cells/s;
+- current/previous GPU reveal state is head distance in cells; no automatic recipe samples `Header.z` as normalized progress;
+- Shore, Inward, Object-contact, Fleck, Lace, Cross-Lace, and Torn/Broken paths all reach the shared GPU reveal-window contract;
+- CPU and GPU bent-path subdivisions both use seven points / six segments;
+- Object initial duration uses the longest concurrently active contact/wake component, contact-only phases suppress wake rasterization, and crossed phase boundaries use bounded slice dispatch;
+- Shore dispatch range includes every newly completed path cell and the old bespoke Shore head-index resolver is absent;
+- CPU and HLSL event records remain eight vector lanes / analytically 128 bytes;
+- compute kernel pragma count remains 22; RW/resource declaration counts are unchanged; no new GPU resource is declared;
+- protected material simulation, Motion/velocity, lifecycle, binding, water Final-Foam include/shader, and Ground source compare byte-identical to pre-D9;
+- all superseded metre/progress event timing symbols are absent repository-wide;
+- D9 is recorded in the active plan, Stage6 architecture, fixed-metric dependency register, and rendering roadmap;
+- every changed code/shader file passes comment/string-aware delimiter checks, C# preprocessor balance where applicable, and trailing-whitespace checks; all four changed Markdown documents have balanced fences.
+
+Available compiler/tool check: no Unity executable, C# compiler, `dxc`, or `fxc` is available in the working environment. Therefore Unity 6000.5.0f1 C# compilation, compute/shader import, Play Mode reveal behavior, P7/Shore live diagnostics, and runtime profiling remain **pending**, not passed.
+
+Performance expectation remains analytic until Unity profiling: D9 adds no persistent GPU resource, kernel, or full-field process. Six-segment bent-path evaluation replaces recipe-local normalized reveal math inside existing bounded automatic-source raster work; extra Object source-raster dispatches occur only on an update that crosses finite stroke boundaries. No runtime performance claim is accepted before profiling.

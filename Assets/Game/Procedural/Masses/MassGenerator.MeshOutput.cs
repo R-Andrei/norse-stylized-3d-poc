@@ -1328,12 +1328,618 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 meshData.AddTriangle(indexA, indexB, indexC);
             }
 
+            // GM-SURFACE.5S4: compile one deterministic signed tonal identity
+            // per logical planar face before the existing material-mask
+            // inheritance pass. UV2.w is carried unchanged by that pass, so
+            // the generated face identity remains an immutable mesh-local
+            // readability field rather than a material or lighting heuristic.
+            CompileGeneratedMassFaceTonePalette(
+                meshData,
+                recipe.SurfaceSeed);
+
             BeginBevelShadingMaskCompilationDiagnostics(soup, meshData);
             InheritGeneratedFaceMaterialMasks(soup, meshData);
             CaptureFinalBevelShadingTriangles(soup, meshData);
             ValidateGeneratedMassMeshData(meshData);
             CompleteBevelShadingDiagnosticMeshBuild(meshData, true);
             return meshData;
+        }
+
+        private sealed class GeneratedMassFaceToneGroup
+        {
+            public readonly int FirstTriangleIndex;
+            public readonly bool IsConvexTransition;
+            public readonly HashSet<int> Neighbours = new HashSet<int>();
+            public readonly HashSet<int> ToneNeighbours = new HashSet<int>();
+            public double Area;
+            public bool Assigned;
+            public float BaseTone;
+            public float FinalTone;
+
+            public GeneratedMassFaceToneGroup(
+                int firstTriangleIndex,
+                bool isConvexTransition)
+            {
+                FirstTriangleIndex = firstTriangleIndex;
+                IsConvexTransition = isConvexTransition;
+            }
+        }
+
+        private static void CompileGeneratedMassFaceTonePalette(
+            MeshData meshData,
+            int surfaceSeed)
+        {
+            if (meshData == null)
+            {
+                throw new ArgumentNullException(nameof(meshData));
+            }
+
+            int triangleCount = meshData.Triangles.Count / 3;
+            if (triangleCount <= 0)
+            {
+                return;
+            }
+
+            const float coplanarNormalDotThreshold = 0.9999f;
+            var triangleNormals = new Vector3[triangleCount];
+            var triangleAreas = new double[triangleCount];
+            var triangleConvexTransitions = new bool[triangleCount];
+            var parents = new int[triangleCount];
+            var edgeOwners = new Dictionary<EdgeKey, List<int>>(
+                triangleCount * 3);
+
+            for (int triangleIndex = 0;
+                 triangleIndex < triangleCount;
+                 triangleIndex++)
+            {
+                parents[triangleIndex] = triangleIndex;
+                int triangleOffset = triangleIndex * 3;
+                int ia = meshData.Triangles[triangleOffset];
+                int ib = meshData.Triangles[triangleOffset + 1];
+                int ic = meshData.Triangles[triangleOffset + 2];
+
+                if (!TryNormalizeMassVector(
+                        meshData.Normals[ia] +
+                        meshData.Normals[ib] +
+                        meshData.Normals[ic],
+                        out Vector3 triangleNormal))
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass face-tone compilation found an " +
+                        "invalid triangle render normal at triangle " +
+                        triangleIndex + ".");
+                }
+
+                Vector3 a = meshData.Vertices[ia];
+                Vector3 b = meshData.Vertices[ib];
+                Vector3 c = meshData.Vertices[ic];
+                Vector3 cross = Vector3.Cross(b - a, c - a);
+                double area = 0.5 * cross.magnitude;
+                if (!(area > 0.0) ||
+                    double.IsNaN(area) ||
+                    double.IsInfinity(area))
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass face-tone compilation found an " +
+                        "invalid triangle area at triangle " +
+                        triangleIndex + ".");
+                }
+
+                triangleNormals[triangleIndex] = triangleNormal;
+                triangleAreas[triangleIndex] = area;
+                triangleConvexTransitions[triangleIndex] =
+                    IsGeneratedMassConvexBoundaryTransition(
+                        meshData.SurfaceFeatures[ia]);
+                AddGeneratedMassFaceToneEdgeOwner(
+                    edgeOwners,
+                    a,
+                    b,
+                    triangleIndex);
+                AddGeneratedMassFaceToneEdgeOwner(
+                    edgeOwners,
+                    b,
+                    c,
+                    triangleIndex);
+                AddGeneratedMassFaceToneEdgeOwner(
+                    edgeOwners,
+                    c,
+                    a,
+                    triangleIndex);
+            }
+
+            foreach (KeyValuePair<EdgeKey, List<int>> pair in edgeOwners)
+            {
+                List<int> owners = pair.Value;
+                for (int first = 0; first < owners.Count; first++)
+                {
+                    for (int second = first + 1;
+                         second < owners.Count;
+                         second++)
+                    {
+                        int firstTriangle = owners[first];
+                        int secondTriangle = owners[second];
+                        float normalDot = Vector3.Dot(
+                            triangleNormals[firstTriangle],
+                            triangleNormals[secondTriangle]);
+                        if (normalDot >= coplanarNormalDotThreshold &&
+                            triangleConvexTransitions[firstTriangle] ==
+                                triangleConvexTransitions[secondTriangle])
+                        {
+                            UnionGeneratedMassFaceToneTriangles(
+                                parents,
+                                firstTriangle,
+                                secondTriangle);
+                        }
+                    }
+                }
+            }
+
+            var groups = new List<GeneratedMassFaceToneGroup>();
+            var groupIndexByRoot = new Dictionary<int, int>();
+            var triangleGroupIndices = new int[triangleCount];
+            for (int triangleIndex = 0;
+                 triangleIndex < triangleCount;
+                 triangleIndex++)
+            {
+                int root = FindGeneratedMassFaceToneRoot(
+                    parents,
+                    triangleIndex);
+                if (!groupIndexByRoot.TryGetValue(
+                        root,
+                        out int groupIndex))
+                {
+                    groupIndex = groups.Count;
+                    groupIndexByRoot.Add(root, groupIndex);
+                    groups.Add(
+                        new GeneratedMassFaceToneGroup(
+                            triangleIndex,
+                            triangleConvexTransitions[triangleIndex]));
+                }
+
+                triangleGroupIndices[triangleIndex] = groupIndex;
+                groups[groupIndex].Area += triangleAreas[triangleIndex];
+            }
+
+            foreach (KeyValuePair<EdgeKey, List<int>> pair in edgeOwners)
+            {
+                List<int> owners = pair.Value;
+                for (int first = 0; first < owners.Count; first++)
+                {
+                    int firstGroup = triangleGroupIndices[owners[first]];
+                    for (int second = first + 1;
+                         second < owners.Count;
+                         second++)
+                    {
+                        int secondGroup = triangleGroupIndices[owners[second]];
+                        if (firstGroup == secondGroup)
+                        {
+                            continue;
+                        }
+
+                        groups[firstGroup].Neighbours.Add(secondGroup);
+                        groups[secondGroup].Neighbours.Add(firstGroup);
+                    }
+                }
+            }
+
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                if (group.IsConvexTransition)
+                {
+                    continue;
+                }
+
+                foreach (int neighbourIndex in group.Neighbours)
+                {
+                    GeneratedMassFaceToneGroup neighbour =
+                        groups[neighbourIndex];
+                    if (!neighbour.IsConvexTransition)
+                    {
+                        group.ToneNeighbours.Add(neighbourIndex);
+                        continue;
+                    }
+
+                    foreach (int bridgedIndex in neighbour.Neighbours)
+                    {
+                        if (bridgedIndex == groupIndex ||
+                            groups[bridgedIndex].IsConvexTransition)
+                        {
+                            continue;
+                        }
+                        group.ToneNeighbours.Add(bridgedIndex);
+                    }
+                }
+            }
+
+            var assignmentOrder = new List<int>(groups.Count);
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                if (!groups[groupIndex].IsConvexTransition)
+                {
+                    assignmentOrder.Add(groupIndex);
+                }
+            }
+            assignmentOrder.Sort(
+                (leftIndex, rightIndex) =>
+                {
+                    GeneratedMassFaceToneGroup left = groups[leftIndex];
+                    GeneratedMassFaceToneGroup right = groups[rightIndex];
+                    int degreeCompare = right.ToneNeighbours.Count.CompareTo(
+                        left.ToneNeighbours.Count);
+                    if (degreeCompare != 0)
+                    {
+                        return degreeCompare;
+                    }
+
+                    int areaCompare = right.Area.CompareTo(left.Area);
+                    if (areaCompare != 0)
+                    {
+                        return areaCompare;
+                    }
+
+                    return left.FirstTriangleIndex.CompareTo(
+                        right.FirstTriangleIndex);
+                });
+
+            for (int orderIndex = 0;
+                 orderIndex < assignmentOrder.Count;
+                 orderIndex++)
+            {
+                int groupIndex = assignmentOrder[orderIndex];
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                int startPaletteIndex = Mathf.Clamp(
+                    Mathf.FloorToInt(
+                        Hash01(
+                            surfaceSeed,
+                            group.FirstTriangleIndex) * 5f),
+                    0,
+                    4);
+                float bestScore = -1f;
+                float bestTone = 0f;
+                for (int paletteOffset = 0;
+                     paletteOffset < 5;
+                     paletteOffset++)
+                {
+                    int paletteIndex =
+                        (startPaletteIndex + paletteOffset) % 5;
+                    float candidateTone =
+                        ResolveGeneratedMassFaceTonePaletteValue(
+                            paletteIndex);
+                    bool hasAssignedNeighbour = false;
+                    float minimumDistance = 2f;
+                    foreach (int neighbourIndex in group.ToneNeighbours)
+                    {
+                        GeneratedMassFaceToneGroup neighbour =
+                            groups[neighbourIndex];
+                        if (!neighbour.Assigned)
+                        {
+                            continue;
+                        }
+
+                        hasAssignedNeighbour = true;
+                        minimumDistance = Mathf.Min(
+                            minimumDistance,
+                            Mathf.Abs(
+                                candidateTone - neighbour.BaseTone));
+                    }
+
+                    float score = hasAssignedNeighbour
+                        ? minimumDistance
+                        : 0f;
+                    if (score > bestScore + 0.000001f)
+                    {
+                        bestScore = score;
+                        bestTone = candidateTone;
+                    }
+                }
+
+                group.BaseTone = bestTone;
+                group.Assigned = true;
+            }
+
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                if (!group.IsConvexTransition)
+                {
+                    continue;
+                }
+
+                float neighbourToneSum = 0f;
+                int neighbourToneCount = 0;
+                foreach (int neighbourIndex in group.Neighbours)
+                {
+                    GeneratedMassFaceToneGroup neighbour =
+                        groups[neighbourIndex];
+                    if (neighbour.IsConvexTransition || !neighbour.Assigned)
+                    {
+                        continue;
+                    }
+                    neighbourToneSum += neighbour.BaseTone;
+                    neighbourToneCount++;
+                }
+
+                group.BaseTone = neighbourToneCount > 0
+                    ? neighbourToneSum / neighbourToneCount
+                    : 0f;
+                group.Assigned = true;
+            }
+
+            double totalArea = 0.0;
+            double weightedToneSum = 0.0;
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                totalArea += group.Area;
+                weightedToneSum += group.Area * group.BaseTone;
+            }
+            if (!(totalArea > 0.0) ||
+                double.IsNaN(totalArea) ||
+                double.IsInfinity(totalArea))
+            {
+                throw new InvalidOperationException(
+                    "Generated mass face-tone compilation produced an " +
+                    "invalid total logical-face area.");
+            }
+
+            float weightedMean = (float)(weightedToneSum / totalArea);
+            float maximumMagnitude = 0f;
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                maximumMagnitude = Mathf.Max(
+                    maximumMagnitude,
+                    Mathf.Abs(
+                        groups[groupIndex].BaseTone - weightedMean));
+            }
+            float recenterScale = maximumMagnitude > 1f
+                ? 1f / maximumMagnitude
+                : 1f;
+
+            double finalWeightedToneSum = 0.0;
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                group.FinalTone = Mathf.Clamp(
+                    (group.BaseTone - weightedMean) * recenterScale,
+                    -1f,
+                    1f);
+                finalWeightedToneSum += group.Area * group.FinalTone;
+            }
+
+            double finalWeightedMean =
+                finalWeightedToneSum / totalArea;
+            if (double.IsNaN(finalWeightedMean) ||
+                double.IsInfinity(finalWeightedMean) ||
+                Math.Abs(finalWeightedMean) > 0.0001)
+            {
+                throw new InvalidOperationException(
+                    "Generated mass face-tone compilation failed its " +
+                    "area-weighted zero-mean contract. mean=" +
+                    finalWeightedMean.ToString("R") + ".");
+            }
+
+            for (int triangleIndex = 0;
+                 triangleIndex < triangleCount;
+                 triangleIndex++)
+            {
+                float faceTone = groups[
+                    triangleGroupIndices[triangleIndex]].FinalTone;
+                int triangleOffset = triangleIndex * 3;
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int vertexIndex =
+                        meshData.Triangles[triangleOffset + corner];
+                    Vector4 uv2 = meshData.UV2[vertexIndex];
+                    uv2.w = faceTone;
+                    meshData.UV2[vertexIndex] = uv2;
+                }
+            }
+
+            ValidateGeneratedMassFaceToneCompilation(
+                meshData,
+                triangleGroupIndices,
+                groups,
+                finalWeightedMean);
+        }
+
+        private static bool IsGeneratedMassConvexBoundaryTransition(
+            Vector4 packedSurfaceFeatures)
+        {
+            bool primary =
+                Mathf.RoundToInt(packedSurfaceFeatures.x) ==
+                    (int)MassSurfaceFeatureType.ConvexBoundary &&
+                packedSurfaceFeatures.y > 0.0001f;
+            bool secondary =
+                Mathf.RoundToInt(packedSurfaceFeatures.z) ==
+                    (int)MassSurfaceFeatureType.ConvexBoundary &&
+                packedSurfaceFeatures.w > 0.0001f;
+            return primary || secondary;
+        }
+
+        private static void AddGeneratedMassFaceToneEdgeOwner(
+            Dictionary<EdgeKey, List<int>> edgeOwners,
+            Vector3 start,
+            Vector3 end,
+            int triangleIndex)
+        {
+            EdgeKey key = new EdgeKey(start, end);
+            if (!edgeOwners.TryGetValue(key, out List<int> owners))
+            {
+                owners = new List<int>(2);
+                edgeOwners.Add(key, owners);
+            }
+            owners.Add(triangleIndex);
+        }
+
+        private static int FindGeneratedMassFaceToneRoot(
+            int[] parents,
+            int triangleIndex)
+        {
+            int root = triangleIndex;
+            while (parents[root] != root)
+            {
+                root = parents[root];
+            }
+
+            while (parents[triangleIndex] != triangleIndex)
+            {
+                int next = parents[triangleIndex];
+                parents[triangleIndex] = root;
+                triangleIndex = next;
+            }
+            return root;
+        }
+
+        private static void UnionGeneratedMassFaceToneTriangles(
+            int[] parents,
+            int firstTriangle,
+            int secondTriangle)
+        {
+            int firstRoot = FindGeneratedMassFaceToneRoot(
+                parents,
+                firstTriangle);
+            int secondRoot = FindGeneratedMassFaceToneRoot(
+                parents,
+                secondTriangle);
+            if (firstRoot == secondRoot)
+            {
+                return;
+            }
+
+            if (firstRoot < secondRoot)
+            {
+                parents[secondRoot] = firstRoot;
+            }
+            else
+            {
+                parents[firstRoot] = secondRoot;
+            }
+        }
+
+        private static float ResolveGeneratedMassFaceTonePaletteValue(
+            int paletteIndex)
+        {
+            return paletteIndex switch
+            {
+                0 => -1f,
+                1 => -0.5f,
+                2 => 0f,
+                3 => 0.5f,
+                4 => 1f,
+                _ => 0f
+            };
+        }
+
+        private static void ValidateGeneratedMassFaceToneCompilation(
+            MeshData meshData,
+            int[] triangleGroupIndices,
+            List<GeneratedMassFaceToneGroup> groups,
+            double weightedMean)
+        {
+            if (meshData == null ||
+                triangleGroupIndices == null ||
+                groups == null ||
+                triangleGroupIndices.Length !=
+                    meshData.Triangles.Count / 3 ||
+                Math.Abs(weightedMean) > 0.0001)
+            {
+                throw new InvalidOperationException(
+                    "Generated mass face-tone compilation state is invalid.");
+            }
+
+            int triangleCount = meshData.Triangles.Count / 3;
+            for (int triangleIndex = 0;
+                 triangleIndex < triangleCount;
+                 triangleIndex++)
+            {
+                int groupIndex = triangleGroupIndices[triangleIndex];
+                if (groupIndex < 0 || groupIndex >= groups.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass face-tone triangle has an invalid " +
+                        "logical group at triangle " + triangleIndex + ".");
+                }
+
+                float expectedTone = groups[groupIndex].FinalTone;
+                if (!IsFiniteMassValue(expectedTone) ||
+                    expectedTone < -1.0001f ||
+                    expectedTone > 1.0001f)
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass logical face tone is outside the " +
+                        "signed channel contract at group " + groupIndex + ".");
+                }
+
+                int triangleOffset = triangleIndex * 3;
+                for (int corner = 0; corner < 3; corner++)
+                {
+                    int vertexIndex =
+                        meshData.Triangles[triangleOffset + corner];
+                    float actualTone = meshData.UV2[vertexIndex].w;
+                    if (!IsFiniteMassValue(actualTone) ||
+                        Mathf.Abs(actualTone - expectedTone) > 0.000001f)
+                    {
+                        throw new InvalidOperationException(
+                            "Generated mass face-tone channel is not " +
+                            "constant across logical face triangle " +
+                            triangleIndex + ".");
+                    }
+                }
+            }
+
+            for (int groupIndex = 0;
+                 groupIndex < groups.Count;
+                 groupIndex++)
+            {
+                GeneratedMassFaceToneGroup group = groups[groupIndex];
+                if (!group.IsConvexTransition)
+                {
+                    continue;
+                }
+
+                bool hasNonConvexNeighbour = false;
+                float minimumNeighbourTone = float.PositiveInfinity;
+                float maximumNeighbourTone = float.NegativeInfinity;
+                foreach (int neighbourIndex in group.Neighbours)
+                {
+                    GeneratedMassFaceToneGroup neighbour =
+                        groups[neighbourIndex];
+                    if (neighbour.IsConvexTransition)
+                    {
+                        continue;
+                    }
+                    hasNonConvexNeighbour = true;
+                    minimumNeighbourTone = Mathf.Min(
+                        minimumNeighbourTone,
+                        neighbour.FinalTone);
+                    maximumNeighbourTone = Mathf.Max(
+                        maximumNeighbourTone,
+                        neighbour.FinalTone);
+                }
+
+                if (hasNonConvexNeighbour &&
+                    (group.FinalTone < minimumNeighbourTone - 0.0001f ||
+                     group.FinalTone > maximumNeighbourTone + 0.0001f))
+                {
+                    throw new InvalidOperationException(
+                        "Generated mass convex transition face tone escaped " +
+                        "its adjacent non-convex tonal envelope at group " +
+                        groupIndex + ".");
+                }
+            }
         }
 
         private static void CaptureFinalBevelShadingTriangles(
@@ -1844,6 +2450,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     !IsFiniteMassValue(uv2.y) ||
                     !IsFiniteMassValue(uv2.z) ||
                     !IsFiniteMassValue(uv2.w) ||
+                    uv2.w < -1.0001f ||
+                    uv2.w > 1.0001f ||
                     !IsValidPackedSurfaceFeaturePair(surfaceFeatures))
                 {
                     throw new InvalidOperationException(
@@ -2056,11 +2664,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         // A = generated convex edge-wear strength on actual bevel/chamfer faces only.
         //     It mirrors UV2.z for inspection/backward compatibility.
         //
-        // UV2 material contract:
+        // UV2 material contract for Generated Mass:
         // X = reserved for future concave crease or selected crack-darkening strength.
         // Y = dirty deposit / mineral stain area mask.
         // Z = generated convex edge-wear strength on actual bevel/chamfer faces.
-        // W = reserved for future concave crease localization data.
+        // W = GM-SURFACE.5S4 signed logical-face tone in [-1,+1]. Zero is
+        //     neutral/backward-compatible. Ground owns a separate UV2 contract.
         //
         // Line-like features need a later line/overlay or per-edge representation.
         // Broad area features remain safe as vertex/interpolated masks.

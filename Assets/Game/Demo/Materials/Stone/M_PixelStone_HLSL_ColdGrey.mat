@@ -57,17 +57,17 @@ Material:
     - _EdgeDarkenStrength: 0.012
     - _EdgeDarkenPower: 2.5
     - _FlatNormalStrength: 0
-    - _PixelBroadVariation: 0.026
+    - _PixelBroadVariation: 0
     - _PixelCellSize: 0.058
     - _PixelClusterStrength: 0.591
     - _PixelEffectStrength: 1
     - _PixelSeed: 906
     - _PixelToneCount: 3.89
-    - _PixelVariation: 0.062
-    - _PixelVertexVariation: 0.10
-    - _PixelWarpStrength: 0.18
+    - _PixelVariation: 0.057
+    - _PixelVertexVariation: 0.09
+    - _PixelWarpStrength: 0
     - _ProfileContrast: 1.05
-    - _ProfilePixelContrast: 1.05
+    - _ProfilePixelContrast: 1
     - _ReceiveShadows: 1
     - _Smoothness: 0.2
     - _SpecularStrength: 0.04

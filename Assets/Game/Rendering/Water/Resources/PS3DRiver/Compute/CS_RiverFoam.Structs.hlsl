@@ -1,15 +1,17 @@
 
 struct FoamSourceEventData
 {
-    // x = source type, y = side sign except Object Arc/Semi-Arc deposition
-    // phase (Build = 0), z = reveal progress, w = shape seed.
+    // x = source type, y = side sign except Object Arc/Semi-Arc finite
+    // stroke phase (initial = 0), z = current reveal-head distance in Foam
+    // cells, w = shape seed.
     float4 header;
     // x/y = start/end storage global except Object Arc/Semi-Arc point 0;
     // z = centre storage global; w = flow direction except Object Arc/Semi-Arc point 1.x.
     float4 distance;
-    // x = shore offset cells for D8 Shore/Inward except Object Arc/Semi-Arc point 1.y; y = width metres
-    // except Shore Ribbon thickness cells and Object Arc/Semi-Arc wake-arm length;
-    // z = inward reach cells for D8 Inward Wash or Arc/Semi-Arc normalized material-step duration; w = feather or point 2.x.
+    // x = shore offset cells for Shore/Inward except Object Arc/Semi-Arc point 1.y;
+    // y = width cells except Object Arc/Semi-Arc wake length cells; z = inward
+    // reach cells except Object Arc/Semi-Arc contact width cells; w = head width
+    // cells except Object Arc/Semi-Arc point 2.x.
     float4 shore;
     // x = authored intrinsic Presence, y = authored normalized Remaining Life,
     // z = material pattern seed, w = pattern feature size.
@@ -18,21 +20,19 @@ struct FoamSourceEventData
     // first-segment split; y/z = breakup scale/strength except Object
     // Arc/Semi-Arc point 2.y / point 3.x; w = curvature or selected Semi-Arc side.
     float4 variation;
-    // x/y = formation speed / moving-head trail except Object Arc/Semi-Arc
-    // point 3.y / point 4.x; z = source path length metres; w = reserved legacy
-    // source-fill blend except Object Arc/Semi-Arc positive-half first-segment
-    // split. P13A does not use it to reinterpret Initial Presence as Coverage.
+    // x/y = captured Reveal Speed in cells/s / head length cells except
+    // Object Arc/Semi-Arc point 3.y / point 4.x; z = reveal path length in
+    // Foam cells; w = reserved legacy source-fill blend except Object
+    // Arc/Semi-Arc positive-half first-segment split.
     float4 kinematics;
-    // x = object centre lateral metres; y/z = object half extents except
-    // Object Arc/Semi-Arc point 4.y / front split; w = Fleck contact offset or
-    // Arc/Semi-Arc source-local lateral cell spacing metres.
+    // x = object/free-water centre lateral metres; y/z = object half extents
+    // except Object Arc/Semi-Arc point 4.y / front split; w = Fleck contact
+    // offset, Free-Water shape parameter, or Object Arc/Semi-Arc wake width cells.
     float4 objectData;
-    // x = previous deposition side/phase, y = previous deposition progress,
-    // z = previous deposition state valid (0 on the first source tick),
-    // w = Object Arc/Semi-Arc contact-stroke path length in metres (0 otherwise).
-    // Current deposition side/phase and progress remain header.y/z. Positive
-    // newly revealed coverage gates every finite source. Object Arc/Semi-Arc
-    // phase changes reset that one-shot gate for the next bounded stroke.
+    // x = previous deposition side/phase, y = previous reveal-head distance
+    // in Foam cells, z = previous deposition state valid (0 on the first
+    // source tick), w = Object Arc/Semi-Arc authored contact span in cells.
+    // Current side/phase and head distance remain header.y/z.
     float4 deposit;
 };
 

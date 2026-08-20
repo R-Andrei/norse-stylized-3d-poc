@@ -6,7 +6,7 @@ namespace ProgrammaticStylized3D.Trees
     [Serializable]
     public sealed class TreeResolvedControls
     {
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         [SerializeField, HideInInspector]
         private int schemaVersion;
@@ -17,7 +17,6 @@ namespace ProgrammaticStylized3D.Trees
 
         [SerializeField] private float bendAmount;
         [SerializeField] private float leanAmount;
-        [SerializeField] private float leanDirection;
 
         [SerializeField] private float pathSpiralRadius;
         [SerializeField] private float signedPathSpiralTurns;
@@ -66,13 +65,14 @@ namespace ProgrammaticStylized3D.Trees
         [SerializeField] private float forkChance;
 
         public int SchemaVersion => schemaVersion;
-        public bool IsInitialized => schemaVersion >= CurrentSchemaVersion;
+        // Any positive schema carries an authored exact snapshot.
+        // ValidateAndClamp/EnsureInitialized upgrades surviving fields in place.
+        public bool IsInitialized => schemaVersion > 0;
         public float Height => height;
         public float TrunkBaseRadius => trunkBaseRadius;
         public float TrunkTaper => trunkTaper;
         public float BendAmount => bendAmount;
         public float LeanAmount => leanAmount;
-        public float LeanDirection => leanDirection;
         public float PathSpiralRadius => pathSpiralRadius;
         public float SignedPathSpiralTurns => signedPathSpiralTurns;
         public float AxialTwist => axialTwist;
@@ -131,9 +131,6 @@ namespace ProgrammaticStylized3D.Trees
             leanAmount = ranges.LeanAmount.Sample(
                 masterSeed,
                 "tree.trunk.lean-amount");
-            leanDirection = ranges.LeanDirection.Sample(
-                masterSeed,
-                "tree.trunk.lean-direction");
 
             pathSpiralRadius = ranges.PathSpiralRadius.Sample(
                 masterSeed,
@@ -256,14 +253,22 @@ namespace ProgrammaticStylized3D.Trees
 
         public void EnsureInitialized(TreeRecipeControlRanges ranges, int seed)
         {
-            if (!IsInitialized)
+            if (schemaVersion <= 0)
             {
                 ResolveFrom(ranges, seed);
+                return;
             }
-            else
+
+            if (schemaVersion < 2)
             {
-                ValidateAndClamp();
+                buttressTransition = 1f;
             }
+
+            // TREE-TRUNK.1 removes Lean Direction without rerolling any
+            // surviving exact-control value. Older initialized snapshots are
+            // upgraded in place and then clamped to the current live schema.
+            schemaVersion = CurrentSchemaVersion;
+            ValidateAndClamp();
         }
 
         public string CalculateFingerprint()
@@ -276,7 +281,6 @@ namespace ProgrammaticStylized3D.Trees
             TreeDeterministicUtility.Append(ref hash, trunkTaper);
             TreeDeterministicUtility.Append(ref hash, bendAmount);
             TreeDeterministicUtility.Append(ref hash, leanAmount);
-            TreeDeterministicUtility.Append(ref hash, leanDirection);
             TreeDeterministicUtility.Append(ref hash, pathSpiralRadius);
             TreeDeterministicUtility.Append(ref hash, signedPathSpiralTurns);
             TreeDeterministicUtility.Append(ref hash, axialTwist);
@@ -322,7 +326,6 @@ namespace ProgrammaticStylized3D.Trees
             trunkTaper = FiniteClamp(trunkTaper, 0f, 1f);
             bendAmount = FiniteClamp(bendAmount, 0f, 1f);
             leanAmount = FiniteClamp(leanAmount, 0f, 0.60f);
-            leanDirection = NormalizeAngle(leanDirection);
             pathSpiralRadius = FiniteClamp(pathSpiralRadius, 0f, 0.50f);
             signedPathSpiralTurns = FiniteClamp(
                 signedPathSpiralTurns,

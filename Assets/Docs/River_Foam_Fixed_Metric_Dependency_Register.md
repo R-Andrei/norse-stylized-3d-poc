@@ -2574,3 +2574,102 @@ This section is the authoritative replacement for earlier entries stating that S
 - Capacity dependency: source-event capacity is `32 + shoreBucketCount`; reservation capacity is twice that value and is allocated only when the grid descriptor is applied.
 
 No transport, lifecycle, topology, boundary, obstacle-routing, or final-render dependency changes.
+
+### 2.1.11B Baseline contract consolidation source state — `RIVER-FOAM-MATERIAL-C1`
+
+C1 implements the C0 dependency freeze without changing the fixed-metric resource topology. Unity validation is pending.
+
+Current source ownership:
+
+| Contract area | C1 source state | Retained dependency |
+| --- | --- | --- |
+| Authoring | one `Material Contract` selector with `C × P × L Baseline` | no runtime mode uniform is required while only one contract exists |
+| Transport | Bulk-Phase Residual TVD unconditional | global phase, integer shift, residual subtraction, Superbee reconstruction, donor/upwind state, neighbour reconstruction samples |
+| Final visibility | Lifecycle-Faithful unconditional | `RiverWaterFoamResolveMeaningfulCoverageFootprint(C) = saturate(C)` plus existing Pattern/Strand shaping |
+| Presence footprint | Coverage-Only unconditional | intrinsic Presence remains packed/diagnostic state but does not scale Final Foam |
+| Chipping | Coverage-Only eligibility unconditional | fixed `0.06` soft-edge origin, authored Edge Width, authored Interior Access |
+| Removed | three legacy selector enums/fields/uniforms, rejected alternative branches, Presence-Amplitude-only Soft Edge Start | none of the removed pieces are required by the retained baseline |
+
+Resource impact: no texture, buffer, kernel, pass, dispatch, readback, cache-format, or grid-descriptor addition. Shared `RiverWaterFoam.hlsl` has one consumer (`SH_CleanStylizedRiver.shader`); `CS_RiverFoam.Motion.hlsl` has one consumer (`CS_RiverFoam.compute`), keeping C1's shared-shader impact inside the River Foam subsystem.
+
+C/P/L/Pattern packing and fixed-metric topology/transport resources remain authoritative until the separate C2 Life-Only contract is designed and approved.
+
+
+### 2.1.11C Life-Only binary-cell dependency — `RIVER-FOAM-MATERIAL-C2`
+
+C2 adds a second selectable material contract without replacing the C1 baseline resources.
+
+| Contract area | Life Only dependency | Resource/cadence impact |
+| --- | --- | --- |
+| Persistent material | `R = Remaining Life`; `GBA = 0`; `Life > 0` is one whole cell | reuses existing ARGBHalf ping-pong textures |
+| Birth | any valid source touch creates a full live cell; overlap does not refresh live Life | no new source resource |
+| Transport | one destination-gather `SimulateLifeOnlyFoam` dispatch per existing CFL substep | +1 compiled kernel, but only one selected simulation dispatch per substep |
+| Movement authority | canonical `FoamResolveVelocity`, fixed-metric longitudinal/lateral spacing, curvature Jacobian, existing CFL bound | no new velocity field or solve |
+| Collision | multiple sources targeting one destination merge to `max(RemainingLife)` | no atomics or claim buffer |
+| Invalid target | lateral/bank/invalid-fluid move stays; physical longitudinal endpoint remains outflow | existing domain/boundary authority |
+| Lifecycle | existing topology-adjusted age rate decrements Life | unchanged lifecycle cadence/rates |
+| Final render | current-state point sample; binary occupancy; shader-derived visual Pattern | no material interpolation for Life Only |
+| Diagnostics | Coverage/Presence/Amount views become explicitly labelled binary occupancy aliases | no persistent C/P state introduced |
+
+Bulk Phase, residual subtraction, donor/upwind reconstruction, and Superbee remain required by `C × P × L Baseline` only. `CS_RiverFoam.Motion.hlsl` and `RiverWaterFoamVelocity.hlsl` remain unchanged shared velocity authorities. No new persistent GPU texture/buffer, cache format, grid descriptor, CPU readback, scene/prefab/material dependency, or per-frame full-field rebuild is introduced.
+
+### 2.1.11D Coverage + Life geometric-occupancy dependency — `RIVER-FOAM-MATERIAL-C3`
+
+C2 `Life Only` is rejected by live visual validation because binary positive-Life occupancy rendered complete simulation cells. C3 supersedes contract value `1` while retaining the accepted baseline at value/default `0`.
+
+| Contract area | Coverage + Life dependency | Resource/cadence impact |
+| --- | --- | --- |
+| Persistent material | `R=C`, `G=C×L`, `B=0`, `A=C` | reuses existing ARGBHalf ping-pong textures |
+| Coverage authority | fractional geometric occupancy `C` | no weak/strong-Foam meaning |
+| Presence | implicit `1` wherever `C > 0`; Initial Presence ignored for C3 | no persistent Presence moment |
+| Pattern | deterministic render-side River-coordinate hash | no persistent Pattern moment |
+| Birth | existing geometric source Coverage; overlap affects only newly added Coverage | existing source resources/cadence |
+| Transport | existing `SimulateFoam` Bulk-Phase Residual TVD for both contracts | C2-only whole-cell kernel removed; no added dispatch |
+| Transported Life | Coverage-weighted moment `C×L` | same packed flux/resource path |
+| Lifecycle | existing topology-adjusted age rate; preserve C while L > 0; clear at death | unchanged lifecycle cadence/rates |
+| Final render | previous/current phase-aware interpolation; literal Coverage footprint; Life as alive/dead gate | no binary point-sample path |
+| Velocity | existing canonical velocity, including Motion Lane, object routing/slowdown, B1/B1A Shore suppression | no velocity resource or solver change |
+| Diagnostics | literal Coverage, compatibility Amount=`C`, implicit Presence, Life moment=`C×L` | no new readback/resource |
+| P8 | baseline-only proof | C3 intentionally lacks independent Presence/Pattern moments |
+
+No new persistent GPU texture/buffer, grid descriptor, cache format, CPU readback, scene/prefab/material dependency, or per-frame full-field rebuild is introduced. The existing shared velocity authority is unchanged. Runtime cost relative to the baseline remains a profiling question rather than an accepted claim.
+
+### 2.1.11E Coverage + Life transported visual-Pattern dependency — `RIVER-FOAM-MATERIAL-C3A`
+
+C3A changes only contract value `1` (`Coverage + Life`). The accepted baseline remains unchanged.
+
+| Contract area | Coverage + Life C3A dependency | Resource/cadence impact |
+| --- | --- | --- |
+| Material authorities | Coverage `C` and Remaining Life `L` only | unchanged |
+| Presence | implicit `1` wherever live Coverage exists | no persistent Presence moment |
+| Visual Pattern metadata | `B = C×Mvisual`; decoded as `B/C` | reuses existing blue channel; no new resource |
+| Birth Pattern | existing deterministic source Pattern evaluation | existing source inputs only |
+| Birth overlap | Pattern merges only with genuinely newly added Coverage | existing no-refresh packet-independence path |
+| Transport | existing packed-state Bulk-Phase Residual TVD | same dispatch/kernel/resource path |
+| Final Pattern authority | transported/interpolated `Mvisual`; no fixed quantized River-coordinate replacement | removes stationary render stencil |
+| Chipping / Strands | existing algorithms consume transported Pattern | no retuning or new sampling pass |
+| Baseline | `C×P`, `C×P×L`, `C×P×M`, `C` unchanged | no baseline behavior/resource change |
+
+No new persistent GPU texture/buffer, kernel, dispatch, grid descriptor, cache format, CPU readback, scene/prefab/material dependency, or per-frame full-field rebuild is introduced. Coverage + Life birth now performs the existing deterministic Material Pattern evaluation used by the baseline for valid source samples; Final rendering adds no new sampling pass. Pattern under Coverage + Life remains visual-only metadata and is not a material-strength, occupancy, or lifecycle authority.
+
+
+
+### 2.1.11F Unified automatic reveal-kinematics dependency — `RIVER-FOAM-SPAWN-D9`
+
+D9 changes automatic-source reveal timing/raster progression only. Material, transport, lifecycle, velocity, Ground, and final-render dependencies are unchanged.
+
+| Contract area | D9 authority | Resource/cadence impact |
+| --- | --- | --- |
+| Reveal speed | each recipe's visible cells/s value captured at event birth | no hidden m/s base, multiplier, or jitter |
+| Duration | `pathLengthCells / speedCellsPerSecond` | logical duration independent of material-step floor |
+| Head state | current/previous path distance in cells | reuses existing two universal event lanes |
+| Bent-path distance | deterministic seven-point/six-segment cell-space polyline | event-creation CPU work; matching bounded GPU polyline |
+| Shore Ribbon | discrete one-cell path identity derived from shared head distance | all crossed cells included in existing bounded raster range |
+| Object initial Arc/Semi | contact and wake components advance concurrently at the same cells/s | duration uses longest concurrent component |
+| Object later strokes | contact path only at the same captured cells/s | bounded phase-slice catch-up when a tick crosses a stroke boundary |
+| Lace/Cross-Lace/Torn/Fleck/Inward | recipe geometry maps to path distance; shared reveal window controls progression | no recipe-specific timing equation |
+| GPU ABI | eight `float4` lanes / 128 bytes | unchanged stride |
+| Kernels/resources | existing automatic-source raster kernels/resources | no new persistent resource, kernel, full-field pass, or readback |
+| Legacy speed fields | serialized compatibility tombstones | zero production reveal-timing consumers |
+
+The source material cadence remains an observation/raster cadence, not a velocity authority. At high cells/s, one update may emit many newly crossed cells/segments. Completed geometry for fixed recipe settings and seed is required to be speed-invariant.

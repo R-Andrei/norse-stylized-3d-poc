@@ -97,7 +97,7 @@ namespace ProgrammaticStylized3D.Trees
                 TreeControlSection.TrunkShape,
                 "trunk-shape",
                 "Trunk Shape",
-                "Bend Amount creates lateral trunk curvature. Lean Amount moves the whole trunk coherently in Lean Direction. Lean Direction has no visible effect when Lean Amount is zero.",
+                "Bend Amount creates lateral trunk curvature. Lean Amount moves the whole trunk coherently in the canonical tree-local +X direction; rotate the whole tree object to change its world-space lean direction.",
                 false),
             new TreeControlSectionDescriptor(
                 TreeControlSection.TrunkSpiralAndTwist,
@@ -175,7 +175,6 @@ namespace ProgrammaticStylized3D.Trees
 
             Float(TreeControlSection.TrunkShape, "tree.trunk.bend-amount", "bendAmount", "Bend Amount", "Lateral centreline bend amplitude as a normalized tree-shape control.", 0f, 1f),
             Float(TreeControlSection.TrunkShape, "tree.trunk.lean-amount", "leanAmount", "Lean Amount", "Coherent horizontal trunk displacement as a fraction of tree height.", 0f, 0.60f),
-            Angle(TreeControlSection.TrunkShape, "tree.trunk.lean-direction", "leanDirection", "Lean Direction", "Horizontal lean direction in degrees. This interval may wrap through zero.", 0f, 360f),
 
             Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.path-spiral-radius", "pathSpiralRadius", "Path Spiral Radius", "Radius of the actual centreline spiral as a fraction of tree height.", 0f, 0.50f),
             Float(TreeControlSection.TrunkSpiralAndTwist, "tree.trunk.path-spiral-turns", "signedPathSpiralTurns", "Signed Path Spiral Turns", "Number of height-preserving centreline revolutions. Positive and negative values select opposite handedness without changing authored tree height.", -3f, 3f),

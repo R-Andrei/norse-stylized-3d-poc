@@ -34,6 +34,23 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private const float RenderMeshDegenerateUvDeterminant = 0.0000000001f;
         private const float RenderMeshIllConditionedUvDeterminant = 0.000001f;
         private const int RenderMeshWorstListCapacity = 8;
+        private const int StructuralFeatureTypeCount = 7;
+        private const int StructuralFeatureConvexBoundaryCode = 1;
+        private const int StructuralFeatureCornerChipCapCode = 3;
+        private const float StructuralFeatureStrengthEpsilon = 0.0001f;
+
+        private static readonly int StructuralConvexResponseId =
+            Shader.PropertyToID("_GeneratedMassEdgeWearResponseStrength");
+        private static readonly int StructuralChipResponseId =
+            Shader.PropertyToID("_GeneratedMassChipInteriorResponse");
+        private static readonly int StructuralConvexVariationStrengthId =
+            Shader.PropertyToID("_GeneratedMassConvexVariationStrength");
+        private static readonly int StructuralConvexSmoothnessOffsetId =
+            Shader.PropertyToID("_GeneratedMassConvexSmoothnessOffset");
+        private static readonly int StructuralChipVariationStrengthId =
+            Shader.PropertyToID("_GeneratedMassChipVariationStrength");
+        private static readonly int StructuralChipSmoothnessOffsetId =
+            Shader.PropertyToID("_GeneratedMassChipSmoothnessOffset");
 
         private static bool renderMeshAuditDrawWorstTriangle = true;
         private static bool renderMeshAuditXRay;
@@ -169,6 +186,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             (int)StoneSurfaceMaskDebug.None,
             (int)StoneSurfaceMaskDebug.ConvexEdgeWear,
+            (int)StoneSurfaceMaskDebug.StructuralSemantics,
+            (int)StoneSurfaceMaskDebug.StructuralResolvedResponse,
             (int)StoneSurfaceMaskDebug.Exposure,
             (int)StoneSurfaceMaskDebug.CreviceBase,
             (int)StoneSurfaceMaskDebug.DirtDeposit
@@ -178,6 +197,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             new GUIContent("None"),
             new GUIContent("Convex Edge Wear", "Physical generated bevel/chamfer geometry mask carried by UV2.z. This is the correct edge-wear validation view."),
+            new GUIContent("Structural Semantics", "GM-SURFACE.6A.2 raw TEXCOORD4 structural diagnostic. ConvexBoundary is yellow, CornerChipCap is cyan, neither is black. This ignores all structural response controls."),
+            new GUIContent("Structural Resolved Response", "GM-SURFACE.6A.2 resolved structural diagnostic after the Convex Surface Response and Chip Interior Response master gates. Yellow is convex, cyan is chip, black is zero response."),
             new GUIContent("Exposure"),
             new GUIContent("Crevice / Base"),
             new GUIContent("Dirt / Deposit")
@@ -229,6 +250,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int Uv0Count;
             public int ColorCount;
             public int Uv2Count;
+            public int StructuralFeaturesCount;
             public int TriangleCount;
             public int SubMeshCount;
             public int NonFinitePositions;
@@ -249,6 +271,32 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             public int OutOfRangeColors;
             public int MissingOrPartialUv2;
             public int NonFiniteUv2;
+            public int MissingOrPartialStructuralFeatures;
+            public int NonFiniteStructuralFeatures;
+            public int InvalidStructuralFeatures;
+            public int ConvexStructuralVertexCount;
+            public int ChipStructuralVertexCount;
+            public int ConvexStructuralTriangleCount;
+            public int ChipStructuralTriangleCount;
+            public float MinimumConvexStructuralStrength = float.PositiveInfinity;
+            public float MaximumConvexStructuralStrength;
+            public float MinimumChipStructuralStrength = float.PositiveInfinity;
+            public float MaximumChipStructuralStrength;
+            public readonly int[] PrimaryStructuralTypeCounts =
+                new int[StructuralFeatureTypeCount];
+            public readonly int[] SecondaryStructuralTypeCounts =
+                new int[StructuralFeatureTypeCount];
+            public bool RendererPropertyBlockAvailable;
+            public bool RendererPropertyBlockEmpty;
+            public float PropertyBlockConvexResponse;
+            public float PropertyBlockChipResponse;
+            public float PropertyBlockConvexVariationStrength;
+            public float PropertyBlockConvexSmoothnessOffset;
+            public float PropertyBlockChipVariationStrength;
+            public float PropertyBlockChipSmoothnessOffset;
+            public bool ConvexResponseMissingSemantic;
+            public bool ChipResponseMissingSemantic;
+            public string StructuralSummary = string.Empty;
             public int InvalidTriangleIndices;
             public int NonFiniteTriangleGeometry;
             public int DegenerateTriangles;
@@ -284,6 +332,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 NonFiniteUv0 > 0 ||
                 NonFiniteColors > 0 ||
                 NonFiniteUv2 > 0 ||
+                NonFiniteStructuralFeatures > 0 ||
+                InvalidStructuralFeatures > 0 ||
                 InvalidTriangleIndices > 0 ||
                 NonFiniteTriangleGeometry > 0 ||
                 DegenerateTriangles > 0;
@@ -300,6 +350,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 MissingOrPartialColors > 0 ||
                 OutOfRangeColors > 0 ||
                 MissingOrPartialUv2 > 0 ||
+                MissingOrPartialStructuralFeatures > 0 ||
+                ConvexResponseMissingSemantic ||
+                ChipResponseMissingSemantic ||
                 SliverTriangles > 0 ||
                 UvDegenerateTriangles > 0 ||
                 UvIllConditionedTriangles > 0 ||
@@ -404,6 +457,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty edgeWearCoverage;
         private SerializedProperty edgeWearSoftness;
         private SerializedProperty edgeWearResponseStrength;
+        private SerializedProperty convexVariationStrength;
+        private SerializedProperty convexSmoothnessOffset;
         private SerializedProperty edgeWearBrightnessLift;
         private SerializedProperty edgeWearTint;
         private SerializedProperty edgeWearTintStrength;
@@ -415,6 +470,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         private SerializedProperty cornerChipTopFacingPreference;
         private SerializedProperty cornerChipCapRingWidthScale;
         private SerializedProperty cornerChipCapRingWearStrength;
+        private SerializedProperty chipInteriorResponse;
+        private SerializedProperty chipVariationStrength;
+        private SerializedProperty chipSmoothnessOffset;
         private SerializedProperty creaseAmount;
         private SerializedProperty creaseWidth;
         private SerializedProperty creaseLength;
@@ -631,6 +689,10 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearSoftness");
             edgeWearResponseStrength = serializedObject.FindProperty(
                 "edgeWearResponseStrength");
+            convexVariationStrength = serializedObject.FindProperty(
+                "convexVariationStrength");
+            convexSmoothnessOffset = serializedObject.FindProperty(
+                "convexSmoothnessOffset");
             edgeWearBrightnessLift = serializedObject.FindProperty(
                 "edgeWearBrightnessLift");
             edgeWearTint = serializedObject.FindProperty(
@@ -653,6 +715,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "cornerChipCapRingWidthScale");
             cornerChipCapRingWearStrength = serializedObject.FindProperty(
                 "cornerChipCapRingWearStrength");
+            chipInteriorResponse = serializedObject.FindProperty(
+                "chipInteriorResponse");
+            chipVariationStrength = serializedObject.FindProperty(
+                "chipVariationStrength");
+            chipSmoothnessOffset = serializedObject.FindProperty(
+                "chipSmoothnessOffset");
             creaseAmount = serializedObject.FindProperty(
                 "creaseAmount");
             creaseWidth = serializedObject.FindProperty(
@@ -756,6 +824,8 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "edgeWearCoverage",
                 "edgeWearSoftness",
                 "edgeWearResponseStrength",
+                "convexVariationStrength",
+                "convexSmoothnessOffset",
                 "edgeWearBrightnessLift",
                 "edgeWearTint",
                 "edgeWearTintStrength",
@@ -769,6 +839,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "cornerChipTopFacingPreference",
                 "cornerChipCapRingWidthScale",
                 "cornerChipCapRingWearStrength",
+                "chipInteriorResponse",
+                "chipVariationStrength",
+                "chipSmoothnessOffset",
                 "creaseAmount",
                 "creaseWidth",
                 "creaseLength",
@@ -12943,6 +13016,21 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                         new GUIContent(
                             "Top-Facing Preference",
                             "Interpolates the ranking between strong all-around convexity and upward exposure. Bottom-side candidates remain protected regardless of this value."));
+                    EditorGUILayout.PropertyField(
+                        chipInteriorResponse,
+                        new GUIContent(
+                            "Chip Interior Response",
+                            "Master material-response intensity for semantic chip-cap faces. Zero disables the chip material response; one applies the authored absolute variation strength and smoothness offset."));
+                    EditorGUILayout.PropertyField(
+                        chipVariationStrength,
+                        new GUIContent(
+                            "Chip Variation Strength",
+                            "Absolute zero-mean tonal breakup strength for semantic chip-cap faces at full response. One strength unit contributes up to approximately +/-0.10 tonal amplitude before Pixel Effect Strength; 0 disables this tonal term. Set this to 0 to test smoothness independently."));
+                    EditorGUILayout.PropertyField(
+                        chipSmoothnessOffset,
+                        new GUIContent(
+                            "Chip Smoothness Offset",
+                            "Full-response signed smoothness offset for semantic chip-cap faces. Negative values make the exposed interior rougher. Set this to 0 to test tonal variation independently."));
                     EditorGUILayout.HelpBox(
                         "Chips are committed sequentially. Candidates below normalized height 0.12 are rejected, candidates from 0.12 to 0.30 are strongly penalized, and candidates touching or bordering a previous chip are rejected. Ordinary bevels run once after the final committed chip.",
                         MessageType.None);
@@ -12976,38 +13064,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 EditorGUILayout.PropertyField(
                     edgeWearSoftness,
                     new GUIContent(
-                        "Softness",
-                        "Controls visible material softness on marked bevel faces. EW-4A.1 does not let this change physical bevel depth."));
+                        "Legacy Softness",
+                        "Retained for recipe/diagnostic compatibility. GM-SURFACE.6A.4 structural material response uses Convex Variation Strength and Convex Smoothness Offset instead; this value does not change physical bevel depth."));
 
                 EditorGUILayout.Space(3f);
                 EditorGUILayout.LabelField(
-                    "Visual Response",
+                    "Structural Material Response",
                     EditorStyles.miniBoldLabel);
                 EditorGUILayout.HelpBox(
-                    "Visual response is applied only to generated bevel faces marked in UV2.z. " +
-                    "Response Strength controls the uniform worn-edge lift/tint; Softness " +
-                    "controls its visible material softening without changing bevel geometry.",
+                    "Convex Surface Response consumes the packed ConvexBoundary semantic on generated transition faces. Variation and smoothness are authored independently so each underlying material response can be tested directly. No fixed brightening, tint, or normal change is applied.",
                     MessageType.None);
                 EditorGUILayout.PropertyField(
                     edgeWearResponseStrength,
                     new GUIContent(
-                        "Response Strength",
-                        "Master visible intensity for UV2.z-marked generated bevel/chamfer faces."));
+                        "Convex Surface Response",
+                        "Master material-response intensity for semantic ConvexBoundary surfaces. Zero preserves the baseline; one applies the authored absolute variation strength and smoothness offset."));
                 EditorGUILayout.PropertyField(
-                    edgeWearBrightnessLift,
+                    convexVariationStrength,
                     new GUIContent(
-                        "Brightness Lift",
-                        "How much visible worn ridges brighten the stone value."));
+                        "Convex Variation Strength",
+                        "Absolute zero-mean tonal breakup strength for semantic ConvexBoundary surfaces at full response. One strength unit contributes up to approximately +/-0.10 tonal amplitude before Pixel Effect Strength; 0 disables this tonal term. Set this to 0 to test smoothness independently."));
                 EditorGUILayout.PropertyField(
-                    edgeWearTint,
+                    convexSmoothnessOffset,
                     new GUIContent(
-                        "Worn Edge Tint",
-                        "Optional hue target for worn convex ridges."));
-                EditorGUILayout.PropertyField(
-                    edgeWearTintStrength,
-                    new GUIContent(
-                        "Tint Influence",
-                        "How strongly Worn Edge Tint affects the visible response. Zero keeps the response value-only."));
+                        "Convex Smoothness Offset",
+                        "Full-response signed smoothness offset for semantic ConvexBoundary surfaces. Positive values make transitions smoother. Set this to 0 to test tonal variation independently."));
 
             }
         }
@@ -13691,6 +13772,20 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 lastRenderMeshAudit.Summary,
                 auditMessageType);
 
+            if (!string.IsNullOrEmpty(lastRenderMeshAudit.StructuralSummary))
+            {
+                bool structuralResponseWarning =
+                    lastRenderMeshAudit.ConvexResponseMissingSemantic ||
+                    lastRenderMeshAudit.ChipResponseMissingSemantic ||
+                    (lastRenderMeshAudit.ConvexStructuralVertexCount == 0 &&
+                     lastRenderMeshAudit.ChipStructuralVertexCount == 0);
+                EditorGUILayout.HelpBox(
+                    lastRenderMeshAudit.StructuralSummary,
+                    structuralResponseWarning
+                        ? MessageType.Warning
+                        : MessageType.Info);
+            }
+
             EditorGUI.BeginChangeCheck();
             renderMeshAuditDrawWorstTriangle =
                 EditorGUILayout.Toggle(
@@ -13906,12 +14001,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 List<Vector4> tangents = new List<Vector4>();
                 List<Vector2> uv0 = new List<Vector2>();
                 List<Vector4> uv2 = new List<Vector4>();
+                List<Vector4> structuralFeatures = new List<Vector4>();
                 List<Color> colors = new List<Color>();
                 mesh.GetVertices(vertices);
                 mesh.GetNormals(normals);
                 mesh.GetTangents(tangents);
                 mesh.GetUVs(0, uv0);
                 mesh.GetUVs(2, uv2);
+                mesh.GetUVs(4, structuralFeatures);
                 mesh.GetColors(colors);
                 int[] triangles = mesh.triangles;
 
@@ -13921,6 +14018,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 result.Uv0Count = uv0.Count;
                 result.ColorCount = colors.Count;
                 result.Uv2Count = uv2.Count;
+                result.StructuralFeaturesCount = structuralFeatures.Count;
                 result.TriangleCount = triangles.Length / 3;
                 result.SubMeshCount = mesh.subMeshCount;
                 result.MissingOrPartialNormals =
@@ -13935,6 +14033,31 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     uv2.Count == 0 || uv2.Count == vertices.Count
                         ? 0
                         : 1;
+                result.MissingOrPartialStructuralFeatures =
+                    structuralFeatures.Count == vertices.Count
+                        ? 0
+                        : 1;
+
+                MeshRenderer liveRenderer = mass.GetComponent<MeshRenderer>();
+                if (liveRenderer != null)
+                {
+                    MaterialPropertyBlock block = new MaterialPropertyBlock();
+                    liveRenderer.GetPropertyBlock(block);
+                    result.RendererPropertyBlockAvailable = true;
+                    result.RendererPropertyBlockEmpty = block.isEmpty;
+                    result.PropertyBlockConvexResponse =
+                        block.GetFloat(StructuralConvexResponseId);
+                    result.PropertyBlockChipResponse =
+                        block.GetFloat(StructuralChipResponseId);
+                    result.PropertyBlockConvexVariationStrength =
+                        block.GetFloat(StructuralConvexVariationStrengthId);
+                    result.PropertyBlockConvexSmoothnessOffset =
+                        block.GetFloat(StructuralConvexSmoothnessOffsetId);
+                    result.PropertyBlockChipVariationStrength =
+                        block.GetFloat(StructuralChipVariationStrengthId);
+                    result.PropertyBlockChipSmoothnessOffset =
+                        block.GetFloat(StructuralChipSmoothnessOffsetId);
+                }
 
                 Vector3 positionCentre = Vector3.zero;
                 int finitePositionCount = 0;
@@ -14078,6 +14201,55 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     {
                         result.NonFiniteUv2++;
                     }
+                    if (structuralFeatures.Count == vertices.Count)
+                    {
+                        Vector4 packed = structuralFeatures[vertexIndex];
+                        if (!IsFinite(packed))
+                        {
+                            result.NonFiniteStructuralFeatures++;
+                        }
+                        else if (!IsValidPackedStructuralFeatures(packed))
+                        {
+                            result.InvalidStructuralFeatures++;
+                        }
+                        else
+                        {
+                            int primaryType = Mathf.RoundToInt(packed.x);
+                            int secondaryType = Mathf.RoundToInt(packed.z);
+                            result.PrimaryStructuralTypeCounts[primaryType]++;
+                            result.SecondaryStructuralTypeCounts[secondaryType]++;
+
+                            float convexStrength =
+                                ResolvePackedStructuralFeatureStrength(
+                                    packed,
+                                    StructuralFeatureConvexBoundaryCode);
+                            if (convexStrength > StructuralFeatureStrengthEpsilon)
+                            {
+                                result.ConvexStructuralVertexCount++;
+                                result.MinimumConvexStructuralStrength = Mathf.Min(
+                                    result.MinimumConvexStructuralStrength,
+                                    convexStrength);
+                                result.MaximumConvexStructuralStrength = Mathf.Max(
+                                    result.MaximumConvexStructuralStrength,
+                                    convexStrength);
+                            }
+
+                            float chipStrength =
+                                ResolvePackedStructuralFeatureStrength(
+                                    packed,
+                                    StructuralFeatureCornerChipCapCode);
+                            if (chipStrength > StructuralFeatureStrengthEpsilon)
+                            {
+                                result.ChipStructuralVertexCount++;
+                                result.MinimumChipStructuralStrength = Mathf.Min(
+                                    result.MinimumChipStructuralStrength,
+                                    chipStrength);
+                                result.MaximumChipStructuralStrength = Mathf.Max(
+                                    result.MaximumChipStructuralStrength,
+                                    chipStrength);
+                            }
+                        }
+                    }
                 }
 
                 RenderMeshTriangleAudit firstNonFinite = null;
@@ -14103,6 +14275,43 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     {
                         result.InvalidTriangleIndices++;
                         continue;
+                    }
+
+                    if (structuralFeatures.Count == vertices.Count)
+                    {
+                        float convexTriangleStrength = Mathf.Max(
+                            ResolvePackedStructuralFeatureStrength(
+                                structuralFeatures[indexA],
+                                StructuralFeatureConvexBoundaryCode),
+                            Mathf.Max(
+                                ResolvePackedStructuralFeatureStrength(
+                                    structuralFeatures[indexB],
+                                    StructuralFeatureConvexBoundaryCode),
+                                ResolvePackedStructuralFeatureStrength(
+                                    structuralFeatures[indexC],
+                                    StructuralFeatureConvexBoundaryCode)));
+                        if (convexTriangleStrength >
+                            StructuralFeatureStrengthEpsilon)
+                        {
+                            result.ConvexStructuralTriangleCount++;
+                        }
+
+                        float chipTriangleStrength = Mathf.Max(
+                            ResolvePackedStructuralFeatureStrength(
+                                structuralFeatures[indexA],
+                                StructuralFeatureCornerChipCapCode),
+                            Mathf.Max(
+                                ResolvePackedStructuralFeatureStrength(
+                                    structuralFeatures[indexB],
+                                    StructuralFeatureCornerChipCapCode),
+                                ResolvePackedStructuralFeatureStrength(
+                                    structuralFeatures[indexC],
+                                    StructuralFeatureCornerChipCapCode)));
+                        if (chipTriangleStrength >
+                            StructuralFeatureStrengthEpsilon)
+                        {
+                            result.ChipStructuralTriangleCount++;
+                        }
                     }
 
                     RenderMeshTriangleAudit triangle =
@@ -14247,6 +14456,79 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 {
                     result.MinimumAbsoluteUvDeterminant = 0f;
                 }
+                if (float.IsPositiveInfinity(
+                        result.MinimumConvexStructuralStrength))
+                {
+                    result.MinimumConvexStructuralStrength = 0f;
+                }
+                if (float.IsPositiveInfinity(
+                        result.MinimumChipStructuralStrength))
+                {
+                    result.MinimumChipStructuralStrength = 0f;
+                }
+
+                bool hasAnyExpectedStructuralSemantic =
+                    result.ConvexStructuralVertexCount > 0 ||
+                    result.ChipStructuralVertexCount > 0;
+                result.ConvexResponseMissingSemantic =
+                    result.PropertyBlockConvexResponse >
+                        StructuralFeatureStrengthEpsilon &&
+                    result.ConvexStructuralVertexCount == 0;
+                result.ChipResponseMissingSemantic =
+                    result.PropertyBlockChipResponse >
+                        StructuralFeatureStrengthEpsilon &&
+                    result.ChipStructuralVertexCount == 0;
+
+                string responseWarning = string.Empty;
+                if (result.ConvexResponseMissingSemantic)
+                {
+                    responseWarning +=
+                        "WARNING: Convex Surface Response is non-zero but this mesh has zero ConvexBoundary semantics; the control cannot affect this mesh. ";
+                }
+                if (result.ChipResponseMissingSemantic)
+                {
+                    responseWarning +=
+                        "WARNING: Chip Interior Response is non-zero but this mesh has zero CornerChipCap semantics; the control cannot affect this mesh. ";
+                }
+
+                result.StructuralSummary =
+                    responseWarning +
+                    (hasAnyExpectedStructuralSemantic
+                        ? "Structural semantic audit: "
+                        : "Structural semantic audit: NO NON-ZERO CONVEX/CHIP SEMANTICS. ") +
+                    "uv4=" + result.StructuralFeaturesCount +
+                    "/" + result.VertexCount +
+                    ", convex vertices/triangles=" +
+                    result.ConvexStructuralVertexCount +
+                    "/" + result.ConvexStructuralTriangleCount +
+                    ", strength=" +
+                    FormatAuditFloat(result.MinimumConvexStructuralStrength) +
+                    ".." +
+                    FormatAuditFloat(result.MaximumConvexStructuralStrength) +
+                    ", chip vertices/triangles=" +
+                    result.ChipStructuralVertexCount +
+                    "/" + result.ChipStructuralTriangleCount +
+                    ", strength=" +
+                    FormatAuditFloat(result.MinimumChipStructuralStrength) +
+                    ".." +
+                    FormatAuditFloat(result.MaximumChipStructuralStrength) +
+                    ", MPB convex/chip=" +
+                    FormatAuditFloat(result.PropertyBlockConvexResponse) +
+                    "/" +
+                    FormatAuditFloat(result.PropertyBlockChipResponse) +
+                    ", variationStrength convex/chip=" +
+                    FormatAuditFloat(
+                        result.PropertyBlockConvexVariationStrength) +
+                    "/" +
+                    FormatAuditFloat(
+                        result.PropertyBlockChipVariationStrength) +
+                    ", smoothness convex/chip=" +
+                    FormatAuditFloat(
+                        result.PropertyBlockConvexSmoothnessOffset) +
+                    "/" +
+                    FormatAuditFloat(
+                        result.PropertyBlockChipSmoothnessOffset) +
+                    ".";
 
                 string status = result.HasHardFailure
                     ? "failed"
@@ -14265,7 +14547,14 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                      result.NonFiniteTangents +
                      result.NonFiniteUv0 +
                      result.NonFiniteColors +
-                     result.NonFiniteUv2) +
+                     result.NonFiniteUv2 +
+                     result.NonFiniteStructuralFeatures) +
+                    ", structuralConvexV/T=" +
+                    result.ConvexStructuralVertexCount +
+                    "/" + result.ConvexStructuralTriangleCount +
+                    ", structuralChipV/T=" +
+                    result.ChipStructuralVertexCount +
+                    "/" + result.ChipStructuralTriangleCount +
                     ", extremeTangents=" +
                     result.ExtremeTangents +
                     ", uvDegenerate=" +
@@ -14483,7 +14772,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
         {
             StringBuilder builder = new StringBuilder(32768);
             builder.AppendLine("GeneratedMass live render-mesh audit");
-            builder.AppendLine("contract=GM-R12B.1E-render-audit-v3");
+            builder.AppendLine("contract=GM-R12B.1E-render-audit-v4+GM-SURFACE.6A.3");
             builder.Append("status=");
             builder.AppendLine(
                 result.HasHardFailure
@@ -14508,7 +14797,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                     : "0");
             builder.Append("vertices=");
             builder.AppendLine(result.VertexCount.ToString());
-            builder.Append("channelCounts=positions/normals/tangents/uv0/colors/uv2:");
+            builder.Append("channelCounts=positions/normals/tangents/uv0/colors/uv2/structuralUV4:");
             builder.Append(result.VertexCount);
             builder.Append("/");
             builder.Append(result.NormalCount);
@@ -14519,7 +14808,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
             builder.Append("/");
             builder.Append(result.ColorCount);
             builder.Append("/");
-            builder.AppendLine(result.Uv2Count.ToString());
+            builder.Append(result.Uv2Count);
+            builder.Append("/");
+            builder.AppendLine(result.StructuralFeaturesCount.ToString());
             builder.Append("triangles=");
             builder.AppendLine(result.TriangleCount.ToString());
             builder.Append("subMeshes=");
@@ -14570,6 +14861,78 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 "uv2",
                 result.NonFiniteUv2,
                 result.MissingOrPartialUv2);
+            AppendAuditMetric(
+                builder,
+                "structuralUV4",
+                result.NonFiniteStructuralFeatures,
+                result.InvalidStructuralFeatures,
+                result.MissingOrPartialStructuralFeatures);
+
+            builder.AppendLine();
+            builder.AppendLine("[GM-SURFACE.6A.3 Structural Semantic Audit]");
+            builder.Append("convexVertices/triangles=");
+            builder.Append(result.ConvexStructuralVertexCount);
+            builder.Append("/");
+            builder.AppendLine(result.ConvexStructuralTriangleCount.ToString());
+            builder.Append("convexStrength=min/max:");
+            builder.Append(FormatAuditFloat(
+                result.MinimumConvexStructuralStrength));
+            builder.Append("/");
+            builder.AppendLine(FormatAuditFloat(
+                result.MaximumConvexStructuralStrength));
+            builder.Append("chipVertices/triangles=");
+            builder.Append(result.ChipStructuralVertexCount);
+            builder.Append("/");
+            builder.AppendLine(result.ChipStructuralTriangleCount.ToString());
+            builder.Append("chipStrength=min/max:");
+            builder.Append(FormatAuditFloat(
+                result.MinimumChipStructuralStrength));
+            builder.Append("/");
+            builder.AppendLine(FormatAuditFloat(
+                result.MaximumChipStructuralStrength));
+            builder.Append("primaryTypeHistogram[0..6]=");
+            AppendStructuralTypeHistogram(
+                builder,
+                result.PrimaryStructuralTypeCounts);
+            builder.Append("secondaryTypeHistogram[0..6]=");
+            AppendStructuralTypeHistogram(
+                builder,
+                result.SecondaryStructuralTypeCounts);
+            builder.Append("propertyBlock=available/empty:");
+            builder.Append(result.RendererPropertyBlockAvailable ? "1" : "0");
+            builder.Append("/");
+            builder.AppendLine(result.RendererPropertyBlockEmpty ? "1" : "0");
+            builder.Append("propertyBlock.convexResponse=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockConvexResponse));
+            builder.Append("propertyBlock.chipResponse=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockChipResponse));
+            builder.Append("propertyBlock.convexVariationStrength=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockConvexVariationStrength));
+            builder.Append("propertyBlock.convexSmoothnessOffset=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockConvexSmoothnessOffset));
+            builder.Append("propertyBlock.chipVariationStrength=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockChipVariationStrength));
+            builder.Append("propertyBlock.chipSmoothnessOffset=");
+            builder.AppendLine(FormatAuditFloat(
+                result.PropertyBlockChipSmoothnessOffset));
+            builder.Append("allExpectedStructuralSemanticsZero=");
+            builder.AppendLine(
+                result.ConvexStructuralVertexCount == 0 &&
+                result.ChipStructuralVertexCount == 0
+                    ? "1"
+                    : "0");
+            builder.Append("convexResponseCannotAffectMesh=");
+            builder.AppendLine(
+                result.ConvexResponseMissingSemantic ? "1" : "0");
+            builder.Append("chipResponseCannotAffectMesh=");
+            builder.AppendLine(
+                result.ChipResponseMissingSemantic ? "1" : "0");
+
             builder.Append("positionDistance=max/median/outliers:");
             builder.Append(FormatAuditFloat(
                 result.MaximumPositionDistance));
@@ -14645,6 +15008,67 @@ namespace ProgrammaticStylized3D.Geometry.Masses.Editor
                 result.WorstTangentTriangles,
                 "maxTangentMagnitude");
             return builder.ToString();
+        }
+
+        private static bool IsValidPackedStructuralFeatures(Vector4 packed)
+        {
+            int primaryType = Mathf.RoundToInt(packed.x);
+            int secondaryType = Mathf.RoundToInt(packed.z);
+            bool primaryTypeValid =
+                Mathf.Abs(packed.x - primaryType) <= 0.0001f &&
+                primaryType >= 0 &&
+                primaryType < StructuralFeatureTypeCount;
+            bool secondaryTypeValid =
+                Mathf.Abs(packed.z - secondaryType) <= 0.0001f &&
+                secondaryType >= 0 &&
+                secondaryType < StructuralFeatureTypeCount;
+            bool strengthsValid =
+                packed.y >= 0f && packed.y <= 1f &&
+                packed.w >= 0f && packed.w <= 1f;
+            bool emptyPrimaryIsZero = primaryType != 0 || packed.y == 0f;
+            bool emptySecondaryIsZero = secondaryType != 0 || packed.w == 0f;
+            return primaryTypeValid &&
+                secondaryTypeValid &&
+                strengthsValid &&
+                emptyPrimaryIsZero &&
+                emptySecondaryIsZero;
+        }
+
+        private static float ResolvePackedStructuralFeatureStrength(
+            Vector4 packed,
+            int expectedType)
+        {
+            if (!IsFinite(packed) ||
+                !IsValidPackedStructuralFeatures(packed))
+            {
+                return 0f;
+            }
+
+            float primary = Mathf.RoundToInt(packed.x) == expectedType
+                ? Mathf.Clamp01(packed.y)
+                : 0f;
+            float secondary = Mathf.RoundToInt(packed.z) == expectedType
+                ? Mathf.Clamp01(packed.w)
+                : 0f;
+            return Mathf.Max(primary, secondary);
+        }
+
+        private static void AppendStructuralTypeHistogram(
+            StringBuilder builder,
+            int[] counts)
+        {
+            for (int index = 0; index < StructuralFeatureTypeCount; index++)
+            {
+                if (index > 0)
+                {
+                    builder.Append("/");
+                }
+                builder.Append(
+                    counts != null && index < counts.Length
+                        ? counts[index]
+                        : 0);
+            }
+            builder.AppendLine();
         }
 
         private static void AppendAuditMetric(

@@ -1,4 +1,10 @@
 static const float FoamMaterialStateEpsilon = 0.0001;
+static const int FoamMaterialContractCoverageLife = 1;
+
+bool FoamMaterialContractUsesCoverageLife()
+{
+    return _FoamMaterialContract == FoamMaterialContractCoverageLife;
+}
 
 struct FoamMaterialState
 {
@@ -10,7 +16,30 @@ struct FoamMaterialState
 
 FoamMaterialState FoamDecodeMaterialState(float4 packed)
 {
-    FoamMaterialState state;
+    FoamMaterialState state = (FoamMaterialState)0;
+    if (FoamMaterialContractUsesCoverageLife())
+    {
+        float storedCoverage = saturate(packed.w);
+        if (storedCoverage <= 0.00000001 && packed.x > 0.0)
+        {
+            storedCoverage = saturate(packed.x);
+        }
+
+        float lifeMoment = clamp(packed.y, 0.0, storedCoverage);
+        float patternMoment = clamp(packed.z, 0.0, storedCoverage);
+        state.coverage = storedCoverage;
+        if (storedCoverage > FoamMaterialStateEpsilon &&
+            lifeMoment > 0.0)
+        {
+            state.presence = 1.0;
+            state.remainingLife = saturate(
+                lifeMoment / max(storedCoverage, 0.00000001));
+            state.materialPattern = saturate(
+                patternMoment / max(storedCoverage, 0.00000001));
+        }
+        return state;
+    }
+
     float materialAmount = saturate(packed.x);
     float storedCoverage = saturate(packed.w);
 
@@ -46,6 +75,24 @@ FoamMaterialState FoamDecodeMaterialState(float4 packed)
 
 float4 FoamEncodeMaterialState(FoamMaterialState state)
 {
+    if (FoamMaterialContractUsesCoverageLife())
+    {
+        float coverage = saturate(state.coverage);
+        float life = saturate(state.remainingLife);
+        if (coverage <= FoamMaterialStateEpsilon ||
+            life <= FoamMaterialStateEpsilon)
+        {
+            return 0.0.xxxx;
+        }
+
+        float pattern = saturate(state.materialPattern);
+        return float4(
+            coverage,
+            coverage * life,
+            coverage * pattern,
+            coverage);
+    }
+
     state.coverage = saturate(state.coverage);
     state.presence = saturate(state.presence);
     state.remainingLife = saturate(state.remainingLife);
@@ -67,6 +114,33 @@ float4 FoamEncodeMaterialState(FoamMaterialState state)
 
 float4 FoamClampPackedMaterialState(float4 packed)
 {
+    if (FoamMaterialContractUsesCoverageLife())
+    {
+        float rawCoverage = max(0.0, packed.w);
+        if (rawCoverage <= 0.00000001 && packed.x > 0.0)
+        {
+            rawCoverage = max(0.0, packed.x);
+        }
+        float rawLifeMoment = clamp(packed.y, 0.0, rawCoverage);
+        float rawPatternMoment = clamp(packed.z, 0.0, rawCoverage);
+        if (rawCoverage <= FoamMaterialStateEpsilon ||
+            rawLifeMoment <= 0.0)
+        {
+            return 0.0.xxxx;
+        }
+
+        float coverage = saturate(rawCoverage);
+        float life = saturate(
+            rawLifeMoment / max(rawCoverage, 0.00000001));
+        float pattern = saturate(
+            rawPatternMoment / max(rawCoverage, 0.00000001));
+        return float4(
+            coverage,
+            coverage * life,
+            coverage * pattern,
+            coverage);
+    }
+
     // Clamp capacity coherently. Transport may temporarily converge more than
     // one cell of Coverage, but capacity resolution must not independently
     // reshape the material moments and thereby invent new Presence or Life.
@@ -178,11 +252,11 @@ float4 FoamPreservePersistentMaterialState(
 
 
 
-// Conservative packed-state transport. Donor Cell is the exact accepted
-// first-order baseline; the optional TVD branch changes only interior face
-// reconstruction. Every flux carries material amount, its Remaining-Life and
-// Pattern moments, plus geometric Coverage, so decoded material properties remain
-// attached to one coherent transported state.
+// Conservative packed-state transport shared by both material contracts.
+// Bulk Phase removes the shared downstream speed and the retained bounded
+// Superbee TVD reconstruction resolves interior faces for residual/lateral
+// advection. Baseline transports C×P/C×P×L/C×P×M/C; Coverage + Life reduces
+// those coherent moments to C/C×L/C×Mvisual/C.
 
 bool FoamTransportInsideGrid(int2 coordinate)
 {
@@ -205,10 +279,7 @@ float4 FoamLoadTransportPacked(int2 coordinate, out float validFluid)
     }
 
     int2 sampleCoordinate = coordinate;
-    if (_FoamTransportScheme == 2)
-    {
-        sampleCoordinate.x -= _FoamBulkTransportIntegerShift;
-    }
+    sampleCoordinate.x -= _FoamBulkTransportIntegerShift;
     if (!FoamTransportInsideSimulation(sampleCoordinate))
     {
         return 0.0.xxxx;
@@ -229,11 +300,8 @@ float2 FoamResolveGridVelocity(int2 coordinate, float validFluid)
         validFluid);
     float flowSign = _FoamFlowDirection >= 0.0 ? 1.0 : -1.0;
     float downstream = resolved.velocityMetresPerSecond.x * flowSign;
-    if (_FoamTransportScheme == 2)
-    {
-        downstream -= _FoamBulkTransportSpeed * flowSign *
-            saturate(validFluid);
-    }
+    downstream -= _FoamBulkTransportSpeed * flowSign *
+        saturate(validFluid);
     return float2(downstream, resolved.velocityMetresPerSecond.y);
 }
 
@@ -284,6 +352,7 @@ float FoamTransportCellArea(int x, int y)
         FoamTransportCurvatureJacobian(x, lateralMetres);
 }
 
+
 float FoamTransportLateralFaceLength(int x, int lowerY)
 {
     float longitudinalSpacing = FoamTransportLongitudinalSpacing(x);
@@ -300,16 +369,6 @@ float FoamTransportLateralFaceLength(int x, int lowerY)
     return longitudinalSpacing *
         FoamTransportCurvatureJacobian(x, faceLateral);
 }
-
-static const int FoamTransportSchemeTvdSuperbee = 1;
-static const int FoamTransportSchemeBulkPhaseResidualTvd = 2;
-
-bool FoamTransportUsesTvdSuperbee()
-{
-    return _FoamTransportScheme == FoamTransportSchemeTvdSuperbee ||
-        _FoamTransportScheme == FoamTransportSchemeBulkPhaseResidualTvd;
-}
-
 
 float FoamTransportSuperbeeSlopeComponent(
     float backwardDifference,
@@ -362,14 +421,6 @@ float4 FoamResolveInteriorFaceDonor(
     float4 negativePacked,
     float4 positivePacked)
 {
-    float4 donorPacked = faceVelocity >= 0.0
-        ? negativePacked
-        : positivePacked;
-    if (!FoamTransportUsesTvdSuperbee())
-    {
-        return donorPacked;
-    }
-
     FoamMaterialState negativeState = FoamDecodeMaterialState(
         negativePacked);
     FoamMaterialState positiveState = FoamDecodeMaterialState(

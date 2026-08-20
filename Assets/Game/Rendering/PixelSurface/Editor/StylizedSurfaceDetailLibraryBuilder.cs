@@ -113,12 +113,28 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         [InitializeOnLoadMethod]
         private static void Initialize()
         {
-            ScheduleRepair();
-            EditorApplication.projectChanged += ScheduleRepair;
+            ScheduleRepair("InitializeOnLoad");
+            EditorApplication.projectChanged -= OnProjectChanged;
+            EditorApplication.projectChanged += OnProjectChanged;
         }
 
         public static void ScheduleRepair()
         {
+            ScheduleRepair("ExternalRequest");
+        }
+
+        private static void OnProjectChanged()
+        {
+            ScheduleRepair("ProjectChanged");
+        }
+
+        private static void ScheduleRepair(string reason)
+        {
+            EditorReloadDiagnostics.RecordPixelSurfaceSchedule(
+                reason,
+                repairScheduled,
+                buildInProgress,
+                EditorApplication.isCompiling);
             if (repairScheduled)
             {
                 return;
@@ -136,6 +152,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 return false;
             }
 
+            bool diagnosticCapture =
+                EditorReloadDiagnostics.IsCaptureActive;
+            long totalStart = diagnosticCapture
+                ? EditorReloadDiagnostics.BeginTiming()
+                : 0L;
             string signature = CalculateSignature(library);
             Texture2DArray detailArray = library.GeneratedTextureArray;
             bool detailInvalid =
@@ -157,14 +178,26 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 library.GeneratedAuthoredColorSliceIndices == null ||
                 library.GeneratedAuthoredColorSliceIndices.Count !=
                 library.Entries.Count;
+            bool signatureInvalid = !string.Equals(
+                signature,
+                library.GeneratedSignature,
+                StringComparison.Ordinal);
+            bool needsRebuild =
+                detailInvalid ||
+                colorInvalid ||
+                mappingInvalid ||
+                signatureInvalid;
+            if (diagnosticCapture)
+            {
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "NeedsRebuild",
+                    totalStart,
+                    $"library={library.name}, result={needsRebuild}, " +
+                    $"detailInvalid={detailInvalid}, colorInvalid={colorInvalid}, " +
+                    $"mappingInvalid={mappingInvalid}, signatureInvalid={signatureInvalid}");
+            }
 
-            return detailInvalid ||
-                   colorInvalid ||
-                   mappingInvalid ||
-                   !string.Equals(
-                       signature,
-                       library.GeneratedSignature,
-                       StringComparison.Ordinal);
+            return needsRebuild;
         }
 
         public static IReadOnlyList<string> Validate(
@@ -269,11 +302,24 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 return false;
             }
 
+            long rebuildTotalStart = EditorReloadDiagnostics.BeginTiming();
+            bool rebuildSucceeded = false;
             buildInProgress = true;
             try
             {
+                long normalizeStart = EditorReloadDiagnostics.BeginTiming();
                 NormalizeSourceImporters(library);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.NormalizeSourceImporters",
+                    normalizeStart,
+                    $"library={library.name}");
+
+                long validationStart = EditorReloadDiagnostics.BeginTiming();
                 IReadOnlyList<string> validation = Validate(library);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.Validate",
+                    validationStart,
+                    $"library={library.name}, failures={validation.Count}");
                 if (validation.Count > 0)
                 {
                     failures.AddRange(validation);
@@ -288,6 +334,7 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                     return false;
                 }
 
+                long constructStart = EditorReloadDiagnostics.BeginTiming();
                 int resolution = library.SliceResolution;
                 int logicalDepth = library.LogicalEntryCount;
                 int backingDepth = library.RequiredPackedBackingDepth;
@@ -385,10 +432,22 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         }
                     }
                 }
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.ConstructAndPopulateArrays",
+                    constructStart,
+                    $"library={library.name}, logicalDepth={logicalDepth}, " +
+                    $"backingDepth={backingDepth}, textureFormCount={textureFormCount}, " +
+                    $"resolution={resolution}");
 
+                long applyStart = EditorReloadDiagnostics.BeginTiming();
                 detailArray.Apply(false, true);
                 authoredColorArray?.Apply(false, true);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.TextureArrayApply",
+                    applyStart,
+                    $"library={library.name}");
 
+                long subAssetStart = EditorReloadDiagnostics.BeginTiming();
                 string libraryPath = AssetDatabase.GetAssetPath(library);
                 Texture2DArray previousDetail =
                     library.GeneratedTextureArray;
@@ -409,24 +468,57 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         authoredColorArray,
                         library);
                 }
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.ReplaceGeneratedSubAssets",
+                    subAssetStart,
+                    $"library={library.name}, asset={libraryPath}");
 
+                long finalizeStateStart = EditorReloadDiagnostics.BeginTiming();
                 library.SetGeneratedArrays(
                     detailArray,
                     authoredColorArray,
                     authoredColorSliceIndices,
                     CalculateSignature(library));
                 EditorUtility.SetDirty(library);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.FinalizeGeneratedState",
+                    finalizeStateStart,
+                    $"library={library.name}");
+
+                long saveStart = EditorReloadDiagnostics.BeginTiming();
                 AssetDatabase.SaveAssetIfDirty(library);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.SaveAssetIfDirty",
+                    saveStart,
+                    $"library={library.name}, asset={libraryPath}");
+
+                long importStart = EditorReloadDiagnostics.BeginTiming();
                 AssetDatabase.ImportAsset(
                     libraryPath,
                     ImportAssetOptions.ForceUpdate);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.ImportAssetForceUpdate",
+                    importStart,
+                    $"library={library.name}, asset={libraryPath}");
+
+                long reloadStart = EditorReloadDiagnostics.BeginTiming();
                 StylizedSurfaceDetailLibrary refreshedLibrary =
                     AssetDatabase.LoadAssetAtPath<
                         StylizedSurfaceDetailLibrary>(libraryPath);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.ReloadLibraryAsset",
+                    reloadStart,
+                    $"library={library.name}, asset={libraryPath}");
+
+                long notifyStart = EditorReloadDiagnostics.BeginTiming();
                 NotifyMaterialsUsingLibrary(
                     refreshedLibrary != null
                         ? refreshedLibrary
                         : library);
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.NotifyMaterialsUsingLibrary",
+                    notifyStart,
+                    $"library={library.name}");
 
                 if (logResult)
                 {
@@ -435,11 +527,16 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                         library);
                 }
 
+                rebuildSucceeded = true;
                 return true;
             }
             finally
             {
                 buildInProgress = false;
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "Rebuild.TOTAL",
+                    rebuildTotalStart,
+                    $"library={library.name}, success={rebuildSucceeded}, failures={failures.Count}");
             }
         }
 
@@ -451,6 +548,11 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 return string.Empty;
             }
 
+            bool diagnosticCapture =
+                EditorReloadDiagnostics.IsCaptureActive;
+            long totalStart = diagnosticCapture
+                ? EditorReloadDiagnostics.BeginTiming()
+                : 0L;
             StringBuilder builder = new StringBuilder();
             builder.Append(library.SliceResolution).Append('|');
             if (library.UsesInternalNeutralBackingSlice)
@@ -524,29 +626,125 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 }
             }
 
-            return Hash128.Compute(builder.ToString()).ToString();
+            string result = Hash128.Compute(builder.ToString()).ToString();
+            if (diagnosticCapture)
+            {
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "CalculateSignature",
+                    totalStart,
+                    $"library={library.name}, entries={library.Entries.Count}");
+            }
+
+            return result;
         }
 
         private static void RepairAllLibraries()
         {
-            repairScheduled = false;
-            if (buildInProgress || EditorApplication.isCompiling)
+            bool diagnosticCapture =
+                EditorReloadDiagnostics.IsCaptureActive;
+            long totalStart = diagnosticCapture
+                ? EditorReloadDiagnostics.BeginTiming()
+                : 0L;
+            int invocation = diagnosticCapture
+                ? EditorReloadDiagnostics.RecordPixelSurfaceRepairStart()
+                : 0;
+            string outcome = "completed";
+            try
             {
-                ScheduleRepair();
-                return;
-            }
-
-            string[] guids = AssetDatabase.FindAssets(
-                "t:StylizedSurfaceDetailLibrary");
-            for (int index = 0; index < guids.Length; index++)
-            {
-                string path = AssetDatabase.GUIDToAssetPath(guids[index]);
-                StylizedSurfaceDetailLibrary library =
-                    AssetDatabase.LoadAssetAtPath<
-                        StylizedSurfaceDetailLibrary>(path);
-                if (library != null && NeedsRebuild(library))
+                repairScheduled = false;
+                if (buildInProgress || EditorApplication.isCompiling)
                 {
-                    Rebuild(library, false);
+                    outcome = buildInProgress
+                        ? "deferred:build-in-progress"
+                        : "deferred:editor-compiling";
+                    ScheduleRepair("RepairDeferred");
+                    return;
+                }
+
+                long findStart = diagnosticCapture
+                    ? EditorReloadDiagnostics.BeginTiming()
+                    : 0L;
+                string[] guids = AssetDatabase.FindAssets(
+                    "t:StylizedSurfaceDetailLibrary");
+                if (diagnosticCapture)
+                {
+                    EditorReloadDiagnostics.RecordTimedStage(
+                        "RepairAllLibraries.FindAssets",
+                        findStart,
+                        $"count={guids.Length}");
+                }
+
+                int rebuilt = 0;
+                int current = 0;
+                int missing = 0;
+                for (int index = 0; index < guids.Length; index++)
+                {
+                    long loadStart = diagnosticCapture
+                        ? EditorReloadDiagnostics.BeginTiming()
+                        : 0L;
+                    string path = AssetDatabase.GUIDToAssetPath(guids[index]);
+                    StylizedSurfaceDetailLibrary library =
+                        AssetDatabase.LoadAssetAtPath<
+                            StylizedSurfaceDetailLibrary>(path);
+                    if (diagnosticCapture)
+                    {
+                        EditorReloadDiagnostics.RecordTimedStage(
+                            "RepairAllLibraries.LoadLibrary",
+                            loadStart,
+                            $"index={index}, asset={path}");
+                    }
+
+                    if (library == null)
+                    {
+                        missing++;
+                        continue;
+                    }
+
+                    bool needsRebuild = NeedsRebuild(library);
+                    if (diagnosticCapture)
+                    {
+                        EditorReloadDiagnostics.RecordEvent(
+                            "PixelSurface",
+                            $"Library decision: name={library.name}, asset={path}, " +
+                            $"needsRebuild={needsRebuild}.");
+                    }
+
+                    if (!needsRebuild)
+                    {
+                        current++;
+                        continue;
+                    }
+
+                    long rebuildStart = diagnosticCapture
+                        ? EditorReloadDiagnostics.BeginTiming()
+                        : 0L;
+                    bool rebuiltSuccessfully = Rebuild(library, false);
+                    if (diagnosticCapture)
+                    {
+                        EditorReloadDiagnostics.RecordTimedStage(
+                            "RepairAllLibraries.Rebuild",
+                            rebuildStart,
+                            $"library={library.name}, success={rebuiltSuccessfully}");
+                    }
+
+                    if (rebuiltSuccessfully)
+                    {
+                        rebuilt++;
+                    }
+                }
+
+                outcome =
+                    $"completed:found={guids.Length}, current={current}, " +
+                    $"rebuilt={rebuilt}, missing={missing}";
+            }
+            finally
+            {
+                if (diagnosticCapture)
+                {
+                    EditorReloadDiagnostics.RecordPixelSurfaceRepairEnd(
+                        invocation,
+                        totalStart,
+                        outcome);
                 }
             }
         }
@@ -554,8 +752,22 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
         private static void NotifyMaterialsUsingLibrary(
             StylizedSurfaceDetailLibrary library)
         {
+            bool diagnosticCapture =
+                EditorReloadDiagnostics.IsCaptureActive;
+            long findStart = diagnosticCapture
+                ? EditorReloadDiagnostics.BeginTiming()
+                : 0L;
             string[] guids = AssetDatabase.FindAssets(
                 "t:StylizedSurfaceMaterialProfile");
+            if (diagnosticCapture)
+            {
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "NotifyMaterials.FindAssets",
+                    findStart,
+                    $"library={library?.name ?? "<null>"}, count={guids.Length}");
+            }
+
+            int notified = 0;
             for (int index = 0; index < guids.Length; index++)
             {
                 string path = AssetDatabase.GUIDToAssetPath(guids[index]);
@@ -565,7 +777,16 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 if (profile != null && profile.DetailLibrary == library)
                 {
                     profile.NotifyEditorChanged();
+                    notified++;
                 }
+            }
+
+            if (diagnosticCapture)
+            {
+                EditorReloadDiagnostics.RecordEvent(
+                    "PixelSurface",
+                    $"NotifyMaterialsUsingLibrary: library={library?.name ?? "<null>"}, " +
+                    $"profilesScanned={guids.Length}, notified={notified}.");
             }
         }
 
@@ -1760,7 +1981,12 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
             if (changed)
             {
+                long reimportStart = EditorReloadDiagnostics.BeginTiming();
                 importer.SaveAndReimport();
+                EditorReloadDiagnostics.RecordTimedStage(
+                    "NormalizeImporter.SaveAndReimport",
+                    reimportStart,
+                    $"asset={path}");
             }
         }
 
@@ -1772,8 +1998,22 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             builder.Append(path).Append('|');
             if (!string.IsNullOrWhiteSpace(path))
             {
-                builder.Append(
-                    AssetDatabase.GetAssetDependencyHash(path));
+                bool diagnosticCapture =
+                    EditorReloadDiagnostics.IsCaptureActive;
+                long dependencyStart = diagnosticCapture
+                    ? EditorReloadDiagnostics.BeginTiming()
+                    : 0L;
+                Hash128 dependencyHash =
+                    AssetDatabase.GetAssetDependencyHash(path);
+                if (diagnosticCapture)
+                {
+                    EditorReloadDiagnostics.RecordTimedStage(
+                        "GetAssetDependencyHash",
+                        dependencyStart,
+                        $"asset={path}");
+                }
+
+                builder.Append(dependencyHash);
             }
 
             builder.Append('|');

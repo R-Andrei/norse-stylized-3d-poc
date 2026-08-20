@@ -8,7 +8,7 @@ namespace ProgrammaticStylized3D.Trees
 {
     public static class TreeGenerator
     {
-        public const int CurrentGeneratorVersion = 7;
+        public const int CurrentGeneratorVersion = 8;
         // Geometry/constraint algorithm versions may advance without rerolling
         // accepted seed streams or stable branch IDs. Change this only when a
         // deterministic structural reroll is explicitly approved.
@@ -716,7 +716,6 @@ namespace ProgrammaticStylized3D.Trees
                 TrunkBendCount = controls.BendFrequency,
                 TrunkDirectionalDrift = controls.TrunkDrift,
                 TrunkLeanStrength = controls.LeanAmount,
-                TrunkLeanDirectionDegrees = controls.LeanDirection,
                 TrunkSurfaceTorsionDegrees = controls.AxialTwist,
                 RootButtressCount = controls.RootCount,
                 RootButtressStrength = 0f,
@@ -788,7 +787,7 @@ namespace ProgrammaticStylized3D.Trees
             };
             parameters.AddOwnership(
                 "Recipe-only exact snapshot: " + sourceIdentity +
-                " (41 controls; zero family/calibration behavioral reads).");
+                " (40 controls; zero family/calibration behavioral reads).");
             return parameters;
         }
 
@@ -897,7 +896,6 @@ namespace ProgrammaticStylized3D.Trees
                 TrunkBendCount = Sample(profile.Trunk.BendCount, seeds, TreeSeedStream.TrunkShape, "trunk-bend-count"),
                 TrunkDirectionalDrift = Sample(profile.Trunk.DirectionalDrift, seeds, TreeSeedStream.TrunkShape, "trunk-drift"),
                 TrunkLeanStrength = Sample(profile.Trunk.LeanStrength, seeds, TreeSeedStream.TrunkShape, "trunk-lean"),
-                TrunkLeanDirectionDegrees = Sample(profile.Trunk.LeanDirectionDegrees, seeds, TreeSeedStream.TrunkShape, "trunk-lean-yaw"),
                 TrunkSurfaceTorsionDegrees = Sample(profile.Trunk.SurfaceTorsionDegrees, seeds, TreeSeedStream.TrunkShape, "trunk-surface-torsion"),
                 RootButtressCount = Sample(profile.Trunk.RootButtressCount, seeds, TreeSeedStream.TrunkShape, "root-buttress-count"),
                 RootButtressStrength = Sample(profile.Trunk.RootButtressStrength, seeds, TreeSeedStream.TrunkShape, "root-buttress-strength"),
@@ -1028,7 +1026,6 @@ namespace ProgrammaticStylized3D.Trees
             p.TrunkBendCount = o.TrunkBendCount.Resolve(p.TrunkBendCount, trunkSeed, owner + ".trunk-bends");
             p.TrunkDirectionalDrift = o.TrunkDirectionalDrift.Resolve(p.TrunkDirectionalDrift, trunkSeed, owner + ".trunk-drift");
             p.TrunkLeanStrength = o.TrunkLeanStrength.Resolve(p.TrunkLeanStrength, trunkSeed, owner + ".trunk-lean");
-            p.TrunkLeanDirectionDegrees = o.TrunkLeanDirectionDegrees.Resolve(p.TrunkLeanDirectionDegrees, trunkSeed, owner + ".trunk-lean-yaw");
             p.TrunkSurfaceTorsionDegrees = o.TrunkSurfaceTorsionDegrees.Resolve(p.TrunkSurfaceTorsionDegrees, trunkSeed, owner + ".trunk-surface-torsion");
             p.RootButtressCount = o.RootButtressCount.Resolve(p.RootButtressCount, trunkSeed, owner + ".root-buttress-count");
             p.RootButtressStrength = o.RootButtressStrength.Resolve(p.RootButtressStrength, trunkSeed, owner + ".root-buttress-strength");
@@ -1106,7 +1103,6 @@ namespace ProgrammaticStylized3D.Trees
             ValidateInside(p.TrunkBendCount, profile.Trunk.BendCount, "Trunk bend count", failures);
             ValidateInside(p.TrunkDirectionalDrift, profile.Trunk.DirectionalDrift, "Trunk directional drift", failures);
             ValidateInside(p.TrunkLeanStrength, profile.Trunk.LeanStrength, "Trunk lean strength", failures);
-            ValidateInside(p.TrunkLeanDirectionDegrees, profile.Trunk.LeanDirectionDegrees, "Trunk lean direction", failures);
             ValidateInside(p.TrunkSurfaceTorsionDegrees, profile.Trunk.SurfaceTorsionDegrees, "Trunk twist degrees", failures);
             ValidateInside(p.RootButtressCount, profile.Trunk.RootButtressCount, "Root buttress count", failures);
             ValidateInside(p.RootButtressStrength, profile.Trunk.RootButtressStrength, "Root buttress strength", failures);
@@ -1211,7 +1207,7 @@ namespace ProgrammaticStylized3D.Trees
             int seed = context.Seeds.GetSeed(TreeSeedStream.TrunkShape);
             int pointCount = Mathf.Max(3, p.TrunkControlPointCount);
             var nonSpiralAnchors = new List<Vector3>(pointCount);
-            Vector2 leanDirection = DirectionFromDegrees(p.TrunkLeanDirectionDegrees);
+            Vector2 leanAxis = Vector2.right;
             Vector2 primaryCurveDirection = TreeDeterministicUtility.DirectionXZ(seed, "trunk-primary-curve");
             Vector2 secondaryCurveDirection = new Vector2(-primaryCurveDirection.y, primaryCurveDirection.x);
             float spiralPhase = TreeDeterministicUtility.Sample01(seed, "trunk-spiral-phase") * Mathf.PI * 2f;
@@ -1242,7 +1238,7 @@ namespace ProgrammaticStylized3D.Trees
                     Mathf.Max(1, pointCount - 1) * t;
                 Vector2 irregularity = jitterDirection *
                     p.TrunkIrregularity * p.Height * 0.035f * bendEnvelope;
-                Vector2 lean = leanDirection *
+                Vector2 lean = leanAxis *
                     p.TrunkLeanStrength * p.Height * Mathf.Pow(t, 1.35f);
                 nonSpiralAnchors.Add(new Vector3(
                     curve.x + drift.x + irregularity.x + lean.x,
@@ -1984,6 +1980,15 @@ namespace ProgrammaticStylized3D.Trees
                 return;
             }
 
+            if (context.RecipeOnly)
+            {
+                ConstrainRecipeOnlyTrunkPreservingEndpointAndHeight(
+                    context,
+                    points,
+                    maximumHorizontal);
+                return;
+            }
+
             for (int index = 1; index < points.Count; index++)
             {
                 Vector2 horizontal = new Vector2(
@@ -2016,6 +2021,185 @@ namespace ProgrammaticStylized3D.Trees
                 0f,
                 context.Parameters.Height);
             ClampControlPointsToReferenceEnvelope(context, points);
+        }
+
+        private static void ConstrainRecipeOnlyTrunkPreservingEndpointAndHeight(
+            GenerationContext context,
+            List<Vector3> points,
+            float maximumHorizontal)
+        {
+            TreeGenerationRuntimePolicy constraints = context.Policy;
+            if (RecipeOnlyTrunkCandidatePassesConstraints(
+                    points,
+                    maximumHorizontal,
+                    constraints.MaximumTrunkSegmentTurnDegrees,
+                    constraints.MaximumPrimaryAccumulatedTurnDegrees))
+            {
+                return;
+            }
+
+            int count = points.Count;
+            Vector3 basePoint = points[0];
+            Vector3 tipPoint = points[count - 1];
+            Vector2 baseHorizontal = new Vector2(basePoint.x, basePoint.z);
+            Vector2 tipHorizontal = new Vector2(tipPoint.x, tipPoint.z);
+            var chord = new Vector2[count];
+            var residual = new Vector2[count];
+            var candidate = new Vector3[count];
+
+            for (int index = 0; index < count; index++)
+            {
+                float t = index / (float)(count - 1);
+                chord[index] = Vector2.Lerp(
+                    baseHorizontal,
+                    tipHorizontal,
+                    t);
+                Vector3 authored = points[index];
+                residual[index] = new Vector2(
+                    authored.x - chord[index].x,
+                    authored.z - chord[index].y);
+            }
+
+            BuildRecipeOnlyTrunkConstraintCandidate(
+                points,
+                chord,
+                residual,
+                0f,
+                candidate);
+            if (!RecipeOnlyTrunkCandidatePassesConstraints(
+                    candidate,
+                    maximumHorizontal,
+                    constraints.MaximumTrunkSegmentTurnDegrees,
+                    constraints.MaximumPrimaryAccumulatedTurnDegrees))
+            {
+                context.Warnings.Add(
+                    "Recipe-only trunk endpoint cannot satisfy the active horizontal/turn safety policy without changing the authored base, tip, or height; authored endpoint contract was preserved.");
+                return;
+            }
+
+            float passingScale = 0f;
+            float failingScale = 1f;
+            const int bisectionIterations = 10;
+            for (int iteration = 0; iteration < bisectionIterations; iteration++)
+            {
+                float scale = (passingScale + failingScale) * 0.5f;
+                BuildRecipeOnlyTrunkConstraintCandidate(
+                    points,
+                    chord,
+                    residual,
+                    scale,
+                    candidate);
+                if (RecipeOnlyTrunkCandidatePassesConstraints(
+                        candidate,
+                        maximumHorizontal,
+                        constraints.MaximumTrunkSegmentTurnDegrees,
+                        constraints.MaximumPrimaryAccumulatedTurnDegrees))
+                {
+                    passingScale = scale;
+                }
+                else
+                {
+                    failingScale = scale;
+                }
+            }
+
+            BuildRecipeOnlyTrunkConstraintCandidate(
+                points,
+                chord,
+                residual,
+                passingScale,
+                candidate);
+            for (int index = 0; index < count; index++)
+            {
+                points[index] = candidate[index];
+            }
+        }
+
+        private static void BuildRecipeOnlyTrunkConstraintCandidate(
+            IReadOnlyList<Vector3> authored,
+            IReadOnlyList<Vector2> chord,
+            IReadOnlyList<Vector2> residual,
+            float residualScale,
+            Vector3[] candidate)
+        {
+            int count = authored.Count;
+            for (int index = 0; index < count; index++)
+            {
+                Vector3 source = authored[index];
+                if (index == 0 || index == count - 1)
+                {
+                    candidate[index] = source;
+                    continue;
+                }
+
+                Vector2 horizontal = chord[index] +
+                    residual[index] * residualScale;
+                candidate[index] = new Vector3(
+                    horizontal.x,
+                    source.y,
+                    horizontal.y);
+            }
+        }
+
+        private static bool RecipeOnlyTrunkCandidatePassesConstraints(
+            IReadOnlyList<Vector3> points,
+            float maximumHorizontal,
+            float maximumSegmentTurnDegrees,
+            float maximumAccumulatedTurnDegrees)
+        {
+            if (points == null || points.Count < 2)
+            {
+                return true;
+            }
+
+            Vector3 previousDirection = Vector3.up;
+            float accumulatedTurn = 0f;
+            for (int index = 0; index < points.Count; index++)
+            {
+                Vector3 point = points[index];
+                if (!IsFinite(point))
+                {
+                    return false;
+                }
+
+                if (maximumHorizontal > Epsilon &&
+                    new Vector2(point.x, point.z).magnitude >
+                    maximumHorizontal + Epsilon)
+                {
+                    return false;
+                }
+
+                if (index == 0)
+                {
+                    continue;
+                }
+
+                Vector3 segment = point - points[index - 1];
+                if (segment.sqrMagnitude <= Epsilon)
+                {
+                    return false;
+                }
+
+                Vector3 direction = segment.normalized;
+                float turn = Vector3.Angle(
+                    previousDirection,
+                    direction);
+                if (turn > maximumSegmentTurnDegrees + 0.0001f)
+                {
+                    return false;
+                }
+
+                accumulatedTurn += turn;
+                if (accumulatedTurn >
+                    maximumAccumulatedTurnDegrees + 0.0001f)
+                {
+                    return false;
+                }
+
+                previousDirection = direction;
+            }
+
+            return true;
         }
 
         private static void ScaleHeightPreservingTrunkToHorizontalEnvelope(
@@ -4087,7 +4271,6 @@ namespace ProgrammaticStylized3D.Trees
             TreeDeterministicUtility.Append(ref hash, p.TrunkBendCount);
             TreeDeterministicUtility.Append(ref hash, p.TrunkDirectionalDrift);
             TreeDeterministicUtility.Append(ref hash, p.TrunkLeanStrength);
-            TreeDeterministicUtility.Append(ref hash, p.TrunkLeanDirectionDegrees);
             TreeDeterministicUtility.Append(ref hash, p.TrunkSurfaceTorsionDegrees);
             TreeDeterministicUtility.Append(ref hash, p.RootButtressCount);
             TreeDeterministicUtility.Append(ref hash, p.RootButtressStrength);
@@ -4399,7 +4582,6 @@ namespace ProgrammaticStylized3D.Trees
                 .Append(" drift=").Append(p.TrunkDirectionalDrift.ToString("F3"))
                 .Append(" roughness=").Append(p.TrunkIrregularity.ToString("F3"))
                 .Append(" lean=").Append(p.TrunkLeanStrength.ToString("F3"))
-                .Append(" leanYaw=").Append(p.TrunkLeanDirectionDegrees.ToString("F1"))
                 .Append(" axialTwist=")
                 .AppendLine(p.TrunkSurfaceTorsionDegrees.ToString("F1"));
             if (p.RecipeOnlyControlSource)
@@ -4594,12 +4776,6 @@ namespace ProgrammaticStylized3D.Trees
                 TreeDeterministicUtility.IsFinite(value.g) &&
                 TreeDeterministicUtility.IsFinite(value.b) &&
                 TreeDeterministicUtility.IsFinite(value.a);
-        }
-
-        private static Vector2 DirectionFromDegrees(float degrees)
-        {
-            float radians = degrees * Mathf.Deg2Rad;
-            return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
         }
 
         private static float ResolveSpiralDirection(

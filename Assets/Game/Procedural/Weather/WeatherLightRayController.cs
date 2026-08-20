@@ -23,13 +23,12 @@ namespace ProgrammaticStylized3D.Weather
         private const int DefaultRenderingLayerMask = 1;
         private const int SurfaceSpotRenderingLayerMask =
             DefaultRenderingLayerMask;
-        private const float SharedAccentLineMaximumRelativeScale = 1000f;
-        private const float SharedAccentLineExponentialBase =
-            SharedAccentLineMaximumRelativeScale + 1f;
-        private const float SharedAccentLineOutputMultiplier = 0.2f;
-        private const float SharedAccentLineBaselineDefault = 0.03f;
+        private const float VegetationAccentLineMaximumRelativeScale = 1000f;
+        private const float VegetationAccentLineExponentialBase =
+            VegetationAccentLineMaximumRelativeScale + 1f;
+        private const float VegetationAccentLineOutputMultiplier = 0.2f;
         private const string ImplementationPatchIdentifier =
-            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A4-PER-RAY-PRESET-AUTHORITY";
+            "WEATHER-LIGHT-RAY-CLEANUP-V1.3A5-AUTHORITY-CLOSURE";
 
         private struct RuntimeSlot
         {
@@ -107,40 +106,6 @@ namespace ProgrammaticStylized3D.Weather
         [SerializeField]
         private WeatherLightRayRenderDebugView renderDebugView =
             WeatherLightRayRenderDebugView.FinalComposite;
-
-        [Header("Shared LightRay Accent Response")]
-        [SerializeField, Range(0f, 1f)]
-        [Tooltip(
-            "Global master for LightRay-specific stylized accent-line responses. " +
-            "0 disables those accents. The response is intentionally exponential: " +
-            "approximately 0.03 is 0.046x the former AF5D maximum, 0.10 is 0.20x, " +
-            "0.20 is about 0.60x, 0.50 is about 6.13x, and 1.0 is 200x. " +
-            "This is exactly 40% of the AF5F output at every slider value and does " +
-            "not change real surface-light intensity or ordinary lights. Newly " +
-            "created controllers default to 0.03; existing serialized controllers " +
-            "retain their saved value and are not migrated by source-default changes.")]
-        private float accentLineIntensity = SharedAccentLineBaselineDefault;
-
-        [SerializeField, Range(0f, 1f)]
-        [Tooltip(
-            "Controls how many vegetation blade/card candidates participate in " +
-            "the registered Weather LightRay Spot accent response. " +
-            "0 selects none; 1 preserves the current full participation. " +
-            "This does not dim surviving accents and does not affect ordinary " +
-            "lights, vegetation body lighting, or atmospheric beams.")]
-        private float lightRayVegetationAccentCoverage = 1f;
-
-
-        [Header("Beam Evolution Defaults")]
-        [SerializeField]
-        private WeatherLightRayEvolutionPreset evolutionPreset =
-            WeatherLightRayEvolutionPreset.Subtle;
-
-        [SerializeField, Range(0f, 1f)]
-        private float evolutionStrength = 0.35f;
-
-        [SerializeField, Range(0f, 1f)]
-        private float evolutionSpeed = 0.25f;
 
         [Header("Central Storage")]
         [SerializeField, Range(MinimumStorageCapacity, MaximumStorageCapacity)]
@@ -244,7 +209,6 @@ namespace ProgrammaticStylized3D.Weather
         /// </summary>
         public WeatherLightRayPreset ActivePreset => activePreset;
         public WeatherLightRayPreset DefaultPreset => activePreset;
-        public bool UsesPresetAuthority => activePreset != null;
         public bool PreviewInEditMode => previewInEditMode;
         public bool IsPublished => PublishedController == this;
         public int StorageCapacity =>
@@ -263,33 +227,6 @@ namespace ProgrammaticStylized3D.Weather
         public Camera ResolvedRenderCamera => resolvedRenderCamera;
         public WeatherLightRayRenderDebugView RenderDebugView =>
             renderDebugView;
-        public float AccentLineIntensity => activePreset != null
-            ? Mathf.Lerp(
-                previousPresentationPreset != null ? previousPresentationPreset.AccentLineIntensity : activePreset.AccentLineIntensity,
-                activePreset.AccentLineIntensity,
-                PresetPresentationBlend)
-            : accentLineIntensity;
-        public float LightRayVegetationAccentCoverage => activePreset != null
-            ? Mathf.Lerp(
-                previousPresentationPreset != null ? previousPresentationPreset.VegetationAccentCoverage : activePreset.VegetationAccentCoverage,
-                activePreset.VegetationAccentCoverage,
-                PresetPresentationBlend)
-            : lightRayVegetationAccentCoverage;
-        public float LightRayVegetationAccentSoftness => activePreset != null
-            ? Mathf.Lerp(
-                previousPresentationPreset != null ? previousPresentationPreset.VegetationAccentSoftness : activePreset.VegetationAccentSoftness,
-                activePreset.VegetationAccentSoftness,
-                PresetPresentationBlend)
-            : 0.5f;
-        public WeatherLightRayEvolutionPreset EvolutionPreset => activePreset != null
-            ? activePreset.EvolutionPreset
-            : evolutionPreset;
-        public float EvolutionStrength => activePreset != null
-            ? activePreset.EvolutionStrength
-            : ResolveEvolutionStrength(evolutionPreset, evolutionStrength);
-        public float EvolutionSpeed => activePreset != null
-            ? activePreset.EvolutionSpeed
-            : ResolveEvolutionSpeed(evolutionPreset, evolutionSpeed);
         public int PublishedVegetationAdditionalLightCount =>
             publishedVegetationAdditionalLightCount;
         public int PublishedVegetationWeatherOverrideCount =>
@@ -443,11 +380,6 @@ namespace ProgrammaticStylized3D.Weather
                 automaticPopulationMaximumGroundSlopeDegrees,
                 0f,
                 89f);
-            accentLineIntensity = Mathf.Clamp01(accentLineIntensity);
-            lightRayVegetationAccentCoverage = Mathf.Clamp01(
-                lightRayVegetationAccentCoverage);
-            evolutionStrength = Mathf.Clamp01(evolutionStrength);
-            evolutionSpeed = Mathf.Clamp01(evolutionSpeed);
 
             if (isActiveAndEnabled)
             {
@@ -587,23 +519,31 @@ namespace ProgrammaticStylized3D.Weather
             return true;
         }
 
-        public float PresetPresentationBlend
+        private void FinalizeCompletedDefaultPresetTransition(double now)
         {
-            get
+            if (previousPresentationPreset == null)
             {
-                if (previousPresentationPreset == null || presetTransitionDurationSeconds <= 0f)
-                {
-                    return 1f;
-                }
-
-                float blend = Mathf.Clamp01((float)((Time.realtimeSinceStartupAsDouble - presetTransitionStartedAt) / presetTransitionDurationSeconds));
-                if (blend >= 1f)
-                {
-                    previousPresentationPreset = null;
-                    presetTransitionDurationSeconds = 0f;
-                }
-                return blend;
+                presetTransitionDurationSeconds = 0f;
+                return;
             }
+
+            if (presetTransitionDurationSeconds <= 0f)
+            {
+                previousPresentationPreset = null;
+                presetTransitionDurationSeconds = 0f;
+                return;
+            }
+
+            double elapsed = System.Math.Max(
+                0.0,
+                now - presetTransitionStartedAt);
+            if (elapsed < presetTransitionDurationSeconds)
+            {
+                return;
+            }
+
+            previousPresentationPreset = null;
+            presetTransitionDurationSeconds = 0f;
         }
 
         private WeatherLightRayPreset ResolvePresetOverride(
@@ -1291,7 +1231,7 @@ namespace ProgrammaticStylized3D.Weather
         {
             var builder = new StringBuilder(4096);
             builder.AppendLine(
-                "[Weather LightRay Cleanup V1.3A4 Comprehensive Report]");
+                "[Weather LightRay Cleanup V1.3A5 Comprehensive Report]");
             builder.Append("Implementation patch: ")
                 .AppendLine(ImplementationPatchIdentifier);
             builder.Append("Published / active controllers: ")
@@ -1322,19 +1262,6 @@ namespace ProgrammaticStylized3D.Weather
                     : "None")
                 .Append(" / ")
                 .AppendLine(renderDebugView.ToString());
-            builder.Append("Default-preset vegetation accent intensity / coverage / softness: ");
-            if (activePreset != null)
-            {
-                builder.Append(AccentLineIntensity.ToString("0.###"))
-                    .Append(" / ")
-                    .Append(LightRayVegetationAccentCoverage.ToString("0.###"))
-                    .Append(" / ")
-                    .AppendLine(LightRayVegetationAccentSoftness.ToString("0.###"));
-            }
-            else
-            {
-                builder.AppendLine("N/A (no Controller Default Preset)");
-            }
             builder.Append("Published vegetation additional lights / Weather overrides / buffer capacity / overflow: ")
                 .Append(publishedVegetationAdditionalLightCount)
                 .Append(" / ")
@@ -1443,6 +1370,8 @@ namespace ProgrammaticStylized3D.Weather
                 return;
             }
 
+            FinalizeCompletedDefaultPresetTransition(
+                Time.realtimeSinceStartupAsDouble);
             EnsureStorage();
             ResolveSourceStates();
             ResolveRenderCamera();
@@ -1957,7 +1886,7 @@ namespace ProgrammaticStylized3D.Weather
                         WeatherLightRayDescriptor descriptor =
                             raySnapshot.Descriptor;
                         float accentScale = lightRaysEnabled
-                            ? EvaluateSharedAccentLineRelativeScale(
+                            ? EvaluateVegetationAccentLineRelativeScale(
                                 descriptor.VegetationAccentIntensity)
                             : 0f;
                         Vector4 accentData = new Vector4(
@@ -2172,7 +2101,7 @@ namespace ProgrammaticStylized3D.Weather
             return light.enabled;
         }
 
-        private static float EvaluateSharedAccentLineRelativeScale(
+        private static float EvaluateVegetationAccentLineRelativeScale(
             float normalizedIntensity)
         {
             float clamped = Mathf.Clamp01(normalizedIntensity);
@@ -2181,8 +2110,8 @@ namespace ProgrammaticStylized3D.Weather
                 return 0f;
             }
 
-            return SharedAccentLineOutputMultiplier *
-                (Mathf.Pow(SharedAccentLineExponentialBase, clamped) - 1f);
+            return VegetationAccentLineOutputMultiplier *
+                (Mathf.Pow(VegetationAccentLineExponentialBase, clamped) - 1f);
         }
 
         private static Color ResolveSourcePresentationColour(
@@ -2680,40 +2609,6 @@ namespace ProgrammaticStylized3D.Weather
                 lifecycleState == WeatherLightRayLifecycleState.Inactive)
             {
                 ReleaseSlot(slotIndex);
-            }
-        }
-
-        private static float ResolveEvolutionStrength(
-            WeatherLightRayEvolutionPreset preset,
-            float customStrength)
-        {
-            switch (preset)
-            {
-                case WeatherLightRayEvolutionPreset.Static:
-                    return 0f;
-                case WeatherLightRayEvolutionPreset.Subtle:
-                    return 0.35f;
-                case WeatherLightRayEvolutionPreset.Living:
-                    return 0.65f;
-                default:
-                    return Mathf.Clamp01(customStrength);
-            }
-        }
-
-        private static float ResolveEvolutionSpeed(
-            WeatherLightRayEvolutionPreset preset,
-            float customSpeed)
-        {
-            switch (preset)
-            {
-                case WeatherLightRayEvolutionPreset.Static:
-                    return 0f;
-                case WeatherLightRayEvolutionPreset.Subtle:
-                    return 0.25f;
-                case WeatherLightRayEvolutionPreset.Living:
-                    return 0.50f;
-                default:
-                    return Mathf.Clamp01(customSpeed);
             }
         }
 

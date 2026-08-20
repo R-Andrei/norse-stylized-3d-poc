@@ -36,16 +36,9 @@ namespace ProgrammaticStylized3D.Rivers
         }
 
         private void PrepareBulkTransportSubstep(
-            StylizedRiverFoamTransportScheme transportScheme,
             float substepDelta)
         {
             bulkTransportIntegerShift = 0;
-            bool usesBulkPhase = transportScheme ==
-                StylizedRiverFoamTransportScheme.BulkPhaseResidualTvd;
-            if (!usesBulkPhase)
-            {
-                return;
-            }
 
             float spacing = Mathf.Max(
                 0.0001f,
@@ -97,9 +90,6 @@ namespace ProgrammaticStylized3D.Rivers
                 return;
             }
 
-            StylizedRiverFoamTransportScheme transportScheme =
-                river.FoamTransportScheme;
-
             Graphics.CopyTexture(currentState, presentationPreviousState);
             previousState = presentationPreviousState;
             previousBulkTransportPhaseCells = bulkTransportPhaseCells;
@@ -127,9 +117,7 @@ namespace ProgrammaticStylized3D.Rivers
                 float lifecycleDeltaTime = finalSubstep
                     ? materialStepDuration
                     : 0f;
-                PrepareBulkTransportSubstep(
-                    transportScheme,
-                    substepDelta);
+                PrepareBulkTransportSubstep(substepDelta);
                 ConfigureSharedComputeParameters(
                     substepDelta,
                     lifecycleDeltaTime);
@@ -244,11 +232,8 @@ namespace ProgrammaticStylized3D.Rivers
                         automaticFoamSourceEventGpuData[index];
                     bool depositionPhaseChanged = Mathf.Abs(
                         gpuData.Header.y - gpuData.Deposit.x) > 0.0001f;
-                    bool shoreRibbon = sourceEvent.Type ==
-                        AutomaticFoamSourceEventType.ShoreRibbon;
-                    bool debugHeadRequired = shoreRibbon &&
-                        IsAutomaticBirthSourcesDebugActive;
-                    bool hasNewDeposition = shoreRibbon ||
+                    bool debugHeadRequired = IsAutomaticBirthSourcesDebugActive;
+                    bool hasNewDeposition =
                         gpuData.Deposit.z < 0.5f ||
                         depositionPhaseChanged ||
                         gpuData.Header.z >
@@ -256,14 +241,31 @@ namespace ProgrammaticStylized3D.Rivers
 
                     if (hasNewDeposition || debugHeadRequired)
                     {
-                        DispatchAutomaticFoamSourceEvent(
-                            index,
-                            sourceEvent,
-                            gpuData,
-                            target,
-                            shoreRibbon || debugHeadRequired);
-                        automaticSourceEventsRasterizedLastUpdate++;
-                        if (hasNewDeposition)
+                        int revealDispatchCount;
+                        if (IsAutomaticObjectContactCycle(sourceEvent.Type) &&
+                            depositionPhaseChanged)
+                        {
+                            revealDispatchCount =
+                                DispatchAutomaticObjectRevealSlices(
+                                    index,
+                                    sourceEvent,
+                                    gpuData,
+                                    target);
+                        }
+                        else
+                        {
+                            DispatchAutomaticFoamSourceEvent(
+                                index,
+                                sourceEvent,
+                                gpuData,
+                                target,
+                                debugHeadRequired);
+                            revealDispatchCount = 1;
+                        }
+
+                        automaticSourceEventsRasterizedLastUpdate +=
+                            revealDispatchCount;
+                        if (hasNewDeposition && revealDispatchCount > 0)
                         {
                             injectedLastUpdate++;
                         }
@@ -310,34 +312,22 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceType == AutomaticFoamSourceEventType.ObjectContactSemiArc;
         }
 
-        private static int ResolveShoreRibbonHeadCellIndex(
-            AutomaticFoamSourceEvent sourceEvent,
-            float progress)
-        {
-            float authoredCellCount = sourceEvent.BodyLengthCells > 0f
-                ? sourceEvent.BodyLengthCells
-                : sourceEvent.RevealPathDistanceMetres;
-            int totalCellCount = Mathf.Max(
-                1,
-                Mathf.RoundToInt(authoredCellCount));
-            return Mathf.Clamp(
-                Mathf.FloorToInt(
-                    Mathf.Clamp01(progress) * totalCellCount + 0.00001f),
-                0,
-                totalCellCount - 1);
-        }
-
         private static void ResolveAutomaticSourceDepositionState(
             AutomaticFoamSourceEvent sourceEvent,
             float elapsed,
             out float phaseOrSide,
-            out float progress)
+            out float headDistanceCells)
         {
+            float speedCellsPerSecond = Mathf.Max(
+                0.0001f,
+                sourceEvent.RevealSpeedCellsPerSecond);
             if (!IsAutomaticObjectContactCycle(sourceEvent.Type))
             {
                 phaseOrSide = sourceEvent.SideSign;
-                progress = Mathf.Clamp01(
-                    elapsed / Mathf.Max(0.0001f, sourceEvent.Duration));
+                headDistanceCells = ResolveAutomaticRevealHeadDistanceCells(
+                    sourceEvent.RevealPathLengthCells,
+                    speedCellsPerSecond,
+                    elapsed);
                 return;
             }
 
@@ -349,7 +339,12 @@ namespace ProgrammaticStylized3D.Rivers
             if (sourceEvent.ObjectContactReinforcementOnly)
             {
                 phaseOrSide = 1f;
-                progress = Mathf.Clamp01(elapsed / contactStrokeDuration);
+                headDistanceCells = ResolveAutomaticRevealHeadDistanceCells(
+                    ResolveAutomaticObjectContactPhasePathLengthCells(
+                        sourceEvent,
+                        phaseOrSide),
+                    speedCellsPerSecond,
+                    elapsed);
                 return;
             }
 
@@ -363,56 +358,54 @@ namespace ProgrammaticStylized3D.Rivers
             float totalDuration = initialStrokeDuration +
                 Mathf.Max(0, strokeCount - 1) * contactStrokeDuration;
             float clampedElapsed = Mathf.Clamp(elapsed, 0f, totalDuration);
+            float phaseElapsed;
             if (strokeCount <= 1 || clampedElapsed < initialStrokeDuration)
             {
                 phaseOrSide = 0f;
-                progress = Mathf.Clamp01(
-                    clampedElapsed / initialStrokeDuration);
-                return;
+                phaseElapsed = clampedElapsed;
+            }
+            else
+            {
+                float reinforcementElapsed =
+                    clampedElapsed - initialStrokeDuration;
+                int reinforcementIndex = Mathf.Min(
+                    strokeCount - 2,
+                    Mathf.FloorToInt(
+                        reinforcementElapsed / contactStrokeDuration));
+                phaseElapsed = reinforcementElapsed -
+                    reinforcementIndex * contactStrokeDuration;
+                phaseOrSide = reinforcementIndex + 1;
+                if (clampedElapsed >= totalDuration - 0.000001f)
+                {
+                    phaseElapsed = contactStrokeDuration;
+                }
             }
 
-            float reinforcementElapsed = clampedElapsed - initialStrokeDuration;
-            int reinforcementIndex = Mathf.Min(
-                strokeCount - 2,
-                Mathf.FloorToInt(reinforcementElapsed / contactStrokeDuration));
-            float strokeElapsed = reinforcementElapsed -
-                reinforcementIndex * contactStrokeDuration;
-            phaseOrSide = reinforcementIndex + 1;
-            progress = Mathf.Clamp01(strokeElapsed / contactStrokeDuration);
+            headDistanceCells = ResolveAutomaticRevealHeadDistanceCells(
+                ResolveAutomaticObjectContactPhasePathLengthCells(
+                    sourceEvent,
+                    phaseOrSide),
+                speedCellsPerSecond,
+                phaseElapsed);
         }
 
-        private static float ResolveAutomaticObjectContactPhaseDuration(
+        private static float ResolveAutomaticObjectContactPhasePathLengthCells(
             AutomaticFoamSourceEvent sourceEvent,
             float phaseCode)
         {
             if (!IsAutomaticObjectContactCycle(sourceEvent.Type) ||
                 phaseCode < 0.5f)
             {
-                return Mathf.Max(0.0001f, sourceEvent.ObjectBuildDuration);
-            }
-
-            return Mathf.Max(
-                0.0001f,
-                sourceEvent.ObjectContactStrokeDuration > 0f
-                    ? sourceEvent.ObjectContactStrokeDuration
-                    : sourceEvent.ObjectBuildDuration);
-        }
-
-        private static float ResolveAutomaticObjectContactPhasePathLength(
-            AutomaticFoamSourceEvent sourceEvent,
-            float phaseCode)
-        {
-            if (!IsAutomaticObjectContactCycle(sourceEvent.Type) ||
-                phaseCode < 0.5f)
-            {
-                return Mathf.Max(0.001f, sourceEvent.RevealPathDistanceMetres);
+                return Mathf.Max(
+                    0.001f,
+                    sourceEvent.RevealPathLengthCells);
             }
 
             return Mathf.Max(
                 0.001f,
-                sourceEvent.ObjectContactStrokePathLengthMetres > 0f
-                    ? sourceEvent.ObjectContactStrokePathLengthMetres
-                    : sourceEvent.RevealPathDistanceMetres);
+                sourceEvent.ObjectContactStrokePathLengthCells > 0f
+                    ? sourceEvent.ObjectContactStrokePathLengthCells
+                    : sourceEvent.RevealPathLengthCells);
         }
 
         private FoamSourceEventGpuData BuildAutomaticFoamSourceGpuData(
@@ -437,20 +430,12 @@ namespace ProgrammaticStylized3D.Rivers
                 sourceEvent,
                 sourceEvent.Elapsed,
                 out float phaseCode,
-                out float progress);
+                out float headDistanceCells);
             ResolveAutomaticSourceDepositionState(
                 sourceEvent,
                 previousElapsed,
                 out float previousPhaseCode,
-                out float previousProgress);
-            float depositionPhaseDuration = objectContactCycle
-                ? ResolveAutomaticObjectContactPhaseDuration(
-                    sourceEvent,
-                    phaseCode)
-                : sourceEvent.Duration;
-            float materialStepProgress = Mathf.Clamp01(
-                (1f / Mathf.Max(1f, ResolveUpdateRate())) /
-                Mathf.Max(0.0001f, depositionPhaseDuration));
+                out float previousHeadDistanceCells);
 
             Vector4 distanceData;
             Vector4 shoreData;
@@ -529,21 +514,13 @@ namespace ProgrammaticStylized3D.Rivers
                     0f,
                     0f,
                     d8CellRecipe ? sourceEvent.BendAmplitudeCells : sourceEvent.Curvature);
-                kinematicsData = d8CellRecipe
-                    ? new Vector4(
-                        sourceEvent.FormationSpeedMetresPerSecond,
-                        sourceEvent.HeadLengthCells,
-                        sourceEvent.BodyLengthCells > 0f ? sourceEvent.BodyLengthCells : sourceEvent.RevealPathDistanceMetres,
-                        1f)
-                    : new Vector4(
-                        sourceEvent.FormationSpeedMetresPerSecond,
-                        sourceEvent.HeadTrailMetres,
-                        Mathf.Sqrt(
-                            Mathf.Abs(endStorageGlobal - startStorageGlobal) *
-                            Mathf.Abs(endStorageGlobal - startStorageGlobal) +
-                            sourceEvent.InwardReachMetres *
-                            sourceEvent.InwardReachMetres),
-                        Mathf.Clamp01(sourceEvent.SourceFillBlend));
+                kinematicsData = new Vector4(
+                    sourceEvent.RevealSpeedCellsPerSecond,
+                    sourceEvent.HeadLengthCells,
+                    sourceEvent.RevealPathLengthCells,
+                    d8CellRecipe
+                        ? 1f
+                        : Mathf.Clamp01(sourceEvent.SourceFillBlend));
                 objectData = d8CellRecipe && !cellExactShoreSource
                     ? new Vector4(
                         sourceEvent.ObjectCentreAcrossMetres,
@@ -562,7 +539,7 @@ namespace ProgrammaticStylized3D.Rivers
                 Header = new Vector4(
                     (float)sourceEvent.Type,
                     phaseCode,
-                    progress,
+                    headDistanceCells,
                     sourceEvent.ShapeSeed),
                 Distance = distanceData,
                 Shore = shoreData,
@@ -576,12 +553,108 @@ namespace ProgrammaticStylized3D.Rivers
                 ObjectData = objectData,
                 Deposit = new Vector4(
                     previousPhaseCode,
-                    previousProgress,
+                    previousHeadDistanceCells,
                     previousElapsed > 0.000001f ? 1f : 0f,
                     objectContactCycle
                         ? sourceEvent.ContactSpanCells
                         : 0f)
             };
+        }
+
+        private static FoamSourceEventGpuData WithAutomaticRevealState(
+            FoamSourceEventGpuData gpuData,
+            float phaseCode,
+            float currentHeadDistanceCells,
+            float previousHeadDistanceCells,
+            bool previousValid)
+        {
+            gpuData.Header.y = phaseCode;
+            gpuData.Header.z = Mathf.Max(0f, currentHeadDistanceCells);
+            gpuData.Deposit.x = phaseCode;
+            gpuData.Deposit.y = Mathf.Max(0f, previousHeadDistanceCells);
+            gpuData.Deposit.z = previousValid ? 1f : 0f;
+            return gpuData;
+        }
+
+        private int DispatchAutomaticObjectRevealSlices(
+            int eventIndex,
+            AutomaticFoamSourceEvent sourceEvent,
+            FoamSourceEventGpuData endpointGpuData,
+            RenderTexture target)
+        {
+            int previousPhase = Mathf.Max(
+                0,
+                Mathf.RoundToInt(endpointGpuData.Deposit.x));
+            int currentPhase = Mathf.Max(
+                previousPhase,
+                Mathf.RoundToInt(endpointGpuData.Header.y));
+            if (currentPhase <= previousPhase)
+            {
+                DispatchAutomaticFoamSourceEvent(
+                    eventIndex,
+                    sourceEvent,
+                    endpointGpuData,
+                    target,
+                    IsAutomaticBirthSourcesDebugActive);
+                return 1;
+            }
+
+            int dispatchCount = 0;
+            float previousHead = Mathf.Max(0f, endpointGpuData.Deposit.y);
+            for (int phase = previousPhase; phase <= currentPhase; phase++)
+            {
+                float phasePathLength =
+                    ResolveAutomaticObjectContactPhasePathLengthCells(
+                        sourceEvent,
+                        phase);
+                float currentHead = phase < currentPhase
+                    ? phasePathLength
+                    : Mathf.Clamp(
+                        endpointGpuData.Header.z,
+                        0f,
+                        phasePathLength);
+                float slicePreviousHead = phase == previousPhase
+                    ? Mathf.Clamp(previousHead, 0f, phasePathLength)
+                    : 0f;
+                bool previousValid = phase == previousPhase
+                    ? endpointGpuData.Deposit.z > 0.5f
+                    : false;
+                if (currentHead <= slicePreviousHead + 0.000001f &&
+                    previousValid &&
+                    !IsAutomaticBirthSourcesDebugActive)
+                {
+                    continue;
+                }
+
+                FoamSourceEventGpuData sliceGpuData =
+                    WithAutomaticRevealState(
+                        endpointGpuData,
+                        phase,
+                        currentHead,
+                        slicePreviousHead,
+                        previousValid);
+                automaticFoamSourceEventGpuData[eventIndex] = sliceGpuData;
+                automaticFoamSourceEventBuffer.SetData(
+                    automaticFoamSourceEventGpuData,
+                    eventIndex,
+                    eventIndex,
+                    1);
+                DispatchAutomaticFoamSourceEvent(
+                    eventIndex,
+                    sourceEvent,
+                    sliceGpuData,
+                    target,
+                    IsAutomaticBirthSourcesDebugActive);
+                dispatchCount++;
+            }
+
+            automaticFoamSourceEventGpuData[eventIndex] = endpointGpuData;
+            automaticFoamSourceEventBuffer.SetData(
+                automaticFoamSourceEventGpuData,
+                eventIndex,
+                eventIndex,
+                1);
+            return dispatchCount;
         }
 
         private void DispatchAutomaticFoamSourceEvent(
