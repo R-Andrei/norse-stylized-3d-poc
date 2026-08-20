@@ -16,14 +16,24 @@ Any invented, stale, partial, unchecked, or inaccurate location is a project fai
 - Modify only approved files. Obtain approval before adding layers, tags, components, renamed assets, folders, architectural dependencies, or materially different defaults; disclose every proposed default change.
 - Preserve unrelated user and repository changes.
 
+## Git workflow and delivery
+
+- Treat `fufu` as the integration and user-testing branch. The user should only need to pull `fufu` to test the latest accepted agent work in Unity.
+- Use one dedicated Git branch per active chat or agent thread. At the start of a new thread, begin from the latest `origin/fufu`, create a uniquely named thread branch, and keep all work for that thread on that branch. Reuse that branch when the same thread resumes; never share one working branch across concurrent threads.
+- Before editing, fetch the trusted remote and reconcile the thread branch with the latest `origin/fufu`. Preserve local or user-owned changes and stop for direction if a safe update is not possible.
+- Commit repository changes on the thread branch. Do not exchange patch files as the normal delivery mechanism; use a patch only when Git is unavailable or the user explicitly requests one.
+- Before delivery, run the required local validation, update the thread branch against the latest `origin/fufu`, push the thread branch, and open or update its pull request targeting `fufu`. Merge only after the required GitHub Actions checks pass. After the merge, synchronize local `fufu` with `origin/fufu` and verify the published integration commit so the user can pull and test it. Do not bypass the pull request with an untested local merge.
+- Publishing remains subject to explicit authorization: staging, committing, pushing, pull-request creation, and merging must be covered by the user's request or separately approved. Report the thread branch, pull request, integration commit, push result, and any conflict or CI blocker. Do not force-push `fufu` or rewrite published history unless the user explicitly authorizes that exact operation.
+- Changes intended for `fufu` must pass the repository's required GitHub Actions checks before merge. If branch protection is unavailable or not yet configured, wait for the checks and verify their successful result manually before merging; report that enforcement limitation and do not claim CI is enforced.
+
 ## Implementation gates
 
 Apply all four gates to every implementation change. Never skip, perform mentally, or complete one retroactively. If a gate cannot be completed, stop and report the blocker; work performed in breach is unverified and incomplete.
 
-1. **Review before editing.** Read the review surface: the complete implementation to change and its direct callers, consumers, producers, shared contracts, and related modules. Read the latest canonical architecture, active plans, handoffs, and validation requirements. Repository evidence overrides remembered context. Record exact files, documents, commits, findings, and constraints in the canonical plan before modifying code, shaders, serialized assets, generated inputs, or running any formatter, generator, autofix, or other modifying tool.
-2. **Plan before implementation.** Make the canonical Markdown plan the first modification after review. Record the objective, acceptance criteria, approved files, reviewed evidence, invariants, non-goals, file-by-file sequence, affected modules, risks, validation/compliance checks, and each item's status. If no plan exists or it is outside scope, stop and request approval for that document. Update the plan and obtain required approval before any material deviation, design change, or scope expansion.
+1. **Review before editing.** Read the review surface: the complete implementation to change and its direct callers, consumers, producers, shared contracts, and related modules. Read the latest canonical architecture, active plans, handoffs, and validation requirements. Repository evidence overrides remembered context. Capture the reviewed files, documents, commits, findings, and constraints in the working plan before modifying code, shaders, serialized assets, generated inputs, or running any formatter, generator, autofix, or other modifying tool.
+2. **Plan before implementation.** Formulate a plan after review and before the first implementation change. The plan must cover the objective, acceptance criteria, approved files, reviewed evidence, invariants, non-goals, file-by-file sequence, affected modules, risks, validation/compliance checks, and each item's status. The plan may live in the agent's working context, task tracker, or a repository document; it does not have to be persisted or use Markdown unless the user or task explicitly requires a durable plan. Update the plan and obtain required approval before any material deviation, design change, or scope expansion.
 3. **Implement the plan only.** Trace every edit to an active plan item within scope. Never add speculative changes, unrelated cleanup, refactors, renames, dependencies, or architecture changes. If evidence invalidates a step or assumption, stop, record it, update the plan, and resolve approval before resuming. Complete an item only after its verification passes.
-4. **Audit after implementation.** Compare the final diff with the approved scope and plan. Re-read complete final versions of the Gate 1 review surface. Compare behavior with the pre-edit state, `HEAD`, and relevant accepted or superseded versions. Record every intentional difference and confirm all behavior intended to remain unchanged. Verify canonical documents, plans, handoffs, repository rules, budgets, performance constraints, and Unity requirements. Run all available compilation, tests, static checks, and Unity validation; record all evidence, results, deviations, and pending checks in the plan.
+4. **Audit after implementation.** Compare the final diff with the approved scope and plan. Re-read complete final versions of the Gate 1 review surface. Compare behavior with the pre-edit state, `HEAD`, and relevant accepted or superseded versions. Record every intentional difference and confirm all behavior intended to remain unchanged. Verify canonical documents, durable plans when present, handoffs, repository rules, budgets, performance constraints, and Unity requirements. Run all available compilation, tests, static checks, and Unity validation; capture all evidence, results, deviations, and pending checks in the working plan or final handoff.
 
 Do not describe a patch as complete, compliant, ready, or successful until all gates pass. Treat missing comparisons, undocumented deviations, unresolved inconsistencies, failed checks, and unverified items as blockers. Mark unavailable validation pending with a concrete next action; never represent it as passed.
 
@@ -63,13 +73,13 @@ Never state incomplete or unavailable proof as fact. Label it **Inference**, **O
 - Never add a per-frame full-field rebuild without explicit performance justification.
 - Perform an explicit cross-subsystem impact audit for every shared shader or include change.
 
-## Patch delivery and future work
+## Git delivery and future work
 
 Implementation responses must briefly:
 
 - State outcome and changed files.
 - Describe material changes.
-- Report canonical plan and consistency/compliance audit result.
+- Report the formulated plan and consistency/compliance audit result.
 - Provide 1-6 concise, fully actionable validation steps in the required order, or state that no Unity validation is required.
 - State each blocker or limitation and its concrete next action.
 
