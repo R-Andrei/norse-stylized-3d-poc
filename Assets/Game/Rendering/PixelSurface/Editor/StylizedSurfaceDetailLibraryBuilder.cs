@@ -449,17 +449,13 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
 
                 long subAssetStart = EditorReloadDiagnostics.BeginTiming();
                 string libraryPath = AssetDatabase.GetAssetPath(library);
-                Texture2DArray previousDetail =
-                    library.GeneratedTextureArray;
-                Texture2DArray previousColor =
-                    library.GeneratedAuthoredColorArray;
                 library.SetGeneratedArrays(
                     null,
                     null,
                     Array.Empty<int>(),
                     string.Empty);
-                DestroyGeneratedSubAsset(previousDetail);
-                DestroyGeneratedSubAsset(previousColor);
+                int removedGeneratedSubAssetCount =
+                    DestroyGeneratedTextureArraySubAssets(libraryPath);
 
                 AssetDatabase.AddObjectToAsset(detailArray, library);
                 if (authoredColorArray != null)
@@ -471,7 +467,8 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
                 EditorReloadDiagnostics.RecordTimedStage(
                     "Rebuild.ReplaceGeneratedSubAssets",
                     subAssetStart,
-                    $"library={library.name}, asset={libraryPath}");
+                    $"library={library.name}, asset={libraryPath}, " +
+                    $"removed={removedGeneratedSubAssetCount}");
 
                 long finalizeStateStart = EditorReloadDiagnostics.BeginTiming();
                 library.SetGeneratedArrays(
@@ -2019,13 +2016,30 @@ namespace ProgrammaticStylized3D.Rendering.PixelSurface.Editor
             builder.Append('|');
         }
 
-        private static void DestroyGeneratedSubAsset(
-            Texture2DArray array)
+        private static int DestroyGeneratedTextureArraySubAssets(
+            string libraryPath)
         {
-            if (array != null && AssetDatabase.IsSubAsset(array))
+            if (string.IsNullOrWhiteSpace(libraryPath))
             {
-                UnityEngine.Object.DestroyImmediate(array, true);
+                return 0;
             }
+
+            UnityEngine.Object[] assets =
+                AssetDatabase.LoadAllAssetsAtPath(libraryPath);
+            int destroyedCount = 0;
+            for (int index = 0; index < assets.Length; index++)
+            {
+                if (!(assets[index] is Texture2DArray array) ||
+                    !AssetDatabase.IsSubAsset(array))
+                {
+                    continue;
+                }
+
+                UnityEngine.Object.DestroyImmediate(array, true);
+                destroyedCount++;
+            }
+
+            return destroyedCount;
         }
     }
 }
