@@ -49,12 +49,12 @@
 
 ## Reviewed evidence
 
-- `AGENTS.md` and `Assets/AGENTS.md`: implementation requires a recorded plan before code, strict scope control, final consistency audit, and Unity validation.
+- `AGENTS.md` and `Assets/AGENTS.md`: implementation requires a formulated plan before code, strict scope control, final consistency audit, and Unity validation.
 - `Assets/Docs/Proof of Concept/07_Implementation_Guide_for_Proof_of_Concept.md`, section 8: the prototype requires a very simple new-Input-System controller moving on XZ and facing movement or cursor direction.
 - `Assets/Docs/Proof of Concept/06_Proof_of_Concept.md`, project setup and variation boundaries: the prototype uses the new Input System exclusively, needs a minimal controller, and retains a fixed camera contract.
 - `Assets/Docs/Proof of Concept/08_Proof_of_Concept_Implementation_Log.md`, initial implementation and current limitations: the scene has a player capsule, Cinemachine follow camera, player-centred aura, and no movement controller.
 - `Assets/Docs/Proof of Concept/10_Project_Architecture_and_Asset_Organisation_Rules.md`: reusable input behaviour belongs under `Game/Input/`; C# filenames match their principal public type; reusable namespaces remain project-generic.
-- `Assets/Docs/handoff.md`: active-gameplay runtime cost has highest performance priority; every update requires exact expected and actual file reconciliation.
+- Applicable repository instructions: runtime cost, scope control, planning, and validation requirements were reviewed before implementation.
 - `Assets/InputSystem_Actions.inputactions`, complete asset: `Player/Move` is a `Vector2` value action with WASD and other device bindings; `UI/Point` is a `Vector2` pass-through action with mouse, pen, and touch position bindings. The working asset is identical to `HEAD`.
 - `Assets/InputSystem_Actions.inputactions.meta`: wrapper generation is disabled, so the controller will use the existing `InputActionAsset` directly rather than add a generated wrapper.
 - `Packages/manifest.json`: Input System `1.19.0`, Cinemachine `3.1.7`, and Unity physics are already present; no dependency change is required.
