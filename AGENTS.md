@@ -15,17 +15,21 @@
 ## Plan and implementation
 
 1. Review the complete change surface: implementation, direct dependencies, contracts, current architecture, validation requirements, and working-tree state.
-2. Formulate a plan before editing. Include objective, acceptance criteria, scope, evidence, invariants, sequence, risks, and validation. The plan may remain in working context; a persisted Markdown plan is required only when the user or task requests one.
-3. Implement only the approved plan. Stop and update the plan before any material deviation or scope expansion.
-4. Audit the final diff against the plan. Re-read changed files and direct dependencies, confirm preserved behavior, and run all available validation.
+2. Inspect relevant Git history for files and symbols being changed when prior intent, regressions, compatibility, or rejected approaches may affect the solution. Use targeted logs, blame, and diffs; do not review unrelated history or let historical behavior override current requirements and source.
+3. Formulate a plan before editing. Include objective, acceptance criteria, scope, evidence, invariants, sequence, risks, and validation. The plan may remain in working context; a persisted Markdown plan is required only when the user or task requests one.
+4. Implement only the approved plan. Stop and update the plan before any material deviation or scope expansion.
+5. Audit the final diff against the plan. Re-read changed files and direct dependencies, confirm preserved behavior, and run all available validation.
 
 ## Git delivery
 
 - `fufu` is the integration and user-testing branch.
 - Use one dedicated branch per active chat or agent thread. Start it from the latest `origin/fufu` and reuse it when that thread resumes.
-- Before editing, fetch the trusted remote and reconcile the thread branch with `origin/fufu`. Stop if local work prevents a safe update.
+- Fetch `origin` when starting or resuming a thread, before the first edit, at major work boundaries, before final validation, and immediately before pushing or merging.
+- Reconcile the thread branch with the latest `origin/fufu` before editing and again before final validation. Do not interrupt unsafe or incomplete working-tree changes merely to synchronize; first reach a safe checkpoint.
+- If `origin/fufu` advances after validation, reconcile again and rerun every affected check before delivery.
+- Never use a bare `git pull` as a substitute for identifying which remote branch is being incorporated.
 - Use Git commits and pull requests for delivery from the thread branch.
-- Before delivery, validate locally, reconcile with the latest `origin/fufu`, push the thread branch, and open or update a pull request targeting `fufu`.
+- After final validation, push the thread branch and open or update a pull request targeting `fufu`.
 - Merge only after required GitHub Actions checks pass. Never bypass the pull request with a local merge.
 - After merge, synchronize local `fufu` with `origin/fufu` and verify the published commit.
 - Staging, committing, pushing, pull-request creation, and merging require user authorization. Never force-push `fufu` or rewrite published history without explicit authorization.
