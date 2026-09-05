@@ -33,7 +33,7 @@ Status: ACTIVE
 Scope: <short description of the approved work>
 ```
 
-- Valid claim statuses are `ACTIVE`, `INTEGRATED`, `RELEASED`, and `COMPLETED`. Post a later structured claim comment with the same Thread-ID to update status; do not erase historical claim comments.
+- Valid claim statuses are `ACTIVE`, `INTEGRATED`, and `COMPLETED`. Post a later structured claim comment with the same Thread-ID to update status; do not erase historical claim comments.
 - Only one effective ACTIVE thread claim may exist for an issue. If the user explicitly authorizes a takeover/migration, the new ACTIVE claim must add `Supersedes: <old-thread-id>` (comma-separated for more than one). Superseded claims never become active again automatically.
 - Do not supersede a claim that owns an open pull request unless that PR is first closed/merged or the user explicitly authorizes the takeover with awareness of the open PR.
 - If the issue's effective ACTIVE claim, Thread-ID, or recorded Branch does not match the current thread/repository branch, stop all writes. Do not guess which branch is yours and do not silently repair another thread's claim.

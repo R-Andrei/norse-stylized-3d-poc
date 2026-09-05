@@ -22,7 +22,7 @@ BRANCH_RE = re.compile(
 )
 THREAD_RE = re.compile(rf"^{THREAD_PATTERN}$")
 CLAIM_MARKER = "<!-- agent-thread-claim:v1 -->"
-ALLOWED_STATUSES = {"ACTIVE", "INTEGRATED", "RELEASED", "COMPLETED"}
+ALLOWED_STATUSES = {"ACTIVE", "INTEGRATED", "COMPLETED"}
 FORBIDDEN_TRACKED_PREFIXES = (
     "Library/",
     "Temp/",
