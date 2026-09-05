@@ -1,0 +1,68 @@
+name: Agent implementation task
+description: Canonical task record for repository implementation work.
+title: "[Task] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Implementation work is owned through this issue. Before creating a work branch, the active agent/chat thread must add a structured `agent-thread-claim:v1` comment and then use the matching issue + Thread-ID branch.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: State the concrete outcome this task should produce.
+      placeholder: Describe the desired repository change and why it is needed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable conditions that define completion.
+      placeholder: |
+        - Criterion 1
+        - Criterion 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Approved scope
+      description: List files, subsystems, assets, or behavior that may change. Scope expansion requires user approval.
+      placeholder: |
+        - path/or/subsystem
+        - path/or/subsystem
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and preserved behavior
+      description: Record important invariants, non-goals, and behavior that must remain unchanged.
+      placeholder: List relevant repository, Unity, performance, serialization, visual, or compatibility constraints.
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Prefer deterministic automated checks. Reserve manual Unity validation for behavior or appearance that cannot be reliably automated.
+      placeholder: |
+        - Automated test/check
+        - CI workflow/check
+        - Manual Unity evidence only if necessary
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Optional evidence, links, historical context, or deferred work.
+    validations:
+      required: false
