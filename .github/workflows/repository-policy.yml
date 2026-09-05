@@ -1,0 +1,57 @@
+name: Repository Policy
+
+on:
+  pull_request:
+    branches:
+      - fufu
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+  push:
+    branches:
+      - fufu
+  workflow_dispatch:
+
+concurrency:
+  group: repository-policy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  repository-policy:
+    name: Repository policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out exact change head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          lfs: false
+
+      - name: Fetch current integration branch
+        if: github.event_name == 'pull_request'
+        run: git fetch --no-tags origin fufu
+
+      - name: Compile policy validator
+        run: python3 -m py_compile .github/scripts/validate_agent_workflow.py
+
+      - name: Run policy self-test
+        run: python3 .github/scripts/validate_agent_workflow.py --self-test
+
+      - name: Validate repository and agent workflow policy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          python3 .github/scripts/validate_agent_workflow.py
+          --event "$GITHUB_EVENT_PATH"
+          --repo "$GITHUB_REPOSITORY"
+          --repo-root "$GITHUB_WORKSPACE"
