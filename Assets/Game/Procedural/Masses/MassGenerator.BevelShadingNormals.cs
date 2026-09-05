@@ -14,20 +14,24 @@ namespace ProgrammaticStylized3D.Geometry.Masses
         private readonly struct ConvexBevelNormalPositionKey :
             IEquatable<ConvexBevelNormalPositionKey>
         {
+            private readonly int provenanceKind;
             private readonly int provenanceIndex;
             private readonly Vector3Int position;
 
             public ConvexBevelNormalPositionKey(
+                PolygonFaceProvenanceKind provenanceKind,
                 int provenanceIndex,
                 Vector3Int position)
             {
+                this.provenanceKind = (int)provenanceKind;
                 this.provenanceIndex = provenanceIndex;
                 this.position = position;
             }
 
             public bool Equals(ConvexBevelNormalPositionKey other)
             {
-                return provenanceIndex == other.provenanceIndex &&
+                return provenanceKind == other.provenanceKind &&
+                    provenanceIndex == other.provenanceIndex &&
                     position == other.position;
             }
 
@@ -41,7 +45,9 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             {
                 unchecked
                 {
-                    return (provenanceIndex * 397) ^ position.GetHashCode();
+                    int hash = provenanceKind;
+                    hash = (hash * 397) ^ provenanceIndex;
+                    return (hash * 397) ^ position.GetHashCode();
                 }
             }
         }
@@ -75,9 +81,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
 
         // GM-SURFACE.6B: preserve the authored/flat normal through all existing
         // material-mask and face-tone compilation, then replace only ordinary
-        // BoundedEdgeBevel rail normals. Source-face boundary positions are the
-        // authoritative ownership seam already used by material-mask inheritance;
-        // no topology state or runtime channel is carried beyond generation.
+        // convex bevel rail normals. Production uses EdgeBevelPlane provenance;
+        // bounded preview paths use BoundedEdgeBevel. Source-face boundary
+        // positions are the authoritative ownership seam already used by
+        // material-mask inheritance; no topology state or runtime channel is
+        // carried beyond generation.
         private static void CompileGeneratedMassConvexBevelShadingNormals(
             TriangleSoup soup,
             MeshData meshData)
@@ -260,8 +268,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         soupIndex,
                         out PolygonFaceProvenanceKind provenanceKind,
                         out int provenanceIndex) ||
-                    provenanceKind !=
-                        PolygonFaceProvenanceKind.BoundedEdgeBevel ||
+                    !IsOrdinaryBevelProvenance(provenanceKind) ||
                     provenanceIndex < 0)
                 {
                     continue;
@@ -296,6 +303,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                         ConvexBevelNormalPositionQuantization);
                     ConvexBevelNormalPositionKey key =
                         new ConvexBevelNormalPositionKey(
+                            provenanceKind,
                             provenanceIndex,
                             position);
                     if (!result.TryGetValue(
