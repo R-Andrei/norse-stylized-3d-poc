@@ -68,6 +68,15 @@ Branch: <exact-branch-name>
 - If manual validation rejects an integrated change, reopen/reactivate work on the same issue with a valid ACTIVE claim, reconcile the thread branch from current `fufu`, and deliver a new PR rather than bypassing the workflow.
 - Report the issue, Thread-ID, branch, pull request, CI result, integration commit, conflicts, and blockers.
 
+## Issue worklog convention
+
+- Use the task issue thread as the durable, concise engineering history for non-trivial implementation work. A future agent should be able to recover the important reasoning without replaying the full chat or reconstructing every intermediate diff.
+- Post a short worklog comment when there is durable information worth preserving: a meaningful implementation milestone, an accepted or rejected approach whose reason matters, a diagnostic/root-cause conclusion, a material plan or scope change, a blocker, or a validation/acceptance result.
+- Record failed approaches for the reusable reason they failed, not as exhaustive command-by-command or edit-by-edit transcripts. Routine progress chatter, repeated status, and implementation narration that is already obvious from the diff should not be logged.
+- Point worklog entries to the relevant commit SHA(s), pull request, CI run, report, screenshot, or other evidence when available. Keep implementation detail in commits/diffs/tests; use the issue comment to explain what changed in understanding and why the referenced evidence matters.
+- Keep each entry compact and self-contained. Prefer a few high-information bullets or a short paragraph over long chronological logs.
+- When a commit changes the engineering conclusion, add or update the issue history with that conclusion rather than merely posting that a commit exists.
+
 ## Automated validation policy
 
 - Prefer deterministic automated validation over manual Unity testing whenever the contract can be tested reliably and at proportionate cost.
