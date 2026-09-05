@@ -151,6 +151,70 @@ def github_get_all_pages(url: str, token: str) -> list[Any]:
     return items
 
 
+def claims_from_comments(comments: list[Any]) -> list[dict[str, Any]]:
+    claims: list[dict[str, Any]] = []
+    for comment in comments:
+        if not isinstance(comment, dict):
+            continue
+        parsed = parse_claim(comment.get("body") or "", int(comment.get("id", 0)))
+        if parsed is not None:
+            claims.append(parsed)
+    return claims
+
+
+def find_active_thread_conflicts(
+    current_issue_number: int,
+    thread_id: str,
+    active_claims_by_issue: dict[int, list[dict[str, Any]]],
+) -> list[int]:
+    return sorted(
+        issue_number
+        for issue_number, active_claims in active_claims_by_issue.items()
+        if issue_number != current_issue_number
+        and any(claim["thread_id"] == thread_id for claim in active_claims)
+    )
+
+
+def validate_thread_exclusivity(
+    repo: str,
+    token: str,
+    current_issue_number: int,
+    thread_id: str,
+) -> None:
+    issues_url = f"https://api.github.com/repos/{repo}/issues?state=open&per_page=100"
+    open_items = github_get_all_pages(issues_url, token)
+    active_claims_by_issue: dict[int, list[dict[str, Any]]] = {}
+
+    for item in open_items:
+        if not isinstance(item, dict) or "pull_request" in item:
+            continue
+
+        issue_number = int(item.get("number", 0) or 0)
+        if issue_number <= 0 or issue_number == current_issue_number:
+            continue
+        if int(item.get("comments", 0) or 0) <= 0:
+            continue
+
+        comments_url = (
+            f"https://api.github.com/repos/{repo}/issues/{issue_number}/comments?per_page=100"
+        )
+        claims = claims_from_comments(github_get_all_pages(comments_url, token))
+        if claims:
+            active_claims_by_issue[issue_number] = resolve_active_claims(claims)
+
+    conflicts = find_active_thread_conflicts(
+        current_issue_number,
+        thread_id,
+        active_claims_by_issue,
+    )
+    require(
+        not conflicts,
+        f"Thread-ID {thread_id} is already ACTIVE on other open task issue(s): "
+        + ", ".join(f"#{issue_number}" for issue_number in conflicts)
+        + ". Complete, supersede, or deactivate that claim before opening another implementation PR.",
+    )
+
+
 def validate_repository_invariants(repo_root: Path) -> None:
     root_agents = repo_root / "AGENTS.md"
     assets_agents = repo_root / "Assets" / "AGENTS.md"
@@ -253,14 +317,7 @@ def validate_pull_request(
     require(issue.get("state") == "open", f"Task issue #{branch_issue} must remain open during implementation.")
 
     comments_url = f"{issue_url}/comments?per_page=100"
-    comments = github_get_all_pages(comments_url, token)
-    claims: list[dict[str, Any]] = []
-    for comment in comments:
-        if not isinstance(comment, dict):
-            continue
-        parsed = parse_claim(comment.get("body") or "", int(comment.get("id", 0)))
-        if parsed is not None:
-            claims.append(parsed)
+    claims = claims_from_comments(github_get_all_pages(comments_url, token))
 
     require(claims, f"Task issue #{branch_issue} has no structured agent-thread claim comments.")
     active = resolve_active_claims(claims)
@@ -273,6 +330,8 @@ def validate_pull_request(
             f"ACTIVE claim belongs to {claim['thread_id']}, not this PR thread {branch_thread}.")
     require(claim["branch"] == head_ref,
             f"ACTIVE claim branch {claim['branch']!r} does not match PR branch {head_ref!r}.")
+
+    validate_thread_exclusivity(repo, token, branch_issue, branch_thread)
 
 
 def run_self_test() -> None:
@@ -296,6 +355,47 @@ def run_self_test() -> None:
     active = resolve_active_claims([first, second])
     require(len(active) == 1 and active[0]["thread_id"] == "t-20260906-0915-b3d91e",
             "Self-test claim supersession failed.")
+
+    duplicate_branch = "issue-38/t-20260905-2230-a7c4f2-second-task"
+    duplicate = parse_claim(
+        CLAIM_MARKER + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + duplicate_branch +
+        "\nBase: fufu@1234567\nStatus: ACTIVE\nScope: Conflicting active task.",
+        3,
+    )
+    completed_branch = "issue-39/t-20260905-2230-a7c4f2-finished-task"
+    completed = parse_claim(
+        CLAIM_MARKER + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + completed_branch +
+        "\nBase: fufu@1234567\nStatus: COMPLETED\nScope: Historical finished task.",
+        4,
+    )
+    takeover_branch = "issue-38/t-20260906-1015-c4e82d-second-task"
+    takeover = parse_claim(
+        CLAIM_MARKER + "\nThread-ID: t-20260906-1015-c4e82d\nBranch: " + takeover_branch +
+        "\nBase: fufu@89abcde\nStatus: ACTIVE\nScope: Authorized replacement."
+        "\nSupersedes: t-20260905-2230-a7c4f2",
+        5,
+    )
+    require(
+        duplicate is not None and completed is not None and takeover is not None,
+        "Self-test cross-issue claim parsing failed.",
+    )
+
+    conflicts = find_active_thread_conflicts(
+        37,
+        "t-20260905-2230-a7c4f2",
+        {38: resolve_active_claims([duplicate])},
+    )
+    require(conflicts == [38], "Self-test cross-issue ACTIVE conflict detection failed.")
+
+    conflicts = find_active_thread_conflicts(
+        37,
+        "t-20260905-2230-a7c4f2",
+        {
+            38: resolve_active_claims([duplicate, takeover]),
+            39: resolve_active_claims([completed]),
+        },
+    )
+    require(not conflicts, "Self-test historical/superseded claim filtering failed.")
     print("Agent workflow policy self-test: PASS")
 
 
@@ -324,7 +424,7 @@ def main() -> int:
             require(bool(token), "GITHUB_TOKEN is required for pull_request policy validation.")
             validate_pull_request(event, args.repo, token)
             validate_branch_freshness(repo_root)
-            print("Agent PR identity and branch freshness: PASS")
+            print("Agent PR identity, thread exclusivity, and branch freshness: PASS")
         else:
             print(f"Repository invariants: PASS ({event_name or 'manual event'})")
         return 0
