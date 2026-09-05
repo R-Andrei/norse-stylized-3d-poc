@@ -98,19 +98,12 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                 return;
             }
 
-            Dictionary<int, Vector3> transformedAuthoredSurfaceNormals =
-                ResolveTransformedAuthoredSurfaceNormals(soup);
-            if (transformedAuthoredSurfaceNormals.Count == 0)
-            {
-                return;
-            }
-
+            // Source-face vertices already contain the final transformed authored
+            // normals resolved by BuildMeshData. Reuse that final render stream as
+            // the parent truth instead of running the authored-normal solver twice.
             Dictionary<Vector3Int, List<ConvexBevelSourceNormalSample>>
                 sourceNormalsByPosition =
-                    BuildConvexBevelSourceNormalsByPosition(
-                        soup,
-                        meshData,
-                        transformedAuthoredSurfaceNormals);
+                    BuildConvexBevelSourceNormalsByPosition(soup, meshData);
             if (sourceNormalsByPosition.Count == 0)
             {
                 return;
@@ -178,8 +171,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             List<ConvexBevelSourceNormalSample>>
             BuildConvexBevelSourceNormalsByPosition(
                 TriangleSoup soup,
-                MeshData meshData,
-                Dictionary<int, Vector3> transformedAuthoredSurfaceNormals)
+                MeshData meshData)
         {
             var result = new Dictionary<Vector3Int,
                 List<ConvexBevelSourceNormalSample>>();
@@ -196,13 +188,7 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     provenanceKind != PolygonFaceProvenanceKind.SourceFace ||
                     !soup.TryResolveAuthoredSurfaceGroup(
                         soupIndex,
-                        out int surfaceGroup) ||
-                    !transformedAuthoredSurfaceNormals.TryGetValue(
-                        surfaceGroup,
-                        out Vector3 transformedNormal) ||
-                    !TryNormalizeMassVector(
-                        transformedNormal,
-                        out transformedNormal))
+                        out int surfaceGroup))
                 {
                     continue;
                 }
@@ -212,7 +198,11 @@ namespace ProgrammaticStylized3D.Geometry.Masses
                     int vertexIndex =
                         meshData.Triangles[soupIndex + corner];
                     if (vertexIndex < 0 ||
-                        vertexIndex >= meshData.Vertices.Count)
+                        vertexIndex >= meshData.Vertices.Count ||
+                        vertexIndex >= meshData.Normals.Count ||
+                        !TryNormalizeMassVector(
+                            meshData.Normals[vertexIndex],
+                            out Vector3 transformedNormal))
                     {
                         continue;
                     }
