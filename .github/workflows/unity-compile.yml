@@ -10,12 +10,14 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: unity-compile-${{ github.ref }}
+  group: unity-compile-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   checks: write
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   unity-compile:
@@ -24,10 +26,27 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Check out repository
+      - name: Check out exact change head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           lfs: true
+
+      - name: Fetch current integration branch
+        if: github.event_name == 'pull_request'
+        run: git fetch --no-tags origin fufu
+
+      - name: Policy preflight
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 -m py_compile .github/scripts/validate_agent_workflow.py
+          python3 .github/scripts/validate_agent_workflow.py --self-test
+          python3 .github/scripts/validate_agent_workflow.py \
+            --event "$GITHUB_EVENT_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --repo-root "$GITHUB_WORKSPACE"
 
       - name: Compile project and run Edit Mode tests
         id: unity-tests
