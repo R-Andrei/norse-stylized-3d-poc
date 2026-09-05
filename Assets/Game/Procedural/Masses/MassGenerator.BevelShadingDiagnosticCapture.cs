@@ -298,39 +298,46 @@ namespace ProgrammaticStylized3D.Geometry.Masses
             int reconciledPositionGroups,
             int reconciledVertices)
         {
-            if (activeBevelShadingBuild == null || meshData == null) return;
-            BevelShadingDiagnosticBuildRecord build = activeBevelShadingBuild;
-            build.PostMaskImmutableFingerprint =
-                BuildBevelShadingImmutableFingerprint(soup, meshData);
-            build.PostMaskValueFingerprint =
-                BuildBevelShadingMaskValueFingerprint(meshData);
-            build.ReconciledLogicalBevelPositionGroups =
-                reconciledPositionGroups;
-            build.ReconciledLogicalBevelVertices = reconciledVertices;
-            build.SourceFaceMaskChangeCount = 0;
-            foreach (KeyValuePair<int, Vector3> pair in
-                     build.PreMaskSourceFaceMasks)
+            if (meshData == null) return;
+            if (activeBevelShadingBuild != null)
             {
-                int vertexIndex = pair.Key;
-                if (vertexIndex < 0 ||
-                    vertexIndex >= meshData.Vertices.Count)
+                BevelShadingDiagnosticBuildRecord build = activeBevelShadingBuild;
+                build.PostMaskImmutableFingerprint =
+                    BuildBevelShadingImmutableFingerprint(soup, meshData);
+                build.PostMaskValueFingerprint =
+                    BuildBevelShadingMaskValueFingerprint(meshData);
+                build.ReconciledLogicalBevelPositionGroups =
+                    reconciledPositionGroups;
+                build.ReconciledLogicalBevelVertices = reconciledVertices;
+                build.SourceFaceMaskChangeCount = 0;
+                foreach (KeyValuePair<int, Vector3> pair in
+                         build.PreMaskSourceFaceMasks)
                 {
-                    build.SourceFaceMaskChangeCount++;
-                    continue;
+                    int vertexIndex = pair.Key;
+                    if (vertexIndex < 0 ||
+                        vertexIndex >= meshData.Vertices.Count)
+                    {
+                        build.SourceFaceMaskChangeCount++;
+                        continue;
+                    }
+                    Vector3 after = new Vector3(
+                        meshData.Colors[vertexIndex].g,
+                        meshData.Colors[vertexIndex].b,
+                        meshData.UV2[vertexIndex].y);
+                    if ((after - pair.Value).sqrMagnitude > 0.0000000001f)
+                    {
+                        build.SourceFaceMaskChangeCount++;
+                    }
                 }
-                Vector3 after = new Vector3(
-                    meshData.Colors[vertexIndex].g,
-                    meshData.Colors[vertexIndex].b,
-                    meshData.UV2[vertexIndex].y);
-                if ((after - pair.Value).sqrMagnitude > 0.0000000001f)
-                {
-                    build.SourceFaceMaskChangeCount++;
-                }
+                BuildBevelShadingDegenerateTriangleEvidence(
+                    meshData,
+                    out build.PostMaskDegenerateTriangleCount,
+                    out build.PostMaskDegenerateTriangleFingerprint);
             }
-            BuildBevelShadingDegenerateTriangleEvidence(
-                meshData,
-                out build.PostMaskDegenerateTriangleCount,
-                out build.PostMaskDegenerateTriangleFingerprint);
+
+            // GM-SURFACE.6B deliberately runs after the pre/post mask contract is
+            // measured. Only the final render-normal stream may change here.
+            CompileGeneratedMassConvexBevelShadingNormals(soup, meshData);
         }
 
         private static ulong BuildBevelShadingImmutableFingerprint(
