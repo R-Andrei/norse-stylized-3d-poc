@@ -397,7 +397,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
                     TreeRootCollapseTournament.IsRunning ||
-                    TreeTrunkResponseDiagnosticSuite.IsRunning))
+                    TreeTrunkResponseDiagnosticSuite.IsRunning ||
+                    TreeWychRootHeightMinimumSweep.IsRunning))
                 {
                     if (GUILayout.Button("Run 40-Control Response Suite"))
                     {
@@ -427,7 +428,7 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 "Lean / Bend Contract Diagnostics",
                 EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Measures the current structural centreline against the production bark/root surface frame across Lean, Bend, Buttress Persistence, root extremes, axial twist and Path Spiral combinations. TREE-TRUNK.1 does not repair Lean/Bend behavior; this suite records the data needed for the follow-up contract change. It advances one topology-validated case per Editor update and remains cancellable.",
+                "Verifies the accepted TREE-TRUNK.2 Generator 8 / Bark 31 Lean/Bend contract across Buttress Persistence, root extremes, axial twist and Path Spiral combinations. It advances one topology-validated case per Editor update and remains cancellable.",
                 MessageType.None);
             if (TreeTrunkResponseDiagnosticSuite.IsRunning)
             {
@@ -456,7 +457,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeControlResponseSuite.IsRunning ||
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
-                    TreeRootCollapseTournament.IsRunning))
+                    TreeRootCollapseTournament.IsRunning ||
+                    TreeWychRootHeightMinimumSweep.IsRunning))
                 {
                     if (GUILayout.Button("Run Lean / Bend Contract Diagnostic"))
                     {
@@ -515,7 +517,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeControlResponseSuite.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
                     TreeRootCollapseTournament.IsRunning ||
-                    TreeTrunkResponseDiagnosticSuite.IsRunning))
+                    TreeTrunkResponseDiagnosticSuite.IsRunning ||
+                    TreeWychRootHeightMinimumSweep.IsRunning))
                 {
                     if (GUILayout.Button("Run Geometry Efficiency Audit"))
                     {
@@ -574,7 +577,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeControlResponseSuite.IsRunning ||
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootCollapseTournament.IsRunning ||
-                    TreeTrunkResponseDiagnosticSuite.IsRunning))
+                    TreeTrunkResponseDiagnosticSuite.IsRunning ||
+                    TreeWychRootHeightMinimumSweep.IsRunning))
                 {
                     if (GUILayout.Button("Run Ground-Contact Radial Board"))
                     {
@@ -599,6 +603,66 @@ namespace ProgrammaticStylized3D.Trees.Editor
                 if (GUILayout.Button("Open Ground-Contact Radial Folder"))
                 {
                     TreeRootQualityEvaluation.OpenOutputFolder();
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(
+                "Wych Root Height × Buttress Persistence Sweep",
+                EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(
+                "Runs the focused 256-case current-production Wych matrix across Buttress Persistence 0.0–0.7, Root Height 0.050–0.225, and recipe/high-reach/high-thickness profiles. Use this before changing root topology; it records Generator/Bark versions, topology failures, fingerprints, and the current passing frontier.",
+                MessageType.None);
+            if (TreeWychRootHeightMinimumSweep.IsRunning)
+            {
+                Rect rootHeightProgressRect = GUILayoutUtility.GetRect(
+                    10f,
+                    18f,
+                    GUILayout.ExpandWidth(true));
+                EditorGUI.ProgressBar(
+                    rootHeightProgressRect,
+                    TreeWychRootHeightMinimumSweep.CurrentProgress,
+                    TreeWychRootHeightMinimumSweep.ProgressLabel);
+                EditorGUILayout.LabelField(
+                    "Current",
+                    TreeWychRootHeightMinimumSweep.CurrentDetail);
+                EditorGUILayout.LabelField(
+                    "Timing",
+                    TreeWychRootHeightMinimumSweep.CurrentEta);
+                if (GUILayout.Button("Cancel Wych Root Height Sweep"))
+                {
+                    TreeWychRootHeightMinimumSweep.RequestCancel();
+                }
+            }
+            else
+            {
+                using (new EditorGUI.DisabledScope(
+                    TreeControlResponseSuite.IsRunning ||
+                    TreeGeometryEfficiencyAudit.IsRunning ||
+                    TreeRootQualityEvaluation.IsRunning ||
+                    TreeRootCollapseTournament.IsRunning ||
+                    TreeTrunkResponseDiagnosticSuite.IsRunning))
+                {
+                    if (GUILayout.Button("Run Wych Root Height Sweep"))
+                    {
+                        TreeWychRootHeightMinimumSweep.Start(instance);
+                    }
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                string.IsNullOrEmpty(
+                    TreeWychRootHeightMinimumSweep.LastReportPath)))
+            {
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Copy Wych Root Height Report"))
+                {
+                    TreeWychRootHeightMinimumSweep.CopyLastReport();
+                }
+                if (GUILayout.Button("Open Wych Root Height Folder"))
+                {
+                    TreeWychRootHeightMinimumSweep.OpenOutputFolder();
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -637,7 +701,8 @@ namespace ProgrammaticStylized3D.Trees.Editor
                     TreeControlResponseSuite.IsRunning ||
                     TreeGeometryEfficiencyAudit.IsRunning ||
                     TreeRootQualityEvaluation.IsRunning ||
-                    TreeTrunkResponseDiagnosticSuite.IsRunning))
+                    TreeTrunkResponseDiagnosticSuite.IsRunning ||
+                    TreeWychRootHeightMinimumSweep.IsRunning))
                 {
                     if (GUILayout.Button("Run Root-Frame Tournament"))
                     {
