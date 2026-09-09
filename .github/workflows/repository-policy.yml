@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - fufu
+      - stabilization
     types:
       - opened
       - synchronize
@@ -12,6 +13,7 @@ on:
   push:
     branches:
       - fufu
+      - stabilization
   workflow_dispatch:
 
 concurrency:
@@ -39,7 +41,7 @@ jobs:
 
       - name: Fetch current integration branch
         if: github.event_name == 'pull_request'
-        run: git fetch --no-tags origin fufu
+        run: git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
 
       - name: Compile policy validator
         run: python3 -m py_compile .github/scripts/validate_agent_workflow.py

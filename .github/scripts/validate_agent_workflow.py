@@ -21,8 +21,14 @@ BRANCH_RE = re.compile(
     r"(?P<slug>[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)$"
 )
 THREAD_RE = re.compile(rf"^{THREAD_PATTERN}$")
-CLAIM_MARKER = "<!-- agent-thread-claim:v1 -->"
+CLAIM_MARKER_V1 = "<!-- agent-thread-claim:v1 -->"
+CLAIM_MARKER_V2 = "<!-- agent-thread-claim:v2 -->"
 ALLOWED_STATUSES = {"ACTIVE", "INTEGRATED", "COMPLETED"}
+ALLOWED_INTEGRATION_BRANCHES = {"fufu", "stabilization"}
+INTEGRATION_RE = re.compile(
+    rf"^(?P<branch>{'|'.join(sorted(ALLOWED_INTEGRATION_BRANCHES))})@"
+    r"(?P<sha>[0-9a-f]{7,40})$"
+)
 FORBIDDEN_TRACKED_PREFIXES = (
     "Library/",
     "Temp/",
@@ -57,12 +63,18 @@ def field_from_markdown(body: str, label: str) -> str | None:
 
 
 def parse_claim(body: str, comment_id: int) -> dict[str, Any] | None:
-    if CLAIM_MARKER not in (body or ""):
+    body = body or ""
+    has_v1 = CLAIM_MARKER_V1 in body
+    has_v2 = CLAIM_MARKER_V2 in body
+    if not has_v1 and not has_v2:
         return None
+    require(
+        not (has_v1 and has_v2),
+        f"Claim comment {comment_id} contains multiple claim schema markers.",
+    )
 
     thread_id = field_from_markdown(body, "Thread-ID")
     branch = field_from_markdown(body, "Branch")
-    base = field_from_markdown(body, "Base")
     status = field_from_markdown(body, "Status")
     scope = field_from_markdown(body, "Scope")
     supersedes_raw = field_from_markdown(body, "Supersedes") or ""
@@ -72,12 +84,33 @@ def parse_claim(body: str, comment_id: int) -> dict[str, Any] | None:
         if value.strip()
     ]
 
+    if has_v2:
+        schema_version = 2
+        integration = field_from_markdown(body, "Integration")
+        integration_match = INTEGRATION_RE.fullmatch(integration or "")
+        require(
+            integration_match is not None,
+            f"Claim comment {comment_id} has an invalid Integration; expected "
+            "<allowed-integration-branch>@<commit>.",
+        )
+        integration_branch = integration_match.group("branch")
+        integration_sha = integration_match.group("sha")
+    else:
+        schema_version = 1
+        base = field_from_markdown(body, "Base")
+        base_match = re.fullmatch(r"fufu@(?P<sha>[0-9a-f]{7,40})", base or "")
+        require(
+            base_match is not None,
+            f"Claim comment {comment_id} has an invalid Base; expected fufu@<commit>.",
+        )
+        integration = base
+        integration_branch = "fufu"
+        integration_sha = base_match.group("sha")
+
     require(thread_id is not None and THREAD_RE.fullmatch(thread_id) is not None,
             f"Claim comment {comment_id} has an invalid Thread-ID.")
     require(branch is not None and BRANCH_RE.fullmatch(branch) is not None,
             f"Claim comment {comment_id} has an invalid Branch.")
-    require(base is not None and re.fullmatch(r"fufu@[0-9a-f]{7,40}", base) is not None,
-            f"Claim comment {comment_id} has an invalid Base; expected fufu@<commit>.")
     require(status is not None and status.upper() in ALLOWED_STATUSES,
             f"Claim comment {comment_id} has an invalid Status.")
     require(scope is not None and bool(scope.strip()),
@@ -88,9 +121,12 @@ def parse_claim(body: str, comment_id: int) -> dict[str, Any] | None:
 
     return {
         "comment_id": comment_id,
+        "schema_version": schema_version,
         "thread_id": thread_id,
         "branch": branch,
-        "base": base,
+        "integration": integration,
+        "integration_branch": integration_branch,
+        "integration_sha": integration_sha,
         "status": status.upper(),
         "scope": scope,
         "supersedes": supersedes,
@@ -254,9 +290,14 @@ def validate_repository_invariants(repo_root: Path) -> None:
     )
 
 
-def validate_branch_freshness(repo_root: Path) -> None:
+def validate_branch_freshness(repo_root: Path, integration_branch: str) -> None:
+    require(
+        integration_branch in ALLOWED_INTEGRATION_BRANCHES,
+        f"Unsupported integration branch {integration_branch!r}.",
+    )
+    integration_ref = f"origin/{integration_branch}"
     result = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", "origin/fufu", "HEAD"],
+        ["git", "merge-base", "--is-ancestor", integration_ref, "HEAD"],
         cwd=repo_root,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -264,15 +305,26 @@ def validate_branch_freshness(repo_root: Path) -> None:
     )
     require(
         result.returncode == 0,
-        "PR branch does not contain the latest fetched origin/fufu. Reconcile with fufu and rerun CI.",
+        f"PR branch does not contain the latest fetched {integration_ref}. "
+        f"Reconcile with {integration_branch} and rerun CI.",
     )
+
+
+def validate_claim_target(base_ref: str | None, claim: dict[str, Any]) -> str:
+    integration_branch = claim["integration_branch"]
+    require(
+        base_ref == integration_branch,
+        f"PR target {base_ref!r} does not match ACTIVE claim integration branch "
+        f"{integration_branch!r}.",
+    )
+    return integration_branch
 
 
 def validate_pull_request(
     event: dict[str, Any],
     repo: str,
     token: str,
-) -> None:
+) -> str:
     pr = event.get("pull_request")
     require(isinstance(pr, dict), "pull_request event payload is missing pull_request data.")
 
@@ -281,7 +333,6 @@ def validate_pull_request(
     head_repo = pr.get("head", {}).get("repo", {}).get("full_name")
     body = pr.get("body") or ""
 
-    require(base_ref == "fufu", f"Agent implementation PRs must target fufu, not {base_ref!r}.")
     require(head_repo == repo, "Agent implementation PR branches must live in the canonical repository, not a fork.")
     require(isinstance(head_ref, str), "PR head branch is missing.")
 
@@ -331,7 +382,17 @@ def validate_pull_request(
     require(claim["branch"] == head_ref,
             f"ACTIVE claim branch {claim['branch']!r} does not match PR branch {head_ref!r}.")
 
+    integration_branch = validate_claim_target(base_ref, claim)
     validate_thread_exclusivity(repo, token, branch_issue, branch_thread)
+    return integration_branch
+
+
+def expect_policy_failure(action: Any, message: str) -> None:
+    try:
+        action()
+    except PolicyFailure:
+        return
+    raise PolicyFailure(message)
 
 
 def run_self_test() -> None:
@@ -340,40 +401,74 @@ def run_self_test() -> None:
     sample_body = "Issue: #37\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + sample_branch
     require(field_from_markdown(sample_body, "Issue") == "#37", "Self-test PR metadata failed.")
 
-    first = parse_claim(
-        CLAIM_MARKER + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + sample_branch +
-        "\nBase: fufu@1234567\nStatus: ACTIVE\nScope: Bootstrap policy.",
+    legacy = parse_claim(
+        CLAIM_MARKER_V1 + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + sample_branch +
+        "\nBase: fufu@1234567\nStatus: ACTIVE\nScope: Legacy policy.",
         1,
     )
-    second_branch = "issue-37/t-20260906-0915-b3d91e-agent-workflow"
-    second = parse_claim(
-        CLAIM_MARKER + "\nThread-ID: t-20260906-0915-b3d91e\nBranch: " + second_branch +
-        "\nBase: fufu@89abcde\nStatus: ACTIVE\nScope: Authorized takeover.\nSupersedes: t-20260905-2230-a7c4f2",
+    require(legacy is not None, "Self-test v1 claim parsing failed.")
+    require(
+        legacy["schema_version"] == 1 and legacy["integration_branch"] == "fufu",
+        "Self-test v1 integration compatibility failed.",
+    )
+
+    migrated = parse_claim(
+        CLAIM_MARKER_V2 + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + sample_branch +
+        "\nIntegration: stabilization@89abcde\nStatus: ACTIVE\nScope: Migration policy.",
         2,
     )
-    require(first is not None and second is not None, "Self-test claim parsing failed.")
-    active = resolve_active_claims([first, second])
+    require(migrated is not None, "Self-test v2 claim parsing failed.")
+    require(
+        migrated["schema_version"] == 2
+        and migrated["integration_branch"] == "stabilization"
+        and migrated["integration_sha"] == "89abcde",
+        "Self-test v2 integration parsing failed.",
+    )
+
+    active = resolve_active_claims([legacy, migrated])
+    require(
+        len(active) == 1 and active[0]["schema_version"] == 2,
+        "Self-test latest same-thread claim resolution failed.",
+    )
+    require(
+        validate_claim_target("stabilization", migrated) == "stabilization",
+        "Self-test v2 PR target match failed.",
+    )
+    expect_policy_failure(
+        lambda: validate_claim_target("fufu", migrated),
+        "Self-test mismatched integration target was not rejected.",
+    )
+
+    second_branch = "issue-37/t-20260906-0915-b3d91e-agent-workflow"
+    second = parse_claim(
+        CLAIM_MARKER_V2 + "\nThread-ID: t-20260906-0915-b3d91e\nBranch: " + second_branch +
+        "\nIntegration: stabilization@89abcde\nStatus: ACTIVE\nScope: Authorized takeover."
+        "\nSupersedes: t-20260905-2230-a7c4f2",
+        3,
+    )
+    require(second is not None, "Self-test v2 takeover claim parsing failed.")
+    active = resolve_active_claims([legacy, migrated, second])
     require(len(active) == 1 and active[0]["thread_id"] == "t-20260906-0915-b3d91e",
             "Self-test claim supersession failed.")
 
     duplicate_branch = "issue-38/t-20260905-2230-a7c4f2-second-task"
     duplicate = parse_claim(
-        CLAIM_MARKER + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + duplicate_branch +
+        CLAIM_MARKER_V1 + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + duplicate_branch +
         "\nBase: fufu@1234567\nStatus: ACTIVE\nScope: Conflicting active task.",
-        3,
+        4,
     )
     completed_branch = "issue-39/t-20260905-2230-a7c4f2-finished-task"
     completed = parse_claim(
-        CLAIM_MARKER + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + completed_branch +
+        CLAIM_MARKER_V1 + "\nThread-ID: t-20260905-2230-a7c4f2\nBranch: " + completed_branch +
         "\nBase: fufu@1234567\nStatus: COMPLETED\nScope: Historical finished task.",
-        4,
+        5,
     )
     takeover_branch = "issue-38/t-20260906-1015-c4e82d-second-task"
     takeover = parse_claim(
-        CLAIM_MARKER + "\nThread-ID: t-20260906-1015-c4e82d\nBranch: " + takeover_branch +
-        "\nBase: fufu@89abcde\nStatus: ACTIVE\nScope: Authorized replacement."
+        CLAIM_MARKER_V2 + "\nThread-ID: t-20260906-1015-c4e82d\nBranch: " + takeover_branch +
+        "\nIntegration: stabilization@89abcde\nStatus: ACTIVE\nScope: Authorized replacement."
         "\nSupersedes: t-20260905-2230-a7c4f2",
-        5,
+        6,
     )
     require(
         duplicate is not None and completed is not None and takeover is not None,
@@ -422,9 +517,12 @@ def main() -> int:
         if event_name == "pull_request":
             token = os.environ.get("GITHUB_TOKEN", "")
             require(bool(token), "GITHUB_TOKEN is required for pull_request policy validation.")
-            validate_pull_request(event, args.repo, token)
-            validate_branch_freshness(repo_root)
-            print("Agent PR identity, thread exclusivity, and branch freshness: PASS")
+            integration_branch = validate_pull_request(event, args.repo, token)
+            validate_branch_freshness(repo_root, integration_branch)
+            print(
+                "Agent PR identity, thread exclusivity, integration target, and "
+                "branch freshness: PASS"
+            )
         else:
             print(f"Repository invariants: PASS ({event_name or 'manual event'})")
         return 0
